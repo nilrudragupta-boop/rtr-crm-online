@@ -780,17 +780,36 @@
                         imapPort: document.getElementById('imapPort') ? document.getElementById('imapPort').value : ''
                     };
 
-                    const result = await window.electronAPI.saveAdminCreds(data);
-                    if (result.success) {
+                    if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+                        const result = await window.electronAPI.saveAdminCreds(data);
+                        if (result.success) {
+                            alert("Security credentials updated successfully!");
+                            // Clear sensitive fields
+                            document.getElementById('devId').value = '';
+                            document.getElementById('adminPass').value = '';
+                            document.getElementById('adminEmailPass').value = '';
+
+                            triggerBackgroundSync();
+                        } else {
+                            alert("Failed: " + result.message);
+                        }
+                    } else {
+                        // Web Browser Fallback
+                        if (devId !== "NANCY@20129830428736") {
+                            alert("Failed: Invalid Developer ID.");
+                            return;
+                        }
+                        localStorage.setItem('adminUser', data.adminUser);
+                        if (data.adminPass) localStorage.setItem('adminPass', data.adminPass);
+                        localStorage.setItem('adminEmail', data.adminEmail);
+                        if (data.adminEmailPass) localStorage.setItem('adminEmailPass', data.adminEmailPass);
+                        localStorage.setItem('ADMIN_USERS', JSON.stringify(data.adminUsers));
+                        
                         alert("Security credentials updated successfully!");
-                        // Clear sensitive fields
                         document.getElementById('devId').value = '';
                         document.getElementById('adminPass').value = '';
                         document.getElementById('adminEmailPass').value = '';
-
                         triggerBackgroundSync();
-                    } else {
-                        alert("Failed: " + result.message);
                     }
                 }
 
