@@ -688,7 +688,7 @@
                 const res = await window.electronAPI.getAppSettings();
                 if (res.success) scriptUrl = res.updateServerUrl || res.googleScriptUrl || res.cloudBackupUrl || "";
             }
-            if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || GOOGLE_SCRIPT_URL;
+            if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
 
             if (!scriptUrl || !scriptUrl.startsWith("http")) {
                 showToast("System Error: Google Script URL is not configured.", "#dc3545");
@@ -938,7 +938,7 @@
             
             // 1. Try fetching from MongoDB first
             try {
-                const res = await fetch('http://localhost:5000/api/settings');
+                const res = await fetch('/api/settings');
                 const apiData = await res.json();
                 if (apiData.success && apiData.data) {
                     scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
@@ -956,7 +956,7 @@
                     if (!contactNumber) contactNumber = res.contactNumber || "";
                 }
             }
-            if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || GOOGLE_SCRIPT_URL;
+            if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
             if (!contactNumber) contactNumber = localStorage.getItem('contactNumber') || "";
 
             if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -974,6 +974,8 @@
                             ADMIN_USERS = data.config.users;
                             if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                                 window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
+                            } else {
+                                localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
                             }
                         }
 
@@ -995,8 +997,12 @@
                             if (lowerC.district) appSettingsUpdates.district = lowerC.district;
                             if (lowerC.currency) appSettingsUpdates.currency = lowerC.currency;
 
-                            if (Object.keys(appSettingsUpdates).length > 0 && window.electronAPI && window.electronAPI.saveAppSettings) {
-                                window.electronAPI.saveAppSettings(appSettingsUpdates).catch(console.error);
+                            if (Object.keys(appSettingsUpdates).length > 0) {
+                                if (window.electronAPI && window.electronAPI.saveAppSettings) {
+                                    window.electronAPI.saveAppSettings(appSettingsUpdates).catch(console.error);
+                                } else {
+                                    Object.keys(appSettingsUpdates).forEach(k => localStorage.setItem(k, appSettingsUpdates[k]));
+                                }
                                 const brandElements = document.querySelectorAll('[data-brand="name"]');
                                 brandElements.forEach(el => { if (appSettingsUpdates.companyName) el.innerText = appSettingsUpdates.companyName; });
                             }
@@ -1389,13 +1395,13 @@
                     // Browser Fallback via MongoDB -> Google Apps Script
                     let scriptUrl = "";
                     try {
-                        const dbRes = await fetch('http://localhost:5000/api/settings');
+                        const dbRes = await fetch('/api/settings');
                         const apiData = await dbRes.json();
                         if (apiData.success && apiData.data) {
                             scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
                         }
                     } catch (e) {}
-                if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || GOOGLE_SCRIPT_URL;
+                if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
 
                     if (scriptUrl && scriptUrl.startsWith("http")) {
                         const tempOtp = Math.floor(100000 + Math.random() * 900000).toString();
