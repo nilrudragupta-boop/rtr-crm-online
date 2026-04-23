@@ -1561,13 +1561,13 @@
         // 🔸 Load items from local storage
         function loadItems() {
             apiClient.getItems().then(items => {
-            const list = document.getElementById("itemList");
-            list.innerHTML = "";
-            items.forEach(i => {
-                const opt = document.createElement("option");
-                opt.value = i.name;
-                list.appendChild(opt);
-            });
+                const list = document.getElementById("itemList");
+                list.innerHTML = "";
+                items.forEach(i => {
+                    const opt = document.createElement("option");
+                    opt.value = i.name;
+                    list.appendChild(opt);
+                });
             });
         }
 
@@ -2148,7 +2148,7 @@
             };
 
             const invoices = await apiClient.getInvoices();
-            
+
             const existingInvIndex = invoices.findIndex(inv => inv.invoice_no === invoice_no);
             if (existingInvIndex > -1) {
                 askConfirm("Overwrite Invoice?", "Invoice number exists. Overwrite?", () => {
@@ -2159,18 +2159,18 @@
                     if (existing.createdDate) audit.createdDate = existing.createdDate;
 
                     invoices[existingInvIndex] = { ...payload, ...audit };
-                finalizeSave(invoices[existingInvIndex]);
+                    finalizeSave(invoices[existingInvIndex]);
                 });
             } else {
                 const audit = AuditManager.getAuditTrail(false);
                 invoices.push({ ...payload, ...audit });
-            finalizeSave({ ...payload, ...audit });
+                finalizeSave({ ...payload, ...audit });
             }
         }
 
         async function finalizeSave(invoiceData) {
             const result = await apiClient.saveInvoice(invoiceData);
-            if(result.success) {
+            if (result.success) {
                 openSaveSuccessModal();
                 await loadLastInvoiceNo();
                 loadCustomers();
@@ -3025,6 +3025,9 @@
             document.getElementById("invoiceDate").valueAsDate = new Date();
             loadLastInvoiceNo();
 
+            // Apply brand details on initial load
+            if (window.BrandService) window.BrandService.applyBrand();
+
 
             // Load Brand Details from Persistent Storage
             if (window.electronAPI && window.electronAPI.getAppSettings) {
@@ -3725,49 +3728,49 @@
                 { label: "Office Copy", suffix: "_office" }
             ];
             for (const copy of copies) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
 
-            // Load invoice table column visibility settings
-            let invColVis = JSON.parse(localStorage.getItem("invoiceColumnVisibility"));
-            if (!invColVis || invColVis.length !== 18) {
-                invColVis = new Array(18).fill(true);
-                [3, 4, 5, 6, 7].forEach(i => invColVis[i] = false);
-            }
-
-            // Company Info
-            let companyName = "RISE Tech Revolution"; // Default
-            let addressLine1 = "";
-            let addressLine2 = "";
-            let companyGstin = "";
-            let companyEmail = "";
-            let contactNumber = "";
-            let district = localStorage.getItem('district') || "";
-            let state = localStorage.getItem('sellerState') || "";
-
-            if (typeof APP_SETTINGS !== 'undefined') {
-                companyName = APP_SETTINGS.COMPANY_NAME || companyName;
-                addressLine1 = APP_SETTINGS.ADDRESS_LINE_1 || addressLine1;
-                addressLine2 = APP_SETTINGS.ADDRESS_LINE_2 || addressLine2;
-                contactNumber = APP_SETTINGS.CONTACT_NUMBER ? `Mo: ${APP_SETTINGS.CONTACT_NUMBER}` : contactNumber;
-                companyGstin = APP_SETTINGS.COMPANY_GSTIN || companyGstin;
-                companyEmail = APP_SETTINGS.COMPANY_EMAIL || companyEmail;
-                district = district || APP_SETTINGS.DISTRICT || "";
-                state = state || APP_SETTINGS.SELLER_STATE || "";
-            }
-
-            if (window.electronAPI && window.electronAPI.getAppSettings) {
-                const res = await window.electronAPI.getAppSettings();
-                if (res.success) {
-                    companyName = res.companyName || companyName;
-                    addressLine1 = res.addressLine1 || addressLine1;
-                    addressLine2 = res.addressLine2 || addressLine2;
-                    contactNumber = res.contactNumber ? `Mo: ${res.contactNumber}` : contactNumber;
-                    companyGstin = res.companyGstin || companyGstin;
-                    companyEmail = res.companyEmail || companyEmail;
-                    district = res.district || district;
-                    state = res.sellerState || state;
+                // Load invoice table column visibility settings
+                let invColVis = JSON.parse(localStorage.getItem("invoiceColumnVisibility"));
+                if (!invColVis || invColVis.length !== 18) {
+                    invColVis = new Array(18).fill(true);
+                    [3, 4, 5, 6, 7].forEach(i => invColVis[i] = false);
                 }
+
+                // Company Info
+                let companyName = "RISE Tech Revolution"; // Default
+                let addressLine1 = "";
+                let addressLine2 = "";
+                let companyGstin = "";
+                let companyEmail = "";
+                let contactNumber = "";
+                let district = localStorage.getItem('district') || "";
+                let state = localStorage.getItem('sellerState') || "";
+
+                if (typeof APP_SETTINGS !== 'undefined') {
+                    companyName = APP_SETTINGS.COMPANY_NAME || companyName;
+                    addressLine1 = APP_SETTINGS.ADDRESS_LINE_1 || addressLine1;
+                    addressLine2 = APP_SETTINGS.ADDRESS_LINE_2 || addressLine2;
+                    contactNumber = APP_SETTINGS.CONTACT_NUMBER ? `Mo: ${APP_SETTINGS.CONTACT_NUMBER}` : contactNumber;
+                    companyGstin = APP_SETTINGS.COMPANY_GSTIN || companyGstin;
+                    companyEmail = APP_SETTINGS.COMPANY_EMAIL || companyEmail;
+                    district = district || APP_SETTINGS.DISTRICT || "";
+                    state = state || APP_SETTINGS.SELLER_STATE || "";
+                }
+
+                if (window.electronAPI && window.electronAPI.getAppSettings) {
+                    const res = await window.electronAPI.getAppSettings();
+                    if (res.success) {
+                        companyName = res.companyName || companyName;
+                        addressLine1 = res.addressLine1 || addressLine1;
+                        addressLine2 = res.addressLine2 || addressLine2;
+                        contactNumber = res.contactNumber ? `Mo: ${res.contactNumber}` : contactNumber;
+                        companyGstin = res.companyGstin || companyGstin;
+                        companyEmail = res.companyEmail || companyEmail;
+                        district = res.district || district;
+                        state = res.sellerState || state;
+                    }
                 } else {
                     companyName = localStorage.getItem('companyName') || companyName;
                     addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
@@ -3777,245 +3780,245 @@
                     companyEmail = localStorage.getItem('companyEmail') || companyEmail;
                     district = localStorage.getItem('district') || district;
                     state = localStorage.getItem('sellerState') || state;
-            }
+                }
 
-            // Layout Constants
-            const startX = 10;
-            const startY = 10;
-            const width = 190;
-            const pageHeight = 297;
-            const bottomMargin = 20;
+                // Layout Constants
+                const startX = 10;
+                const startY = 10;
+                const width = 190;
+                const pageHeight = 297;
+                const bottomMargin = 20;
 
-            // Add Company Logo if available
-            const logoImg = document.getElementById('invoiceLogo');
-            if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
-                try {
-                    doc.addImage(logoImg, 'PNG', 14, 5, 25, 25);
-                } catch (e) { console.warn("Error adding logo to PDF:", e); }
-            }
+                // Add Company Logo if available
+                const logoImg = document.getElementById('invoiceLogo');
+                if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
+                    try {
+                        doc.addImage(logoImg, 'PNG', 14, 5, 25, 25);
+                    } catch (e) { console.warn("Error adding logo to PDF:", e); }
+                }
 
-            // --- Header Section ---
-            doc.setFontSize(14);
-            doc.setFont("helvetica", "bold");
-            doc.text("TAX INVOICE", 105, 18, { align: "center" });
-
-            doc.setFontSize(10);
-            doc.text(copy.label, startX + width, startY - 2, { align: "right" });
-
-            doc.setLineWidth(0.1);
-            doc.rect(startX, startY + 10, width, 45); // Header Box
-
-            // Left: Company Details
-            doc.setFontSize(12);
-            doc.text(companyName, startX + 2, startY + 16);
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "normal");
-
-            let compY = startY + 21;
-            if (addressLine1) {
-                doc.text(addressLine1, startX + 2, compY);
-                compY += 4;
-            }
-
-            let addr2 = addressLine2;
-            let distStateParts = [];
-            if (district) distStateParts.push(`Dist: ${district}`);
-            if (state) distStateParts.push(`State: ${state}`);
-            let distState = distStateParts.join(", ");
-            if (addr2 && distState) addr2 += ", " + distState;
-            else if (!addr2 && distState) addr2 = distState;
-
-            if (addr2) {
-                doc.text(addr2, startX + 2, compY);
-                compY += 5;
-            }
-            if (companyGstin) {
-                doc.text(`GSTIN/UIN: ${companyGstin}`, startX + 2, compY);
-                compY += 4;
-            }
-
-            let contactStr = [];
-            if (contactNumber) contactStr.push(contactNumber);
-            if (companyEmail) contactStr.push(`E-Mail: ${companyEmail}`);
-            if (contactStr.length > 0) {
-                doc.text(contactStr.join(" | "), startX + 2, compY);
-            }
-
-            // Right: Invoice Details (Split by vertical line)
-            doc.line(startX + 95, startY + 10, startX + 95, startY + 55);
-
-            // Right Sub-grid
-            doc.line(startX + 95, startY + 25, startX + 190, startY + 25);
-            doc.line(startX + 95, startY + 40, startX + 190, startY + 40);
-
-            // Row 1
-            doc.text("Invoice No.", startX + 97, startY + 14);
-            doc.setFont("helvetica", "bold");
-            doc.text(invoice.invoice_no || "", startX + 97, startY + 19);
-            doc.setFont("helvetica", "normal");
-
-            doc.text("Dated", startX + 145, startY + 14);
-            doc.setFont("helvetica", "bold");
-
-            let dateDisplay = invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-GB') : "";
-            if (showTimestamp && invoice.invoice_time) {
-                const [h, m] = invoice.invoice_time.split(':');
-                const timeObj = new Date();
-                timeObj.setHours(h); timeObj.setMinutes(m);
-                const timeStr = timeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                dateDisplay += " " + timeStr;
-            }
-            doc.text(dateDisplay, startX + 145, startY + 19);
-            doc.setFont("helvetica", "normal");
-
-            // Row 2
-            doc.text("Delivery Note", startX + 97, startY + 29);
-            doc.text(invoice.deliveryChallanNo || "", startX + 97, startY + 34);
-
-            doc.text("Mode/Terms of Payment", startX + 145, startY + 29);
-
-            // Row 3
-            doc.text("Buyer's Order No.", startX + 97, startY + 44);
-            doc.text(invoice.buyersOrderNo || "", startX + 97, startY + 49);
-
-            doc.text("Dated", startX + 145, startY + 44);
-            doc.text(invoice.buyersOrderDate ? new Date(invoice.buyersOrderDate).toLocaleDateString('en-GB') : "", startX + 145, startY + 49);
-
-            // --- Buyer & Consignee Section ---
-            const buyerY = startY + 55;
-            doc.rect(startX, buyerY, width, 35);
-            doc.line(startX + 95, buyerY, startX + 95, buyerY + 35); // Vertical Split
-
-            // Consignee (Ship To) - Left
-            doc.text("Consignee (Ship to)", startX + 2, buyerY + 5);
-            doc.setFont("helvetica", "bold");
-            doc.text(invoice.shipName || invoice.customer_name || "", startX + 2, buyerY + 10);
-            doc.setFont("helvetica", "normal");
-            let sAddr = invoice.shipAddress || invoice.address || "";
-            let sLoc = [];
-            if (invoice.shipDistrict || invoice.district) sLoc.push(invoice.shipDistrict || invoice.district);
-            if (invoice.shipState || invoice.state) sLoc.push(invoice.shipState || invoice.state);
-            if (invoice.shipPin || invoice.pin) sLoc.push("PIN: " + (invoice.shipPin || invoice.pin));
-            if (sLoc.length > 0) sAddr += "\n" + sLoc.join(", ");
-            if (invoice.shipContact || invoice.contact) sAddr += "\nPh: " + (invoice.shipContact || invoice.contact);
-
-            const shipAddrLines = doc.splitTextToSize(sAddr, 90);
-            doc.text(shipAddrLines, startX + 2, buyerY + 15);
-
-            const sGst = invoice.shipGST || invoice.gst_no;
-            if (sGst) doc.text(`GSTIN/UIN: ${sGst}`, startX + 2, buyerY + 32);
-
-
-            // Buyer (Bill To) - Right
-            doc.text("Buyer (Bill to)", startX + 97, buyerY + 5);
-            doc.setFont("helvetica", "bold");
-            doc.text(invoice.customer_name || "", startX + 97, buyerY + 10);
-            doc.setFont("helvetica", "normal");
-            let bAddr = invoice.address || "";
-            let bLoc = [];
-            if (invoice.district) bLoc.push(invoice.district);
-            if (invoice.state) bLoc.push(invoice.state);
-            if (invoice.pin) bLoc.push("PIN: " + invoice.pin);
-            if (bLoc.length > 0) bAddr += "\n" + bLoc.join(", ");
-            if (invoice.contact) bAddr += "\nPh: " + invoice.contact;
-
-            const billAddrLines = doc.splitTextToSize(bAddr, 90);
-            doc.text(billAddrLines, startX + 97, buyerY + 15);
-
-            const bGst = invoice.gst_no;
-            if (bGst) doc.text(`GSTIN/UIN: ${bGst}`, startX + 97, buyerY + 32);
-
-
-            // --- Item Table ---
-            const tableY = buyerY + 35;
-
-            const tableBody = invoice.items.map((item, i) => [
-                i + 1,
-                item.item + (item.subDetails ? "\n" + item.subDetails : ""),
-                item.hsn || "",
-                item.qty + " " + (item.uom || ""),
-                parseFloat(item.price).toFixed(2),
-                item.disc > 0 ? item.disc : "",
-                parseFloat(item.total).toFixed(2)
-            ]);
-
-            doc.autoTable({
-                startY: tableY,
-                head: [['Sl', 'Description of Goods', 'HSN/SAC', 'Quantity', 'Rate', 'Disc', 'Amount']],
-                body: tableBody,
-                theme: 'plain',
-                styles: { fontSize: 9, cellPadding: 2, lineColor: 0, lineWidth: 0.1 },
-                headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', halign: 'center' },
-                columnStyles: {
-                    0: { halign: 'center', cellWidth: 10 },
-                    1: { cellWidth: 'auto' },
-                    2: { halign: 'center', cellWidth: 25 },
-                    3: { halign: 'right', cellWidth: 25 },
-                    4: { halign: 'right', cellWidth: 25 },
-                    5: { halign: 'right', cellWidth: 15 },
-                    6: { halign: 'right', cellWidth: 30 }
-                },
-                margin: { left: startX, right: 10 },
-                tableWidth: width
-            });
-
-            // --- Footer ---
-            let finalY = doc.lastAutoTable.finalY;
-
-            doc.setFontSize(9);
-
-            // Round Off
-            if (invoice.roundOffAmount && parseFloat(invoice.roundOffAmount) !== 0) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Round Off", startX + 120, finalY + 5);
-                doc.text(parseFloat(invoice.roundOffAmount).toFixed(2), 198, finalY + 5, { align: "right" });
-                finalY += 5;
-            }
-
-            // Total
-            doc.setFont("helvetica", "bold");
-            doc.text("Total", startX + 120, finalY + 5);
-            doc.text(parseFloat(invoice.invoice_total).toFixed(2), 198, finalY + 5, { align: "right" });
-
-            doc.line(startX, finalY, startX + width, finalY); // Top line of footer
-            doc.line(startX, finalY + 7, startX + width, finalY + 7); // Bottom line of total
-
-            const savedChargeName = localStorage.getItem("invoiceCustomChargeName");
-            if (savedChargeName && document.getElementById("customChargeName")) {
-                document.getElementById("customChargeName").value = savedChargeName;
-            }
-
-            // Amount in Words
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(9);
-            doc.text("Amount Chargeable (in words):", startX + 2, finalY + 12);
-            doc.setFont("helvetica", "bold");
-            const amtWords = convertNumberToWords(invoice.invoice_total);
-            doc.text(amtWords, startX + 2, finalY + 17);
-
-            // Bank Details
-            if (bankText) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Bank Details:", startX + 100, finalY + 25);
+                // --- Header Section ---
+                doc.setFontSize(14);
                 doc.setFont("helvetica", "bold");
-                const splitBank = doc.splitTextToSize(bankText, 80);
-                doc.text(splitBank, startX + 100, finalY + 30);
-            }
+                doc.text("TAX INVOICE", 105, 18, { align: "center" });
 
-            // Signature
-            const sigY = finalY + 50;
-            doc.text(`For ${companyName}`, 195, sigY, { align: "right" });
-            doc.text("Authorized Signatory", 195, sigY + 15, { align: "right" });
+                doc.setFontSize(10);
+                doc.text(copy.label, startX + width, startY - 2, { align: "right" });
 
-            if (copy.label === "Office Copy") {
-                doc.text("Receiver's Signature", startX + 2, sigY + 15, { align: "left" });
-            }
+                doc.setLineWidth(0.1);
+                doc.rect(startX, startY + 10, width, 45); // Header Box
 
-            // Border for the whole page content (redraw to cover table area)
-            doc.rect(startX, startY, width, sigY + 20 - startY);
+                // Left: Company Details
+                doc.setFontSize(12);
+                doc.text(companyName, startX + 2, startY + 16);
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "normal");
 
-            const custNameForFile = (invoice.customer_name || invoice.customerName || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-            doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                let compY = startY + 21;
+                if (addressLine1) {
+                    doc.text(addressLine1, startX + 2, compY);
+                    compY += 4;
+                }
+
+                let addr2 = addressLine2;
+                let distStateParts = [];
+                if (district) distStateParts.push(`Dist: ${district}`);
+                if (state) distStateParts.push(`State: ${state}`);
+                let distState = distStateParts.join(", ");
+                if (addr2 && distState) addr2 += ", " + distState;
+                else if (!addr2 && distState) addr2 = distState;
+
+                if (addr2) {
+                    doc.text(addr2, startX + 2, compY);
+                    compY += 5;
+                }
+                if (companyGstin) {
+                    doc.text(`GSTIN/UIN: ${companyGstin}`, startX + 2, compY);
+                    compY += 4;
+                }
+
+                let contactStr = [];
+                if (contactNumber) contactStr.push(contactNumber);
+                if (companyEmail) contactStr.push(`E-Mail: ${companyEmail}`);
+                if (contactStr.length > 0) {
+                    doc.text(contactStr.join(" | "), startX + 2, compY);
+                }
+
+                // Right: Invoice Details (Split by vertical line)
+                doc.line(startX + 95, startY + 10, startX + 95, startY + 55);
+
+                // Right Sub-grid
+                doc.line(startX + 95, startY + 25, startX + 190, startY + 25);
+                doc.line(startX + 95, startY + 40, startX + 190, startY + 40);
+
+                // Row 1
+                doc.text("Invoice No.", startX + 97, startY + 14);
+                doc.setFont("helvetica", "bold");
+                doc.text(invoice.invoice_no || "", startX + 97, startY + 19);
+                doc.setFont("helvetica", "normal");
+
+                doc.text("Dated", startX + 145, startY + 14);
+                doc.setFont("helvetica", "bold");
+
+                let dateDisplay = invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-GB') : "";
+                if (showTimestamp && invoice.invoice_time) {
+                    const [h, m] = invoice.invoice_time.split(':');
+                    const timeObj = new Date();
+                    timeObj.setHours(h); timeObj.setMinutes(m);
+                    const timeStr = timeObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    dateDisplay += " " + timeStr;
+                }
+                doc.text(dateDisplay, startX + 145, startY + 19);
+                doc.setFont("helvetica", "normal");
+
+                // Row 2
+                doc.text("Delivery Note", startX + 97, startY + 29);
+                doc.text(invoice.deliveryChallanNo || "", startX + 97, startY + 34);
+
+                doc.text("Mode/Terms of Payment", startX + 145, startY + 29);
+
+                // Row 3
+                doc.text("Buyer's Order No.", startX + 97, startY + 44);
+                doc.text(invoice.buyersOrderNo || "", startX + 97, startY + 49);
+
+                doc.text("Dated", startX + 145, startY + 44);
+                doc.text(invoice.buyersOrderDate ? new Date(invoice.buyersOrderDate).toLocaleDateString('en-GB') : "", startX + 145, startY + 49);
+
+                // --- Buyer & Consignee Section ---
+                const buyerY = startY + 55;
+                doc.rect(startX, buyerY, width, 35);
+                doc.line(startX + 95, buyerY, startX + 95, buyerY + 35); // Vertical Split
+
+                // Consignee (Ship To) - Left
+                doc.text("Consignee (Ship to)", startX + 2, buyerY + 5);
+                doc.setFont("helvetica", "bold");
+                doc.text(invoice.shipName || invoice.customer_name || "", startX + 2, buyerY + 10);
+                doc.setFont("helvetica", "normal");
+                let sAddr = invoice.shipAddress || invoice.address || "";
+                let sLoc = [];
+                if (invoice.shipDistrict || invoice.district) sLoc.push(invoice.shipDistrict || invoice.district);
+                if (invoice.shipState || invoice.state) sLoc.push(invoice.shipState || invoice.state);
+                if (invoice.shipPin || invoice.pin) sLoc.push("PIN: " + (invoice.shipPin || invoice.pin));
+                if (sLoc.length > 0) sAddr += "\n" + sLoc.join(", ");
+                if (invoice.shipContact || invoice.contact) sAddr += "\nPh: " + (invoice.shipContact || invoice.contact);
+
+                const shipAddrLines = doc.splitTextToSize(sAddr, 90);
+                doc.text(shipAddrLines, startX + 2, buyerY + 15);
+
+                const sGst = invoice.shipGST || invoice.gst_no;
+                if (sGst) doc.text(`GSTIN/UIN: ${sGst}`, startX + 2, buyerY + 32);
+
+
+                // Buyer (Bill To) - Right
+                doc.text("Buyer (Bill to)", startX + 97, buyerY + 5);
+                doc.setFont("helvetica", "bold");
+                doc.text(invoice.customer_name || "", startX + 97, buyerY + 10);
+                doc.setFont("helvetica", "normal");
+                let bAddr = invoice.address || "";
+                let bLoc = [];
+                if (invoice.district) bLoc.push(invoice.district);
+                if (invoice.state) bLoc.push(invoice.state);
+                if (invoice.pin) bLoc.push("PIN: " + invoice.pin);
+                if (bLoc.length > 0) bAddr += "\n" + bLoc.join(", ");
+                if (invoice.contact) bAddr += "\nPh: " + invoice.contact;
+
+                const billAddrLines = doc.splitTextToSize(bAddr, 90);
+                doc.text(billAddrLines, startX + 97, buyerY + 15);
+
+                const bGst = invoice.gst_no;
+                if (bGst) doc.text(`GSTIN/UIN: ${bGst}`, startX + 97, buyerY + 32);
+
+
+                // --- Item Table ---
+                const tableY = buyerY + 35;
+
+                const tableBody = invoice.items.map((item, i) => [
+                    i + 1,
+                    item.item + (item.subDetails ? "\n" + item.subDetails : ""),
+                    item.hsn || "",
+                    item.qty + " " + (item.uom || ""),
+                    parseFloat(item.price).toFixed(2),
+                    item.disc > 0 ? item.disc : "",
+                    parseFloat(item.total).toFixed(2)
+                ]);
+
+                doc.autoTable({
+                    startY: tableY,
+                    head: [['Sl', 'Description of Goods', 'HSN/SAC', 'Quantity', 'Rate', 'Disc', 'Amount']],
+                    body: tableBody,
+                    theme: 'plain',
+                    styles: { fontSize: 9, cellPadding: 2, lineColor: 0, lineWidth: 0.1 },
+                    headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', halign: 'center' },
+                    columnStyles: {
+                        0: { halign: 'center', cellWidth: 10 },
+                        1: { cellWidth: 'auto' },
+                        2: { halign: 'center', cellWidth: 25 },
+                        3: { halign: 'right', cellWidth: 25 },
+                        4: { halign: 'right', cellWidth: 25 },
+                        5: { halign: 'right', cellWidth: 15 },
+                        6: { halign: 'right', cellWidth: 30 }
+                    },
+                    margin: { left: startX, right: 10 },
+                    tableWidth: width
+                });
+
+                // --- Footer ---
+                let finalY = doc.lastAutoTable.finalY;
+
+                doc.setFontSize(9);
+
+                // Round Off
+                if (invoice.roundOffAmount && parseFloat(invoice.roundOffAmount) !== 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Round Off", startX + 120, finalY + 5);
+                    doc.text(parseFloat(invoice.roundOffAmount).toFixed(2), 198, finalY + 5, { align: "right" });
+                    finalY += 5;
+                }
+
+                // Total
+                doc.setFont("helvetica", "bold");
+                doc.text("Total", startX + 120, finalY + 5);
+                doc.text(parseFloat(invoice.invoice_total).toFixed(2), 198, finalY + 5, { align: "right" });
+
+                doc.line(startX, finalY, startX + width, finalY); // Top line of footer
+                doc.line(startX, finalY + 7, startX + width, finalY + 7); // Bottom line of total
+
+                const savedChargeName = localStorage.getItem("invoiceCustomChargeName");
+                if (savedChargeName && document.getElementById("customChargeName")) {
+                    document.getElementById("customChargeName").value = savedChargeName;
+                }
+
+                // Amount in Words
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
+                doc.text("Amount Chargeable (in words):", startX + 2, finalY + 12);
+                doc.setFont("helvetica", "bold");
+                const amtWords = convertNumberToWords(invoice.invoice_total);
+                doc.text(amtWords, startX + 2, finalY + 17);
+
+                // Bank Details
+                if (bankText) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Bank Details:", startX + 100, finalY + 25);
+                    doc.setFont("helvetica", "bold");
+                    const splitBank = doc.splitTextToSize(bankText, 80);
+                    doc.text(splitBank, startX + 100, finalY + 30);
+                }
+
+                // Signature
+                const sigY = finalY + 50;
+                doc.text(`For ${companyName}`, 195, sigY, { align: "right" });
+                doc.text("Authorized Signatory", 195, sigY + 15, { align: "right" });
+
+                if (copy.label === "Office Copy") {
+                    doc.text("Receiver's Signature", startX + 2, sigY + 15, { align: "left" });
+                }
+
+                // Border for the whole page content (redraw to cover table area)
+                doc.rect(startX, startY, width, sigY + 20 - startY);
+
+                const custNameForFile = (invoice.customer_name || invoice.customerName || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
             }
         }
 
