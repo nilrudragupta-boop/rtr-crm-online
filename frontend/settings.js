@@ -1,3 +1,6 @@
+// Global Google Apps Script URL for Cloud Sync, OTP & Registration
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
+
 var APP_SETTINGS = {
     SELLER_STATE: "",
     DISTRICT: "",
