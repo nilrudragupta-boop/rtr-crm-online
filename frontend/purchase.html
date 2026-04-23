@@ -2126,6 +2126,8 @@
                 roundOffValue = roundedTotal - totalInvoiceBeforeRound;
             }
 
+            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+
             for (const item of itemsProcessed) {
                 let itemRoundOff = 0;
                 if (totalInvoiceBeforeRound > 0) {
@@ -2135,15 +2137,17 @@
                 }
                 const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(false) : {};
                 const payload = {
-                    id: Date.now() + Math.random(),
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
                     itemId: item.itemId, itemName: item.itemName, supplierName, supplierInv, uom: item.uom, date, qty: item.qty, price: item.price,
                     discount: item.discount || 0, discType: item.discType || '%', discountAmt: item.discAmt || 0, freightCharges: item.freightCharges || 0, packingCharges: item.packingCharges || 0, loadingCharges: item.loadingCharges || 0, roundOff: itemRoundOff,
                     salePrice: item.salePrice || 0, margin: item.margin || 0, itemCode: item.itemCode || "", category: item.category || "", hsn: item.hsn || "",
                     imei: item.imei || "", batch: item.batch || "", lot: item.lot || "", serial: item.serial || "", gst: item.gst,
                     ...audit
                 };
-                await apiClient.savePurchase(payload);
+                purchases.push(payload);
+                apiClient.savePurchase(payload).catch(e => console.warn("API sync failed", e));
             }
+            localStorage.setItem("purchases", JSON.stringify(purchases));
 
             draftItems = [];
             if ($("freightCharges")) $("freightCharges").value = "0";
@@ -2207,11 +2211,12 @@
                 ...audit
             };
 
-            const purchases = await apiClient.getPurchases();
-            const idx = purchases.findIndex(p => p.id == editingId);
+            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            const idx = purchases.findIndex(p => String(p.id) === String(editingId));
             if (idx > -1) {
-                const updatedRecord = { ...purchases[idx], ...payload };
-                await apiClient.savePurchase(updatedRecord);
+                purchases[idx] = { ...purchases[idx], ...payload };
+                localStorage.setItem("purchases", JSON.stringify(purchases));
+                apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
             }
             editingId = null;
             showToast("Purchase updated ✅");
@@ -2225,10 +2230,20 @@
         }
 
         async function loadPurchases() {
-            let data = await apiClient.getPurchases();
+            let remoteData = await apiClient.getPurchases();
+            let data = [];
+            if (remoteData && remoteData.length > 0) {
+                data = remoteData;
+                localStorage.setItem("purchases", JSON.stringify(data));
+            } else {
+                data = JSON.parse(localStorage.getItem("purchases")) || [];
+            }
 
             // Calculate Stock Map for sorting
-            const allInvoices = await apiClient.getInvoices();
+            let allInvoices = await apiClient.getInvoices();
+            if (!allInvoices || allInvoices.length === 0) {
+                allInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            }
             const returns = JSON.parse(localStorage.getItem("returns")) || [];
             const scraps = JSON.parse(localStorage.getItem("scraps")) || [];
             const stockMap = {};
@@ -2964,13 +2979,13 @@
         }
 
         async function duplicatePurchase(id) {
-            const purchases = await apiClient.getPurchases();
-            const p = purchases.find(x => x.id == id);
+            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            const p = purchases.find(x => String(x.id) === String(id));
             if (!p) return showToast("Purchase not found ⚠️");
 
             askConfirm("Confirm Duplicate", "Create a copy of this purchase entry?", async () => {
                 const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(false) : {};
-                const newId = Date.now() + Math.random();
+                const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                 const newEntry = {
                     ...p,
                     id: newId,
@@ -2983,7 +2998,9 @@
                 delete newEntry.editedBy;
                 delete newEntry.editedDate;
 
-                await apiClient.savePurchase(newEntry);
+                purchases.push(newEntry);
+                localStorage.setItem("purchases", JSON.stringify(purchases));
+                apiClient.savePurchase(newEntry).catch(e => console.warn("API sync failed", e));
                 await loadPurchases();
                 showToast("Purchase duplicated successfully ✅");
             }, "btn-save");
@@ -2997,9 +3014,12 @@
 
         async function confirmDelete() {
             if (idsToDelete.length === 0) return;
+            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             for (let id of idsToDelete) {
-                await apiClient.deletePurchase(id);
+                purchases = purchases.filter(p => String(p.id) !== String(id));
+                apiClient.deletePurchase(id).catch(e => console.warn("API sync failed", e));
             }
+            localStorage.setItem("purchases", JSON.stringify(purchases));
 
             closeModal();
             openSuccessModal("Purchase deleted successfully.");
@@ -3499,22 +3519,24 @@
         async function savePaymentDate(id) {
             const input = document.getElementById(`paymentDateInput-${id}`);
             if (input) {
-                const purchases = await apiClient.getPurchases();
-                const idx = purchases.findIndex(p => p.id == id);
+                let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                const idx = purchases.findIndex(p => String(p.id) === String(id));
                 if (idx > -1) {
                     purchases[idx].paymentDate = input.value;
-                    await apiClient.savePurchase(purchases[idx]);
+                    localStorage.setItem("purchases", JSON.stringify(purchases));
+                    apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
                     showToast("Payment date saved ✅");
                 }
             }
         }
 
         async function updateRemarks(id, value) {
-            const purchases = await apiClient.getPurchases();
-            const idx = purchases.findIndex(p => p.id == id);
+            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            const idx = purchases.findIndex(p => String(p.id) === String(id));
             if (idx > -1) {
                 purchases[idx].remarks = value;
-                await apiClient.savePurchase(purchases[idx]);
+                localStorage.setItem("purchases", JSON.stringify(purchases));
+                apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
                 showToast("Remarks updated");
             }
         }
@@ -4209,8 +4231,8 @@
                 return;
             }
 
-            const purchases = await apiClient.getPurchases();
-            const idx = purchases.findIndex(p => p.id == currentPaymentInvoiceId);
+            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            const idx = purchases.findIndex(p => String(p.id) === String(currentPaymentInvoiceId));
 
             if (idx > -1) {
                 // Auto-feed to Banking (Indian Accounting: Payment -> Withdrawal)
@@ -4251,7 +4273,8 @@
                 purchases[idx].paymentDateCash = cashDate;
                 purchases[idx].paymentDateBank = bankDate;
 
-                await apiClient.savePurchase(purchases[idx]);
+                localStorage.setItem("purchases", JSON.stringify(purchases));
+                apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
                 await loadPurchases(); // Refresh table
                 closePaymentSplitModal();
                 showToast("Payment updated successfully");

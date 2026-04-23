@@ -792,11 +792,18 @@
         let suppliers = [];
 
         async function fetchSuppliersData() {
-            suppliers = await apiClient.getSuppliers();
+            const remoteData = await apiClient.getSuppliers();
+            if (remoteData && remoteData.length > 0) {
+                suppliers = remoteData;
+                localStorage.setItem("suppliers", JSON.stringify(suppliers));
+            } else {
+                suppliers = JSON.parse(localStorage.getItem("suppliers")) || [];
+            }
             if (!suppliers.some(s => s.name === "ANONYMOUS")) {
                 const anon = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), name: "ANONYMOUS", contact: "0000000000", gstin: "", address: "N/A", pin: "", district: "", state: "West Bengal", stateCode: "19", supplierType: "Retailer", createdAt: new Date().toISOString() };
-                await apiClient.saveSupplier(anon);
                 suppliers.push(anon);
+                localStorage.setItem("suppliers", JSON.stringify(suppliers));
+                apiClient.saveSupplier(anon).catch(e => console.warn(e));
             }
             populateFilters();
             applyFilters();
@@ -1251,17 +1258,15 @@
                     const idx = suppliers.findIndex(s => s.id === id);
                     if (idx > -1) {
                         suppliers[idx] = { ...suppliers[idx], name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments };
-                        const response = await apiClient.saveSupplier(suppliers[idx]);
-                        if (response.success) {
-                            await fetchSuppliersData();
-                            clearForm();
-                            openSuccessModal("Supplier updated successfully.");
-                        } else {
-                            showToast("Error updating supplier.");
-                        }
+                        localStorage.setItem("suppliers", JSON.stringify(suppliers));
+                        
                         if (db) {
                             try { await db.collection('suppliers').doc(id).update(suppliers[idx]); } catch (e) { console.error("Firestore update error", e); }
                         }
+                        apiClient.saveSupplier(suppliers[idx]).catch(e => console.warn("API sync failed", e));
+                        applyFilters();
+                        clearForm();
+                        openSuccessModal("Supplier updated successfully.");
                     }
                 });
             } else {
@@ -1269,17 +1274,17 @@
                 askConfirm("Confirm Addition", "Add this new supplier?", async () => {
                     const newId = Date.now().toString();
                     const newSupplier = { id: newId, name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments, createdAt: new Date().toISOString() };
-                    const response = await apiClient.saveSupplier(newSupplier);
-                    if (response.success) {
-                        await fetchSuppliersData();
-                        clearForm();
-                        openSuccessModal("Supplier added successfully.");
-                    } else {
-                        showToast("Error adding supplier.");
-                    }
+                    
+                    suppliers.push(newSupplier);
+                    localStorage.setItem("suppliers", JSON.stringify(suppliers));
+                    
                     if (db) {
                         try { await db.collection('suppliers').doc(newId).set(newSupplier); } catch (e) { console.error("Firestore save error", e); }
                     }
+                    apiClient.saveSupplier(newSupplier).catch(e => console.warn("API sync failed", e));
+                    applyFilters();
+                    clearForm();
+                    openSuccessModal("Supplier added successfully.");
                 });
             }
         }

@@ -1204,8 +1204,62 @@
                     window.location.href = targetDash;
                 }
             } else {
+                // --- CLOUD SYNC FALLBACK FOR NEW DEVICES ---
+                if (user && user.toLowerCase() !== "admin" && !localStorage.getItem("contactNumber")) {
+                    const contactPrompt = prompt("Account not found locally.\n\nIf you created this account on another device, please enter your Registered 10-Digit Mobile Number to sync your profile:");
+                    if (contactPrompt) {
+                        const cleanContact = contactPrompt.replace(/\D/g, '');
+                        if (cleanContact.length === 10) {
+                            fetchAndRetryLogin(user, pass, cleanContact);
+                            return;
+                        } else {
+                            alert("Invalid mobile number. It must be exactly 10 digits.");
+                        }
+                    }
+                }
                 showToast("⚠️ Warning: Invalid Username or Password!", "#dc3545");
             }
+        }
+
+        async function fetchAndRetryLogin(username, password, contactNumber) {
+            const loginBtn = document.querySelector('button[onclick="validateLogin()"]');
+            const originalBtnText = loginBtn ? loginBtn.innerHTML : '🔓 Login';
+            if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = 'Syncing Cloud...'; }
+            
+            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+
+            if (scriptUrl && scriptUrl.startsWith("http")) {
+                try {
+                    const response = await fetch(scriptUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({ method: 'get_remote_config', contactNumber: contactNumber })
+                    });
+                    const data = await response.json();
+
+                    if (data.success && data.config && data.config.users && data.config.users.length > 0) {
+                        ADMIN_USERS = data.config.users;
+                        if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+                            window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
+                        } else {
+                            localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                        }
+                        localStorage.setItem('contactNumber', contactNumber); // Set identifier for future auto-sync
+                        
+                        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = originalBtnText; }
+                        validateLogin(); // Re-trigger the login process, it will pass this time
+                        return;
+                    } else {
+                        showToast("No remote account found for this Mobile Number.", "#dc3545");
+                    }
+                } catch (e) {
+                    showToast("Network error while syncing account.", "#dc3545");
+                }
+            } else {
+                showToast("System Error: Cloud URL not configured.", "#dc3545");
+            }
+            
+            if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = originalBtnText; }
         }
 
         function checkRenewButtonVisibility() {
