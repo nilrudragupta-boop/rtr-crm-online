@@ -906,7 +906,13 @@
         let idsToDelete = [];
         
         async function fetchItemsData() {
-            items = await apiClient.getItems();
+            const remoteData = await apiClient.getItems();
+            if (remoteData && remoteData.length > 0) {
+                items = remoteData;
+                localStorage.setItem("items", JSON.stringify(items));
+            } else {
+                items = JSON.parse(localStorage.getItem("items")) || [];
+            }
             populateCategoryFilter();
             populateItemNameList();
             applyFilters();
@@ -1926,15 +1932,12 @@
             const id = Date.now().toString();
             const newItem = { id, name, itemCode, category, hsn, indexNo, itemType, uom, description, imei, batch, lot, serial, salePrice, gst, conversions, createdAt: new Date().toISOString() };
 
-            const response = await apiClient.saveItem(newItem);
-            if (response.success) {
-                await fetchItemsData();
-                document.getElementById("newItemName").value = "";
-                document.getElementById("newItemCode").value = "";
-            } else {
-                showToast("Error saving item: " + response.message);
-                return;
-            }
+            items.push(newItem);
+            localStorage.setItem("items", JSON.stringify(items));
+            apiClient.saveItem(newItem).catch(e => console.warn("API sync failed", e));
+
+            document.getElementById("newItemName").value = "";
+            document.getElementById("newItemCode").value = "";
             document.getElementById("newItemCategory").value = "";
             document.getElementById("newItemHsn").value = "";
             document.getElementById("newItemIndex").value = "";
@@ -1953,6 +1956,7 @@
             if (db) {
                 try { await db.collection('items').doc(id).set(newItem); } catch (e) { console.error("Firestore save error", e); }
             }
+            applyFilters();
             openSuccessModal("Item added successfully!");
         }
 
@@ -2065,12 +2069,10 @@
                 items[idx].salePrice = newSalePrice;
                 items[idx].gst = newGst;
                 
-                const response = await apiClient.saveItem(items[idx]);
-                if (response.success) {
-                    await fetchItemsData();
-                } else {
-                    return showToast("Error updating item: " + response.message);
-                }
+                localStorage.setItem("items", JSON.stringify(items));
+                apiClient.saveItem(items[idx]).catch(e => console.warn("API sync failed", e));
+                applyFilters();
+                
                 if (oldName !== newName || oldCode !== newCode) {
                     let productions = JSON.parse(localStorage.getItem("production")) || [];
                     let prodUpdated = false;
@@ -2144,10 +2146,10 @@
                 createdAt: new Date().toISOString()
             };
 
-            const response = await apiClient.saveItem(newItem);
-            if (response.success) {
-                await fetchItemsData();
-            }
+            items.push(newItem);
+            localStorage.setItem("items", JSON.stringify(items));
+            apiClient.saveItem(newItem).catch(e => console.warn("API sync failed", e));
+            applyFilters();
             
             if (db) {
                 try { await db.collection('items').doc(newId).set(newItem); } catch (e) { console.error("Firestore save error", e); }

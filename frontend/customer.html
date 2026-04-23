@@ -1250,7 +1250,13 @@
 
 
         async function fetchCustomersData() {
-            customers = await apiClient.getCustomers();
+            const remoteData = await apiClient.getCustomers();
+            if (remoteData && remoteData.length > 0) {
+                customers = remoteData;
+                localStorage.setItem("customers", JSON.stringify(customers));
+            } else {
+                customers = JSON.parse(localStorage.getItem("customers")) || [];
+            }
             if (!customers.some(c => c.name === "ANONYMOUS")) {
                 const anon = {
                     name: "ANONYMOUS",
@@ -1263,8 +1269,9 @@
                     stateCode: "19",
                     gst: ""
                 };
-                await apiClient.saveCustomer(anon);
                 customers.push(anon);
+                localStorage.setItem("customers", JSON.stringify(customers));
+                apiClient.saveCustomer(anon).catch(e => console.warn(e));
             }
             applyFilters();
         }
@@ -1647,14 +1654,24 @@
 
                 const payload = { name, address, contact, email, pin, district, state, stateCode, gst, creditLimit, openingBalance, openingBalanceType, attachments: currentCustomerAttachments, updatedAt: new Date().toISOString() };
 
-            const response = await apiClient.saveCustomer(payload);
-            if (response.success) {
-                openSuccessModal(id ? "Customer updated successfully!" : "Customer added successfully!");
-                await fetchCustomersData();
-                clearForm();
+            if (id) {
+                payload.id = id;
+                const idx = customers.findIndex(c => String(c.id) === String(id));
+                if (idx > -1) customers[idx] = payload;
             } else {
-                showToast("Error saving customer: " + response.message);
+                payload.id = generateUniqueId();
+                customers.push(payload);
             }
+            localStorage.setItem("customers", JSON.stringify(customers));
+
+            if (db) {
+                try { await db.collection('customers').doc(payload.id).set(payload); } catch (e) { console.error("Firestore save error", e); }
+            }
+
+            apiClient.saveCustomer(payload).catch(e => console.warn("API sync failed", e));
+            openSuccessModal(id ? "Customer updated successfully!" : "Customer added successfully!");
+            applyFilters();
+            clearForm();
             }
 
             function deleteCustomer(id) {
