@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
     <script src="config.js"></script>
 
@@ -2562,8 +2563,12 @@
                             if (lowerC.district) appSettingsUpdates.district = lowerC.district;
                             if (lowerC.currency) appSettingsUpdates.currency = lowerC.currency;
 
-                            if (Object.keys(appSettingsUpdates).length > 0 && window.electronAPI && window.electronAPI.saveAppSettings) {
-                                await window.electronAPI.saveAppSettings(appSettingsUpdates);
+                            if (Object.keys(appSettingsUpdates).length > 0) {
+                                if (window.electronAPI && window.electronAPI.saveAppSettings) {
+                                    await window.electronAPI.saveAppSettings(appSettingsUpdates);
+                                } else {
+                                    Object.keys(appSettingsUpdates).forEach(k => localStorage.setItem(k, appSettingsUpdates[k]));
+                                }
                                 const brandElements = document.querySelectorAll('[data-brand="name"]');
                                 brandElements.forEach(el => { if (appSettingsUpdates.companyName) el.innerText = appSettingsUpdates.companyName; });
                             }
@@ -2924,6 +2929,16 @@
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
                 } catch (e) { console.error(e); }
+                
+                if (res.companyName) {
+                    document.querySelectorAll('[data-brand="name"]').forEach(el => el.innerText = res.companyName);
+                }
+            } else {
+                // Web Browser Fallback
+                const companyName = localStorage.getItem('companyName') || (typeof APP_SETTINGS !== 'undefined' ? APP_SETTINGS.COMPANY_NAME : null);
+                if (companyName) {
+                    document.querySelectorAll('[data-brand="name"]').forEach(el => el.innerText = companyName);
+                }
             }
         }
 

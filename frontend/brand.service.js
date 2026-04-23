@@ -12,11 +12,11 @@
         if (!window.APP_SETTINGS) return DEFAULT_BRAND;
 
         return {
-            name: APP_SETTINGS.COMPANY_NAME || DEFAULT_BRAND.name,
-            address: `${APP_SETTINGS.ADDRESS_LINE_1 || ""}<br>${APP_SETTINGS.ADDRESS_LINE_2 || ""}`,
-            phone: APP_SETTINGS.CONTACT_NUMBER || "",
-            gst: APP_SETTINGS.GST_NUMBER || "",
-            logo: APP_SETTINGS.LOGO_PATH || ""
+            name: APP_SETTINGS.COMPANY_NAME || localStorage.getItem('companyName') || DEFAULT_BRAND.name,
+            address: `${APP_SETTINGS.ADDRESS_LINE_1 || localStorage.getItem('addressLine1') || ""}<br>${APP_SETTINGS.ADDRESS_LINE_2 || localStorage.getItem('addressLine2') || ""}`,
+            phone: APP_SETTINGS.CONTACT_NUMBER || localStorage.getItem('contactNumber') || "",
+            gst: APP_SETTINGS.COMPANY_GSTIN || localStorage.getItem('companyGstin') || "",
+            logo: APP_SETTINGS.LOGO_PATH || localStorage.getItem('logoPath') || ""
         };
     }
 
