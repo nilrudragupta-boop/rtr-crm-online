@@ -1528,6 +1528,12 @@ Branch: </textarea>
                 if (invoiceNo) {
                     loadInvoiceForEdit(invoiceNo);
                 }
+
+                if (window.electronAPI && window.electronAPI.onAppSettingsChanged) {
+                    window.electronAPI.onAppSettingsChanged(() => {
+                        if (window.BrandService) window.BrandService.applyBrand();
+                    });
+                }
             });
 
             function getInvoiceDataFromDOM() {
@@ -1613,16 +1619,17 @@ Branch: </textarea>
                             district = res.district || district;
                             state = res.sellerState || state;
                         }
-                    } else if (typeof getBrandSettings === 'function') {
-                        const brand = getBrandSettings() || {};
-                        companyName = brand.companyName || companyName;
-                        addressLine1 = brand.addressLine1 || addressLine1;
-                        addressLine2 = brand.addressLine2 || addressLine2;
-                        contactNumber = brand.contactNumber ? `Mo: ${brand.contactNumber}` : contactNumber;
-                        companyGstin = brand.companyGstin || companyGstin;
-                        companyEmail = brand.companyEmail || companyEmail;
-                        district = brand.district || district;
-                        state = brand.sellerState || state;
+                    } else if (window.BrandService) {
+                        const brand = window.BrandService.getBrand();
+                        companyName = brand.name || companyName;
+                        // Address parsing from BrandService is combined with <br>, so we use local storage directly for structured lines
+                        addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                        addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                        contactNumber = brand.phone ? `Mo: ${brand.phone}` : contactNumber;
+                        companyGstin = brand.gst || companyGstin;
+                        companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                        district = localStorage.getItem('district') || district;
+                        state = localStorage.getItem('sellerState') || state;
                     }
 
                     let addressStr = addressLine1;
@@ -1831,16 +1838,16 @@ Branch: </textarea>
                             district = res.district || district;
                             state = res.sellerState || state;
                         }
-                    } else if (typeof getBrandSettings === 'function') {
-                        const brand = getBrandSettings() || {};
-                        companyName = brand.companyName || companyName;
-                        addressLine1 = brand.addressLine1 || addressLine1;
-                        addressLine2 = brand.addressLine2 || addressLine2;
-                        contactNumber = brand.contactNumber ? `Mo: ${brand.contactNumber}` : contactNumber;
-                        companyGstin = brand.companyGstin || companyGstin;
-                        companyEmail = brand.companyEmail || companyEmail;
-                        district = brand.district || district;
-                        state = brand.sellerState || state;
+                    } else if (window.BrandService) {
+                        const brand = window.BrandService.getBrand();
+                        companyName = brand.name || companyName;
+                        addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                        addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                        contactNumber = brand.phone ? `Mo: ${brand.phone}` : contactNumber;
+                        companyGstin = brand.gst || companyGstin;
+                        companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                        district = localStorage.getItem('district') || district;
+                        state = localStorage.getItem('sellerState') || state;
                     }
 
                     const startX = 10;

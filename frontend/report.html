@@ -2609,16 +2609,25 @@
                     sellerDistrict = res.district || sellerDistrict;
                     sellerState = res.sellerState || sellerState;
                 }
-            } else if (window.getBrandSettings) { // Fallback for non-electron env
-                const brand = window.getBrandSettings() || {};
-                companyName = brand.companyName || companyName;
-                addressLine1 = brand.addressLine1 || addressLine1;
-                addressLine2 = brand.addressLine2 || addressLine2;
-                contactNumber = brand.contactNumber ? `Mo: ${brand.contactNumber}` : contactNumber;
-                companyGstin = brand.companyGstin || companyGstin;
-                companyEmail = brand.companyEmail || companyEmail;
-                sellerDistrict = brand.district || sellerDistrict;
-                sellerState = brand.sellerState || sellerState;
+            } else if (window.BrandService) { // Fallback for non-electron env
+                const brand = window.BrandService.getBrand();
+                companyName = brand.name || companyName;
+                addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                contactNumber = brand.phone ? `Mo: ${brand.phone}` : contactNumber;
+                companyGstin = brand.gst || companyGstin;
+                companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                sellerDistrict = localStorage.getItem('district') || sellerDistrict;
+                sellerState = localStorage.getItem('sellerState') || sellerState;
+            } else {
+                companyName = localStorage.getItem('companyName') || companyName;
+                addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                contactNumber = localStorage.getItem('contactNumber') ? `Mo: ${localStorage.getItem('contactNumber')}` : contactNumber;
+                companyGstin = localStorage.getItem('companyGstin') || companyGstin;
+                companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                sellerDistrict = localStorage.getItem('district') || sellerDistrict;
+                sellerState = localStorage.getItem('sellerState') || sellerState;
             }
 
             // Header
@@ -3392,16 +3401,16 @@
                     district = res.district || district;
                     state = res.sellerState || state;
                 }
-            } else if (typeof getBrandSettings === 'function') { // Fallback for non-electron env
-                const brand = getBrandSettings() || {};
-                companyName = brand.companyName || companyName;
-                addressLine1 = brand.addressLine1 || addressLine1;
-                addressLine2 = brand.addressLine2 || addressLine2;
-                companyGstin = brand.companyGstin || companyGstin;
-                companyEmail = brand.companyEmail || companyEmail;
-                contactNumber = brand.contactNumber || contactNumber;
-                district = brand.district || district;
-                state = brand.sellerState || state;
+            } else if (window.BrandService) { // Fallback for non-electron env
+                const brand = window.BrandService.getBrand();
+                companyName = brand.name || companyName;
+                addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                companyGstin = brand.gst || companyGstin;
+                companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                contactNumber = brand.phone || contactNumber;
+                district = localStorage.getItem('district') || district;
+                state = localStorage.getItem('sellerState') || state;
             }
 
             // Layout Constants
@@ -5644,13 +5653,6 @@
             document.getElementById('splitViewContent').innerHTML = generateInvoiceHtml(inv);
         }
 
-        function updateBrandInfo(settings) {
-            const nameEl = document.querySelector('[data-brand="name"]');
-            if (nameEl && settings.companyName) {
-                nameEl.innerText = settings.companyName;
-            }
-        }
-
         // --- Column Resizing Logic ---
         function enableColumnResizing() {
             const table = document.getElementById('reportTable');
@@ -5734,25 +5736,11 @@
             loadInvoices();
 
             if (window.electronAPI && window.electronAPI.getAppSettings) {
-                window.electronAPI.getAppSettings().then(res => {
-                    if (res.success) {
-                        updateBrandInfo(res);
-                    }
-                });
+                
                 window.electronAPI.onAppSettingsChanged((newSettings) => {
-                    updateBrandInfo(newSettings);
+                    if (window.BrandService) window.BrandService.applyBrand();
                 });
-            } else if (typeof APP_SETTINGS !== 'undefined') {
-                updateBrandInfo({
-                    companyName: APP_SETTINGS.COMPANY_NAME,
-                    addressLine1: APP_SETTINGS.ADDRESS_LINE_1,
-                    addressLine2: APP_SETTINGS.ADDRESS_LINE_2,
-                    contactNumber: APP_SETTINGS.CONTACT_NUMBER,
-                    companyEmail: APP_SETTINGS.COMPANY_EMAIL,
-                    companyWebsite: APP_SETTINGS.COMPANY_WEBSITE,
-                    companyGstin: APP_SETTINGS.COMPANY_GSTIN
-                });
-            }
+                }
 
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 if (currentTheme === "system") {
@@ -5825,9 +5813,12 @@
             if (window.electronAPI && window.electronAPI.getAppSettings) {
                 const res = await window.electronAPI.getAppSettings();
                 if (res.success) { companyName = res.companyName || companyName; addressLine1 = res.addressLine1 || addressLine1; addressLine2 = res.addressLine2 || addressLine2; contactNumber = res.contactNumber || contactNumber; }
-            } else if (typeof getBrandSettings === 'function') {
-                const brand = getBrandSettings() || {};
-                companyName = brand.companyName || companyName; addressLine1 = brand.addressLine1 || addressLine1; addressLine2 = brand.addressLine2 || addressLine2; contactNumber = brand.contactNumber || contactNumber;
+            } else if (window.BrandService) {
+                const brand = window.BrandService.getBrand();
+                companyName = brand.name || companyName; 
+                addressLine1 = localStorage.getItem('addressLine1') || addressLine1; 
+                addressLine2 = localStorage.getItem('addressLine2') || addressLine2; 
+                contactNumber = brand.phone || contactNumber;
             }
 
             let y = 20;
