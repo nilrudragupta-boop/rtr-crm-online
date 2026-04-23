@@ -111,9 +111,10 @@
     <script src="apiClient.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+
 </head>
 
 <body>
@@ -689,20 +690,20 @@ Branch: </textarea>
             }
 
             function loadPurchaseItems() {
-            apiClient.getPurchases().then(purchases => {
-                const uniqueItems = [...new Set(purchases.map(p => p.itemName))];
-                const datalist = document.getElementById("purchaseItemsList");
-                if (datalist) {
-                    datalist.innerHTML = "";
-                    uniqueItems.forEach(item => {
-                        if (item) {
-                            const option = document.createElement("option");
-                            option.value = item;
-                            datalist.appendChild(option);
-                        }
-                    });
-                }
-            });
+                apiClient.getPurchases().then(purchases => {
+                    const uniqueItems = [...new Set(purchases.map(p => p.itemName))];
+                    const datalist = document.getElementById("purchaseItemsList");
+                    if (datalist) {
+                        datalist.innerHTML = "";
+                        uniqueItems.forEach(item => {
+                            if (item) {
+                                const option = document.createElement("option");
+                                option.value = item;
+                                datalist.appendChild(option);
+                            }
+                        });
+                    }
+                });
             }
 
             function autofillItemDetails(input, selectedItem = null) {
@@ -789,34 +790,34 @@ Branch: </textarea>
             }
 
             function loadCustomers() {
-            apiClient.getCustomers().then(customers => {
-                const datalist = document.getElementById("customerList");
-                if (datalist) {
-                    datalist.innerHTML = "";
-                    customers.forEach(c => {
-                        const option = document.createElement("option");
-                        option.value = c.name;
-                        datalist.appendChild(option);
-                    });
-                }
-            });
+                apiClient.getCustomers().then(customers => {
+                    const datalist = document.getElementById("customerList");
+                    if (datalist) {
+                        datalist.innerHTML = "";
+                        customers.forEach(c => {
+                            const option = document.createElement("option");
+                            option.value = c.name;
+                            datalist.appendChild(option);
+                        });
+                    }
+                });
             }
 
             function fillCustomerDetails() {
                 const name = document.getElementById("buyerName").value;
-            apiClient.getCustomers().then(customers => {
-                const customer = customers.find(c => c.name === name);
-                if (customer) {
-                    document.getElementById("buyerAddress").value = customer.address || "";
-                    document.getElementById("buyerContact").value = customer.contact || "";
-                    document.getElementById("buyerPin").value = customer.pin || "";
-                    document.getElementById("buyerDistrict").value = customer.district || "";
-                    document.getElementById("buyerState").value = customer.state || "";
-                    document.getElementById("buyerStateCode").value = customer.stateCode || "";
-                    document.getElementById("buyerGST").value = customer.gst || customer.gstin || "";
-                    checkGstVisibility(document.getElementById("buyerGST"));
-                }
-            });
+                apiClient.getCustomers().then(customers => {
+                    const customer = customers.find(c => c.name === name);
+                    if (customer) {
+                        document.getElementById("buyerAddress").value = customer.address || "";
+                        document.getElementById("buyerContact").value = customer.contact || "";
+                        document.getElementById("buyerPin").value = customer.pin || "";
+                        document.getElementById("buyerDistrict").value = customer.district || "";
+                        document.getElementById("buyerState").value = customer.state || "";
+                        document.getElementById("buyerStateCode").value = customer.stateCode || "";
+                        document.getElementById("buyerGST").value = customer.gst || customer.gstin || "";
+                        checkGstVisibility(document.getElementById("buyerGST"));
+                    }
+                });
             }
 
             function toggleEdit(id, icon) {
@@ -1222,89 +1223,89 @@ Branch: </textarea>
             }
 
             function loadInvoiceForEdit(invoiceNo) {
-            apiClient.getInvoices().then(invoices => {
-                let invoice = invoices.find(inv => inv.invoice_no === invoiceNo);
+                apiClient.getInvoices().then(invoices => {
+                    let invoice = invoices.find(inv => inv.invoice_no === invoiceNo);
 
-                if (!invoice) {
-                    const editInvoice = JSON.parse(localStorage.getItem('editInvoice'));
-                    if (editInvoice && (editInvoice.invoice_no === invoiceNo || editInvoice.invoiceNo === invoiceNo)) {
-                        invoice = editInvoice;
+                    if (!invoice) {
+                        const editInvoice = JSON.parse(localStorage.getItem('editInvoice'));
+                        if (editInvoice && (editInvoice.invoice_no === invoiceNo || editInvoice.invoiceNo === invoiceNo)) {
+                            invoice = editInvoice;
+                        }
                     }
-                }
 
-                if (!invoice) return;
+                    if (!invoice) return;
 
-                const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+                    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
 
-                setVal('invoiceNo', invoice.invoice_no || invoice.invoiceNo);
-                setVal('invoiceDate', invoice.invoice_date || invoice.date);
-                setVal('invoiceTime', invoice.invoice_time || invoice.time);
-                setVal('refNoDate', invoice.refNoDate);
-                setVal('ewayBillNo', invoice.ewayBillNo);
-                setVal('paymentTerms', invoice.remarks);
+                    setVal('invoiceNo', invoice.invoice_no || invoice.invoiceNo);
+                    setVal('invoiceDate', invoice.invoice_date || invoice.date);
+                    setVal('invoiceTime', invoice.invoice_time || invoice.time);
+                    setVal('refNoDate', invoice.refNoDate);
+                    setVal('ewayBillNo', invoice.ewayBillNo);
+                    setVal('paymentTerms', invoice.remarks);
 
-                let loadedGstType = invoice.gstType || 'Intra-State';
-                if (loadedGstType === 'Intra') loadedGstType = 'Intra-State';
-                if (loadedGstType === 'Inter') loadedGstType = 'Inter-State';
-                setVal('gstType', loadedGstType);
+                    let loadedGstType = invoice.gstType || 'Intra-State';
+                    if (loadedGstType === 'Intra') loadedGstType = 'Intra-State';
+                    if (loadedGstType === 'Inter') loadedGstType = 'Inter-State';
+                    setVal('gstType', loadedGstType);
 
-                setVal('buyerName', invoice.customer_name || invoice.customerName);
-                setVal('buyerAddress', invoice.address);
-                setVal('buyerContact', invoice.contact);
-                setVal('buyerPin', invoice.pin);
-                setVal('buyerDistrict', invoice.district);
-                setVal('buyerState', invoice.state);
-                setVal('buyerStateCode', invoice.stateCode);
-                setVal('buyerGST', invoice.gst_no || invoice.gst);
+                    setVal('buyerName', invoice.customer_name || invoice.customerName);
+                    setVal('buyerAddress', invoice.address);
+                    setVal('buyerContact', invoice.contact);
+                    setVal('buyerPin', invoice.pin);
+                    setVal('buyerDistrict', invoice.district);
+                    setVal('buyerState', invoice.state);
+                    setVal('buyerStateCode', invoice.stateCode);
+                    setVal('buyerGST', invoice.gst_no || invoice.gst);
 
-                setVal('consigneeName', invoice.shipName);
-                setVal('consigneeAddress', invoice.shipAddress);
-                setVal('consigneeContact', invoice.shipContact);
-                setVal('consigneePin', invoice.shipPin);
-                setVal('consigneeDistrict', invoice.shipDistrict);
-                setVal('consigneeState', invoice.shipState);
-                setVal('consigneeStateCode', invoice.shipStateCode);
-                setVal('consigneeGST', invoice.shipGST);
+                    setVal('consigneeName', invoice.shipName);
+                    setVal('consigneeAddress', invoice.shipAddress);
+                    setVal('consigneeContact', invoice.shipContact);
+                    setVal('consigneePin', invoice.shipPin);
+                    setVal('consigneeDistrict', invoice.shipDistrict);
+                    setVal('consigneeState', invoice.shipState);
+                    setVal('consigneeStateCode', invoice.shipStateCode);
+                    setVal('consigneeGST', invoice.shipGST);
 
-                setVal('buyersOrderNo', invoice.buyersOrderNo);
-                setVal('buyersOrderDate', invoice.buyersOrderDate);
-                setVal('dispatchDocNo', invoice.dispatchDocNo);
-                setVal('deliveryNoteDate', invoice.deliveryNoteDate);
-                setVal('dispatch', invoice.dispatchedThrough);
-                setVal('vehicleNo', invoice.vehicleNo);
-                setVal('destination', invoice.destination);
-                setVal('lrNo', invoice.lrNo);
-                setVal('termsOfDelivery', invoice.termsOfDelivery);
+                    setVal('buyersOrderNo', invoice.buyersOrderNo);
+                    setVal('buyersOrderDate', invoice.buyersOrderDate);
+                    setVal('dispatchDocNo', invoice.dispatchDocNo);
+                    setVal('deliveryNoteDate', invoice.deliveryNoteDate);
+                    setVal('dispatch', invoice.dispatchedThrough);
+                    setVal('vehicleNo', invoice.vehicleNo);
+                    setVal('destination', invoice.destination);
+                    setVal('lrNo', invoice.lrNo);
+                    setVal('termsOfDelivery', invoice.termsOfDelivery);
 
-                setVal('freightCharges', invoice.freightCharges || 0);
-                setVal('packingCharges', invoice.packingCharges || 0);
-                if (invoice.customChargeName) setVal('customChargeName', invoice.customChargeName);
-                setVal('customCharges', invoice.customCharges || 0);
-                setVal('freightBeforeGst', invoice.freightBeforeGst || 0);
-                setVal('freightBeforeGstRate', invoice.freightBeforeGstRate || 0);
-                setVal('previousDue', invoice.previousDue || 0);
+                    setVal('freightCharges', invoice.freightCharges || 0);
+                    setVal('packingCharges', invoice.packingCharges || 0);
+                    if (invoice.customChargeName) setVal('customChargeName', invoice.customChargeName);
+                    setVal('customCharges', invoice.customCharges || 0);
+                    setVal('freightBeforeGst', invoice.freightBeforeGst || 0);
+                    setVal('freightBeforeGstRate', invoice.freightBeforeGstRate || 0);
+                    setVal('previousDue', invoice.previousDue || 0);
 
-                const tbody = document.getElementById("primeItems");
-                tbody.innerHTML = "";
-                if (invoice.items && invoice.items.length > 0) {
-                    invoice.items.forEach((item, i) => {
-                        const qty = parseFloat(item.qty) || 0;
-                        const price = parseFloat(item.price) || 0;
-                        const disc = parseFloat(item.disc) || 0;
-                        const discType = item.discType || '%';
+                    const tbody = document.getElementById("primeItems");
+                    tbody.innerHTML = "";
+                    if (invoice.items && invoice.items.length > 0) {
+                        invoice.items.forEach((item, i) => {
+                            const qty = parseFloat(item.qty) || 0;
+                            const price = parseFloat(item.price) || 0;
+                            const disc = parseFloat(item.disc) || 0;
+                            const discType = item.discType || '%';
 
-                        const base = qty * price;
-                        const discAmt = (discType === 'flat') ? disc : base * (disc / 100);
-                        const taxable = Math.max(0, base - discAmt);
+                            const base = qty * price;
+                            const discAmt = (discType === 'flat') ? disc : base * (disc / 100);
+                            const taxable = Math.max(0, base - discAmt);
 
-                        addPrimeRow(i + 1, item.item, item.hsn, item.qty, item.uom, item.price, item.disc, item.gst, taxable.toFixed(2), item.discType, item.itemCode);
-                    });
-                } else addNewRow();
-                calculateTotals();
-            });
+                            addPrimeRow(i + 1, item.item, item.hsn, item.qty, item.uom, item.price, item.disc, item.gst, taxable.toFixed(2), item.discType, item.itemCode);
+                        });
+                    } else addNewRow();
+                    calculateTotals();
+                });
             }
 
-        async function saveInvoice() {
+            async function saveInvoice() {
                 const invoiceNo = document.getElementById('invoiceNo').value.trim();
                 if (!invoiceNo) return alert("Invoice No is required to save.");
 
@@ -1395,7 +1396,7 @@ Branch: </textarea>
                     previousDue: previousDue
                 };
 
-            let invoices = await apiClient.getInvoices();
+                let invoices = await apiClient.getInvoices();
                 const existingIdx = invoices.findIndex(i => i.invoice_no === invoiceNo);
 
                 if (existingIdx > -1 && !confirm("Invoice number already exists. Overwrite?")) return;
@@ -1416,12 +1417,12 @@ Branch: </textarea>
                     invoices.push(invoiceData);
                 }
 
-            const result = await apiClient.saveInvoice(invoiceData);
-            if (result.success) {
-                alert("Invoice Saved Successfully!");
-            } else {
-                alert("Error saving invoice: " + result.message);
-            }
+                const result = await apiClient.saveInvoice(invoiceData);
+                if (result.success) {
+                    alert("Invoice Saved Successfully!");
+                } else {
+                    alert("Error saving invoice: " + result.message);
+                }
             }
 
             let showFreightBeforeGst = localStorage.getItem("invoiceBShowFreightBeforeGst") === "true";
@@ -1471,6 +1472,9 @@ Branch: </textarea>
             window.addEventListener('DOMContentLoaded', () => {
                 loadPurchaseItems();
                 loadCustomers();
+
+                // Apply brand details on initial load
+                if (window.BrandService) window.BrandService.applyBrand();
 
                 const savedTerms = localStorage.getItem('invoiceTermsAndConditions');
                 if (savedTerms) document.getElementById('termsConditions').value = savedTerms;
@@ -1771,7 +1775,7 @@ Branch: </textarea>
                     doc.setFont(undefined, 'bold');
                     doc.text(`Grand Total:`, 140, currentY);
                     doc.text(`${invoice.invoice_total}`, 195, currentY, { align: 'right' });
-                    
+
                     const totalVal = parseFloat(String(invoice.invoice_total).replace(/,/g, '')) || 0;
                     const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
                     const savedInvoice = invoices.find(i => i.invoice_no === invoice.invoice_no);
@@ -2022,7 +2026,7 @@ Branch: </textarea>
                     doc.text(`Grand Total: ${invoice.invoice_total}`, 190, currentY, { align: "right" });
 
                     const totalVal = parseFloat(String(invoice.invoice_total).replace(/,/g, '')) || 0;
-                    
+
                     const invoicesTally = JSON.parse(localStorage.getItem('invoices')) || [];
                     const savedInvoiceTally = invoicesTally.find(i => i.invoice_no === invoice.invoice_no);
                     const paidTally = savedInvoiceTally ? (parseFloat(savedInvoiceTally.total_paid || savedInvoiceTally.paid_amount || savedInvoiceTally.paid) || 0) : 0;
@@ -2031,7 +2035,7 @@ Branch: </textarea>
                     currentY += 6;
                     doc.setFont("helvetica", "normal");
                     doc.text(`Paid Amount: ${paidTally.toFixed(2)}`, 190, currentY, { align: "right" });
-                    
+
                     currentY += 6;
                     doc.setFont("helvetica", "bold");
                     doc.text(`Balance Due: ${dueTally.toFixed(2)}`, 190, currentY, { align: "right" });
