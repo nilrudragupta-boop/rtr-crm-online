@@ -22,8 +22,14 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Trust proxy to get accurate client IP addresses if hosted on platforms like Render or Heroku
 app.set('trust proxy', true);
 
-// Serve static files (HTML, CSS, JS, Images) from the current directory
-app.use(express.static(__dirname));
+// Serve static files (HTML, CSS, JS, Images) from the frontend directory
+const frontendPath = path.join(__dirname, '../frontend');
+app.use(express.static(frontendPath));
+
+// Redirect the root URL to your login page
+app.get('/', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'login.html'));
+});
 
 // --- Database Connection ---
 // Create a .env file in your root folder and add your MongoDB Atlas connection string:
