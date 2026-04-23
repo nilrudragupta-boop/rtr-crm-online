@@ -838,6 +838,19 @@
                     if (!user || !pass) return alert("Username and Password required");
                     if (window.currentAdminUsers.some(u => u.username === user)) return alert("This username is already taken by another user. Please choose a different one.");
 
+                    // Attempt to register this user on the cloud silently so they get remote access
+                    let scriptUrl = document.getElementById('cloudBackupUrl').value || document.getElementById('updateServerUrl').value;
+                    let contactNumber = document.getElementById('contactNumber').value;
+                    if (scriptUrl && scriptUrl.startsWith("http") && contactNumber) {
+                        try {
+                            fetch(scriptUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain' },
+                                body: JSON.stringify({ method: "register_user", username: user, password: pass, contactNumber: contactNumber })
+                            }).catch(e => console.log("Silent cloud reg failed", e));
+                        } catch (e) {}
+                    }
+
                     window.currentAdminUsers.push({ username: user, password: pass, role: role });
                     document.getElementById('newUsername').value = '';
                     document.getElementById('newUserPass').value = '';

@@ -490,7 +490,7 @@
                 <span class="toggle-icon" onclick="togglePassword('regPassword', this)">🙈</span>
             </div>
 
-            <button onclick="submitRegistration()"
+            <button id="registerBtn" onclick="submitRegistration()"
                 style="background: #28a745; width: 100%; margin-top: 15px;">Register</button>
         </div>
     </div>
@@ -732,6 +732,13 @@
                     // Temporarily add to local users list to allow immediate login
                     ADMIN_USERS.push({ username: username, password: password, role: "User" });
                     
+                    // Save persistently
+                    if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+                        window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
+                    } else {
+                        localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                    }
+
                     // Auto-fill login fields and trigger the login process
                     document.getElementById('username').value = username;
                     document.getElementById('password').value = password;
@@ -870,6 +877,11 @@
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
                 } catch (e) { console.error(e); }
+            } else {
+                const localUsers = localStorage.getItem('ADMIN_USERS');
+                if (localUsers) {
+                    try { ADMIN_USERS = JSON.parse(localUsers); } catch(e) {}
+                }
             }
 
             if (localStorage.getItem("rememberMe") === "true") {
