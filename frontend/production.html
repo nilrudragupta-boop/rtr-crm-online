@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="apiClient.js"></script>
     <script src="settings.js"></script>
     <script>
         function openWindow(url, width, height) {
@@ -837,6 +838,7 @@
 
             prods.push(entry);
             localStorage.setItem("production", JSON.stringify(prods));
+        if (typeof apiClient !== 'undefined' && apiClient.saveProduction) apiClient.saveProduction(entry).catch(console.warn);
 
             // --- Auto Journal Voucher Creation ---
 
@@ -863,6 +865,7 @@
                 const journalVouchers = JSON.parse(localStorage.getItem('journal_vouchers')) || [];
                 journalVouchers.push(newVoucher);
                 localStorage.setItem('journal_vouchers', JSON.stringify(journalVouchers));
+            if (typeof apiClient !== 'undefined' && apiClient.saveJournalVoucher) apiClient.saveJournalVoucher(newVoucher).catch(console.warn);
                 alert(`Production Entry ${prodNo} Saved Successfully!\nJournal Voucher ${newVoucher.voucher_no} also created.`);
             } else {
                 alert(`Production Entry ${prodNo} Saved Successfully as [${prodStage}]!`);
@@ -1061,10 +1064,12 @@
                             const journalVouchers = JSON.parse(localStorage.getItem('journal_vouchers')) || [];
                             journalVouchers.push(newVoucher);
                             localStorage.setItem('journal_vouchers', JSON.stringify(journalVouchers));
+                    if (typeof apiClient !== 'undefined' && apiClient.saveJournalVoucher) apiClient.saveJournalVoucher(newVoucher).catch(console.warn);
                         }
                     }
 
                     localStorage.setItem("production", JSON.stringify(prods));
+            if (typeof apiClient !== 'undefined' && apiClient.saveProduction) apiClient.saveProduction(prods[prodIdx]).catch(console.warn);
                     loadHistory();
                 } else {
                     selectElement.value = oldStage; // Revert
@@ -1311,6 +1316,7 @@
             const prodToDelete = prods.find(p => p.id === id);
             prods = prods.filter(p => p.id !== id);
             localStorage.setItem("production", JSON.stringify(prods));
+        if (typeof apiClient !== 'undefined' && apiClient.deleteProduction) apiClient.deleteProduction(id).catch(console.warn);
 
             // Also delete associated auto-generated Journal Voucher to maintain accounting integrity
             if (prodToDelete && prodToDelete.productionNo) {

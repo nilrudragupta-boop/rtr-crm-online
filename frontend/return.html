@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="apiClient.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
@@ -550,6 +551,7 @@
             const returns = JSON.parse(localStorage.getItem('returns')) || [];
             returns.push(returnData);
             localStorage.setItem('returns', JSON.stringify(returns));
+        if (typeof apiClient !== 'undefined' && apiClient.saveReturn) apiClient.saveReturn(returnData).catch(console.warn);
 
             // 2. Create Credit/Debit Note (Financial Impact)
             if (type === 'Sales Return' || type === 'Purchase Return') {
@@ -597,13 +599,14 @@
 
                     notes.push(note);
                     localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
+            if (typeof apiClient !== 'undefined' && apiClient.saveCreditDebitNote) apiClient.saveCreditDebitNote(note).catch(console.warn);
                 }
             }
 
             // 3. Handle Damage (Expense Impact)
             if (type === 'Damage') {
                 const expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-                expenses.push({
+            const expEntry = {
                     expense_id: Date.now().toString(),
                     expense_date: returnData.return_date,
                     expense_category: "Damage / Loss",
@@ -613,8 +616,10 @@
                     payment_mode: "Adjustment",
                     remarks: `Damage Entry: ${returnData.reason}`,
                     created_at: new Date().toISOString()
-                });
+            };
+            expenses.push(expEntry);
                 localStorage.setItem('expenses', JSON.stringify(expenses));
+            if (typeof apiClient !== 'undefined' && apiClient.saveExpense) apiClient.saveExpense(expEntry).catch(console.warn);
             }
 
             alert("Return processed successfully!");

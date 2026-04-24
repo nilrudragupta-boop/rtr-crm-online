@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>Bill of Materials (BOM)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="apiClient.js"></script>
     <script src="settings.js"></script>
     <style>
         body {
@@ -947,6 +948,7 @@
                 boms.push(bom);
             }
             localStorage.setItem("boms", JSON.stringify(boms));
+        if (typeof apiClient !== 'undefined' && apiClient.saveBom) apiClient.saveBom(bom).catch(console.warn);
 
             // Sync calculated unit cost to Finished Good's item master as salePrice
             let itemUpdated = false;
@@ -960,6 +962,11 @@
             }
             if (itemUpdated) {
                 localStorage.setItem("items", JSON.stringify(items));
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].name === finishedGoodName && (!finishedGoodCode || items[i].itemCode === finishedGoodCode)) {
+                    if (typeof apiClient !== 'undefined' && apiClient.saveItem) apiClient.saveItem(items[i]).catch(console.warn);
+                }
+            }
             }
 
             alert(editingId ? "BOM updated successfully!" : "BOM saved successfully!");
@@ -1241,6 +1248,7 @@
 
             boms[bomIdx] = bom;
             localStorage.setItem("boms", JSON.stringify(boms));
+        if (typeof apiClient !== 'undefined' && apiClient.saveBom) apiClient.saveBom(bom).catch(console.warn);
 
             const items = JSON.parse(localStorage.getItem("items")) || [];
             let itemUpdated = false;
@@ -1255,6 +1263,7 @@
                 }
             }
             if (itemUpdated) localStorage.setItem("items", JSON.stringify(items));
+        if (itemUpdated && typeof apiClient !== 'undefined' && apiClient.saveItem) items.forEach(i => { if (i.name === bom.finishedGoodName && (!bom.finishedGoodCode || i.itemCode === bom.finishedGoodCode)) apiClient.saveItem(i).catch(console.warn); });
 
             alert("BOM rates updated successfully!");
             loadExistingBOMs();
@@ -1266,6 +1275,7 @@
             let boms = JSON.parse(localStorage.getItem("boms")) || [];
             boms = boms.filter(b => b.id !== bomId);
             localStorage.setItem("boms", JSON.stringify(boms));
+        if (typeof apiClient !== 'undefined' && apiClient.deleteBom) apiClient.deleteBom(bomId).catch(console.warn);
             loadExistingBOMs();
         }
 

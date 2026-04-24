@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="apiClient.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
@@ -1939,10 +1940,12 @@
                         const bankTx = JSON.parse(localStorage.getItem('bank_transactions')) || [];
                         bankTx.push(tx);
                         localStorage.setItem('bank_transactions', JSON.stringify(bankTx));
+                    if (typeof apiClient !== 'undefined' && apiClient.saveBankTransaction) apiClient.saveBankTransaction(tx).catch(console.warn);
                     }
                 }
 
                 localStorage.setItem("expenses", JSON.stringify(expenses));
+            if (typeof apiClient !== 'undefined' && apiClient.saveExpense) apiClient.saveExpense(record).catch(console.warn);
                 clearForm();
                 renderTable();
                 updateKPIs();
@@ -2042,6 +2045,7 @@
             askConfirm("Delete Expense", "Are you sure you want to delete this expense?", () => {
                 expenses = expenses.filter(e => e.expense_id !== id);
                 localStorage.setItem("expenses", JSON.stringify(expenses));
+            if (typeof apiClient !== 'undefined' && apiClient.deleteExpense) apiClient.deleteExpense(id).catch(console.warn);
                 renderTable();
                 updateKPIs();
             });
