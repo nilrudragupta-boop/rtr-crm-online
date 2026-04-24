@@ -267,6 +267,7 @@
                     class="fas fa-user-secret"></i>
                 Vault Ledger</h2>
             <div>
+                <button onclick="syncShadowLedger()" style="background: #2980b9;" title="Sync data securely to MongoDB"><i class="fas fa-cloud-upload-alt"></i> Sync to Cloud</button>
                 <button onclick="toggleChart()" style="background: #8e44ad;"><i class="fas fa-chart-bar"></i> Toggle
                     Chart</button>
                 <button onclick="changeVaultPassword()" style="background: #34495e;"
@@ -408,6 +409,30 @@
 
         let brandClickCount = 0;
         let brandClickTimer = null;
+
+        async function syncShadowLedger() {
+            const btn = document.querySelector('button[onclick="syncShadowLedger()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/shadow_ledger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ shadow_ledger_data: shadowData })
+                });
+                
+                if (response.ok) alert("Vault Ledger synced to MongoDB successfully! ✅");
+                else alert("Failed to sync Vault Ledger to MongoDB. ❌");
+            } catch (error) {
+                console.error("Error syncing to MongoDB:", error);
+                alert("Network error connecting to MongoDB backend. ❌");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
 
         function closeVault() {
             if (window.parent && window.parent !== window && typeof window.parent.returnToDashboard === 'function') {
