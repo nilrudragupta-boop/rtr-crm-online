@@ -2156,6 +2156,28 @@
         let currentOtpCallback = null;
         let secureOtpTimerInterval = null;
 
+        // Mobile/Touch friendly secret vault trigger
+        let secretTapCount = 0;
+        let secretTapTimer = null;
+
+        function handleSecretTap() {
+            secretTapCount++;
+            clearTimeout(secretTapTimer);
+            if (secretTapCount >= 5) {
+                secretTapCount = 0;
+                const vaultBtn = document.getElementById('vaultLedgerBtn');
+                if (vaultBtn) vaultBtn.click();
+            } else {
+                secretTapTimer = setTimeout(() => { secretTapCount = 0; }, 2000);
+            }
+        }
+
+        function applyShadowLedgerVisibility() {
+            const isVisible = localStorage.getItem('show_shadow_ledger') === 'true';
+            const btn = document.getElementById('vaultLedgerBtn');
+            if (btn) btn.style.display = isVisible ? 'flex' : 'none';
+        }
+
         // Track opened windows
         const openedWindows = {};
         let isSpaMode = localStorage.getItem("spaMode") === "true";
@@ -2413,7 +2435,6 @@
             syncRemoteLicense(); // Sync directly from Developer's Google Script
             syncRemoteConfig();  // Sync remote user & company details
             updateSystemHealth();
-            applyShadowLedgerVisibility();
 
             window.addEventListener('online', updateSystemHealth);
             window.addEventListener('offline', updateSystemHealth);
@@ -2629,7 +2650,7 @@
                 openedWindows[url].focus();
                 return;
             }
-            
+
             // Auto-hide the Vault Ledger button when navigating (including clicking it)
             if (localStorage.getItem('show_shadow_ledger') === 'true') {
                 localStorage.setItem('show_shadow_ledger', 'false');
