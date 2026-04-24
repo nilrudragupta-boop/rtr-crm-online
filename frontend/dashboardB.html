@@ -12,7 +12,6 @@
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
     <script src="config.js"></script>
-    <script src="apiClient.js"></script>
 
     <style>
         :root {
@@ -2181,6 +2180,12 @@
 
             // Seamlessly refresh the KPIs and Charts with the latest data
             loadDashboardData();
+
+            // Auto-hide the Vault Ledger button when navigating
+            if (localStorage.getItem('show_shadow_ledger') === 'true') {
+                localStorage.setItem('show_shadow_ledger', 'false');
+                if (typeof applyShadowLedgerVisibility === 'function') applyShadowLedgerVisibility();
+            }
         }
 
         function toggleSection(wrapperId, headerElement) {
@@ -2335,12 +2340,12 @@
             if (btn) btn.style.display = (daysLeft <= 30) ? 'inline-block' : 'none';
         }
 
-        function enforceLicenseExpiry() {
-            const today = new Date();
-            if (today > EXPIRY_DATE) {
-                window.location.href = 'expired.html';
-            }
+    function enforceLicenseExpiry() {
+        const today = new Date();
+        if (today > EXPIRY_DATE) {
+            window.location.href = 'expired.html';
         }
+    }
 
         function updateSystemHealth() {
             const netStatus = document.getElementById('netStatus');
@@ -2408,6 +2413,7 @@
             syncRemoteLicense(); // Sync directly from Developer's Google Script
             syncRemoteConfig();  // Sync remote user & company details
             updateSystemHealth();
+            applyShadowLedgerVisibility();
 
             window.addEventListener('online', updateSystemHealth);
             window.addEventListener('offline', updateSystemHealth);
@@ -2458,11 +2464,11 @@
                 document.getElementById('sidebar').classList.add('collapsed');
             }
 
-
+            
             enforceLicenseExpiry();
             setInterval(enforceLicenseExpiry, 60000); // Actively monitor expiry every minute
 
-            // License Info
+        // License Info
             updateLicenseDisplay();
 
             const lastLogin = localStorage.getItem("lastLoginDate");
@@ -2622,6 +2628,12 @@
             if (!isSpaMode && openedWindows[url] && !openedWindows[url].closed) {
                 openedWindows[url].focus();
                 return;
+            }
+            
+            // Auto-hide the Vault Ledger button when navigating (including clicking it)
+            if (localStorage.getItem('show_shadow_ledger') === 'true') {
+                localStorage.setItem('show_shadow_ledger', 'false');
+                if (typeof applyShadowLedgerVisibility === 'function') applyShadowLedgerVisibility();
             }
 
 
@@ -2930,7 +2942,7 @@
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
                 } catch (e) { console.error(e); }
-
+                
                 if (res.companyName) {
                     document.querySelectorAll('[data-brand="name"]').forEach(el => el.innerText = res.companyName);
                 }
@@ -2943,29 +2955,29 @@
             }
         }
 
-        async function loadDashboardData() {
-            let invoices = [];
-            let purchases = [];
-            let items = [];
-            let productions = JSON.parse(localStorage.getItem("production")) || [];
-            let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+    async function loadDashboardData() {
+        let invoices = [];
+        let purchases = [];
+        let items = [];
+        let productions = JSON.parse(localStorage.getItem("production")) || [];
+        let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
-            try {
-                const [invRes, purRes, itemsRes] = await Promise.all([
-                    fetch('api/invoices').then(res => res.json()).catch(() => ({ success: false })),
-                    fetch('api/purchases').then(res => res.json()).catch(() => ({ success: false })),
-                    fetch('api/items').then(res => res.json()).catch(() => ({ success: false }))
-                ]);
-
-                if (invRes.success) invoices = invRes.data; else invoices = JSON.parse(localStorage.getItem("invoices")) || [];
-                if (purRes.success) purchases = purRes.data; else purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-                if (itemsRes.success) items = itemsRes.data; else items = JSON.parse(localStorage.getItem("items")) || [];
-            } catch (e) {
-                console.error("API Fetch Error:", e);
-                invoices = JSON.parse(localStorage.getItem("invoices")) || [];
-                purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-                items = JSON.parse(localStorage.getItem("items")) || [];
-            }
+        try {
+            const [invRes, purRes, itemsRes] = await Promise.all([
+                fetch('api/invoices').then(res => res.json()).catch(() => ({ success: false })),
+                fetch('api/purchases').then(res => res.json()).catch(() => ({ success: false })),
+                fetch('api/items').then(res => res.json()).catch(() => ({ success: false }))
+            ]);
+            
+            if (invRes.success) invoices = invRes.data; else invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            if (purRes.success) purchases = purRes.data; else purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            if (itemsRes.success) items = itemsRes.data; else items = JSON.parse(localStorage.getItem("items")) || [];
+        } catch(e) {
+            console.error("API Fetch Error:", e);
+            invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            items = JSON.parse(localStorage.getItem("items")) || [];
+        }
 
             // 1. KPIs
             const now = new Date();
@@ -3943,7 +3955,7 @@
             } else {
                 let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
                 let contactNumber = localStorage.getItem('contactNumber') || "";
-
+                
                 if (scriptUrl && scriptUrl.startsWith("http")) {
                     try {
                         const response = await fetch(scriptUrl, {
@@ -5363,8 +5375,8 @@
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
             };
 
-            if (isWebMode) {
-                resultsContainer.innerHTML = `
+        if (isWebMode) {
+            resultsContainer.innerHTML = `
                 <table class="system-check-table">
                     <thead><tr><th>Browser Property</th><th>Detected Security Value</th></tr></thead>
                     <tbody>
@@ -5377,8 +5389,8 @@
                     </tbody>
                 </table>
             `;
-                return;
-            }
+            return;
+        }
 
             const checks = [
                 { key: 'os', value: info.os },
