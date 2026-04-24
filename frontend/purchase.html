@@ -690,7 +690,6 @@
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px; user-select:none; margin:0;">
                     <input type="checkbox" id="showExtraFieldsToggle" onchange="toggleExtraFields()"> Show Extra Fields
                 </label>
-                <button class="btn-close" onclick="openCloseModal()">Close</button>
             </div>
         </h2>
     </div>
@@ -931,8 +930,6 @@
         <button onclick="openSettingsModal()" style="background:#607d8b; color: white;">⚙️ Table Settings</button>
     </div>
 
-    <input type="file" id="importJsonInput" accept=".json" style="display:none"
-        onchange="importPurchasesJSON(this)">
 
     <!-- Search Filters -->
     <div class="filter-row">
@@ -1229,18 +1226,6 @@
             <p id="successMsg">Operation successful.</p>
             <div class="modal-buttons">
                 <button class="btn-search" onclick="closeSuccessModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Close Confirmation Modal -->
-    <div id="closeConfirmModal" class="modal">
-        <div class="modal-content">
-            <h3 style="color: #c0392b;">❌ Confirm Close</h3>
-            <p>Are you sure you want to close this window?</p>
-            <div class="modal-buttons">
-                <button class="btn-delete" onclick="window.close()">Yes, Close</button>
-                <button class="btn-search" onclick="closeCloseModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -3254,10 +3239,6 @@
             }, 500);
         }
 
-        // Close Modal
-        function openCloseModal() { $("closeConfirmModal").style.display = "flex"; }
-        function closeCloseModal() { $("closeConfirmModal").style.display = "none"; }
-
         function viewPurchase(id) {
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const p = purchases.find(x => x.id == id);
@@ -3397,78 +3378,6 @@
                 return false;
             }
             return true;
-        }
-
-        function confirmExport() {
-            askConfirm("Confirm Export", "Are you sure you want to export purchase data?", () => {
-                exportPurchasesJSON();
-            });
-        }
-
-        function exportPurchasesJSON() {
-            const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            if (purchases.length === 0) {
-                showToast("No data to export ⚠️");
-                return;
-            }
-            const dataStr = JSON.stringify(purchases, null, 2);
-
-            const encrypted = CryptoJS.AES.encrypt(dataStr, '983042').toString();
-
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "purchases_backup_enc.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            showToast("Purchases exported successfully! ✅");
-        }
-
-        async function importPurchasesJSON(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async function (e) {
-                try {
-                    const fileContent = e.target.result;
-                    let importedData = null;
-
-                    // 1. Try Decrypting
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) importedData = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                    // 2. Fallback to plain JSON
-                    if (!importedData) importedData = JSON.parse(fileContent);
-
-                    if (!Array.isArray(importedData)) {
-                        showToast("Invalid JSON format ❌");
-                        return;
-                    }
-
-                    let addedCount = 0;
-                    let updatedCount = 0;
-
-                    for (let newItem of importedData) {
-                        if (!newItem.id) newItem.id = Date.now() + Math.random();
-                        await apiClient.savePurchase(newItem);
-                        addedCount++;
-                    }
-
-                    await loadPurchases();
-                    openSuccessModal(`Imported: ${addedCount} added, ${updatedCount} updated ✅`);
-                } catch (err) {
-                    console.error(err);
-                    showToast("Error parsing JSON file ❌");
-                }
-                input.value = ""; // Reset input
-            };
-            reader.readAsText(file);
         }
 
         async function savePaymentDate(id) {

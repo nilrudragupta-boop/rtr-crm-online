@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>Stock Report</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="apiClient.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -63,13 +64,6 @@
 
         .btn-reset {
             background: #f39c12;
-        }
-
-        .nav-btn {
-            color: #fff;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         table {
@@ -207,10 +201,6 @@
             font-size: 13px;
         }
 
-        .hide-nav {
-            display: none !important;
-        }
-
         /* Grey Mode */
         body.grey-mode button {
             background-color: #6c757d !important;
@@ -310,46 +300,7 @@
             style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px; user-select:none; background:#6c757d; color:white; padding:8px; border-radius:4px;">
             <input type="checkbox" id="compactViewToggle" onchange="toggleCompactView()"> Compact View
         </label>
-        <button class="btn-close" onclick="openCloseModal()">❌ Close</button>
 
-    </div>
-
-    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 15px;">
-        <button onclick="openWindow('reminder.html', 1100, 700)" class="nav-btn" style="background:#4e02ff;"
-            data-tooltip="Set reminders for Customer" data-permission-id="perm_reminder">⏰Reminder</button>
-
-        <button onclick="openWindow('invoice.html', 800, 600)" class="nav-btn" style="background:#c44be9;"
-            data-tooltip="Create a new invoice" data-permission-id="perm_make_invoice">👥Smart Invoice</button>
-
-        <button onclick="openWindow('purchase.html', 1000, 700)" class="nav-btn" style="background:#e6b207;"
-            data-tooltip="Record purchases" data-permission-id="perm_purchase_entries">🛍️Purchase Entries</button>
-
-        <button onclick="openWindow('supplier.html', 800, 600)" class="nav-btn" style="background:#057dec;"
-            data-tooltip="Manage suppliers database" data-permission-id="perm_supplier_manager">🚚Supplier
-            Manager</button>
-
-        <button onclick="openWindow('item.html', 800, 600)" class="nav-btn" style="background:#4ac4be;"
-            data-tooltip="Manage items database" data-permission-id="perm_manage_items"> 📋Manage Items</button>
-
-        <button onclick="openWindow('customer.html', 800, 600)" class="nav-btn" style="background:#c44be9;"
-            data-tooltip="Manage customer database" data-permission-id="perm_manage_customers">👥Manage
-            Customers</button>
-
-        <button id="report" onclick="openWindow('report.html', 1000, 700)" class="nav-btn" style="background:#1f22fd;"
-            data-permission-id="perm_invoice_report">📊Invoice
-            Report</button>
-    </div>
-
-    <!-- Close Confirmation Modal -->
-    <div id="closeConfirmModal" class="modal">
-        <div class="modal-content">
-            <h3 style="color: #dc3545;">❌ Confirm Close</h3>
-            <p>Are you sure you want to close this report?</p>
-            <div class="modal-buttons">
-                <button class="btn-close" onclick="window.close()">Yes, Close</button>
-                <button class="btn-print" onclick="closeCloseModal()">Cancel</button>
-            </div>
-        </div>
     </div>
 
     <!-- Settings Modal -->
@@ -357,10 +308,6 @@
         <div class="modal-content" style="width: 400px; text-align: left;">
             <h3 style="color: #607d8b; text-align: center; margin-top: 0;">⚙️ Table Settings</h3>
             <div style="margin-bottom: 15px; text-align: left; padding-left: 20px;">
-                <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold;">
-                    <input type="checkbox" id="showNavButtonsToggle" onchange="toggleShowNavButtons()"> Show Navigation
-                    Buttons
-                </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top: 5px;">
                     <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
@@ -707,7 +654,7 @@
                     : escapeHtml(part);
             }).join('');
         }
-        
+
         function getRawMaterialStockMap() {
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const invoices = JSON.parse(localStorage.getItem("invoices")) || [];
@@ -765,20 +712,20 @@
         function calculateMaxPossible(bom, rmStockMap) {
             let maxBatches = Infinity;
             if (!bom.rawMaterials || bom.rawMaterials.length === 0) return 0;
-            
+
             for (const rm of bom.rawMaterials) {
                 const rmName = (rm.itemName || "").trim().toLowerCase();
                 const requiredQty = parseFloat(rm.qty) || 0;
                 if (requiredQty <= 0) continue;
-                
+
                 const availableStock = rmStockMap[rmName] || 0;
                 const possibleBatches = availableStock / requiredQty;
-                
+
                 if (possibleBatches < maxBatches) {
                     maxBatches = possibleBatches;
                 }
             }
-            
+
             if (maxBatches === Infinity || maxBatches < 0) return 0;
             return maxBatches * (parseFloat(bom.outputQty) || 1);
         }
@@ -836,16 +783,9 @@
         }
 
         // --- Settings Logic ---
-        let showNavButtons = localStorage.getItem("stockReportShowNavButtons") !== "false";
         let isGreyButtons = localStorage.getItem("stockReportGreyButtons") === "true";
         let isFreezePanes = localStorage.getItem("stockFreezePanes") === "true";
         let numFreezeCols = parseInt(localStorage.getItem("stockFreezeCols")) || 3;
-
-        function toggleShowNavButtons() {
-            showNavButtons = document.getElementById("showNavButtonsToggle").checked;
-            localStorage.setItem("stockReportShowNavButtons", showNavButtons);
-            applyNavButtonsVisibility();
-        }
 
         function toggleGreyButtons() {
             isGreyButtons = document.getElementById("greyButtonsToggle").checked;
@@ -856,18 +796,6 @@
         function applyGreyButtons() {
             if (isGreyButtons) document.body.classList.add("grey-mode");
             else document.body.classList.remove("grey-mode");
-        }
-
-        function applyNavButtonsVisibility() {
-            const btns = document.querySelectorAll(".nav-btn");
-            btns.forEach(btn => {
-                if (showNavButtons) {
-                    btn.classList.remove("hide-nav");
-                } else {
-                    btn.classList.add("hide-nav");
-                }
-            });
-            if (typeof applyUIPermissions === 'function') applyUIPermissions();
         }
 
         function toggleFreezePanesAction() {
@@ -1432,8 +1360,6 @@
         // --- Settings Modal Logic ---
         function openSettingsModal() {
             document.getElementById('settingsModal').style.display = 'flex';
-            const navToggle = document.getElementById("showNavButtonsToggle");
-            if (navToggle) navToggle.checked = showNavButtons;
 
             const greyToggle = document.getElementById("greyButtonsToggle");
             if (greyToggle) greyToggle.checked = isGreyButtons;
@@ -1597,10 +1523,6 @@
             });
         }
 
-        // Close Modal
-        function openCloseModal() { document.getElementById("closeConfirmModal").style.display = "flex"; }
-        function closeCloseModal() { document.getElementById("closeConfirmModal").style.display = "none"; }
-
         // Dark Mode Logic
         let currentTheme = localStorage.getItem("appThemeMode") || "system";
 
@@ -1717,7 +1639,6 @@
             updateColumnStyles();
             applyCompactView();
             applyGreyButtons();
-            applyNavButtonsVisibility();
             applyFreezePanes();
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;

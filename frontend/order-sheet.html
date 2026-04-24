@@ -6,6 +6,7 @@
     <title>Order Copy</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="apiClient.js"></script>
     <script src="settings.js"></script>
     <script src="brandLoader.js"></script>
     <script src="brand.service.js"></script>
@@ -391,7 +392,8 @@
 
     <div class="header no-print">
         <div style="flex: 1;"></div>
-        <h2 style="flex: 1; text-align: center; white-space: nowrap;"><i class="fas fa-file-invoice"></i> Order Copy - <span data-brand="name"></span></h2>
+        <h2 style="flex: 1; text-align: center; white-space: nowrap;"><i class="fas fa-file-invoice"></i> Order Copy -
+            <span data-brand="name"></span></h2>
         <div style="flex: 1; text-align: right;">
             <button class="btn btn-secondary" onclick="openSettingsModal()"><i class="fas fa-cog"></i> Settings</button>
             <button class="btn btn-info" onclick="toggleView()" id="viewToggleBtn"
@@ -400,7 +402,6 @@
             <button class="btn btn-warning" onclick="clearForm()"><i class="fas fa-eraser"></i> Clear</button>
             <button class="btn btn-success" onclick="saveOrder()"><i class="fas fa-save"></i> Save Order</button>
             <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Print / PDF</button>
-            <button class="btn btn-danger" onclick="window.close()"><i class="fas fa-times"></i> Close</button>
         </div>
     </div>
 
@@ -823,24 +824,24 @@
             const order = orders.find(o => o.orderNo === orderNo);
             if (order) {
                 const oldStatus = order.status || 'Pending';
-                
-                askConfirm("Change Status", `Are you sure you want to change the status of ${orderNo} from ${oldStatus} to ${newStatus}?`, 
-                () => {
-                    order.status = newStatus;
-                    localStorage.setItem("order_sheets", JSON.stringify(orders));
 
-                    let statusColor = '#333';
-                    if (newStatus === 'Completed') statusColor = '#27ae60';
-                    else if (newStatus === 'Pending') statusColor = '#f39c12';
-                    else if (newStatus === 'Cancelled') statusColor = '#e74c3c';
-                    else if (newStatus === 'Processing') statusColor = '#3498db';
+                askConfirm("Change Status", `Are you sure you want to change the status of ${orderNo} from ${oldStatus} to ${newStatus}?`,
+                    () => {
+                        order.status = newStatus;
+                        localStorage.setItem("order_sheets", JSON.stringify(orders));
 
-                    selectElement.style.color = statusColor;
-                    selectElement.style.borderColor = statusColor;
-                }, 
-                () => {
-                    selectElement.value = oldStatus;
-                });
+                        let statusColor = '#333';
+                        if (newStatus === 'Completed') statusColor = '#27ae60';
+                        else if (newStatus === 'Pending') statusColor = '#f39c12';
+                        else if (newStatus === 'Cancelled') statusColor = '#e74c3c';
+                        else if (newStatus === 'Processing') statusColor = '#3498db';
+
+                        selectElement.style.color = statusColor;
+                        selectElement.style.borderColor = statusColor;
+                    },
+                    () => {
+                        selectElement.value = oldStatus;
+                    });
             }
         }
 
@@ -851,10 +852,10 @@
 
             const yesBtn = document.getElementById('actionConfirmBtnYes');
             const noBtn = document.getElementById('actionConfirmBtnNo');
-            
+
             const newYesBtn = yesBtn.cloneNode(true);
             yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
-            
+
             const newNoBtn = noBtn.cloneNode(true);
             noBtn.parentNode.replaceChild(newNoBtn, noBtn);
 
@@ -862,7 +863,7 @@
                 closeModal('actionConfirmModal');
                 if (onConfirm) onConfirm();
             };
-            
+
             newNoBtn.onclick = () => {
                 closeModal('actionConfirmModal');
                 if (onCancel) onCancel();

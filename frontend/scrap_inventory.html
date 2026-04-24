@@ -159,18 +159,12 @@
     <div class="header">
         <h2>🗑️ Scrap Inventory [Please Check before Entry] - <span data-brand="name"></span></h2>
         <div>
-            <button class="btn btn-warning" onclick="exportScrapsJSON()" data-permission-id="perm_backup_data">Export
-                JSON</button>
-            <button class="btn btn-info" onclick="document.getElementById('importFile').click()"
-                data-permission-id="perm_restore_data">Import JSON</button>
-            <input type="file" id="importFile" style="display:none" onchange="importScrapsJSON(this)" accept=".json">
             <button class="btn btn-secondary"
                 onclick="window.open('scrap_report.html', 'scrap_report', 'width=1000,height=700')">📊 View
                 Report</button>
             <button class="btn btn-success" onclick="exportHistoryExcel()">📊 Export Excel</button>
             <button class="btn btn-secondary" onclick="location.reload()" style="background:#17a2b8;">🔄
                 Refresh</button>
-            <button class="btn btn-danger" onclick="window.close()">Close</button>
         </div>
     </div>
 
@@ -556,79 +550,6 @@
             const ws = XLSX.utils.aoa_to_sheet(exportData);
             XLSX.utils.book_append_sheet(wb, ws, "Scrap History");
             XLSX.writeFile(wb, "Scrap_History.xlsx");
-        }
-
-        // Export JSON (Encrypted)
-        function exportScrapsJSON() {
-            if (scraps.length === 0) {
-                alert("No scrap data to export");
-                return;
-            }
-
-            const dataStr = JSON.stringify(scraps, null, 2);
-            const encrypted = CryptoJS.AES.encrypt(dataStr, '983042').toString();
-
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "scrap_inventory_backup_enc.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // Import JSON (Encrypted/Plain)
-        async function importScrapsJSON(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const fileContent = e.target.result;
-                    let importedData = null;
-
-                    // 1. Try Decrypting
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) importedData = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                    // 2. Fallback to plain JSON
-                    if (!importedData) importedData = JSON.parse(fileContent);
-
-                    if (!Array.isArray(importedData)) {
-                        alert("Invalid JSON format");
-                        return;
-                    }
-
-                    let added = 0;
-                    let failed = 0;
-
-                    for (const newItem of importedData) {
-                        // Ensure ID exists
-                        if (!newItem.id) newItem.id = Date.now().toString() + '_scrap_' + Math.random().toString(36).substr(2, 5);
-
-                        const result = await apiClient.saveScrap(newItem);
-                        if (result.success) {
-                            added++;
-                        } else {
-                            failed++;
-                        }
-                    }
-
-                    alert(`Import Complete!\nAdded/Updated: ${added}\nFailed: ${failed}`);
-                    await loadData(); // Reload data to update UI and stock calculations
-
-                } catch (err) {
-                    console.error(err);
-                    alert("Error parsing JSON file");
-                }
-                input.value = ""; // Reset input
-            };
-            reader.readAsText(file);
         }
     </script>
 </body>

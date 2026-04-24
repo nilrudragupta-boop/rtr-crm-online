@@ -9,7 +9,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
@@ -24,52 +23,6 @@
             display: flex;
             height: 100vh;
             overflow: hidden;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 240px;
-            background: #2c3e50;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            flex-shrink: 0;
-        }
-
-        .sidebar h3 {
-            margin-top: 0;
-            margin-bottom: 30px;
-            font-size: 18px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-bottom: 1px solid #34495e;
-            padding-bottom: 10px;
-            color: #ecf0f1;
-        }
-
-        .sidebar a {
-            color: #bdc3c7;
-            text-decoration: none;
-            padding: 12px 15px;
-            border-radius: 6px;
-            margin-bottom: 5px;
-            display: block;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-
-        .sidebar a:hover,
-        .sidebar a.active {
-            background: #34495e;
-            color: white;
-            transform: translateX(5px);
-        }
-
-        .sidebar i {
-            width: 25px;
-            text-align: center;
-            margin-right: 10px;
         }
 
         /* Main Content Styles */
@@ -361,8 +314,6 @@
         }
 
         @media print {
-
-            .sidebar,
             .controls,
             .header,
             .pagination-container,
@@ -386,26 +337,6 @@
 
 <body>
 
-
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <h3><i class="fas fa-file-invoice-dollar"></i> Finance</h3>
-
-        <a href="#" onclick="window.open('invoice.html', 'invoice', 'width=800,height=600')"><i
-                class="fas fa-file-invoice"></i> Invoice</a>
-        <a href="#" onclick="window.open('purchase.html', 'purchase', 'width=1000,height=700')"><i
-                class="fas fa-shopping-cart"></i> Purchase</a>
-        <a href="#" onclick="window.open('supplier.html', 'supplier', 'width=800,height=600')"><i
-                class="fas fa-truck"></i>
-            Supplier Manager</a>
-        <a href="#" onclick="window.open('ledger.html', 'ledger', 'width=1000,height=800')"><i class="fas fa-book"></i>
-            Ledger</a>
-        <a href="#" onclick="window.open('report.html', 'report', 'width=1000,height=700')"><i
-                class="fas fa-chart-bar"></i> Reports</a>
-        <div style="flex:1"></div>
-        <a href="#" onclick="window.close()" style="background: #c0392b; color: white; text-align: center;"><i
-                class="fas fa-times"></i> Close Window</a>
-    </div>
 
     <div class="main-content">
         <div class="header">
@@ -1286,71 +1217,6 @@
         }
 
         fetchNotesData();
-
-        // Export JSON (Encrypted)
-        function exportNotesJSON() {
-            if (!notes || notes.length === 0) {
-                alert("No notes to export");
-                return;
-            }
-            const dataStr = JSON.stringify(notes, null, 2);
-            const encrypted = CryptoJS.AES.encrypt(dataStr, '983042').toString();
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "credit_debit_notes_backup_enc.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // Import JSON (Encrypted/Plain)
-        async function importNotesJSON(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async function (e) {
-                try {
-                    const fileContent = e.target.result;
-                    let importedData = null;
-
-                    // 1. Try Decrypting
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) importedData = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                    // 2. Fallback to plain JSON
-                    if (!importedData) importedData = JSON.parse(fileContent);
-
-                    if (!Array.isArray(importedData)) {
-                        alert("Invalid JSON format");
-                        return;
-                    }
-
-                    let added = 0;
-                    let updated = 0;
-
-                    for (let newItem of importedData) {
-                        // Ensure ID exists
-                        if (!newItem.id) newItem.id = Date.now().toString() + '_note_' + Math.random().toString(36).substr(2, 5);
-                        await apiClient.saveCreditDebitNote(newItem);
-                        added++;
-                    }
-
-                    await fetchNotesData();
-                    alert(`Import Successful!\nAdded: ${added}\nUpdated: ${updated}`);
-                } catch (err) {
-                    console.error(err);
-                    alert("Error parsing JSON file");
-                }
-                input.value = ""; // Reset input
-            };
-            reader.readAsText(file);
-        }
 
         // --- Action Dropdown Logic ---
         function toggleActionMenu(btn) {

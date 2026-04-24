@@ -85,9 +85,6 @@
             color: #fff !important;
         }
 
-        .nav-btn {
-            background: #858796;
-        }
 
         table {
             width: 100%;
@@ -657,34 +654,6 @@
             style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size:14px; margin-left: 10px;">
             <input type="checkbox" id="tFormatToggle" onchange="toggleTFormat()"> T-Format View
         </label>
-        <button class="btn-close" onclick="openCloseModal()">❌ Close</button>
-    </div>
-
-    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 15px;" class="no-print">
-        <button onclick="openWindow('reminder.html', 1100, 700)" class="nav-btn" style="background:#4e02ff;"
-            data-tooltip="Set reminders for Customer">⏰Reminder</button>
-
-        <button onclick="openWindow('invoice.html', 800, 600)" class="nav-btn" style="background:#c44be9;"
-            data-tooltip="Create a new invoice">👥Smart Invoice</button>
-
-        <button onclick="openWindow('purchase.html', 1000, 700)" class="nav-btn" style="background:#e6b207;"
-            data-tooltip="Record purchases">🛍️Purchase Entries</button>
-
-        <button onclick="openWindow('supplier.html', 800, 600)" class="nav-btn" style="background:#057dec;"
-            data-tooltip="Manage suppliers database">🚚Supplier Manager</button>
-
-        <button onclick="openWindow('item.html', 800, 600)" class="nav-btn" style="background:#4ac4be;"
-            data-tooltip="Manage items database"> 📋Manage Items</button>
-
-        <button onclick="openWindow('customer.html', 800, 600)" class="nav-btn" style="background:#c44be9;"
-            data-tooltip="Manage customer database">👥Manage Customers</button>
-
-        <button onclick="openWindow('stock_report.html', 1000, 700)" class="nav-btn" style="background:#16a085;"
-            data-tooltip="View stock report">📦Stock Report</button>
-
-        <button id="report" onclick="openWindow('report.html', 1000, 700)" class="nav-btn"
-            style="background:#1f22fd;">📊Invoice
-            Report</button>
     </div>
 
     <!-- KPI Cards -->
@@ -726,10 +695,6 @@
         <div class="modal-content" style="width: 400px; text-align: left;">
             <h3 style="color: #607d8b; text-align: center; margin-top: 0;">⚙️ Table Settings</h3>
             <div style="margin-bottom: 15px; text-align: left; padding-left: 20px;">
-                <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold;">
-                    <input type="checkbox" id="showNavButtonsToggle" onchange="toggleShowNavButtons()"> Show Navigation
-                    Buttons
-                </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top: 5px;">
                     <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
@@ -803,18 +768,6 @@
         </div>
     </div>
 
-    <!-- Close Confirmation Modal -->
-    <div id="closeConfirmModal" class="modal">
-        <div class="modal-content">
-            <h3 style="color: #dc3545;">❌ Confirm Close</h3>
-            <p>Are you sure you want to close this report?</p>
-            <div class="modal-buttons">
-                <button class="btn-close" onclick="window.close()">Yes, Close</button>
-                <button class="btn-print" onclick="closeCloseModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <h3 style="margin-top: 30px; border-bottom: 2px solid #ddd; padding-bottom: 10px;">Detailed Sales & COGS Schedule
     </h3>
     <input type="text" id="searchBox" placeholder="Search Item in Schedule..." oninput="renderItemTable()"
@@ -869,20 +822,10 @@
         }
 
         // --- Settings Logic ---
-        let showNavButtons = localStorage.getItem("profitLossShowNavButtons") !== "false";
         let isGreyButtons = localStorage.getItem("profitLossGreyButtons") === "true";
 
         // Column visibility state (10 columns total)
         let columnVisibility = JSON.parse(localStorage.getItem("profitLossColumnVisibility")) || new Array(10).fill(true);
-        if (columnVisibility.length !== 10) {
-            columnVisibility = new Array(10).fill(true);
-        }
-
-        function toggleShowNavButtons() {
-            showNavButtons = document.getElementById("showNavButtonsToggle").checked;
-            localStorage.setItem("profitLossShowNavButtons", showNavButtons);
-            applyNavButtonsVisibility();
-        }
 
         function toggleGreyButtons() {
             isGreyButtons = document.getElementById("greyButtonsToggle").checked;
@@ -895,15 +838,8 @@
             else document.body.classList.remove("grey-mode");
         }
 
-        function applyNavButtonsVisibility() {
-            const btns = document.querySelectorAll(".nav-btn");
-            btns.forEach(btn => btn.style.display = showNavButtons ? "" : "none");
-        }
-
         function openSettingsModal() {
             document.getElementById('settingsModal').style.display = 'flex';
-            const navToggle = document.getElementById("showNavButtonsToggle");
-            if (navToggle) navToggle.checked = showNavButtons;
 
             const greyToggle = document.getElementById("greyButtonsToggle");
             if (greyToggle) greyToggle.checked = isGreyButtons;
@@ -1874,10 +1810,6 @@
             renderReport();
         }
 
-        // Close Modal
-        function openCloseModal() { document.getElementById("closeConfirmModal").style.display = "flex"; }
-        function closeCloseModal() { document.getElementById("closeConfirmModal").style.display = "none"; }
-
         // Dark Mode Logic
         let currentTheme = localStorage.getItem("appThemeMode") || "system";
 
@@ -2082,7 +2014,6 @@
             updateColumnStyles();
             // renderReport called by setDateFilter
             applyTheme();
-            applyNavButtonsVisibility();
             applyGreyButtons();
 
             const tToggle = document.getElementById("tFormatToggle");

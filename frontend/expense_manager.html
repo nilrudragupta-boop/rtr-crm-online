@@ -323,7 +323,6 @@
             <span>💸 Expense Ledger - <span data-brand="name">RISE Tech Revolution</span></span>
             <div style="display:flex; align-items:center; gap:10px;">
                 <button class="btn-recurring" onclick="openRecurringModal()">🔄 Manage Recurring</button>
-                <button class="btn-clear" onclick="window.close()">Close</button>
             </div>
         </h2>
 
@@ -574,13 +573,6 @@
             <div>
                 <button class="btn-save" style="background:#17a2b8; margin-right:5px;" 
                     onclick="location.reload()">🔄 Refresh</button>
-                <button id="btnExportJson" class="btn-save" style="background:#f39c12; margin-right:5px;"
-                    onclick="exportExpensesJSON()" data-permission-id="perm_backup_data">Export JSON</button>
-                <button id="btnImportJson" class="btn-save" style="background:#2c3e50; margin-right:5px;"
-                    onclick="document.getElementById('importFile').click()"
-                    data-permission-id="perm_restore_data">Import JSON</button>
-                <input type="file" id="importFile" style="display:none" onchange="importExpensesJSON(this)"
-                    accept=".json">
 
                 <button class="btn-save" style="background:#8e44ad; margin-right:5px;" onclick="openVendorManager()">👥
                     Manage Vendors</button>
@@ -756,16 +748,6 @@
                 <h5 style="font-size: 1rem; margin-top: 0; margin-bottom: 10px;">Button Visibility</h5>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top: 5px;">
-                    <input type="checkbox" id="showBtnExportJsonToggle"
-                        onchange="toggleButtonVisibility('btnExportJson', this.checked)"> Show Export JSON
-                </label>
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top: 5px;">
-                    <input type="checkbox" id="showBtnImportJsonToggle"
-                        onchange="toggleButtonVisibility('btnImportJson', this.checked)"> Show Import JSON
-                </label>
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top: 5px;">
                     <input type="checkbox" id="showBtnExportVendorsToggle"
                         onchange="toggleButtonVisibility('btnExportVendors', this.checked)"> Show Export Vendors
                 </label>
@@ -861,8 +843,6 @@
         // --- Settings Modal Logic ---
         let savedButtonVisibility = JSON.parse(localStorage.getItem("expenseButtonVisibility")) || {};
         let buttonVisibility = {
-            btnExportJson: true,
-            btnImportJson: true,
             btnExportVendors: true,
             btnExportExpenses: true,
             ...savedButtonVisibility
@@ -2434,80 +2414,6 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Vendors");
             XLSX.writeFile(wb, "Vendor_List.xlsx");
-        }
-
-        // Export JSON (Encrypted)
-        function exportExpensesJSON() {
-            if (!expenses || expenses.length === 0) {
-                alert("No expenses to export");
-                return;
-            }
-            const dataStr = JSON.stringify(expenses, null, 2);
-            const encrypted = CryptoJS.AES.encrypt(dataStr, '983042').toString();
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "expenses_backup_enc.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // Import JSON (Encrypted/Plain)
-        function importExpensesJSON(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const fileContent = e.target.result;
-                    let importedData = null;
-
-                    // 1. Try Decrypting
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) importedData = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                    // 2. Fallback to plain JSON
-                    if (!importedData) importedData = JSON.parse(fileContent);
-
-                    if (!Array.isArray(importedData)) {
-                        alert("Invalid JSON format");
-                        return;
-                    }
-
-                    let added = 0;
-                    let updated = 0;
-
-                    importedData.forEach(newItem => {
-                        // Ensure ID exists
-                        if (!newItem.expense_id) newItem.expense_id = 'exp_' + Date.now() + Math.random().toString(36).substr(2, 5);
-
-                        const idx = expenses.findIndex(e => e.expense_id === newItem.expense_id);
-                        if (idx > -1) {
-                            expenses[idx] = newItem;
-                            updated++;
-                        } else {
-                            expenses.push(newItem);
-                            added++;
-                        }
-                    });
-
-                    localStorage.setItem("expenses", JSON.stringify(expenses));
-                    renderTable();
-                    updateKPIs();
-                    alert(`Import Successful!\nAdded: ${added}\nUpdated: ${updated}`);
-                } catch (err) {
-                    console.error(err);
-                    alert("Error parsing JSON file");
-                }
-                input.value = ""; // Reset input
-            };
-            reader.readAsText(file);
         }
 
         // --- Vendor Manager Logic ---

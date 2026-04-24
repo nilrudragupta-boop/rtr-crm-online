@@ -728,7 +728,6 @@
                 style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px; user-select:none; margin: 0;">
                 <input type="checkbox" id="compactViewToggle" onchange="toggleCompactView()"> Compact View
             </label>
-            <button class="close-btn" onclick="openCloseModal()" style="margin: 0;">Close</button>
         </div>
     </div>
 
@@ -801,11 +800,6 @@
         <button class="action" id="btnImportCsv" onclick="document.getElementById('importCsvFile').click()"
             style="background:#20c997;" data-permission-id="perm_restore_data">Import CSV</button>
         <input type="file" id="importCsvFile" style="display:none" onchange="importCustomersCSV(this)" accept=".csv">
-        <button class="action" id="btnExportJson" onclick="openExportConfirmModal()" style="background:#f39c12;"
-            data-permission-id="perm_backup_data">Export JSON</button>
-        <button class="action" id="btnImportJson" onclick="document.getElementById('importFile').click()"
-            style="background:#2c3e50;" data-permission-id="perm_restore_data">Import JSON</button>
-        <input type="file" id="importFile" style="display:none" onchange="importCustomersJSON(this)" accept=".json">
         <button class="action" id="btnReceiptLog" onclick="openReceiptLogModal()" style="background:rgb(28, 14, 219);"
             data-permission-id="perm_payment_receipt_log">Receipt Log</button>
         <button class="action" onclick="openSettingsModal()" style="background:#607d8b;">⚙️ Table Settings</button>
@@ -883,18 +877,6 @@
             </div>
         </div>
 
-        <!-- Export Confirmation Modal -->
-        <div id="exportConfirmModal" class="modal">
-            <div class="modal-content">
-                <h3 style="color: #f39c12;">📤 Confirm Export</h3>
-                <p>Are you sure you want to export customer data?</p>
-                <div class="modal-buttons">
-                    <button class="action" style="background:#f39c12;" onclick="performExport()">Yes, Export</button>
-                    <button class="clear" onclick="closeExportConfirmModal()">Cancel</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Clear Confirmation Modal -->
         <div id="clearConfirmModal" class="modal">
             <div class="modal-content">
@@ -941,18 +923,6 @@
             </div>
         </div>
 
-        <!-- Close Confirmation Modal -->
-        <div id="closeConfirmModal" class="modal">
-            <div class="modal-content">
-                <h3 style="color: #dc3545;">❌ Confirm Close</h3>
-                <p>Are you sure you want to close this window?</p>
-                <div class="modal-buttons">
-                    <button class="action" style="background:#dc3545;" onclick="window.close()">Yes, Close</button>
-                    <button class="clear" onclick="closeCloseModal()">Cancel</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Table Settings Modal -->
         <div id="settingsModal" class="modal">
             <div class="modal-content" style="width: 400px; max-height: 85vh; overflow-y: auto;">
@@ -964,16 +934,6 @@
                         style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
                         <input type="checkbox" id="showBtnExportPdfToggle"
                             onchange="toggleButtonVisibility('btnExportPdf', this.checked)"> Show Export PDF
-                    </label>
-                    <label
-                        style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
-                        <input type="checkbox" id="showBtnExportJsonToggle"
-                            onchange="toggleButtonVisibility('btnExportJson', this.checked)"> Show Export JSON
-                    </label>
-                    <label
-                        style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
-                        <input type="checkbox" id="showBtnImportJsonToggle"
-                            onchange="toggleButtonVisibility('btnImportJson', this.checked)"> Show Import JSON
                     </label>
                     <label
                         style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
@@ -1669,10 +1629,6 @@
                 closeEditModal();
             });
 
-            // Close Modal
-            function openCloseModal() { document.getElementById("closeConfirmModal").style.display = "flex"; }
-            function closeCloseModal() { document.getElementById("closeConfirmModal").style.display = "none"; }
-
             function confirmClearForm() {
                 document.getElementById("clearConfirmModal").style.display = "flex";
             }
@@ -1927,10 +1883,6 @@
                 setTimeout(() => (t.className = ""), 3000);
             }
 
-            function openExportConfirmModal() { document.getElementById("exportConfirmModal").style.display = "flex"; }
-            function closeExportConfirmModal() { document.getElementById("exportConfirmModal").style.display = "none"; }
-            function performExport() { closeExportConfirmModal(); exportCustomersJSON(); }
-
             // Export CSV
             function exportCustomersCSV() {
                 if (!customers.length) return showToast("No data to export");
@@ -2070,21 +2022,6 @@
                 return rows;
             }
 
-            // Export JSON
-            function exportCustomersJSON() {
-                if (!customers.length) return showToast("No data to export");
-
-                const jsonString = JSON.stringify(customers, null, 2);
-                // Encrypt data using fixed password '983042'
-                const encrypted = CryptoJS.AES.encrypt(jsonString, '983042').toString();
-
-                const blob = new Blob([encrypted], { type: "text/plain" });
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = "customers_backup_enc.json";
-                a.click();
-            }
-
             function exportCustomersPDF() {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
@@ -2122,65 +2059,10 @@
                 doc.save("customers_list.pdf");
             }
 
-            // Import JSON
-            function importCustomersJSON(input) {
-                const file = input.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const fileContent = e.target.result;
-                        let imported = null;
-
-                        // 1. Try Decrypting
-                        try {
-                            const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                            if (decrypted) imported = JSON.parse(decrypted);
-                        } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                        // 2. Fallback to plain JSON
-                        if (!imported) imported = JSON.parse(fileContent);
-
-                        if (!Array.isArray(imported)) throw new Error("Invalid Data");
-
-                        let added = 0;
-                        let updated = 0;
-
-                        for (const c of imported) {
-                            if (!c.name) continue;
-
-                            let idx = -1;
-                            if (c.id) idx = customers.findIndex(x => String(x.id) === String(c.id));
-                            if (idx === -1) idx = customers.findIndex(x => x.name.trim().toLowerCase() === c.name.trim().toLowerCase());
-
-                            if (idx > -1) {
-                                customers[idx] = { ...customers[idx], ...c, id: customers[idx].id };
-                                if (db) db.collection('customers').doc(customers[idx].id).set(customers[idx]).catch(console.error);
-                                updated++;
-                            } else {
-                                const newId = c.id || generateUniqueId();
-                                const newCustomer = { ...c, id: newId };
-                                customers.push(newCustomer);
-                                if (db) db.collection('customers').doc(newId).set(newCustomer).catch(console.error);
-                                added++;
-                            }
-                        }
-                        localStorage.setItem("customers", JSON.stringify(customers));
-                        applyFilters();
-                        openSuccessModal(`Imported: ${added} added, ${updated} updated.`);
-                    } catch (err) { showToast("Import failed: " + err.message); }
-                    input.value = "";
-                };
-                reader.readAsText(file);
-            }
-
             // --- Button Visibility Logic ---
             let savedButtonVisibility = JSON.parse(localStorage.getItem("customerButtonVisibility")) || {};
             let buttonVisibility = {
                 btnExportPdf: true,
-                btnExportJson: true,
-                btnImportJson: true,
                 btnExportCsv: true,
                 btnImportCsv: true,
                 ...savedButtonVisibility

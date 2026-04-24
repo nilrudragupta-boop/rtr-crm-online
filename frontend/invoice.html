@@ -389,10 +389,6 @@
         .sale-invoice-mode td:nth-child(16) {
             display: none !important;
         }
-
-        .hide-nav {
-            display: none !important;
-        }
     </style>
 </head>
 
@@ -717,25 +713,7 @@
         <div style="text-align: center;">
             <button onclick="openSaveConfirmModal()" style="background:#27ae60;">💾 Save</button>
 
-            <button id="report" class="nav-btn" onclick="openreportWindow()" style="background:#2b2edd;"
-                data-permission-id="perm_invoice_report">📊Invoice Report</button>
-
-            <button class="nav-btn" onclick="openWindow('customer.html', 800, 600)" style="background:#c44be9;"
-                data-permission-id="perm_manage_customers">👥Manage
-                Customers</button>
-            <button class="nav-btn" onclick="openWindow('item.html', 800, 600)" style="background:#4ac4be;"
-                data-permission-id="perm_manage_items"> 📋Manage Items</button>
-            <button class="nav-btn" onclick="openWindow('purchase.html', 1000, 700)" style="background:#e6b207;"
-                data-permission-id="perm_purchase_entries">🛍️Purchase
-                Entries</button>
-            <button class="nav-btn" onclick="openWindow('stock_report.html', 1000, 700)" style="background:#16a085;"
-                data-permission-id="perm_stock_report">📦Stock
-                Report</button>
-
-            <input type="file" id="importFile" style="display:none" onchange="importData(this)" accept=".json">
-
             <button onclick="window.location.href='invoice.html'" style="background:#17a2b8;">🔄 Refresh Page</button>
-            <button class="btn-close" onclick="openCloseModal()" style="background:#fa0202;">Close</button>
         </div>
     </div>
 
@@ -765,10 +743,6 @@
                         <input type="checkbox" id="showFetchItemCode"
                             onchange="toggleValidationVisibility('FetchItemCode')" style="width:auto; margin:0;"> Show
                         'Fetch by Item Code'
-                    </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
-                        <input type="checkbox" id="showNavButtonsToggle" onchange="toggleShowNavButtons()"
-                            style="width:auto; margin:0;"> Show Navigation Buttons
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
                         <input type="checkbox" id="showGstCalc" onchange="toggleValidationVisibility('GstCalc')"
@@ -946,19 +920,6 @@
             <p id="warningMsg" style="white-space: pre-line;"></p>
             <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
                 <button onclick="closeWarningModal()" style="background:#d35400; margin: 0;">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Close Confirmation Modal -->
-    <div id="closeModal" class="modal">
-        <div class="modal-content" style="text-align: center;">
-            <span class="close-modal-btn" onclick="closeCloseModal()">&times;</span>
-            <h3 style="color: #ad2d2d;">❌ Confirm Close</h3>
-            <p>Are you sure you want to close?</p>
-            <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
-                <button onclick="confirmClose()" style="background:#dc3545; margin: 0;">Yes, Close</button>
-                <button onclick="closeCloseModal()" style="background:#6c757d; margin: 0;">Cancel</button>
             </div>
         </div>
     </div>
@@ -1202,7 +1163,6 @@
         let isPreventNegativeStock = localStorage.getItem("invoicePreventNegativeStock") === "true";
         let isPreviousDueVisible = localStorage.getItem("invoiceShowPreviousDue") === "true";
         let isTotalTaxableVisible = localStorage.getItem("invoiceShowTotalTaxable") === "true";
-        let showNavButtons = localStorage.getItem("invoiceShowNavButtons") !== "false";
         let isFetchItemCodeVisible = localStorage.getItem("invoiceShowFetchItemCode") !== "false";
         let isGreyButtons = localStorage.getItem("invoiceGreyButtons") === "true";
         let allowDuplicateItems = localStorage.getItem("invoiceAllowDuplicateItems") === "true";
@@ -1262,12 +1222,6 @@
             applyValidationVisibility();
         }
 
-        function toggleShowNavButtons() {
-            showNavButtons = document.getElementById("showNavButtonsToggle").checked;
-            localStorage.setItem("invoiceShowNavButtons", showNavButtons);
-            applyNavButtonsVisibility();
-        }
-
         function toggleGreyButtons() {
             isGreyButtons = document.getElementById("greyButtonsToggle").checked;
             localStorage.setItem("invoiceGreyButtons", isGreyButtons);
@@ -1282,17 +1236,6 @@
         function toggleAllowDuplicateItems() {
             allowDuplicateItems = document.getElementById("allowDuplicateItemsToggle").checked;
             localStorage.setItem("invoiceAllowDuplicateItems", allowDuplicateItems);
-        }
-
-        function applyNavButtonsVisibility() {
-            const btns = document.querySelectorAll(".nav-btn");
-            btns.forEach(btn => {
-                if (showNavButtons) {
-                    btn.classList.remove("hide-nav");
-                } else {
-                    btn.classList.add("hide-nav");
-                }
-            });
         }
 
         // Dark Mode Logic
@@ -3061,7 +3004,6 @@
             toggleShipToSame();
             toggleShipToPrint();
             applyValidationVisibility();
-            applyNavButtonsVisibility();
             applyGreyButtons();
             loadColumnWidths();
             enableColumnResizing();
@@ -3081,10 +3023,6 @@
             });
         };
 
-        function openreportWindow() {
-            openWindow('report.html', 800, 600);
-        }
-
         // Helpers
         function clearInvoice() {
             document.querySelectorAll('#invoice input:not([type=date])').forEach(i => i.value = '');
@@ -3094,103 +3032,6 @@
             document.getElementById('packingCharges').value = '0';
             document.getElementById('customCharges').value = '0';
             updateTotal();
-        }
-
-        // Export/Import
-        function exportData() {
-            const data = {
-                invoices: JSON.parse(localStorage.getItem("invoices")) || [],
-                customers: JSON.parse(localStorage.getItem("customers")) || []
-            };
-            const exportPass = prompt("Enter a password to encrypt the backup:");
-            if (!exportPass) {
-                showToast("Export cancelled. Password required.", "#e74c3c");
-                return;
-            }
-            const jsonString = JSON.stringify(data, null, 2);
-            const encrypted = CryptoJS.AES.encrypt(jsonString, exportPass).toString();
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "invoice_backup.json";
-            a.download = "invoice_backup_enc.json";
-            a.click();
-        }
-        function importData(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const importPass = prompt("Enter the password to decrypt the backup:");
-            if (!importPass) {
-                showToast("Import cancelled. Password required.", "#e74c3c");
-                input.value = "";
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = e => {
-                try {
-                    let d = null;
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(e.target.result, importPass);
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) d = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted, trying plain JSON..."); }
-
-                    if (!d) d = JSON.parse(e.target.result);
-
-                    // Merge Invoices
-                    if (d.invoices && Array.isArray(d.invoices)) {
-                        let currentInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
-                        let invCount = 0;
-                        d.invoices.forEach(newInv => {
-                            const idx = currentInvoices.findIndex(inv => inv.invoice_no === newInv.invoice_no);
-                            if (idx > -1) {
-                                currentInvoices[idx] = newInv;
-                            } else {
-                                currentInvoices.push(newInv);
-                            }
-                            invCount++;
-                        });
-                        localStorage.setItem("invoices", JSON.stringify(currentInvoices));
-                    }
-
-                    // Merge Customers
-                    if (d.customers && Array.isArray(d.customers)) {
-                        let currentCustomers = JSON.parse(localStorage.getItem("customers")) || [];
-                        d.customers.forEach(newCust => {
-                            // Match by ID or Name
-                            const idx = currentCustomers.findIndex(c =>
-                                (newCust.id && c.id === newCust.id) ||
-                                (c.name.toLowerCase() === newCust.name.toLowerCase())
-                            );
-                            if (idx > -1) {
-                                currentCustomers[idx] = { ...currentCustomers[idx], ...newCust };
-                            } else {
-                                if (!newCust.id) newCust.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-                                currentCustomers.push(newCust);
-                            }
-                        });
-                        localStorage.setItem("customers", JSON.stringify(currentCustomers));
-                    }
-
-                    openImportSuccessModal();
-                } catch (err) { showToast("Invalid JSON", "#e74c3c"); }
-            };
-            reader.readAsText(file);
-        }
-
-        // Close Modal Logic
-        function openCloseModal() {
-            document.getElementById('closeModal').style.display = 'block';
-        }
-
-        function closeCloseModal() {
-            document.getElementById('closeModal').style.display = 'none';
-        }
-
-        function confirmClose() {
-            window.close();
         }
 
         // Save Modal Logic
@@ -3347,7 +3188,6 @@
             if (document.getElementById("showValidateUom")) document.getElementById("showValidateUom").checked = isValidateUomVisible;
             if (document.getElementById("showValidatePrice")) document.getElementById("showValidatePrice").checked = isValidatePriceVisible;
             if (document.getElementById("showValidateLastSale")) document.getElementById("showValidateLastSale").checked = isValidateLastSaleVisible;
-            if (document.getElementById("showNavButtonsToggle")) document.getElementById("showNavButtonsToggle").checked = showNavButtons;
             if (document.getElementById("showGstCalc")) document.getElementById("showGstCalc").checked = isGstCalcVisible;
             if (document.getElementById("showOverallDiscount")) document.getElementById("showOverallDiscount").checked = isOverallDiscountVisible;
             if (document.getElementById("showClearItems")) document.getElementById("showClearItems").checked = isClearItemsVisible;
@@ -3492,10 +3332,6 @@
             localStorage.removeItem("invoiceShowTimestamp");
             if (document.getElementById("showTimestampToggle")) document.getElementById("showTimestampToggle").checked = true;
             toggleTimestamp(); // Apply default
-
-            showNavButtons = true;
-            localStorage.removeItem("invoiceShowNavButtons");
-            applyNavButtonsVisibility();
 
             isGreyButtons = false;
             localStorage.removeItem("invoiceGreyButtons");

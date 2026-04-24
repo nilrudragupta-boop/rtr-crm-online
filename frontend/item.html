@@ -270,7 +270,6 @@
                         <option value="dark">Dark</option>
                         <option value="system">System Default</option>
                     </select>
-                    <button class="btn btn-sm btn-danger" onclick="openCloseConfirmModal()">Close</button>
                 </div>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px; user-select:none;">
@@ -285,20 +284,13 @@
             class="d-flex flex-wrap gap-2 mb-4 align-items-center justify-content-between p-3 bg-white rounded shadow-sm">
             <!-- Data Actions -->
             <div class="d-flex flex-wrap gap-2">
-                <button id="exportJsonBtn" class="btn btn-outline-primary" onclick="openExportConfirmModal('json')"
-                    data-permission-id="perm_backup_data">Export JSON</button>
                 <button id="exportCsvBtn" class="btn btn-outline-primary" onclick="openExportConfirmModal('csv')"
                     data-permission-id="perm_backup_data">Export CSV</button>
 
-                <button id="importJsonBtn" class="btn btn-outline-secondary"
-                    onclick="document.getElementById('importJsonInput').click()"
-                    data-permission-id="perm_restore_data">Import JSON</button>
                 <button id="importCsvBtn" class="btn btn-outline-secondary"
                     onclick="document.getElementById('importCsvInput').click()"
                     data-permission-id="perm_restore_data">Import CSV</button>
 
-                <input type="file" id="importJsonInput" accept=".json" style="display:none"
-                    onchange="importItemsJSON(this)">
                 <input type="file" id="importCsvInput" accept=".csv" style="display:none"
                     onchange="importItemsCSV(this)">
 
@@ -624,18 +616,6 @@
         </div>
     </div>
 
-    <!-- Close Confirmation Modal -->
-    <div id="closeConfirmModal" class="custom-modal">
-        <div class="custom-modal-content">
-            <h3 style="color: #ad2d2d;">❌ Confirm Close</h3>
-            <p>Are you sure you want to close this window?</p>
-            <div class="modal-buttons">
-                <button class="btn btn-danger" onclick="window.close()">Yes, Close</button>
-                <button class="btn btn-secondary" onclick="closeCloseConfirmModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Settings Modal -->
     <div id="settingsModal" class="custom-modal">
         <div class="custom-modal-content" style="width: 400px; max-height: 85vh; overflow-y: auto;">
@@ -643,16 +623,6 @@
             <div
                 style="margin: 15px 0; text-align: left; padding-left: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
                 <h5 style="font-size: 1rem;" class="text-secondary">Button Visibility</h5>
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
-                    <input type="checkbox" id="showExportJsonBtnToggle"
-                        onchange="toggleButtonVisibility('exportJsonBtn', this.checked)"> Show Export JSON
-                </label>
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
-                    <input type="checkbox" id="showImportJsonBtnToggle"
-                        onchange="toggleButtonVisibility('importJsonBtn', this.checked)"> Show Import JSON
-                </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
                     <input type="checkbox" id="showExportCsvBtnToggle"
@@ -871,8 +841,6 @@
         // --- Settings Logic ---
         let savedButtonVisibility = JSON.parse(localStorage.getItem("itemButtonVisibility")) || {};
         let buttonVisibility = {
-            exportJsonBtn: true,
-            importJsonBtn: true,
             exportCsvBtn: true,
             importCsvBtn: true,
             ...savedButtonVisibility
@@ -2192,8 +2160,6 @@
             closeExportConfirmModal();
             if (currentExportType === 'csv') {
                 exportItemsCSV();
-            } else {
-                exportItemsJSON();
             }
         }
 
@@ -2217,122 +2183,6 @@
             a.click();
             document.body.removeChild(a);
             openSuccessModal("Items exported to CSV successfully!");
-        }
-
-        // 🔹 Export JSON
-        function exportItemsJSON() {
-            if (!items || items.length === 0) return openInfoModal("No items to export");
-            const exportData = items.map(item => ({
-                ...item,
-                itemCode: item.itemCode || "",
-                category: item.category || "",
-                hsn: item.hsn || "",
-                itemType: item.itemType || "Finished Good",
-                uom: item.uom || "",
-                description: item.description || "",
-                salePrice: item.salePrice || 0,
-                gst: item.gst || 0,
-                imei: item.imei || "",
-                batch: item.batch || "",
-                lot: item.lot || "",
-                serial: item.serial || "",
-                conversions: item.conversions || {}
-            }));
-            const dataStr = JSON.stringify(exportData, null, 2);
-
-            const encrypted = CryptoJS.AES.encrypt(dataStr, '983042').toString();
-
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "items_backup_enc.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            openSuccessModal("Items exported successfully!");
-        }
-
-        // 🔹 Import JSON
-        function importItemsJSON(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-
-            reader.onload = async (e) => {
-                try {
-                    const fileContent = e.target.result;
-                    let imported = null;
-
-                    // 1. Try Decrypting
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) imported = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                    // 2. Fallback to plain JSON
-                    if (!imported) imported = JSON.parse(fileContent);
-
-                    if (!Array.isArray(imported)) {
-                        throw new Error("Invalid JSON format (expected array)");
-                    }
-
-                    let count = 0;
-
-                    for (const item of imported) {
-                        if (!item.name) continue;
-
-                        // 🔑 Preserve or generate ID
-                        const id = item.id || Date.now().toString() + Math.random().toString(36).slice(2);
-
-                        const data = {
-                            id: id,
-                            name: item.name,
-                            itemCode: item.itemCode || "",
-                            category: item.category || "",
-                            hsn: item.hsn || "",
-                            indexNo: item.indexNo || "",
-                            itemType: item.itemType || "Finished Good",
-                            uom: item.uom || "",
-                            description: item.description || "",
-                            createdAt: item.createdAt || new Date().toISOString(),
-                            imei: item.imei || "",
-                            batch: item.batch || "",
-                            lot: item.lot || "",
-                            serial: item.serial || "",
-                            salePrice: item.salePrice || 0,
-                            gst: item.gst || 0,
-                            conversions: item.conversions || {}
-                        };
-
-                        // Update Local
-                        const idx = items.findIndex(x => x.id === id);
-                        if (idx > -1) items[idx] = data;
-                        else items.push(data);
-
-                        // Save to Firestore if available
-                        if (db) {
-                            await db.collection("items").doc(id).set(data).catch(console.error);
-                        }
-                        count++;
-                    }
-
-                    localStorage.setItem("items", JSON.stringify(items));
-                    populateCategoryFilter();
-                    populateItemNameList();
-                    applyFilters();
-                    openSuccessModal(`Successfully imported ${count} items.`);
-                } catch (err) {
-                    console.error("Import error:", err);
-                    openInfoModal("Error importing JSON: " + err.message);
-                }
-
-                input.value = "";
-            };
-
-            reader.readAsText(file);
         }
 
         // 🔹 Import CSV
@@ -2739,11 +2589,6 @@
             }
             pageInput.value = "";
         }
-
-        function openCloseConfirmModal() {
-            document.getElementById("closeConfirmModal").style.display = "flex";
-        }
-        function closeCloseConfirmModal() { document.getElementById("closeConfirmModal").style.display = "none"; }
 
         // Generic Modal Functions
         function openActionConfirmModal(title, msg, callback) {

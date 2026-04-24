@@ -670,11 +670,6 @@
         </div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="btnExportJson" class="small" style="background:#f39c12;"
-                data-permission-id="perm_backup_data">Export Backup</button>
-            <button id="btnImportJson" class="small" style="background:#8e44ad;"
-                data-permission-id="perm_restore_data">Import Backup</button>
-            <input type="file" id="importJsonInput" accept=".json" style="display:none">
             <button id="btnExportCsv" class="small" style="background:#2ecc71;"
                 data-permission-id="perm_backup_data">Export CSV</button>
             <button id="btnImportCsv" class="small" style="background:#16a085;"
@@ -685,8 +680,6 @@
                 onclick="openReceiptLogModal()" data-permission-id="perm_payment_receipt_log">Receipt Log</button>
 
             <button onclick="window.print()" class="small" data-permission-id="perm_print">Print</button>
-            <button id="closeBtn" onclick="openCloseConfirmModal()" class="small"
-                style="background:#f80202;">Close</button>
         </div>
     </div>
 
@@ -1002,16 +995,6 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-    </div>
-
-    <!-- Close Confirmation Modal -->
-    <div id="closeConfirmModal" aria-hidden="true">
-        <h3 style="margin-top:0; color:#c0392b;">❌ Confirm Close</h3>
-        <p>Are you sure you want to close this window?</p>
-        <div class="modal-btns">
-            <button class="danger small" onclick="window.close()">Yes, Close</button>
-            <button class="secondary small" onclick="closeCloseConfirmModal()">Cancel</button>
         </div>
     </div>
 
@@ -4493,38 +4476,16 @@
             });
         });
 
-        document.getElementById("btnExportCsv").addEventListener("click", () => {
-            currentExportType = 'csv';
-            document.getElementById("overlay").style.display = "block";
-            document.getElementById("exportConfirmModal").style.display = "block";
-        });
-
-        document.getElementById("btnImportCsv").addEventListener("click", () => {
-            currentImportType = 'csv';
-            initiateSecureAction('Data Import', () => {
-                document.getElementById("overlay").style.display = "block";
-                document.getElementById("importWarningModal").style.display = "block";
-            });
-        });
-
         document.getElementById("btnCancelImport").addEventListener("click", closeImportWarning);
         document.getElementById("btnConfirmImport").addEventListener("click", () => {
             closeImportWarning();
-            if (currentImportType === 'csv') {
-                document.getElementById("importCsvInput").click();
-            } else {
-                document.getElementById("importJsonInput").click();
-            }
+            document.getElementById("importCsvInput").click();
         });
 
         document.getElementById("btnCancelExport").addEventListener("click", closeExportConfirm);
         document.getElementById("btnConfirmExport").addEventListener("click", () => {
             closeExportConfirm();
-            if (currentExportType === 'csv') {
-                exportInvoicesCSV();
-            } else {
-                exportInvoicesJSON();
-            }
+            exportInvoicesCSV();
         });
 
         function closeExportConfirm() {
@@ -4532,7 +4493,6 @@
             document.getElementById("overlay").style.display = "none";
         }
 
-        document.getElementById("importJsonInput").addEventListener("change", handleImportFile);
         document.getElementById("importCsvInput").addEventListener("change", handleImportCsvFile);
         document.getElementById("btnCloseSuccess").addEventListener("click", closeImportSuccess);
         document.getElementById("btnClosePdfSuccess").addEventListener("click", closePdfSuccessModal);
@@ -4734,16 +4694,6 @@
         });
         document.getElementById("btnCancelEditInvoice").addEventListener("click", closeEditInvoiceWarningModal);
 
-        // --- Close Modal Logic ---
-        function openCloseConfirmModal() {
-            document.getElementById("overlay").style.display = "block";
-            document.getElementById("closeConfirmModal").style.display = "block";
-        }
-        function closeCloseConfirmModal() {
-            document.getElementById("closeConfirmModal").style.display = "none";
-            document.getElementById("overlay").style.display = "none";
-        }
-
         // --- Delete Modal Logic ---
         function openDeleteModal(ids, msg) {
             pendingDeleteIds = ids;
@@ -4768,50 +4718,6 @@
             renderTable(invoices);
             closeDeleteModal();
         });
-
-        function exportInvoicesJSON() {
-            if (!invoices.length) return showToast("No data to export", "#e67e22");
-            const dataStr = JSON.stringify(invoices, null, 2);
-            const blob = new Blob([dataStr], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "invoices_backup.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            showToast("Export successful", "#27ae60");
-        }
-
-        function handleImportFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    if (!Array.isArray(importedData)) throw new Error("Invalid JSON format");
-
-                    let added = 0, updated = 0;
-                    importedData.forEach(newInv => {
-                        const id = newInv.id || newInv.invoice_no;
-                        const idx = invoices.findIndex(curr => String(curr.id || curr.invoice_no) === String(id));
-                        if (idx > -1) { invoices[idx] = { ...invoices[idx], ...newInv }; updated++; }
-                        else { invoices.push(newInv); added++; }
-                    });
-
-                    localStorage.setItem("invoices", JSON.stringify(invoices));
-                    renderTable(invoices);
-
-                    document.getElementById("importSuccessMsg").innerHTML = `Added: <b>${added}</b><br>Updated: <b>${updated}</b>`;
-                    document.getElementById("overlay").style.display = "block";
-                    document.getElementById("importSuccessModal").style.display = "block";
-                } catch (err) { alert("Failed to import: " + err.message); }
-                event.target.value = "";
-            };
-            reader.readAsText(file);
-        }
 
         function exportInvoicesCSV() {
             if (!invoices.length) return showToast("No data to export", "#e67e22");
@@ -5663,7 +5569,6 @@
             applyCompactView();
             applyTheme();
             applyGreyButtons();
-            applyNavButtonsVisibility();
             applyFreezePanes();
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;

@@ -306,7 +306,6 @@
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px; user-select:none;">
                 <input type="checkbox" id="compactViewToggle" onchange="toggleCompactView()"> Compact View
             </label>
-            <button class="close-btn" onclick="openCloseModal()">Close</button>
         </div>
     </div>
 
@@ -381,11 +380,6 @@
         <button class="action" id="btnImportCsv" onclick="document.getElementById('importCsvFile').click()"
             style="background:#20c997;" data-permission-id="perm_restore_data">Import CSV</button>
         <input type="file" id="importCsvFile" style="display:none" onchange="importSuppliersCSV(this)" accept=".csv">
-        <button class="action" id="btnExportJson" onclick="confirmExport()" style="background:#f39c12;"
-            data-permission-id="perm_backup_data">Export JSON</button>
-        <button class="action" id="btnImportJson" onclick="document.getElementById('importFile').click()"
-            style="background:#2c3e50;" data-permission-id="perm_restore_data">Import JSON</button>
-        <input type="file" id="importFile" style="display:none" onchange="importSuppliersJSON(this)" accept=".json">
         <button class="action" onclick="openSettingsModal()" style="background:#607d8b;">⚙️ Table Settings</button>
         <button class="action" onclick="deleteSelectedSuppliers()" style="background:#dc3545;"
             data-permission-id="perm_delete_action">Delete Selected</button>
@@ -468,16 +462,6 @@
             <div
                 style="margin: 15px 0; text-align: left; padding-left: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
                 <h5 style="font-size: 1rem;" class="text-secondary">Button Visibility</h5>
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
-                    <input type="checkbox" id="showBtnExportJsonToggle"
-                        onchange="toggleButtonVisibility('btnExportJson', this.checked)"> Show Export JSON
-                </label>
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
-                    <input type="checkbox" id="showBtnImportJsonToggle"
-                        onchange="toggleButtonVisibility('btnImportJson', this.checked)"> Show Import JSON
-                </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
                     <input type="checkbox" id="showBtnExportCsvToggle"
@@ -605,18 +589,6 @@
             <p id="warningMsg"></p>
             <div class="modal-buttons">
                 <button class="action" onclick="closeWarningModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Close Confirmation Modal -->
-    <div id="closeConfirmModal" class="modal">
-        <div class="modal-content">
-            <h3 style="color: #c0392b;">❌ Confirm Close</h3>
-            <p>Are you sure you want to close this window?</p>
-            <div class="modal-buttons">
-                <button class="action" style="background:#dc3545;" onclick="window.close()">Yes, Close</button>
-                <button class="action" style="background:#6c757d;" onclick="closeCloseModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -753,8 +725,6 @@
         // --- Button Visibility Logic ---
         let savedButtonVisibility = JSON.parse(localStorage.getItem("supplierButtonVisibility")) || {};
         let buttonVisibility = {
-            btnExportJson: true,
-            btnImportJson: true,
             btnExportCsv: true,
             btnImportCsv: true,
             ...savedButtonVisibility
@@ -1432,10 +1402,6 @@
             document.getElementById('actionConfirmModal').style.display = "none";
         }
 
-        // Close Modal
-        function openCloseModal() { document.getElementById("closeConfirmModal").style.display = "flex"; }
-        function closeCloseModal() { document.getElementById("closeConfirmModal").style.display = "none"; }
-
         // 🔹 Search + Sort
         function applyFilters() {
             const search = document.getElementById("searchName").value.toLowerCase();
@@ -1597,12 +1563,6 @@
                 applyFilters();
             }
             pageInput.value = "";
-        }
-
-        function confirmExport() {
-            askConfirm("Confirm Export", "Are you sure you want to export supplier data?", () => {
-                exportSuppliersJSON();
-            });
         }
 
         // Export CSV
@@ -1840,81 +1800,6 @@
                 renderSupplierTypes();
                 loadSupplierTypes();
             }
-        }
-
-        // 🔹 Export JSON
-        function exportSuppliersJSON() {
-            if (!suppliers || suppliers.length === 0) return openWarningModal("No suppliers to export");
-
-            const dataStr = JSON.stringify(suppliers, null, 2);
-            const encrypted = CryptoJS.AES.encrypt(dataStr, '983042').toString();
-
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "suppliers_backup_enc.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // 🔹 Import JSON
-        function importSuppliersJSON(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const fileContent = e.target.result;
-                    let imported = null;
-
-                    // 1. Try Decrypting
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) imported = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                    // 2. Fallback to plain JSON
-                    if (!imported) imported = JSON.parse(fileContent);
-
-                    if (!Array.isArray(imported)) throw new Error("Invalid Data");
-
-                    let added = 0;
-                    let updated = 0;
-
-                    for (const s of imported) {
-                        if (!s.name) continue;
-
-                        // Check for existing supplier by ID or Name
-                        let idx = -1;
-                        if (s.id) idx = suppliers.findIndex(x => String(x.id) === String(s.id));
-                        if (idx === -1) idx = suppliers.findIndex(x => x.name.trim().toLowerCase() === s.name.trim().toLowerCase());
-
-                        if (idx > -1) {
-                            suppliers[idx] = { ...suppliers[idx], ...s, id: suppliers[idx].id };
-                            if (db) db.collection('suppliers').doc(suppliers[idx].id).set(suppliers[idx]).catch(console.error);
-                            updated++;
-                        } else {
-                            const newId = s.id || (Date.now().toString() + Math.random().toString().slice(2, 8));
-                            const newSupplier = { ...s, id: newId };
-                            suppliers.push(newSupplier);
-                            if (db) db.collection('suppliers').doc(newId).set(newSupplier).catch(console.error);
-                            added++;
-                        }
-                    }
-                    localStorage.setItem("suppliers", JSON.stringify(suppliers));
-                    applyFilters();
-                    openSuccessModal(`Imported: ${added} added, ${updated} updated.`);
-                } catch (err) {
-                    console.error("Import error", err);
-                    openWarningModal("Error importing JSON: " + err.message);
-                }
-                input.value = ""; // reset
-            };
-            reader.readAsText(file);
         }
 
         // Dark Mode Logic

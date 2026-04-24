@@ -174,15 +174,9 @@
     <div class="header">
         <h2>↩️ Returns Management - <span data-brand="name">RISE Tech Revolution</span></h2>
         <div>
-            <button class="btn btn-warning" onclick="exportReturnsJSON()" data-permission-id="perm_backup_data">Export
-                JSON</button>
-            <button class="btn btn-info" onclick="document.getElementById('importFile').click()"
-                data-permission-id="perm_restore_data">Import JSON</button>
-            <input type="file" id="importFile" style="display:none" onchange="importReturnsJSON(this)" accept=".json">
             <button class="btn btn-secondary"
                 onclick="window.open('returns_report.html', 'returns_report', 'width=1000,height=700')">📊 View
                 Reports</button>
-            <button class="btn btn-danger" onclick="window.close()">Close</button>
         </div>
     </div>
 
@@ -235,15 +229,19 @@
 
     <div class="card">
         <h3>Items to Return</h3>
-        <div class="pagination-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <div class="pagination-container"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <div style="display: flex; align-items: center; gap: 5px;">
                 <span id="totalItemsDisplay" style="font-weight: bold; color: #2c3e50; margin-right: 8px;"></span>
-                <select id="rowsPerPageSelect" onchange="changeRowsPerPage()" style="width: auto; padding: 4px; border: 1px solid #ccc; border-radius: 4px; margin: 0;">
+                <select id="rowsPerPageSelect" onchange="changeRowsPerPage()"
+                    style="width: auto; padding: 4px; border: 1px solid #ccc; border-radius: 4px; margin: 0;">
                     <option value="5">5 rows</option>
                     <option value="10" selected>10 rows</option>
                     <option value="20">20 rows</option>
                 </select>
-                <input type="number" id="goToPageInput" style="width: 60px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Go to" min="1" onchange="goToPage()">
+                <input type="number" id="goToPageInput"
+                    style="width: 60px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Go to"
+                    min="1" onchange="goToPage()">
             </div>
             <div id="paginationInfo" style="color: #666; font-size: 14px;"></div>
             <div class="pagination" id="paginationControls" style="display: flex; gap: 5px;"></div>
@@ -332,7 +330,7 @@
             }
 
             html += `<button class="btn btn-secondary" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 4px 8px; margin: 0 2px;">Next</button>`;
-            
+
             if (controls) controls.innerHTML = html;
         }
 
@@ -474,7 +472,7 @@
                 `;
                 tbody.appendChild(tr);
             });
-            
+
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
             calculateTotal(); // Update global total
         }
@@ -494,7 +492,7 @@
                     const rowTotal = taxable + taxAmt;
 
                     total += rowTotal;
-                    
+
                     // Update DOM if visible
                     const totEl = document.getElementById(`tot_${index}`);
                     if (totEl) totEl.innerText = rowTotal.toFixed(2);
@@ -551,7 +549,7 @@
             const returns = JSON.parse(localStorage.getItem('returns')) || [];
             returns.push(returnData);
             localStorage.setItem('returns', JSON.stringify(returns));
-        if (typeof apiClient !== 'undefined' && apiClient.saveReturn) apiClient.saveReturn(returnData).catch(console.warn);
+            if (typeof apiClient !== 'undefined' && apiClient.saveReturn) apiClient.saveReturn(returnData).catch(console.warn);
 
             // 2. Create Credit/Debit Note (Financial Impact)
             if (type === 'Sales Return' || type === 'Purchase Return') {
@@ -599,14 +597,14 @@
 
                     notes.push(note);
                     localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
-            if (typeof apiClient !== 'undefined' && apiClient.saveCreditDebitNote) apiClient.saveCreditDebitNote(note).catch(console.warn);
+                    if (typeof apiClient !== 'undefined' && apiClient.saveCreditDebitNote) apiClient.saveCreditDebitNote(note).catch(console.warn);
                 }
             }
 
             // 3. Handle Damage (Expense Impact)
             if (type === 'Damage') {
                 const expenses = JSON.parse(localStorage.getItem('expenses')) || [];
-            const expEntry = {
+                const expEntry = {
                     expense_id: Date.now().toString(),
                     expense_date: returnData.return_date,
                     expense_category: "Damage / Loss",
@@ -616,91 +614,16 @@
                     payment_mode: "Adjustment",
                     remarks: `Damage Entry: ${returnData.reason}`,
                     created_at: new Date().toISOString()
-            };
-            expenses.push(expEntry);
+                };
+                expenses.push(expEntry);
                 localStorage.setItem('expenses', JSON.stringify(expenses));
-            if (typeof apiClient !== 'undefined' && apiClient.saveExpense) apiClient.saveExpense(expEntry).catch(console.warn);
+                if (typeof apiClient !== 'undefined' && apiClient.saveExpense) apiClient.saveExpense(expEntry).catch(console.warn);
             }
 
             alert("Return processed successfully!");
             window.location.reload();
         }
 
-        // Export JSON (Encrypted)
-        function exportReturnsJSON() {
-            const returns = JSON.parse(localStorage.getItem('returns')) || [];
-            if (returns.length === 0) {
-                alert("No returns data to export");
-                return;
-            }
-
-            const dataStr = JSON.stringify(returns, null, 2);
-            const encrypted = CryptoJS.AES.encrypt(dataStr, '983042').toString();
-
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "returns_backup_enc.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // Import JSON (Encrypted/Plain)
-        function importReturnsJSON(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                    const fileContent = e.target.result;
-                    let importedData = null;
-
-                    // 1. Try Decrypting
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) importedData = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted or wrong password, trying plain JSON..."); }
-
-                    // 2. Fallback to plain JSON
-                    if (!importedData) importedData = JSON.parse(fileContent);
-
-                    if (!Array.isArray(importedData)) {
-                        alert("Invalid JSON format");
-                        return;
-                    }
-
-                    let returns = JSON.parse(localStorage.getItem('returns')) || [];
-                    let added = 0;
-                    let updated = 0;
-
-                    importedData.forEach(newItem => {
-                        // Ensure ID exists
-                        if (!newItem.id) newItem.id = Date.now().toString() + '_ret_' + Math.random().toString(36).substr(2, 5);
-
-                        const idx = returns.findIndex(r => r.id === newItem.id);
-                        if (idx > -1) {
-                            returns[idx] = newItem;
-                            updated++;
-                        } else {
-                            returns.push(newItem);
-                            added++;
-                        }
-                    });
-
-                    localStorage.setItem("returns", JSON.stringify(returns));
-                    alert(`Import Successful!\nAdded: ${added}\nUpdated: ${updated}`);
-                } catch (err) {
-                    console.error(err);
-                    alert("Error parsing JSON file");
-                }
-                input.value = ""; // Reset input
-            };
-            reader.readAsText(file);
-        }
     </script>
 </body>
 
