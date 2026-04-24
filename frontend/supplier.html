@@ -109,13 +109,6 @@
             margin: 0 2px;
         }
 
-        .nav-btn {
-            color: #fff;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
         /* Modal Styles */
         .modal {
             display: none;
@@ -295,10 +288,6 @@
             background-color: #3a3a3a !important;
             color: #fff !important;
         }
-
-        .hide-nav {
-            display: none !important;
-        }
     </style>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -400,38 +389,6 @@
         <button class="action" onclick="openSettingsModal()" style="background:#607d8b;">⚙️ Table Settings</button>
         <button class="action" onclick="deleteSelectedSuppliers()" style="background:#dc3545;"
             data-permission-id="perm_delete_action">Delete Selected</button>
-    </div>
-
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="navBtnReminder" onclick="openWindow('reminder.html', 1100, 700)" class="nav-btn"
-            style="background:#4e02ff; color:#fff;" data-tooltip="Set reminders for Customer"
-            data-permission-id="perm_reminder">⏰Reminder</button>
-
-        <button id="navBtnReport" onclick="openWindow('report.html', 1000, 700)" class="nav-btn"
-            style="background:#1f22fd; color:#fff;" data-tooltip="View invoice reports"
-            data-permission-id="perm_invoice_report">📊Invoice
-            Report</button>
-
-        <button id="navBtnInvoice" onclick="openWindow('invoice.html', 800, 600)" class="nav-btn"
-            style="background:#c44be9;" data-tooltip="Create a new invoice"
-            data-permission-id="perm_make_invoice">👥Smart Invoice</button>
-
-        <button id="navBtnPurchase" onclick="openWindow('purchase.html', 1000, 700)" class="nav-btn"
-            style="background:#e6b207;" data-tooltip="Record purchases"
-            data-permission-id="perm_purchase_entries">🛍️Purchase Entries</button>
-
-        <button id="navBtnItem" onclick="openWindow('item.html', 800, 600)" class="nav-btn" style="background:#4ac4be;"
-            data-tooltip="Manage items database" data-permission-id="perm_manage_items">
-            📋Manage Items</button>
-
-        <button id="navBtnCustomer" onclick="openWindow('customer.html', 800, 600)" class="nav-btn"
-            style="background:#c44be9; color:#fff;" data-tooltip="Manage customer database"
-            data-permission-id="perm_manage_customers">👥Manage
-            Customers</button>
-
-        <button id="navBtnStock" onclick="openWindow('stock_report.html', 1000, 700)" class="nav-btn"
-            style="background:#16a085;" data-tooltip="View stock report" data-permission-id="perm_stock_report">📦Stock
-            Report</button>
     </div>
 
     <!-- Datalist for Searchable State Dropdown -->
@@ -553,38 +510,6 @@
                     </label>
                 </div>
 
-                <h5 style="font-size: 1rem; margin-top: 15px;" class="text-secondary">Navigation Buttons</h5>
-                <div
-                    style="margin-left: 15px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showNavBtnReminderToggle"
-                            onchange="toggleButtonVisibility('navBtnReminder', this.checked)"> Reminder
-                    </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showNavBtnReportToggle"
-                            onchange="toggleButtonVisibility('navBtnReport', this.checked)"> Invoice Report
-                    </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showNavBtnInvoiceToggle"
-                            onchange="toggleButtonVisibility('navBtnInvoice', this.checked)"> Smart Invoice
-                    </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showNavBtnPurchaseToggle"
-                            onchange="toggleButtonVisibility('navBtnPurchase', this.checked)"> Purchase
-                    </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showNavBtnItemToggle"
-                            onchange="toggleButtonVisibility('navBtnItem', this.checked)"> Manage Items
-                    </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showNavBtnCustomerToggle"
-                            onchange="toggleButtonVisibility('navBtnCustomer', this.checked)"> Manage Customers
-                    </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showNavBtnStockToggle"
-                            onchange="toggleButtonVisibility('navBtnStock', this.checked)"> Stock Report
-                    </label>
-                </div>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 15px;">
                     <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
@@ -832,13 +757,6 @@
             btnImportJson: true,
             btnExportCsv: true,
             btnImportCsv: true,
-            navBtnReminder: true,
-            navBtnReport: true,
-            navBtnInvoice: true,
-            navBtnPurchase: true,
-            navBtnItem: true,
-            navBtnCustomer: true,
-            navBtnStock: true,
             ...savedButtonVisibility
         };
 
@@ -1260,7 +1178,7 @@
                     if (idx > -1) {
                         suppliers[idx] = { ...suppliers[idx], name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments };
                         localStorage.setItem("suppliers", JSON.stringify(suppliers));
-                        
+
                         if (db) {
                             try { await db.collection('suppliers').doc(id).update(suppliers[idx]); } catch (e) { console.error("Firestore update error", e); }
                         }
@@ -1275,10 +1193,10 @@
                 askConfirm("Confirm Addition", "Add this new supplier?", async () => {
                     const newId = Date.now().toString();
                     const newSupplier = { id: newId, name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments, createdAt: new Date().toISOString() };
-                    
+
                     suppliers.push(newSupplier);
                     localStorage.setItem("suppliers", JSON.stringify(suppliers));
-                    
+
                     if (db) {
                         try { await db.collection('suppliers').doc(newId).set(newSupplier); } catch (e) { console.error("Firestore save error", e); }
                     }
@@ -1436,7 +1354,7 @@
 
         async function confirmDelete() {
             if (idsToDelete.length === 0) return;
-            
+
             for (let id of idsToDelete) {
                 await apiClient.deleteSupplier(id);
             }

@@ -348,10 +348,6 @@
             color: #e0e0e0 !important;
         }
 
-        .hide-nav {
-            display: none !important;
-        }
-
         body.dark-mode .modal,
         body.dark-mode div[id$="Modal"] {
             background: #2c2c2c;
@@ -670,35 +666,6 @@
             <label for="toDate">To:</label>
             <input type="date" id="toDate">
             <button id="btnDateSearch">Search</button>
-        </div>
-
-        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 10px;">
-            <button onclick="openWindow('reminder.html', 1100, 700)" class="nav-btn" style="background:#4e02ff;"
-                data-permission-id="perm_reminder" data-tooltip="Set reminders for Customer">⏰Reminder</button>
-
-            <button onclick="openWindow('invoice.html', 800, 600)" class="nav-btn" style="background:#c44be9;"
-                data-permission-id="perm_make_invoice" data-tooltip="Create a new invoice">👥Smart Invoice</button>
-
-            <button onclick="openWindow('purchase.html', 1000, 700)" class="nav-btn" style="background:#e6b207;"
-                data-permission-id="perm_purchase_entries" data-tooltip="Record purchases">🛍️Purchase Entries</button>
-
-            <button onclick="openWindow('supplier.html', 800, 600)" class="nav-btn" style="background:#057dec;"
-                data-permission-id="perm_supplier_manager" data-tooltip="Manage suppliers database">🚚Supplier
-                Manager</button>
-
-            <button onclick="openWindow('item.html', 800, 600)" class="nav-btn" style="background:#4ac4be;"
-                data-permission-id="perm_manage_items" data-tooltip="Manage items database"> 📋Manage Items</button>
-
-            <button onclick="openWindow('customer.html', 800, 600)" class="nav-btn" style="background:#c44be9;"
-                data-permission-id="perm_manage_customers" data-tooltip="Manage customer database">👥Manage
-                Customers</button>
-
-            <button onclick="openWindow('stock_report.html', 1000, 700)" class="nav-btn" style="background:#16a085;"
-                data-permission-id="perm_stock_report" data-tooltip="View stock report">📦Stock Report</button>
-
-            <button id="navBtnLedger" onclick="openWindow('ledger.html', 1000, 800)" class="nav-btn"
-                style="background:#fd7e14;" data-permission-id="perm_ledger_report"
-                data-tooltip="View Party Ledger">📒Ledger</button>
         </div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1090,10 +1057,6 @@
                 Conditions in Invoice PDF
             </label>
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
-                <input type="checkbox" id="showNavButtonsToggle" onchange="toggleShowNavButtons()"> Show Navigation
-                Buttons
-            </label>
-            <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
                 <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
             </label>
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
@@ -1348,7 +1311,6 @@
         let showTimestampInPdf = localStorage.getItem("reportShowTimestampInPdf") !== "false";
         let showPaidStampInPdf = localStorage.getItem("reportShowPaidStampInPdf") === "true";
         let showTermsInPdf = localStorage.getItem("reportShowTermsInPdf") !== "false";
-        let showNavButtons = localStorage.getItem("reportShowNavButtons") !== "false";
         let isGreyButtons = localStorage.getItem("reportGreyButtons") === "true";
         let currentViewMode = 'table';
         let currentExportType = 'json';
@@ -5160,9 +5122,6 @@
             const termsPdfToggle = document.getElementById("showTermsInPdfToggle");
             if (termsPdfToggle) termsPdfToggle.checked = showTermsInPdf;
 
-            const navButtonsToggle = document.getElementById("showNavButtonsToggle");
-            if (navButtonsToggle) navButtonsToggle.checked = showNavButtons;
-
             const greyButtonsToggle = document.getElementById("greyButtonsToggle");
             if (greyButtonsToggle) greyButtonsToggle.checked = isGreyButtons;
 
@@ -5280,11 +5239,6 @@
             if (sel) sel.value = currentTheme;
         }
 
-        function toggleShowNavButtons() {
-            showNavButtons = document.getElementById("showNavButtonsToggle").checked;
-            localStorage.setItem("reportShowNavButtons", showNavButtons);
-            applyNavButtonsVisibility();
-        }
 
         function toggleGreyButtons() {
             isGreyButtons = document.getElementById("greyButtonsToggle").checked;
@@ -5295,19 +5249,6 @@
         function applyGreyButtons() {
             if (isGreyButtons) document.body.classList.add("grey-mode");
             else document.body.classList.remove("grey-mode");
-        }
-
-
-        function applyNavButtonsVisibility() {
-            const btns = document.querySelectorAll(".nav-btn");
-            btns.forEach(btn => {
-                if (showNavButtons) {
-                    btn.classList.remove("hide-nav");
-                } else {
-                    btn.classList.add("hide-nav");
-                }
-            });
-            if (typeof applyUIPermissions === 'function') applyUIPermissions();
         }
 
         function toggleShowDiscount() {
@@ -5572,12 +5513,6 @@
             localStorage.removeItem("reportShowTermsInPdf");
             if (document.getElementById("showTermsInPdfToggle")) document.getElementById("showTermsInPdfToggle").checked = true;
 
-            // Reset Nav Buttons
-            showNavButtons = true;
-            localStorage.removeItem("reportShowNavButtons");
-            if (document.getElementById("showNavButtonsToggle")) document.getElementById("showNavButtonsToggle").checked = true;
-            applyNavButtonsVisibility();
-
             // Reset Grey Buttons
             isGreyButtons = false;
             localStorage.removeItem("reportGreyButtons");
@@ -5724,7 +5659,6 @@
             applyCompactView();
             applyTheme();
             applyGreyButtons();
-            applyActionBtnVisibility();
             applyNavButtonsVisibility();
             applyFreezePanes();
             const freezeToggle = document.getElementById("freezePanesToggle");
@@ -5736,11 +5670,11 @@
             loadInvoices();
 
             if (window.electronAPI && window.electronAPI.getAppSettings) {
-                
+
                 window.electronAPI.onAppSettingsChanged((newSettings) => {
                     if (window.BrandService) window.BrandService.applyBrand();
                 });
-                }
+            }
 
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 if (currentTheme === "system") {
@@ -5815,9 +5749,9 @@
                 if (res.success) { companyName = res.companyName || companyName; addressLine1 = res.addressLine1 || addressLine1; addressLine2 = res.addressLine2 || addressLine2; contactNumber = res.contactNumber || contactNumber; }
             } else if (window.BrandService) {
                 const brand = window.BrandService.getBrand();
-                companyName = brand.name || companyName; 
-                addressLine1 = localStorage.getItem('addressLine1') || addressLine1; 
-                addressLine2 = localStorage.getItem('addressLine2') || addressLine2; 
+                companyName = brand.name || companyName;
+                addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
                 contactNumber = brand.phone || contactNumber;
             }
 

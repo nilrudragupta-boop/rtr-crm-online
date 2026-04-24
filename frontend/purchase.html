@@ -338,10 +338,6 @@
             display: none;
         }
 
-        .hide-nav {
-            display: none !important;
-        }
-
         .table-responsive {
             overflow-x: auto;
             max-height: 750px;
@@ -934,44 +930,9 @@
             Freeze Panes</button>
         <button onclick="openSettingsModal()" style="background:#607d8b; color: white;">⚙️ Table Settings</button>
     </div>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button onclick="openWindow('reminder.html', 1100, 700)" class="nav-btn"
-            style="background:#4e02ff; color:#ffffff;" data-tooltip="Set reminders for Customer"
-            data-permission-id="perm_reminder">⏰Reminder</button>
 
-        <button onclick="openWindow('invoice.html', 800, 600)" class="nav-btn"
-            style="background:#c44be9; color:#ffffff;" data-tooltip="Create a new invoice"
-            data-permission-id="perm_make_invoice">👥Smart Invoice</button>
-
-        <button id="report" onclick="openWindow('report.html', 1000, 700)" class="nav-btn"
-            style="background:#1f22fd; color:#ffffff;" data-tooltip="View invoice reports"
-            data-permission-id="perm_invoice_report">📊Invoice Report</button>
-
-        <button onclick="openWindow('customer.html', 800, 600)" class="nav-btn"
-            style="background:#c44be9; color:#ffffff;" data-tooltip="Manage customer database"
-            data-permission-id="perm_manage_customers">👥Manage Customers</button>
-
-        <button onclick="openWindow('item.html', 800, 600)" class="nav-btn" style="background:#4ac4be; color:#ffffff;"
-            data-tooltip="Manage items database" data-permission-id="perm_manage_items"> 📋Manage Items</button>
-
-        <button onclick="openWindow('stock_report.html', 1000, 700)" class="nav-btn"
-            style="background:#16a085; color:#ffffff;" data-tooltip="View stock report"
-            data-permission-id="perm_stock_report">📦Stock Report</button>
-
-        <button onclick="openWindow('supplier.html', 800, 600)" class="nav-btn"
-            style="background:#057dec; color:#ffffff;" data-tooltip="Manage suppliers database"
-            data-permission-id="perm_supplier_manager">🚚Supplier Manager</button>
-
-        <button onclick="openWindow('ledger.html', 1000, 800)" class="nav-btn"
-            style="background:#fd7e14; color:#ffffff;" data-tooltip="View Party Ledger"
-            data-permission-id="perm_ledger_report">📒Ledger</button>
-
-
-
-
-        <input type="file" id="importJsonInput" accept=".json" style="display:none"
-            onchange="importPurchasesJSON(this)">
-    </div>
+    <input type="file" id="importJsonInput" accept=".json" style="display:none"
+        onchange="importPurchasesJSON(this)">
 
     <!-- Search Filters -->
     <div class="filter-row">
@@ -1135,11 +1096,6 @@
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px;">
                     <input type="checkbox" id="showTotalQtyToggle" onchange="toggleShowTotalQty()"> Show Total Quantity
                     in Print
-                </label>
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
-                    <input type="checkbox" id="showNavButtonsToggle" onchange="toggleShowNavButtons()"> Show Navigation
-                    Buttons
                 </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
@@ -1442,7 +1398,6 @@
             [6, 7, 8, 9, 10, 11, 12].forEach(i => columnVisibility[i] = false);
         }
         let showTotalQtyInPrint = localStorage.getItem("purchaseShowTotalQtyInPrint") !== "false"; // Default true
-        let showNavButtons = localStorage.getItem("purchaseShowNavButtons") !== "false";
 
         let actionButtonVisibility = JSON.parse(localStorage.getItem("purchaseActionButtons")) || {
             edit: true,
@@ -3585,9 +3540,6 @@
             const qtyToggle = document.getElementById("showTotalQtyToggle");
             if (qtyToggle) qtyToggle.checked = showTotalQtyInPrint;
 
-            const navToggle = document.getElementById("showNavButtonsToggle");
-            if (navToggle) navToggle.checked = showNavButtons;
-
             const greyToggle = document.getElementById("greyButtonsToggle");
             if (greyToggle) greyToggle.checked = isGreyButtons;
 
@@ -3619,12 +3571,6 @@
             showTotalQtyInPrint = document.getElementById("showTotalQtyToggle").checked;
             localStorage.setItem("purchaseShowTotalQtyInPrint", showTotalQtyInPrint);
             loadPurchases();
-        }
-
-        function toggleShowNavButtons() {
-            showNavButtons = document.getElementById("showNavButtonsToggle").checked;
-            localStorage.setItem("purchaseShowNavButtons", showNavButtons);
-            applyNavButtonsVisibility();
         }
 
         function toggleActionButton(type) {
@@ -3718,18 +3664,6 @@
             style.textContent = css;
         }
 
-        function applyNavButtonsVisibility() {
-            const btns = document.querySelectorAll(".nav-btn");
-            btns.forEach(btn => {
-                if (showNavButtons) {
-                    btn.classList.remove("hide-nav");
-                } else {
-                    btn.classList.add("hide-nav");
-                }
-            });
-            if (typeof applyUIPermissions === 'function') applyUIPermissions();
-        }
-
         function resetTableSettings() {
             columnVisibility = new Array(33).fill(true);
             // Default hide extra fields
@@ -3739,10 +3673,6 @@
             showTotalQtyInPrint = true;
             localStorage.removeItem("purchaseShowTotalQtyInPrint");
             if (document.getElementById("showTotalQtyToggle")) document.getElementById("showTotalQtyToggle").checked = true;
-
-            showNavButtons = true;
-            localStorage.removeItem("purchaseShowNavButtons");
-            applyNavButtonsVisibility();
 
             actionButtonVisibility = { edit: true, copy: true, delete: true, view: true };
             localStorage.removeItem("purchaseActionButtons");
@@ -4048,7 +3978,6 @@
             applyFetchItemCodeVisibility();
             applyTheme();
             applyCompactView();
-            applyNavButtonsVisibility();
             applyGreyButtons();
             loadColumnWidths();
             enableColumnResizing();
