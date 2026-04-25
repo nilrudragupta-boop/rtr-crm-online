@@ -1148,7 +1148,8 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 20px; text-align: center; font-size: 12px; color: var(--secondary-color);">
+                <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--secondary-color); font-weight: 500;">
+                    Logged in User: <span id="footerUserDisplay" style="color: var(--primary-color);">Admin</span> | 
                     License Expiry: <span id="licenseExpiryDisplay">Loading...</span>
                     <button id="btnRenewLicense" onclick="openRenewalModal()"
                         style="display:none; margin-left: 5px; padding: 2px 8px; font-size: 11px; background: #e67e22; border: none; border-radius: 4px; cursor: pointer; color: white;"
@@ -2978,6 +2979,10 @@
             if (displayEl) {
                 displayEl.innerHTML = `<i class="fas fa-user-circle"></i> <span>${user}</span>`;
             }
+            const footerUserEl = document.getElementById('footerUserDisplay');
+            if (footerUserEl) {
+                footerUserEl.innerText = user;
+            }
         }
 
         function updateCloseAllButtonVisibility() {
@@ -3617,7 +3622,8 @@
         ];
 
         function loadFavorites() {
-            const saved = JSON.parse(localStorage.getItem('user_favorites')) || [];
+            let saved = [];
+            try { saved = JSON.parse(localStorage.getItem('user_favorites')) || []; } catch(e) { console.warn("Failed to parse favorites", e); }
             const container = document.getElementById('favoritesContainer');
             const list = document.getElementById('favoritesList');
 
@@ -3737,7 +3743,8 @@
         let draggedItem = null;
 
         function loadQuickActions() {
-            const saved = JSON.parse(localStorage.getItem('user_quick_actions'));
+            let saved = null;
+            try { saved = JSON.parse(localStorage.getItem('user_quick_actions')); } catch(e) { console.warn("Failed to parse quick actions", e); }
             const container = document.getElementById('quickActionsGrid');
             container.innerHTML = '';
 
@@ -5701,7 +5708,8 @@
         }
 
         function showDueReminders(options = { openModal: false }) {
-            const reminders = JSON.parse(localStorage.getItem('reminders')) || [];
+            let reminders = [];
+            try { reminders = JSON.parse(localStorage.getItem('reminders')) || []; } catch(e) { console.warn("Failed to parse reminders", e); }
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
 

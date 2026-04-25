@@ -3062,7 +3062,13 @@
             const deletePromises = [];
             for (let id of idsToDelete) {
                 purchases = purchases.filter(p => String(p.id) !== String(id));
-                deletePromises.push(apiClient.deletePurchase(id).catch(e => console.warn("API sync failed", e)));
+                try {
+                    if (typeof apiClient !== 'undefined' && typeof apiClient.deletePurchase === 'function') {
+                        deletePromises.push(apiClient.deletePurchase(id).catch(e => console.warn("API sync failed", e)));
+                    } else {
+                        deletePromises.push(fetch(`/api/purchases/${id}`, { method: 'DELETE' }).catch(e => console.warn("Delete API failed", e)));
+                    }
+                } catch (e) { console.warn("Delete API call error", e); }
             }
             localStorage.setItem("purchases", JSON.stringify(purchases));
 

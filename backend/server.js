@@ -43,9 +43,50 @@ mongoose.connect(process.env.MONGO_URI)
         console.error('❌ MongoDB Connection Error:', err);
     });
 
+// --- Admin Credentials Model ---
+const adminCredsSchema = new mongoose.Schema({
+    id: { type: String, default: 'global_creds', unique: true },
+    adminUser: String,
+    adminEmail: String,
+    adminEmailPass: String,
+    adminPass: String,
+    adminUsers: { type: Array, default: [{ username: "Admin", password: "", role: "Admin" }] },
+    emailProvider: String,
+    smtpHost: String,
+    smtpPort: String,
+    imapHost: String,
+    imapPort: String
+});
+const AdminCreds = mongoose.model('AdminCreds', adminCredsSchema);
+
 // --- API Routes ---
 app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });
+});
+
+// --- Admin Creds Routes (Login Validation) ---
+app.get('/api/admin-creds', async (req, res) => {
+    try {
+        const creds = await AdminCreds.findOne({ id: 'global_creds' });
+        if (creds) {
+            res.json({ success: true, ...creds.toObject() });
+        } else {
+            // Fallback for new databases
+            res.json({ success: true, adminUsers: [{ username: "Admin", password: "", role: "Admin" }] });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/admin-creds', async (req, res) => {
+    try {
+        const payload = req.body;
+        const updated = await AdminCreds.findOneAndUpdate({ id: 'global_creds' }, payload, { new: true, upsert: true });
+        res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // --- Customer Routes ---
