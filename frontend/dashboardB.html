@@ -2179,6 +2179,25 @@
         let currentOtpCallback = null;
         let secureOtpTimerInterval = null;
 
+        function promptForContactAndSyncDashboard(isRetry = false) {
+            const msg = isRetry 
+                ? "⚠️ Contact Number mismatch or not found on server.\n\nPlease carefully re-enter your Registered 10-Digit Mobile Number to verify your license and sync data (or click Cancel to ignore):"
+                : "To verify your license on this device, please enter your Registered 10-Digit Mobile Number:";
+                
+            const contactPrompt = prompt(msg);
+            if (contactPrompt !== null) {
+                const cleanContact = contactPrompt.replace(/\D/g, '');
+                if (cleanContact.length === 10) {
+                    localStorage.setItem('contactNumber', cleanContact);
+                    syncRemoteLicense();
+                    syncRemoteConfig();
+                } else {
+                    alert("⚠️ Invalid mobile number. It must be exactly 10 digits.");
+                    promptForContactAndSyncDashboard(true);
+                }
+            }
+        }
+
         // Mobile/Touch friendly secret vault trigger
         let secretTapCount = 0;
         let secretTapTimer = null;
@@ -4158,6 +4177,9 @@
                         localStorage.setItem("remotePermissions_" + currentUser, JSON.stringify(res.remotePermissions));
                         applyUIPermissions();
                     }
+                } else if (res.success === false && res.message && (res.message.toLowerCase().includes("contact") || res.message.toLowerCase().includes("mobile") || res.message.toLowerCase().includes("number") || res.message.toLowerCase().includes("not found"))) {
+                    // Handle mismatch or missing number on dashboard
+                    promptForContactAndSyncDashboard(true);
                 }
 
                 // Show Cloud Alerts as a scrolling ticker

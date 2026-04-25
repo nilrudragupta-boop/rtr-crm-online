@@ -1086,6 +1086,27 @@
             else document.body.classList.remove("dark-mode");
         }
 
+        function promptForContactAndRetry(user, pass, isRetry = false) {
+            const msg = isRetry 
+                ? "⚠️ No User account found for that Mobile Number, or it is incorrect.\n\nPlease carefully re-enter your Registered 10-Digit Mobile Number to sync your profile (or click Cancel to stop):"
+                : "Account not found locally.\n\nIf you created this account on another device, please enter your Registered 10-Digit Mobile Number to sync your profile:";
+                
+            const contactPrompt = prompt(msg);
+            if (contactPrompt !== null) {
+                const cleanContact = contactPrompt.replace(/\D/g, '');
+                if (cleanContact.length === 10) {
+                    fetchAndRetryLogin(user, pass, cleanContact);
+                } else {
+                    alert("⚠️ Invalid mobile number. It must be exactly 10 digits.");
+                    promptForContactAndRetry(user, pass, true);
+                }
+            } else {
+                const loginBtn = document.querySelector('button[onclick="validateLogin()"]');
+                if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '🔓 Login'; }
+                showToast("⚠️ Warning: Invalid Username or Password!", "#dc3545");
+            }
+        }
+
         async function validateLogin() {
             const loginBtn = document.getElementById('loginBtn');
             const originalBtnText = loginBtn ? loginBtn.innerHTML : '🔓 Login';
@@ -1206,16 +1227,8 @@
             } else {
                 // --- CLOUD SYNC FALLBACK FOR NEW DEVICES ---
                 if (user && user.toLowerCase() !== "admin" && !localStorage.getItem("contactNumber")) {
-                    const contactPrompt = prompt("Account not found locally.\n\nIf you created this account on another device, please enter your Registered 10-Digit Mobile Number to sync your profile:");
-                    if (contactPrompt) {
-                        const cleanContact = contactPrompt.replace(/\D/g, '');
-                        if (cleanContact.length === 10) {
-                            fetchAndRetryLogin(user, pass, cleanContact);
-                            return;
-                        } else {
-                            alert("Invalid mobile number. It must be exactly 10 digits.");
-                        }
-                    }
+                    promptForContactAndRetry(user, pass);
+                    return;
                 }
                 showToast("⚠️ Warning: Invalid Username or Password!", "#dc3545");
             }
@@ -1250,10 +1263,13 @@
                         validateLogin(); // Re-trigger the login process, it will pass this time
                         return;
                     } else {
-                        showToast("No remote account found for this Mobile Number.", "#dc3545");
+                        promptForContactAndRetry(username, password, true);
+                        return;
                     }
                 } catch (e) {
-                    showToast("Network error while syncing account.", "#dc3545");
+                    alert("Network error while syncing account. Please check your internet connection and try again.");
+                    promptForContactAndRetry(username, password, true);
+                    return;
                 }
             } else {
                 showToast("System Error: Cloud URL not configured.", "#dc3545");
