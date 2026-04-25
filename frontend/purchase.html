@@ -2237,7 +2237,13 @@
         }
 
         async function loadPurchases() {
+            const tbody = document.getElementById("purchaseTableBody");
+            if (tbody && (!currentFilteredPurchases || currentFilteredPurchases.length === 0)) {
+                tbody.innerHTML = `<tr><td colspan="34" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
+            }
+
             let localPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            if (!Array.isArray(localPurchases)) localPurchases = [];
             try {
                 let remoteData = await apiClient.getPurchases();
                 if (remoteData && remoteData.length > 0) {
@@ -2258,6 +2264,7 @@
 
             // Calculate Stock Map for sorting
             let allInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            if (!Array.isArray(allInvoices)) allInvoices = [];
             try {
                 let remoteInvoices = await apiClient.getInvoices();
                 if (remoteInvoices && remoteInvoices.length > 0) {
@@ -2589,7 +2596,13 @@
             // --- Stock Calculation End ---
 
             if (!data.length) {
-                tbody.innerHTML = `<tr><td colspan="13">No records found</td></tr>`;
+                let visibleCount = 0;
+                for (let i = 0; i < columnVisibility.length; i++) {
+                    if (columnVisibility[i]) visibleCount++;
+                }
+                tbody.innerHTML = `<tr><td colspan="${visibleCount || 34}" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">No records found</td></tr>`;
+                tfoot.innerHTML = "";
+                renderPagination(0, 0, 0, 1);
                 return;
             }
 
