@@ -1592,13 +1592,23 @@
 
         // --- load invoices ---
         async function loadInvoices() {
-            const remoteData = await apiClient.getInvoices();
-            if (remoteData && remoteData.length > 0) {
-                invoices = remoteData;
-                localStorage.setItem("invoices", JSON.stringify(invoices));
-            } else {
-                invoices = JSON.parse(localStorage.getItem("invoices")) || [];
-            }
+            let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            try {
+                const remoteData = await apiClient.getInvoices();
+                if (remoteData && remoteData.length > 0) {
+                    remoteData.forEach(remoteInv => {
+                        const localIdx = localInvoices.findIndex(inv => inv.invoice_no === remoteInv.invoice_no);
+                        if (localIdx > -1) {
+                            localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
+                        } else {
+                            localInvoices.push(remoteInv);
+                        }
+                    });
+                    localStorage.setItem("invoices", JSON.stringify(localInvoices));
+                }
+            } catch (e) { console.warn("Failed to fetch remote invoices, using local data."); }
+            
+            invoices = localInvoices;
             populateDistrictFilter();
             populateInvoiceTypeFilter();
             populateStateFilter();
@@ -4000,6 +4010,9 @@
             const distFilter = document.getElementById("filterDistrict").value;
             const stateFilter = document.getElementById("filterState").value;
             const supplierFilter = document.getElementById("filterSupplier").value;
+            
+            const from = document.getElementById("fromDate").value;
+            const to = document.getElementById("toDate").value;
 
             const fInvNo = (document.getElementById("search_invNo")?.value || "").toLowerCase().trim();
             const fInvType = (document.getElementById("search_invType")?.value || "").toLowerCase().trim();
@@ -4020,6 +4033,10 @@
             }
 
             const filtered = invoices.filter(inv => {
+                const d = inv.invoice_date || inv.date || "";
+                if (from && d < from) return false;
+                if (to && d > to) return false;
+
                 const { total, paid, due } = getInvoiceTotals(inv);
 
                 let statusMatch = true;
@@ -4133,17 +4150,7 @@
 
         document.getElementById("btnDateSearch").addEventListener("click", applyDateFilter);
         function applyDateFilter() {
-            currentPage = 1;
-            const from = document.getElementById("fromDate").value;
-            const to = document.getElementById("toDate").value;
-            const filtered = invoices.filter(inv => {
-                if (!from && !to) return true;
-                const d = inv.invoice_date || inv.date || "";
-                if (from && d < from) return false;
-                if (to && d > to) return false;
-                return true;
-            });
-            renderTable(filtered);
+            applySearch();
         }
 
         // --- sorting --- (works for both customer stored in nested object or top-level fields)

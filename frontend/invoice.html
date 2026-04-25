@@ -2090,7 +2090,7 @@
                 , freightBeforeGst, freightBeforeGstRate
             };
 
-            const invoices = await apiClient.getInvoices();
+            const invoices = JSON.parse(localStorage.getItem("invoices")) || [];
 
             const existingInvIndex = invoices.findIndex(inv => inv.invoice_no === invoice_no);
             if (existingInvIndex > -1) {
@@ -2112,23 +2112,22 @@
         }
 
         async function finalizeSave(invoiceData) {
-            const result = await apiClient.saveInvoice(invoiceData);
-            if (result.success) {
-                let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
-                const existingIdx = localInvoices.findIndex(inv => inv.invoice_no === invoiceData.invoice_no);
-                if (existingIdx > -1) {
-                    localInvoices[existingIdx] = invoiceData;
-                } else {
-                    localInvoices.push(invoiceData);
-                }
-                localStorage.setItem("invoices", JSON.stringify(localInvoices));
-
-                openSaveSuccessModal();
-                await loadLastInvoiceNo();
-                loadCustomers();
+            let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            const existingIdx = localInvoices.findIndex(inv => inv.invoice_no === invoiceData.invoice_no);
+            if (existingIdx > -1) {
+                localInvoices[existingIdx] = invoiceData;
             } else {
-                showToast("Error saving invoice: " + result.message, "#e74c3c");
+                localInvoices.push(invoiceData);
             }
+            localStorage.setItem("invoices", JSON.stringify(localInvoices));
+            
+            apiClient.saveInvoice(invoiceData).then(result => {
+                if (!result.success) console.warn("API sync failed:", result.message);
+            });
+
+            openSaveSuccessModal();
+            await loadLastInvoiceNo();
+            loadCustomers();
         }
 
         // 🔸 Add item row, total calc (unchanged from yours)

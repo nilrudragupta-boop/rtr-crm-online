@@ -4883,7 +4883,10 @@
                 const jsonString = JSON.stringify(backupData, null, 2);
                 const encrypted = CryptoJS.AES.encrypt(jsonString, '983042').toString();
                 const now = new Date();
-                const fileName = `AllData-${now.toISOString().slice(0, 10)}.json`;
+                
+                const brandEl = document.querySelector('[data-brand="name"]');
+                const companyName = (brandEl && brandEl.innerText !== "Company Name" ? brandEl.innerText : (localStorage.getItem('companyName') || 'RISE_Tech')).replace(/[^a-zA-Z0-9]/g, '_');
+                const fileName = `${companyName}_AllData-${now.toISOString().slice(0, 10)}.json`;
 
                 const backupDateStr = now.toLocaleString();
                 localStorage.setItem('lastBackupDate', backupDateStr);
@@ -4937,7 +4940,9 @@
                 const now = new Date();
                 const datePart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
                 const timePart = String(now.getHours()).padStart(2, '0') + '-' + String(now.getMinutes()).padStart(2, '0') + '-' + String(now.getSeconds()).padStart(2, '0');
-                const fileName = `AutoBackup-Logoff-${datePart}-${timePart}.json`;
+                
+                const companyName = (localStorage.getItem('companyName') || 'RISE_Tech').replace(/[^a-zA-Z0-9]/g, '_');
+                const fileName = `${companyName}_AutoBackup-Logoff-${datePart}-${timePart}.json`;
 
                 if (window.electronAPI && window.electronAPI.saveLocalBackup) {
                     await window.electronAPI.saveLocalBackup(fileName, encrypted);

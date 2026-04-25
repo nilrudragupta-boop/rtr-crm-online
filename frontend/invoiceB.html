@@ -1396,8 +1396,8 @@ Branch: </textarea>
                     previousDue: previousDue
                 };
 
-                let invoices = await apiClient.getInvoices();
-                const existingIdx = invoices.findIndex(i => i.invoice_no === invoiceNo);
+                let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+                const existingIdx = localInvoices.findIndex(inv => inv.invoice_no === invoiceData.invoice_no);
 
                 if (existingIdx > -1 && !confirm("Invoice number already exists. Overwrite?")) return;
 
@@ -1405,33 +1405,26 @@ Branch: </textarea>
                 const timestamp = new Date().toISOString();
 
                 if (existingIdx > -1) {
-                    const existing = invoices[existingIdx];
+                    const existing = localInvoices[existingIdx];
                     invoiceData.createdBy = existing.createdBy || currentUser;
                     invoiceData.createdDate = existing.createdDate || timestamp;
                     invoiceData.editedBy = currentUser;
                     invoiceData.editedDate = timestamp;
-                    invoices[existingIdx] = { ...invoices[existingIdx], ...invoiceData, id: invoices[existingIdx].id };
+                    localInvoices[existingIdx] = invoiceData;
                 } else {
                     invoiceData.createdBy = currentUser;
                     invoiceData.createdDate = timestamp;
-                    invoices.push(invoiceData);
+                    localInvoices.push(invoiceData);
                 }
 
-                const result = await apiClient.saveInvoice(invoiceData);
-                if (result.success) {
-                    let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
-                    const existingIdx = localInvoices.findIndex(inv => inv.invoice_no === invoiceData.invoice_no);
-                    if (existingIdx > -1) {
-                        localInvoices[existingIdx] = invoiceData;
-                    } else {
-                        localInvoices.push(invoiceData);
-                    }
-                    localStorage.setItem("invoices", JSON.stringify(localInvoices));
-                    
-                    alert("Invoice Saved Successfully!");
-                } else {
-                    alert("Error saving invoice: " + result.message);
-                }
+                localStorage.setItem("invoices", JSON.stringify(localInvoices));
+                
+                // Background sync
+                apiClient.saveInvoice(invoiceData).then(result => {
+                    if (!result.success) console.warn("API sync failed:", result.message);
+                });
+                
+                alert("Invoice Saved Successfully!");
             }
 
             let showFreightBeforeGst = localStorage.getItem("invoiceBShowFreightBeforeGst") === "true";
