@@ -4,9 +4,9 @@
  */
 
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
-const API_BASE_URL = isLocal
+const API_BASE_URL = localStorage.getItem('backendApiUrl') || (isLocal
     ? 'http://localhost:5000/api'
-    : 'https://rtr-crm-online.onrender.com/api'; // Replace with your Render/Railway live URL
+    : 'https://rtr-crm-online.onrender.com/api'); // Fallback Render URL
 
 const apiClient = {
     // --- Customers ---
