@@ -63,9 +63,8 @@ app.get('/api/customers', async (req, res) => {
 app.post('/api/customers', async (req, res) => {
     try {
         const payload = req.body;
-        if (payload.id || payload.name) {
-            // Update if exists based on ID or Name
-            const updated = await Customer.findOneAndUpdate({ name: payload.name }, payload, { new: true, upsert: true });
+        if (payload.id) {
+            const updated = await Customer.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
             const newCustomer = new Customer(payload);
@@ -119,8 +118,8 @@ app.get('/api/suppliers', async (req, res) => {
 app.post('/api/suppliers', async (req, res) => {
     try {
         const payload = req.body;
-        if (payload.id || payload.name) {
-            const updated = await Supplier.findOneAndUpdate({ $or: [{ id: payload.id }, { name: payload.name }] }, payload, { new: true, upsert: true });
+        if (payload.id) {
+            const updated = await Supplier.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
             const newSupplier = new Supplier(payload);
@@ -154,8 +153,8 @@ app.get('/api/items', async (req, res) => {
 app.post('/api/items', async (req, res) => {
     try {
         const payload = req.body;
-        if (payload.id || payload.itemCode || payload.name) {
-            const updated = await Item.findOneAndUpdate({ $or: [{ id: payload.id }, { itemCode: payload.itemCode }, { name: payload.name }] }, payload, { new: true, upsert: true });
+        if (payload.id) {
+            const updated = await Item.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
             const newItem = new Item(payload);
@@ -224,8 +223,8 @@ app.get('/api/credit-debit-notes', async (req, res) => {
 app.post('/api/credit-debit-notes', async (req, res) => {
     try {
         const payload = req.body;
-        if (payload.id || payload.noteNo || payload.note_no) {
-            const updated = await CreditDebitNote.findOneAndUpdate({ $or: [{ id: payload.id }, { noteNo: payload.noteNo }, { note_no: payload.note_no }] }, payload, { new: true, upsert: true });
+        if (payload.id) {
+            const updated = await CreditDebitNote.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
             const newNote = new CreditDebitNote(payload);
@@ -329,8 +328,8 @@ app.get('/api/journal-vouchers', async (req, res) => {
 app.post('/api/journal-vouchers', async (req, res) => {
     try {
         const payload = req.body;
-        if (payload.id || payload.voucher_no || payload.voucherNo) {
-            const updated = await JournalVoucher.findOneAndUpdate({ $or: [{ id: payload.id }, { voucher_no: payload.voucher_no }, { voucher_no: payload.voucherNo }] }, payload, { new: true, upsert: true });
+        if (payload.id) {
+            const updated = await JournalVoucher.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
             const newVoucher = new JournalVoucher(payload);
