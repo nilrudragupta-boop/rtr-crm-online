@@ -600,8 +600,36 @@
         let rowsPerPage = 20;
 
         async function fetchBankingData() {
-            accounts = await apiClient.getBankAccounts();
-            transactions = await apiClient.getBankTransactions();
+            let localAccounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
+            let localTransactions = JSON.parse(localStorage.getItem('bank_transactions')) || [];
+            
+            try {
+                const remoteAccounts = await apiClient.getBankAccounts();
+                if (remoteAccounts && remoteAccounts.length > 0) {
+                    remoteAccounts.forEach(remoteAcc => {
+                        const idx = localAccounts.findIndex(a => a.id === remoteAcc.id);
+                        if (idx > -1) localAccounts[idx] = { ...localAccounts[idx], ...remoteAcc };
+                        else localAccounts.push(remoteAcc);
+                    });
+                    localStorage.setItem('bank_accounts', JSON.stringify(localAccounts));
+                }
+                
+                const remoteTrans = await apiClient.getBankTransactions();
+                if (remoteTrans && remoteTrans.length > 0) {
+                    remoteTrans.forEach(remoteTx => {
+                        const idx = localTransactions.findIndex(t => t.id === remoteTx.id);
+                        if (idx > -1) localTransactions[idx] = { ...localTransactions[idx], ...remoteTx };
+                        else localTransactions.push(remoteTx);
+                    });
+                    localStorage.setItem('bank_transactions', JSON.stringify(localTransactions));
+                }
+            } catch (e) {
+                console.warn("API sync failed, using local data", e);
+            }
+            
+            accounts = localAccounts;
+            transactions = localTransactions;
+
             renderAccountList();
             if (accounts.length > 0 && !selectedAccountId) selectAccount(accounts[0].id);
             else if (selectedAccountId) renderTransactions(selectedAccountId);
@@ -852,7 +880,7 @@
                 const primaryBadge = acc.isPrimary ? '<span class="badge bg-primary-badge" style="margin-left:5px; font-size:10px;">Primary</span>' : '';
 
                 if (searchTerm) {
-                    const text = (acc.name + ' ' + acc.number + ' ' + (acc.holderName || '')).toLowerCase();
+                    const text = (String(acc.name || '') + ' ' + String(acc.number || '') + ' ' + String(acc.holderName || '')).toLowerCase();
                     if (!text.includes(searchTerm)) return;
                 }
 

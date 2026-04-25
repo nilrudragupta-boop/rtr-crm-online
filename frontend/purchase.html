@@ -2195,19 +2195,42 @@
         }
 
         async function loadPurchases() {
-            let remoteData = await apiClient.getPurchases();
-            let data = [];
-            if (remoteData && remoteData.length > 0) {
-                data = remoteData;
-                localStorage.setItem("purchases", JSON.stringify(data));
-            } else {
-                data = JSON.parse(localStorage.getItem("purchases")) || [];
+            let localPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            try {
+                let remoteData = await apiClient.getPurchases();
+                if (remoteData && remoteData.length > 0) {
+                    remoteData.forEach(remoteP => {
+                        const localIdx = localPurchases.findIndex(p => p.id === remoteP.id);
+                        if (localIdx > -1) {
+                            localPurchases[localIdx] = { ...localPurchases[localIdx], ...remoteP };
+                        } else {
+                            localPurchases.push(remoteP);
+                        }
+                    });
+                    localStorage.setItem("purchases", JSON.stringify(localPurchases));
+                }
+            } catch (e) {
+                console.warn("API sync failed, using local data", e);
             }
+            let data = localPurchases;
 
             // Calculate Stock Map for sorting
-            let allInvoices = await apiClient.getInvoices();
-            if (!allInvoices || allInvoices.length === 0) {
-                allInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            let allInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            try {
+                let remoteInvoices = await apiClient.getInvoices();
+                if (remoteInvoices && remoteInvoices.length > 0) {
+                    remoteInvoices.forEach(remoteInv => {
+                        const localIdx = allInvoices.findIndex(inv => inv.invoice_no === remoteInv.invoice_no);
+                        if (localIdx > -1) {
+                            allInvoices[localIdx] = { ...allInvoices[localIdx], ...remoteInv };
+                        } else {
+                            allInvoices.push(remoteInv);
+                        }
+                    });
+                    localStorage.setItem("invoices", JSON.stringify(allInvoices));
+                }
+            } catch(e) {
+                console.warn("Failed to fetch invoices for stock map", e);
             }
             const returns = JSON.parse(localStorage.getItem("returns")) || [];
             const scraps = JSON.parse(localStorage.getItem("scraps")) || [];
@@ -2325,14 +2348,15 @@
                     if (to) match = match && (p.date <= to);
 
                     // Column filters
-                    if (fDate) match = match && (p.date && p.date.toLowerCase().includes(fDate));
-                    if (fSupplier) match = match && (p.supplierName && p.supplierName.toLowerCase().includes(fSupplier));
-                    if (fInv) match = match && (p.supplierInv && p.supplierInv.toLowerCase().includes(fInv));
-                    if (fItem) match = match && (p.itemName && p.itemName.toLowerCase().includes(fItem));
-                    if (fItemCode) match = match && (p.itemCode && p.itemCode.toLowerCase().includes(fItemCode));
-                    if (fCategory) match = match && (p.category && p.category.toLowerCase().includes(fCategory));
-                    if (fCreatedBy) match = match && (p.createdBy && p.createdBy.toLowerCase().includes(fCreatedBy));
-                    if (fEditedBy) match = match && (p.editedBy && p.editedBy.toLowerCase().includes(fEditedBy));
+                    if (fDate) match = match && (p.date && String(p.date).toLowerCase().includes(fDate));
+                    if (fSupplier) match = match && (p.supplierName && String(p.supplierName).toLowerCase().includes(fSupplier));
+                    if (fInv) match = match && (p.supplierInv && String(p.supplierInv).toLowerCase().includes(fInv));
+                    if (fItem) match = match && (p.itemName && String(p.itemName).toLowerCase().includes(fItem));
+                    if (fItemCode) match = match && (p.itemCode && String(p.itemCode).toLowerCase().includes(fItemCode));
+                    if (fCategory) match = match && (p.category && String(p.category).toLowerCase().includes(fCategory));
+                    if (fCreatedBy) match = match && (p.createdBy && String(p.createdBy).toLowerCase().includes(fCreatedBy));
+                    if (fEditedBy) match = match && (p.editedBy && String(p.editedBy).toLowerCase().includes(fEditedBy));
+
 
                     return match;
                 });
@@ -2341,14 +2365,14 @@
             // Sorting
             if (currentSortColumn === 'supplier') {
                 data.sort((a, b) => {
-                    const valA = (a.supplierName || "").trim().toLowerCase();
-                    const valB = (b.supplierName || "").trim().toLowerCase();
+                    const valA = String(a.supplierName || "").trim().toLowerCase();
+                    const valB = String(b.supplierName || "").trim().toLowerCase();
                     return currentSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
                 });
             } else if (currentSortColumn === 'date') {
                 data.sort((a, b) => {
-                    const valA = a.date || "";
-                    const valB = b.date || "";
+                    const valA = String(a.date || "");
+                    const valB = String(b.date || "");
                     return currentSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
                 });
             } else if (currentSortColumn === 'stock') {
