@@ -1053,6 +1053,8 @@
                                 <span id="storageStatus"><i class="fas fa-database"></i> ...</span>
                                 <br>
                                 <span id="lastSyncStatus" style="color: var(--secondary-color);"><i class="fas fa-clock"></i> Last Synced: Never</span>
+                                <br>
+                                <span id="syncPendingStatus" style="color: var(--success-color);"><i class="fas fa-check-double"></i> Checking sync status...</span>
                             </div>
                             <div style="display: flex; gap: 10px;">
                                 <button onclick="runNetworkTest()"
@@ -2465,10 +2467,19 @@
 
                 await Promise.all(promises);
                 
+                // Take a snapshot hash of the newly synced local database state
+                let currentStateStr = "";
+                const collectionsToCheck = ["customers", "invoices", "purchases", "items", "suppliers", "expenses", "credit_debit_notes", "bank_accounts", "bank_transactions", "journal_vouchers", "scraps", "production"];
+                collectionsToCheck.forEach(c => currentStateStr += (localStorage.getItem(c) || "[]"));
+                const currentHash = typeof CryptoJS !== 'undefined' ? CryptoJS.MD5(currentStateStr).toString() : currentStateStr.length.toString();
+                localStorage.setItem('lastSyncedHash', currentHash);
+
                 const syncTime = new Date().toLocaleString();
                 localStorage.setItem('lastAutoSync', syncTime);
                 const syncStatusEl = document.getElementById('lastSyncStatus');
                 if (syncStatusEl) syncStatusEl.innerHTML = `<i class="fas fa-clock"></i> Last Synced: ${syncTime}`;
+
+                if (typeof checkPendingSync === 'function') checkPendingSync();
 
                 if (!silent) {
                     document.getElementById('successMsg').innerText = "All local data has been successfully synced to the backend!";
@@ -2485,6 +2496,25 @@
             }
         }
 
+        function checkPendingSync() {
+            const collectionsToCheck = ["customers", "invoices", "purchases", "items", "suppliers", "expenses", "credit_debit_notes", "bank_accounts", "bank_transactions", "journal_vouchers", "scraps", "production"];
+            let currentStateStr = "";
+            collectionsToCheck.forEach(c => currentStateStr += (localStorage.getItem(c) || "[]"));
+            const currentHash = typeof CryptoJS !== 'undefined' ? CryptoJS.MD5(currentStateStr).toString() : currentStateStr.length.toString();
+            const lastHash = localStorage.getItem('lastSyncedHash');
+            
+            const statusEl = document.getElementById('syncPendingStatus');
+            if (!statusEl) return;
+            
+            if (currentHash !== lastHash) {
+                statusEl.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Pending Sync`;
+                statusEl.style.color = 'var(--warning-color)';
+            } else {
+                statusEl.innerHTML = `<i class="fas fa-check-double"></i> Completely Synced`;
+                statusEl.style.color = 'var(--success-color)';
+            }
+        }
+
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             const lastSync = localStorage.getItem('lastAutoSync');
@@ -2493,6 +2523,8 @@
                 if (syncStatusEl) syncStatusEl.innerHTML = `<i class="fas fa-clock"></i> Last Synced: ${lastSync}`;
             }
             setInterval(() => forceSyncData(true), 900000); // Auto-sync every 15 minutes
+            setInterval(checkPendingSync, 5000); // Check for unsynced local data every 5 seconds
+            checkPendingSync();
 
             loadSettings();
             restoreSectionStates();
@@ -5710,7 +5742,9 @@
             const isExpEnabled = localStorage.getItem('showExpenseWidget') === 'true';
             const expToggle = document.getElementById('showExpenseToggle');
             if (expToggle) expToggle.checked = isExpEnabled;
-            document.getElementById('dashboardSettingsModal').style.display = 'flex';
+            const isSyncDiagEnabled = localStorage.getItem('showSyncDiagnosticsWidget') === 'true';
+            const syncDiagToggle = document.getElementById('showSyncDiagnosticsToggle');
+            if (syncDiagToggle) syncDiagToggle.checked = isSyncDiagEnabled;
             document.getElementById('dashboardSettingsModal').style.display = 'flex';
         }
 
@@ -5735,6 +5769,13 @@
             const isEnabled = document.getElementById('showExpenseToggle').checked;
             localStorage.setItem('showExpenseWidget', isEnabled);
             const widget = document.getElementById('expenseWidget');
+            if (widget) widget.style.display = isEnabled ? 'flex' : 'none';
+        }
+
+        function toggleSyncDiagnosticsWidget() {
+            const isEnabled = document.getElementById('showSyncDiagnosticsToggle').checked;
+            localStorage.setItem('showSyncDiagnosticsWidget', isEnabled);
+            const widget = document.getElementById('syncDiagnosticsWidget');
             if (widget) widget.style.display = isEnabled ? 'flex' : 'none';
         }
 
