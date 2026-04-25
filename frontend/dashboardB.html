@@ -12,6 +12,7 @@
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
     <script src="config.js"></script>
+    <script src="apiClient.js"></script>
 
     <style>
         :root {
@@ -1050,6 +1051,8 @@
                                 <span id="apiHealthStatus"><i class="fas fa-server"></i> API: Checking...</span>
                                 <br>
                                 <span id="storageStatus"><i class="fas fa-database"></i> ...</span>
+                                <br>
+                                <span id="lastSyncStatus" style="color: var(--secondary-color);"><i class="fas fa-clock"></i> Last Synced: Never</span>
                             </div>
                             <div style="display: flex; gap: 10px;">
                                 <button onclick="runNetworkTest()"
@@ -1059,6 +1062,10 @@
                                 <button onclick="runSystemCheck()"
                                     style="flex: 1; padding: 6px; font-size: 12px; background: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; text-align: center; color: var(--text-color);">
                                     <i class="fas fa-check-circle"></i> System Check
+                                </button>
+                                <button onclick="forceSyncData()"
+                                    style="flex: 1; padding: 6px; font-size: 12px; background: var(--primary-color); border: 1px solid var(--primary-color); border-radius: 4px; cursor: pointer; text-align: center; color: white;">
+                                    <i class="fas fa-sync-alt"></i> Sync Now
                                 </button>
                             </div>
                         </div>
@@ -2416,8 +2423,77 @@
             window.open('https://fast.com', 'SpeedTest', `width=${width},height=${height},top=${top},left=${left}`);
         }
 
+        async function forceSyncData(silent = false) {
+            if (!silent && !confirm("This will force-push all your local records to the backend. This might take a while. Proceed?")) return;
+            
+            const overlay = document.getElementById('loadingOverlay');
+            if (!silent && overlay) {
+                overlay.style.display = 'flex';
+                overlay.querySelector('p').innerText = "Syncing local data to backend...";
+            }
+            
+            try {
+                const collections = [
+                    { key: "customers", method: "saveCustomer" },
+                    { key: "invoices", method: "saveInvoice" },
+                    { key: "purchases", method: "savePurchase" },
+                    { key: "items", method: "saveItem" },
+                    { key: "suppliers", method: "saveSupplier" },
+                    { key: "expenses", method: "saveExpense" },
+                    { key: "credit_debit_notes", method: "saveCreditDebitNote" },
+                    { key: "bank_accounts", method: "saveBankAccount" },
+                    { key: "bank_transactions", method: "saveBankTransaction" },
+                    { key: "journal_vouchers", method: "saveJournalVoucher" },
+                    { key: "scraps", method: "saveScrap" }
+                ];
+                
+                const promises = [];
+                for (const col of collections) {
+                    const data = JSON.parse(localStorage.getItem(col.key)) || [];
+                    if (data.length > 0 && typeof apiClient !== 'undefined' && apiClient[col.method]) {
+                        data.forEach(record => {
+                            promises.push(apiClientcol.method.catch(e => console.warn("Sync warning:", e)));
+                        });
+                    }
+                }
+                
+                // Production records
+                const prods = JSON.parse(localStorage.getItem("production")) || [];
+                if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
+                    prods.forEach(p => promises.push(apiClient._saveCollection('production', p).catch(e => console.warn(e))));
+                }
+
+                await Promise.all(promises);
+                
+                const syncTime = new Date().toLocaleString();
+                localStorage.setItem('lastAutoSync', syncTime);
+                const syncStatusEl = document.getElementById('lastSyncStatus');
+                if (syncStatusEl) syncStatusEl.innerHTML = `<i class="fas fa-clock"></i> Last Synced: ${syncTime}`;
+
+                if (!silent) {
+                    document.getElementById('successMsg').innerText = "All local data has been successfully synced to the backend!";
+                    document.getElementById('successModal').style.display = 'flex';
+                }
+            } catch (err) {
+                console.error("Sync error:", err);
+                if (!silent) {
+                    document.getElementById('warningMsg').innerText = "Error syncing data: " + err.message;
+                    document.getElementById('warningModal').style.display = 'flex';
+                }
+            } finally {
+                if (!silent && overlay) overlay.style.display = 'none';
+            }
+        }
+
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
+            const lastSync = localStorage.getItem('lastAutoSync');
+            if (lastSync) {
+                const syncStatusEl = document.getElementById('lastSyncStatus');
+                if (syncStatusEl) syncStatusEl.innerHTML = `<i class="fas fa-clock"></i> Last Synced: ${lastSync}`;
+            }
+            setInterval(() => forceSyncData(true), 900000); // Auto-sync every 15 minutes
+
             loadSettings();
             restoreSectionStates();
             loadDashboardData();
