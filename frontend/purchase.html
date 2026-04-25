@@ -2031,72 +2031,86 @@
                 return;
             }
 
+            const btnSave = $("saveAllBtn");
+            const originalText = btnSave.innerHTML;
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
-            let totalTaxable = 0;
-            draftItems.forEach(i => {
-                const base = i.qty * i.price;
-                totalTaxable += base - (i.discType === 'flat' ? (i.discount || 0) : base * ((i.discount || 0) / 100));
-            });
+            try {
 
-            const freight = parseFloat($("freightCharges").value) || 0;
-            const packing = parseFloat($("packingCharges").value) || 0;
-            const loading = parseFloat($("loadingCharges").value) || 0;
-            const extraTotal = freight + packing + loading;
 
-            let totalInvoiceBeforeRound = 0;
-            const itemsProcessed = draftItems.map(item => {
-                const base = item.qty * item.price;
-                const discAmt = item.discType === 'flat' ? (item.discount || 0) : base * ((item.discount || 0) / 100);
-                const itemTaxable = base - discAmt;
-                let ratio = totalTaxable > 0 ? itemTaxable / totalTaxable : (draftItems.length > 0 ? 1 / draftItems.length : 0);
-                const itemFreight = freight * ratio;
-                const itemPacking = packing * ratio;
-                const itemLoading = loading * ratio;
-                const itemExtra = itemFreight + itemPacking + itemLoading;
-                const finalTaxable = itemTaxable + itemExtra;
-                const itemGstAmt = finalTaxable * ((item.gst || 0) / 100);
-                const itemTotalBeforeRound = finalTaxable + itemGstAmt;
-                totalInvoiceBeforeRound += itemTotalBeforeRound;
-                return { ...item, discAmt, freightCharges: itemFreight, packingCharges: itemPacking, loadingCharges: itemLoading, finalTaxable, itemTotalBeforeRound };
-            });
+                let totalTaxable = 0;
+                draftItems.forEach(i => {
+                    const base = i.qty * i.price;
+                    totalTaxable += base - (i.discType === 'flat' ? (i.discount || 0) : base * ((i.discount || 0) / 100));
+                });
 
-            let roundOffValue = 0;
-            if ($("roundOffDraft") && $("roundOffDraft").checked) {
-                const roundedTotal = Math.round(totalInvoiceBeforeRound);
-                roundOffValue = roundedTotal - totalInvoiceBeforeRound;
-            }
+                const freight = parseFloat($("freightCharges").value) || 0;
+                const packing = parseFloat($("packingCharges").value) || 0;
+                const loading = parseFloat($("loadingCharges").value) || 0;
+                const extraTotal = freight + packing + loading;
 
-            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                let totalInvoiceBeforeRound = 0;
+                const itemsProcessed = draftItems.map(item => {
+                    const base = item.qty * item.price;
+                    const discAmt = item.discType === 'flat' ? (item.discount || 0) : base * ((item.discount || 0) / 100);
+                    const itemTaxable = base - discAmt;
+                    let ratio = totalTaxable > 0 ? itemTaxable / totalTaxable : (draftItems.length > 0 ? 1 / draftItems.length : 0);
+                    const itemFreight = freight * ratio;
+                    const itemPacking = packing * ratio;
+                    const itemLoading = loading * ratio;
+                    const itemExtra = itemFreight + itemPacking + itemLoading;
+                    const finalTaxable = itemTaxable + itemExtra;
+                    const itemGstAmt = finalTaxable * ((item.gst || 0) / 100);
+                    const itemTotalBeforeRound = finalTaxable + itemGstAmt;
+                    totalInvoiceBeforeRound += itemTotalBeforeRound;
+                    return { ...item, discAmt, freightCharges: itemFreight, packingCharges: itemPacking, loadingCharges: itemLoading, finalTaxable, itemTotalBeforeRound };
+                });
 
-            for (const item of itemsProcessed) {
-                let itemRoundOff = 0;
-                if (totalInvoiceBeforeRound > 0) {
-                    itemRoundOff = roundOffValue * (item.itemTotalBeforeRound / totalInvoiceBeforeRound);
-                } else if (itemsProcessed.length > 0) {
-                    itemRoundOff = roundOffValue / itemsProcessed.length;
+                let roundOffValue = 0;
+                if ($("roundOffDraft") && $("roundOffDraft").checked) {
+                    const roundedTotal = Math.round(totalInvoiceBeforeRound);
+                    roundOffValue = roundedTotal - totalInvoiceBeforeRound;
                 }
-                const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(false) : {};
-                const payload = {
-                    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                    itemId: item.itemId, itemName: item.itemName, supplierName, supplierInv, uom: item.uom, date, qty: item.qty, price: item.price,
-                    discount: item.discount || 0, discType: item.discType || '%', discountAmt: item.discAmt || 0, freightCharges: item.freightCharges || 0, packingCharges: item.packingCharges || 0, loadingCharges: item.loadingCharges || 0, roundOff: itemRoundOff,
-                    salePrice: item.salePrice || 0, margin: item.margin || 0, itemCode: item.itemCode || "", category: item.category || "", hsn: item.hsn || "",
-                    imei: item.imei || "", batch: item.batch || "", lot: item.lot || "", serial: item.serial || "", gst: item.gst,
-                    ...audit
-                };
-                purchases.push(payload);
-                apiClient.savePurchase(payload).catch(e => console.warn("API sync failed", e));
-            }
-            localStorage.setItem("purchases", JSON.stringify(purchases));
 
-            draftItems = [];
-            if ($("freightCharges")) $("freightCharges").value = "0";
-            if ($("packingCharges")) $("packingCharges").value = "0";
-            if ($("loadingCharges")) $("loadingCharges").value = "0";
-            renderDraftTable();
-            clearFields();
-            await loadPurchases();
-            showToast("All items saved successfully ✅");
+                let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                const syncPromises = [];
+
+                for (const item of itemsProcessed) {
+                    let itemRoundOff = 0;
+                    if (totalInvoiceBeforeRound > 0) {
+                        itemRoundOff = roundOffValue * (item.itemTotalBeforeRound / totalInvoiceBeforeRound);
+                    } else if (itemsProcessed.length > 0) {
+                        itemRoundOff = roundOffValue / itemsProcessed.length;
+                    }
+                    const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(false) : {};
+                    const payload = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                        itemId: item.itemId, itemName: item.itemName, supplierName, supplierInv, uom: item.uom, date, qty: item.qty, price: item.price,
+                        discount: item.discount || 0, discType: item.discType || '%', discountAmt: item.discAmt || 0, freightCharges: item.freightCharges || 0, packingCharges: item.packingCharges || 0, loadingCharges: item.loadingCharges || 0, roundOff: itemRoundOff,
+                        salePrice: item.salePrice || 0, margin: item.margin || 0, itemCode: item.itemCode || "", category: item.category || "", hsn: item.hsn || "",
+                        imei: item.imei || "", batch: item.batch || "", lot: item.lot || "", serial: item.serial || "", gst: item.gst,
+                        ...audit
+                    };
+                    purchases.push(payload);
+                    syncPromises.push(apiClient.savePurchase(payload).catch(e => console.warn("API sync failed", e)));
+                }
+                localStorage.setItem("purchases", JSON.stringify(purchases));
+
+                await Promise.all(syncPromises);
+
+                draftItems = [];
+                if ($("freightCharges")) $("freightCharges").value = "0";
+                if ($("packingCharges")) $("packingCharges").value = "0";
+                if ($("loadingCharges")) $("loadingCharges").value = "0";
+                renderDraftTable();
+                clearFields();
+                await loadPurchases();
+                showToast("All items saved successfully ✅");
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = originalText;
+            }
         }
 
         async function updatePurchase() {
@@ -2140,33 +2154,44 @@
                 return;
             }
 
+            const btnUpdate = $("updateBtn");
+            const originalText = btnUpdate.innerHTML;
+            btnUpdate.disabled = true;
+            btnUpdate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
 
-            const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(true) : {};
-            const payload = {
-                id: editingId,
-                itemId, itemName,
-                supplierName, supplierInv,
-                itemCode, category, uom, date, qty, price, salePrice, margin, gst, hsn, imei, batch, lot, serial,
-                discount, discType, discountAmt, freightCharges, packingCharges, loadingCharges, roundOff,
-                ...audit
-            };
+            try {
 
-            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            const idx = purchases.findIndex(p => String(p.id) === String(editingId));
-            if (idx > -1) {
-                purchases[idx] = { ...purchases[idx], ...payload };
-                localStorage.setItem("purchases", JSON.stringify(purchases));
-                apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
+
+                const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(true) : {};
+                const payload = {
+                    id: editingId,
+                    itemId, itemName,
+                    supplierName, supplierInv,
+                    itemCode, category, uom, date, qty, price, salePrice, margin, gst, hsn, imei, batch, lot, serial,
+                    discount, discType, discountAmt, freightCharges, packingCharges, loadingCharges, roundOff,
+                    ...audit
+                };
+
+                let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                const idx = purchases.findIndex(p => String(p.id) === String(editingId));
+                if (idx > -1) {
+                    purchases[idx] = { ...purchases[idx], ...payload };
+                    localStorage.setItem("purchases", JSON.stringify(purchases));
+                    await apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
+                }
+                editingId = null;
+                showToast("Purchase updated ✅");
+
+                clearFields();
+                await loadPurchases();
+
+                // Reset UI
+                $("addDraftBtn").style.display = "inline-block";
+                $("updateBtn").style.display = "none";
+            } finally {
+                btnUpdate.disabled = false;
+                btnUpdate.innerHTML = originalText;
             }
-            editingId = null;
-            showToast("Purchase updated ✅");
-
-            clearFields();
-            await loadPurchases();
-
-            // Reset UI
-            $("addDraftBtn").style.display = "inline-block";
-            $("updateBtn").style.display = "none";
         }
 
         async function loadPurchases() {
@@ -2940,7 +2965,7 @@
 
                 purchases.push(newEntry);
                 localStorage.setItem("purchases", JSON.stringify(purchases));
-                apiClient.savePurchase(newEntry).catch(e => console.warn("API sync failed", e));
+                await apiClient.savePurchase(newEntry).catch(e => console.warn("API sync failed", e));
                 await loadPurchases();
                 showToast("Purchase duplicated successfully ✅");
             }, "btn-save");
@@ -2955,11 +2980,14 @@
         async function confirmDelete() {
             if (idsToDelete.length === 0) return;
             let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            const deletePromises = [];
             for (let id of idsToDelete) {
                 purchases = purchases.filter(p => String(p.id) !== String(id));
-                apiClient.deletePurchase(id).catch(e => console.warn("API sync failed", e));
+                deletePromises.push(apiClient.deletePurchase(id).catch(e => console.warn("API sync failed", e)));
             }
             localStorage.setItem("purchases", JSON.stringify(purchases));
+
+            await Promise.all(deletePromises);
 
             closeModal();
             openSuccessModal("Purchase deleted successfully.");
@@ -3388,7 +3416,7 @@
                 if (idx > -1) {
                     purchases[idx].paymentDate = input.value;
                     localStorage.setItem("purchases", JSON.stringify(purchases));
-                    apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
+                    await apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
                     showToast("Payment date saved ✅");
                 }
             }
@@ -3400,7 +3428,7 @@
             if (idx > -1) {
                 purchases[idx].remarks = value;
                 localStorage.setItem("purchases", JSON.stringify(purchases));
-                apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
+                await apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
                 showToast("Remarks updated");
             }
         }
@@ -4112,7 +4140,7 @@
                 purchases[idx].paymentDateBank = bankDate;
 
                 localStorage.setItem("purchases", JSON.stringify(purchases));
-                apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
+                await apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
                 await loadPurchases(); // Refresh table
                 closePaymentSplitModal();
                 showToast("Payment updated successfully");

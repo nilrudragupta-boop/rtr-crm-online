@@ -2114,6 +2114,15 @@
         async function finalizeSave(invoiceData) {
             const result = await apiClient.saveInvoice(invoiceData);
             if (result.success) {
+                let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+                const existingIdx = localInvoices.findIndex(inv => inv.invoice_no === invoiceData.invoice_no);
+                if (existingIdx > -1) {
+                    localInvoices[existingIdx] = invoiceData;
+                } else {
+                    localInvoices.push(invoiceData);
+                }
+                localStorage.setItem("invoices", JSON.stringify(localInvoices));
+
                 openSaveSuccessModal();
                 await loadLastInvoiceNo();
                 loadCustomers();
