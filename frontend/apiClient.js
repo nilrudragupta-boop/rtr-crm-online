@@ -9,6 +9,21 @@ const API_BASE_URL = localStorage.getItem('backendApiUrl') || (isLocal
     : 'https://rtr-crm-online.onrender.com/api'); // Fallback Render URL
 
 const apiClient = {
+    // --- Authentication ---
+    login: async (username, password) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error during login:', error);
+            return { success: false, message: error.message };
+        }
+    },
+
     // --- Customers ---
     getCustomers: async () => {
         try {
