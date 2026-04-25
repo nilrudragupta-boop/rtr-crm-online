@@ -713,36 +713,36 @@
                         <tr>
                             <th class="select-col"><input id="selectAll" type="checkbox"></th>
                             <th>Sl No</th>
-                            <th>Invoice No<br><input type="text" id="search_invNo" placeholder="Filter"
+                            <th>Invoice No<br><input type="text" id="search_invNo" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
                             <th style="cursor:pointer;"
                                 onclick="if(event.target.tagName !== 'INPUT') handleSort('invoiceType')">Invoice Type
                                 <span id="sort-icon-invoiceType" class="sort-icon"></span><br><input type="text"
-                                    id="search_invType" placeholder="Filter"
+                                    id="search_invType" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;">
                             </th>
                             <th style="cursor:pointer;"
                                 onclick="if(event.target.tagName !== 'INPUT') handleSort('invoice_date')">Invoice Date
                                 <span id="sort-icon-invoice_date" class="sort-icon"></span><br><input type="text"
-                                    id="search_invDate" placeholder="Filter"
+                                    id="search_invDate" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;">
                             </th>
                             <th style="cursor:pointer;"
                                 onclick="if(event.target.tagName !== 'INPUT') handleSort('customer_name')">Customer Name
                                 <span id="sort-icon-customer_name" class="sort-icon"></span><br><input type="text"
-                                    id="search_custName" placeholder="Filter"
+                                    id="search_custName" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;">
                             </th>
                             <th class="wrap-text">Address</th>
-                            <th>Contact<br><input type="text" id="search_contact" placeholder="Filter"
+                            <th>Contact<br><input type="text" id="search_contact" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
-                            <th>PIN<br><input type="text" id="search_pin" placeholder="Filter"
+                            <th>PIN<br><input type="text" id="search_pin" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
                             <th>District</th>
                             <th>State</th>
-                            <th>GST No<br><input type="text" id="search_gst" placeholder="Filter"
+                            <th>GST No<br><input type="text" id="search_gst" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
-                            <th class="wrap-text">Items<br><input type="text" id="search_items" placeholder="Filter"
+                            <th class="wrap-text">Items<br><input type="text" id="search_items" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
                             <th>HSN/SAC</th>
                             <th>IMEI</th>
@@ -761,9 +761,9 @@
                             <th>Total Due (₹)</th>
                             <th>Payment Date</th>
                             <th>Remarks</th>
-                            <th>Created By<br><input type="text" id="search_createdBy" placeholder="Filter"
+                            <th>Created By<br><input type="text" id="search_createdBy" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
-                            <th>Edited By<br><input type="text" id="search_editedBy" placeholder="Filter"
+                            <th>Edited By<br><input type="text" id="search_editedBy" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
                             <th class="action-col">Actions</th>
                         </tr>
@@ -1513,14 +1513,14 @@
 
         // --- helper to calculate totals ---
         function getInvoiceTotals(inv) {
-            let total = parseFloat(inv.invoice_total || inv.total);
+            let total = parseFloat(String(inv.invoice_total || inv.total).replace(/,/g, ''));
             if (isNaN(total)) {
                 total = 0;
                 if (inv.items && Array.isArray(inv.items) && inv.items.length > 0) {
-                    total = inv.items.reduce((acc, it) => acc + (parseFloat(it.total) || 0), 0);
+                    total = inv.items.reduce((acc, it) => acc + (parseFloat(String(it.total).replace(/,/g, '')) || 0), 0);
                 }
             }
-            const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid) || 0;
+            const paid = parseFloat(String(inv.total_paid || inv.paid_amount || inv.paid || 0).replace(/,/g, '')) || 0;
             const due = total - paid;
             return { total, paid, due };
         }
@@ -1582,7 +1582,7 @@
             const sel = document.getElementById("filterSupplier");
             // Keep "All Suppliers" option
             sel.innerHTML = '<option value="">All Suppliers</option>';
-            suppliers.sort((a, b) => a.name.localeCompare(b.name)).forEach(s => {
+            suppliers.sort((a, b) => (a.name || "").localeCompare(b.name || "")).forEach(s => {
                 const opt = document.createElement("option");
                 opt.value = s.name;
                 opt.textContent = s.name;
@@ -4148,8 +4148,8 @@
 
             if (currentSortColumn === 'customer_name') {
                 filtered.sort((a, b) => {
-                    const valA = String(a.invoiceType || "TAX INVOICE").toLowerCase();
-                    const valB = String(b.invoiceType || "TAX INVOICE").toLowerCase();
+                    const valA = String(a.customer_name || getCustomerNameFrom(a)).toLowerCase();
+                    const valB = String(b.customer_name || getCustomerNameFrom(b)).toLowerCase();
                     return currentSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
                 });
             } else if (currentSortColumn === 'invoice_date') {
