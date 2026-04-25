@@ -3731,6 +3731,11 @@
                 actionsToShow = QUICK_ACTION_ITEMS.filter(i => defaultIds.includes(i.id));
             }
 
+        // Hide 'Update' action if running in a regular web browser
+        if (!window.electronAPI) {
+            actionsToShow = actionsToShow.filter(item => item.id !== 'qa_update');
+        }
+
             const perms = getUIPermissions();
             const flags = typeof FeatureManager !== 'undefined' ? FeatureManager.getFlags() : {};
 
@@ -3878,7 +3883,12 @@
 
             const sortedItems = [...QUICK_ACTION_ITEMS].sort((a, b) => a.label.localeCompare(b.label));
 
-            sortedItems.forEach(item => {
+        let itemsToRender = sortedItems;
+        if (!window.electronAPI) {
+            itemsToRender = itemsToRender.filter(item => item.id !== 'qa_update');
+        }
+
+        itemsToRender.forEach(item => {
                 let isFeatureDisabled = false;
                 if (item.perm && typeof UI_PERMISSION_REGISTRY !== 'undefined') {
                     const permDef = UI_PERMISSION_REGISTRY.find(p => p.id === item.perm);

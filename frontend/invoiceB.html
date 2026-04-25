@@ -690,8 +690,9 @@ Branch: </textarea>
             }
 
             function loadPurchaseItems() {
-                apiClient.getPurchases().then(purchases => {
-                    const uniqueItems = [...new Set(purchases.map(p => p.itemName))];
+                let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                const populateList = (data) => {
+                    const uniqueItems = [...new Set(data.map(p => p.itemName))];
                     const datalist = document.getElementById("purchaseItemsList");
                     if (datalist) {
                         datalist.innerHTML = "";
@@ -703,6 +704,13 @@ Branch: </textarea>
                             }
                         });
                     }
+                };
+                
+                apiClient.getPurchases().then(apiData => {
+                    if (apiData && apiData.length > 0) purchases = apiData;
+                    populateList(purchases);
+                }).catch(() => {
+                    populateList(purchases);
                 });
             }
 
