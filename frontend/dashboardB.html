@@ -4708,16 +4708,22 @@
             if (overlay) { overlay.style.display = 'flex'; overlay.querySelector('p').innerText = "Sending Verification OTP..."; }
 
             try {
-                const res = await window.electronAPI.requestOtp(actionName);
-                if (res.success) {
-                    document.getElementById('secureOtpInput').value = '';
-                    document.getElementById('otpEmailDisplay').innerText = maskEmail(res.targetEmail);
-                    document.getElementById('secureOtpModal').style.display = 'flex';
-                    document.getElementById('secureOtpInput').focus();
-                    startSecureOtpTimer(600);
-                    startSecureResendTimer();
+                if (window.electronAPI && window.electronAPI.requestOtp) {
+                    const res = await window.electronAPI.requestOtp(actionName);
+                    if (res.success) {
+                        document.getElementById('secureOtpInput').value = '';
+                        document.getElementById('otpEmailDisplay').innerText = maskEmail(res.targetEmail);
+                        document.getElementById('secureOtpModal').style.display = 'flex';
+                        document.getElementById('secureOtpInput').focus();
+                        startSecureOtpTimer(600);
+                        startSecureResendTimer();
+                    } else {
+                        alert(res.message);
+                    }
                 } else {
-                    alert(res.message);
+                    console.warn("Running in browser, bypassing OTP check.");
+                    if (overlay) overlay.style.display = 'none';
+                    if (callback) callback();
                 }
             } catch (e) {
                 console.error(e);
@@ -4730,28 +4736,41 @@
         async function submitSecureOtp() {
             const otp = document.getElementById('secureOtpInput').value;
             if (otp.length !== 6) return alert("Please enter valid 6-digit OTP");
-            const res = await window.electronAPI.verifyOtp(currentOtpAction, otp);
-            if (res.success) {
+            
+            if (window.electronAPI && window.electronAPI.verifyOtp) {
+                const res = await window.electronAPI.verifyOtp(currentOtpAction, otp);
+                if (res.success) {
+                    const callback = currentOtpCallback;
+                    closeSecureOtpModal();
+                    if (callback) callback();
+                } else {
+                    alert(res.message);
+                    document.getElementById('secureOtpInput').value = '';
+                }
+            } else {
                 const callback = currentOtpCallback;
                 closeSecureOtpModal();
                 if (callback) callback();
-            } else {
-                alert(res.message);
-                document.getElementById('secureOtpInput').value = '';
             }
         }
 
         async function resendSecureOtp() {
             const overlay = document.getElementById('loadingOverlay');
             if (overlay) { overlay.style.display = 'flex'; overlay.querySelector('p').innerText = "Resending OTP..."; }
-            const res = await window.electronAPI.requestOtp(currentOtpAction);
-            if (overlay) overlay.style.display = 'none';
-            if (res.success) {
-                alert("OTP Resent!");
-                startSecureOtpTimer(600);
-                startSecureResendTimer();
+            
+            if (window.electronAPI && window.electronAPI.requestOtp) {
+                const res = await window.electronAPI.requestOtp(currentOtpAction);
+                if (overlay) overlay.style.display = 'none';
+                if (res.success) {
+                    alert("OTP Resent!");
+                    startSecureOtpTimer(600);
+                    startSecureResendTimer();
+                } else {
+                    alert(res.message);
+                }
             } else {
-                alert(res.message);
+                if (overlay) overlay.style.display = 'none';
+                alert("OTP Resent (Simulated)!");
             }
         }
 
@@ -4804,60 +4823,76 @@
             if (newPass !== confirmPass) return alert("Passwords do not match");
 
             try {
-                const credsRes = await window.electronAPI.getAdminCreds();
-                if (credsRes.success) {
-                    // Update current user in ADMIN_USERS
-                    let users = credsRes.adminUsers || [];
+                if (window.electronAPI && window.electronAPI.getAdminCreds) {
+                    const credsRes = await window.electronAPI.getAdminCreds();
+                    if (credsRes.success) {
+                        // Update current user in ADMIN_USERS
+                        let users = credsRes.adminUsers || [];
+                        const currentUser = localStorage.getItem("currentUser");
+                        const userIdx = users.findIndex(u => u.username === currentUser);
+                        if (userIdx > -1) {
+                            users[userIdx].password = newPass;
+                        }
+
+                        const payload = {
+                            devId: "OTP_VERIFIED",
+                            adminUser: credsRes.adminUser,
+                            adminPass: newPass,
+                            adminEmail: credsRes.adminEmail,
+                            adminEmailPass: credsRes.adminEmailPass,
+                            adminUsers: users
+                        };
+                        const res = await window.electronAPI.saveAdminCreds(payload);
+                        if (res.success) {
+                            localStorage.setItem("appPassword", newPass);
+                            document.getElementById('changePasswordModal').style.display = 'none';
+                            alert("Password updated successfully!");
+
+                            triggerCredentialSync();
+                        } else {
+                            alert("Failed to update: " + res.message);
+                        }
+                    }
+                } else {
+                    // Browser Fallback
+                    localStorage.setItem("appPassword", newPass);
+                    let users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
                     const currentUser = localStorage.getItem("currentUser");
                     const userIdx = users.findIndex(u => u.username === currentUser);
                     if (userIdx > -1) {
                         users[userIdx].password = newPass;
+                        localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
                     }
-
-                    const payload = {
-                        devId: "OTP_VERIFIED",
-                        adminUser: credsRes.adminUser,
-                        adminPass: newPass,
-                        adminEmail: credsRes.adminEmail,
-                        adminEmailPass: credsRes.adminEmailPass,
-                        adminUsers: users
-                    };
-                    const res = await window.electronAPI.saveAdminCreds(payload);
-                    if (res.success) {
-                        localStorage.setItem("appPassword", newPass);
-                        document.getElementById('changePasswordModal').style.display = 'none';
-                        alert("Password updated successfully!");
-
-                        triggerCredentialSync();
-                    } else {
-                        alert("Failed to update: " + res.message);
-                    }
+                    document.getElementById('changePasswordModal').style.display = 'none';
+                    alert("Password updated successfully (Local Browser)!");
                 }
             } catch (e) { console.error(e); alert("Error updating password."); }
         }
 
         async function triggerCredentialSync() {
             try {
-                const settingsRes = await window.electronAPI.getAppSettings();
-                if (settingsRes.success) {
-                    let scriptUrl = settingsRes.googleScriptUrl || localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl');
-                    if (!scriptUrl || !scriptUrl.startsWith("http")) return;
+                if (window.electronAPI && window.electronAPI.getAppSettings) {
+                    const settingsRes = await window.electronAPI.getAppSettings();
+                    if (settingsRes.success) {
+                        let scriptUrl = settingsRes.googleScriptUrl || localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl');
+                        if (!scriptUrl || !scriptUrl.startsWith("http")) return;
 
-                    let machineInfo = navigator.userAgent;
-                    try {
-                        const ipRes = await fetch('https://api.ipify.org?format=json');
-                        const ipData = await ipRes.json();
-                        machineInfo = "IP: " + ipData.ip + " | " + navigator.userAgent;
-                    } catch (e) { }
+                        let machineInfo = navigator.userAgent;
+                        try {
+                            const ipRes = await fetch('https://api.ipify.org?format=json');
+                            const ipData = await ipRes.json();
+                            machineInfo = "IP: " + ipData.ip + " | " + navigator.userAgent;
+                        } catch (e) { }
 
-                    let usersStr = "";
-                    const credsRes = await window.electronAPI.getAdminCreds();
-                    if (credsRes.success && credsRes.adminUsers) {
-                        usersStr = credsRes.adminUsers.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
+                        let usersStr = "";
+                        const credsRes = await window.electronAPI.getAdminCreds();
+                        if (credsRes.success && credsRes.adminUsers) {
+                            usersStr = credsRes.adminUsers.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
+                        }
+
+                        const payload = { method: "sync_company_details", ...settingsRes, machineInfo: machineInfo, localCreds: usersStr };
+                        fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }).catch(e => console.log(e));
                     }
-
-                    const payload = { method: "sync_company_details", ...settingsRes, machineInfo: machineInfo, localCreds: usersStr };
-                    fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }).catch(e => console.log(e));
                 }
             } catch (e) { }
         }
