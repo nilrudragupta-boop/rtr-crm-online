@@ -1377,7 +1377,15 @@
 
         // 🔸 Load customers from backend
         async function loadCustomers() {
-            let customers = await apiClient.getCustomers();
+            let customers = [];
+            try {
+                customers = await apiClient.getCustomers();
+            } catch (e) {
+                console.warn("API failed, loading customers from local storage", e);
+            }
+            if (!customers || customers.length === 0) {
+                customers = JSON.parse(localStorage.getItem("customers")) || [];
+            }
 
             // Ensure ANONYMOUS customer exists
             if (!customers.some(c => c.name === "ANONYMOUS")) {
@@ -1502,21 +1510,38 @@
 
 
         // 🔸 Load items from local storage
-        function loadItems() {
-            apiClient.getItems().then(items => {
-                const list = document.getElementById("itemList");
-                list.innerHTML = "";
-                items.forEach(i => {
-                    const opt = document.createElement("option");
-                    opt.value = i.name;
-                    list.appendChild(opt);
-                });
+        async function loadItems() {
+            let items = [];
+            try {
+                items = await apiClient.getItems();
+            } catch (e) {
+                console.warn("API failed, loading items from local storage", e);
+            }
+            if (!items || items.length === 0) {
+                items = JSON.parse(localStorage.getItem("items")) || [];
+            }
+            const list = document.getElementById("itemList");
+            list.innerHTML = "";
+            items.forEach(i => {
+                const opt = document.createElement("option");
+                opt.value = i.name;
+                list.appendChild(opt);
             });
         }
 
         // 🔸 Load last invoice no
         async function loadLastInvoiceNo() {
-            const invoices = await apiClient.getInvoices();
+            let invoices = [];
+            try {
+                invoices = await apiClient.getInvoices();
+            } catch (e) {
+                console.warn("API failed, loading invoices from local storage", e);
+            }
+            
+            if (!invoices || invoices.length === 0) {
+                invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            }
+
             let last = "INV-0000";
             let lastDate = "-";
             if (invoices.length > 0) {
