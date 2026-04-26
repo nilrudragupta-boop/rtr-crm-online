@@ -1480,13 +1480,28 @@
                 return;
             }
 
-            const res = await window.electronAPI.resetPassword({ newPassword: newPass, resetToken });
-            if (res.success) {
-                openSuccessModal("Password reset process initiated. You will be able to login with the new password shortly.");
+            if (window.electronAPI && window.electronAPI.resetPassword) {
+                const res = await window.electronAPI.resetPassword({ newPassword: newPass, resetToken });
+                if (res.success) {
+                    openSuccessModal("Password reset process initiated. You will be able to login with the new password shortly.");
+                    closeResetModal();
+                    sessionStorage.removeItem('resetToken');
+                } else {
+                    openWarningModal(res.message || "Reset failed.");
+                }
+            } else {
+                localStorage.setItem("appPassword", newPass);
+                let users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
+                const mainUser = localStorage.getItem('adminUser') || "Admin";
+                const userIdx = users.findIndex(u => u.username === mainUser);
+                if (userIdx > -1) users[userIdx].password = newPass;
+                else if (users.length > 0) users[0].password = newPass;
+                else users.push({username: mainUser, password: newPass, role: "Admin"});
+                localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
+                
+                openSuccessModal("Password reset successfully. You can now login with your new password.");
                 closeResetModal();
                 sessionStorage.removeItem('resetToken');
-            } else {
-                openWarningModal(res.message || "Reset failed.");
             }
         }
 

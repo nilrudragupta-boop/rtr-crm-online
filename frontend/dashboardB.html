@@ -934,7 +934,8 @@
             <div class="topbar">
                 <div class="topbar-left">
                     <button class="btn-icon" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-                    <h4 style="margin: 0; color: var(--primary-color); cursor: pointer; user-select: none;" data-brand="name" onclick="handleSecretTap()">Company Name</h4>
+                    <h4 style="margin: 0; color: var(--primary-color); cursor: pointer; user-select: none;"
+                        data-brand="name" onclick="handleSecretTap()">Company Name</h4>
                 </div>
                 <div class="topbar-right">
                     <div id="userDisplay"
@@ -1051,18 +1052,21 @@
                                 <br>
                                 <span id="storageStatus"><i class="fas fa-database"></i> ...</span>
                                 <br>
-                                
-                                <span id="syncPendingStatus" style="color: var(--success-color);"><i class="fas fa-check-double"></i> Checking sync status...</span>
+
+                                <span id="syncPendingStatus" style="color: var(--success-color);"><i
+                                        class="fas fa-check-double"></i> Checking sync status...</span>
                             </div>
-                            
+
                         </div>
                         <div class="card-icon"><i class="fas fa-heartbeat"></i></div>
                     </div>
-                    <div class="card" id="syncDiagnosticsWidget" style="display: none; border-left-color: var(--info-color);">
+                    <div class="card" id="syncDiagnosticsWidget"
+                        style="display: none; border-left-color: var(--info-color);">
                         <div class="card-content" style="width: 100%;">
                             <div class="card-title" style="color: var(--info-color);">Sync & Diagnostics</div>
                             <div class="card-value" style="font-size: 0.9rem; line-height: 1.5; margin-bottom: 10px;">
-                                <span id="lastSyncStatus" style="color: var(--secondary-color);"><i class="fas fa-clock"></i> Last Synced: Never</span>
+                                <span id="lastSyncStatus" style="color: var(--secondary-color);"><i
+                                        class="fas fa-clock"></i> Last Synced: Never</span>
                             </div>
                             <div style="display: flex; gap: 10px;">
                                 <button onclick="runNetworkTest()"
@@ -1147,8 +1151,9 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--secondary-color); font-weight: 500;">
-                    Logged in User: <span id="footerUserDisplay" style="color: var(--primary-color);">Admin</span> | 
+                <div
+                    style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--secondary-color); font-weight: 500;">
+                    Logged in User: <span id="footerUserDisplay" style="color: var(--primary-color);">Admin</span> |
                     License Expiry: <span id="licenseExpiryDisplay">Loading...</span>
                     <button id="btnRenewLicense" onclick="openRenewalModal()"
                         style="display:none; margin-left: 5px; padding: 2px 8px; font-size: 11px; background: #e67e22; border: none; border-radius: 4px; cursor: pointer; color: white;"
@@ -2180,10 +2185,10 @@
         let secureOtpTimerInterval = null;
 
         function promptForContactAndSyncDashboard(isRetry = false) {
-            const msg = isRetry 
+            const msg = isRetry
                 ? "⚠️ Contact Number mismatch or not found on server.\n\nPlease carefully re-enter your Registered 10-Digit Mobile Number to verify your license and sync data (or click Cancel to ignore):"
                 : "To verify your license on this device, please enter your Registered 10-Digit Mobile Number:";
-                
+
             const contactPrompt = prompt(msg);
             if (contactPrompt !== null) {
                 const cleanContact = contactPrompt.replace(/\D/g, '');
@@ -2404,12 +2409,12 @@
             if (btn) btn.style.display = (daysLeft <= 30) ? 'inline-block' : 'none';
         }
 
-    function enforceLicenseExpiry() {
-        const today = new Date();
-        if (today > EXPIRY_DATE) {
-            window.location.href = 'expired.html';
+        function enforceLicenseExpiry() {
+            const today = new Date();
+            if (today > EXPIRY_DATE) {
+                window.location.href = 'expired.html';
+            }
         }
-    }
 
         function updateSystemHealth() {
             const netStatus = document.getElementById('netStatus');
@@ -2460,13 +2465,13 @@
 
         async function forceSyncData(silent = false) {
             if (!silent && !confirm("This will force-push all your local records to the backend. This might take a while. Proceed?")) return;
-            
+
             const overlay = document.getElementById('loadingOverlay');
             if (!silent && overlay) {
                 overlay.style.display = 'flex';
                 overlay.querySelector('p').innerText = "Syncing local data to backend...";
             }
-            
+
             try {
                 const collections = [
                     { key: "customers", method: "saveCustomer" },
@@ -2481,7 +2486,7 @@
                     { key: "journal_vouchers", method: "saveJournalVoucher" },
                     { key: "scraps", method: "saveScrap" }
                 ];
-                
+
                 const promises = [];
                 for (const col of collections) {
                     const data = JSON.parse(localStorage.getItem(col.key)) || [];
@@ -2491,7 +2496,7 @@
                         });
                     }
                 }
-                
+
                 // Production records
                 const prods = JSON.parse(localStorage.getItem("production")) || [];
                 if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
@@ -2499,7 +2504,7 @@
                 }
 
                 await Promise.all(promises);
-                
+
                 // Take a snapshot hash of the newly synced local database state
                 let currentStateStr = "";
                 const collectionsToCheck = ["customers", "invoices", "purchases", "items", "suppliers", "expenses", "credit_debit_notes", "bank_accounts", "bank_transactions", "journal_vouchers", "scraps", "production"];
@@ -2535,10 +2540,10 @@
             collectionsToCheck.forEach(c => currentStateStr += (localStorage.getItem(c) || "[]"));
             const currentHash = typeof CryptoJS !== 'undefined' ? CryptoJS.MD5(currentStateStr).toString() : currentStateStr.length.toString();
             const lastHash = localStorage.getItem('lastSyncedHash');
-            
+
             const statusEl = document.getElementById('syncPendingStatus');
             if (!statusEl) return;
-            
+
             if (currentHash !== lastHash) {
                 statusEl.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Pending Sync`;
                 statusEl.style.color = 'var(--warning-color)';
@@ -2634,11 +2639,11 @@
                 document.getElementById('sidebar').classList.add('collapsed');
             }
 
-            
+
             enforceLicenseExpiry();
             setInterval(enforceLicenseExpiry, 60000); // Actively monitor expiry every minute
 
-        // License Info
+            // License Info
             updateLicenseDisplay();
 
             const lastLogin = localStorage.getItem("lastLoginDate");
@@ -3116,7 +3121,7 @@
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
                 } catch (e) { console.error(e); }
-                
+
                 if (res.companyName) {
                     document.querySelectorAll('[data-brand="name"]').forEach(el => el.innerText = res.companyName);
                 }
@@ -3129,29 +3134,29 @@
             }
         }
 
-    async function loadDashboardData() {
-        let invoices = [];
-        let purchases = [];
-        let items = [];
-        let productions = JSON.parse(localStorage.getItem("production")) || [];
-        let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+        async function loadDashboardData() {
+            let invoices = [];
+            let purchases = [];
+            let items = [];
+            let productions = JSON.parse(localStorage.getItem("production")) || [];
+            let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
-        try {
-            const [invRes, purRes, itemsRes] = await Promise.all([
-                fetch('api/invoices').then(res => res.json()).catch(() => ({ success: false })),
-                fetch('api/purchases').then(res => res.json()).catch(() => ({ success: false })),
-                fetch('api/items').then(res => res.json()).catch(() => ({ success: false }))
-            ]);
-            
-            if (invRes.success) invoices = invRes.data; else invoices = JSON.parse(localStorage.getItem("invoices")) || [];
-            if (purRes.success) purchases = purRes.data; else purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            if (itemsRes.success) items = itemsRes.data; else items = JSON.parse(localStorage.getItem("items")) || [];
-        } catch(e) {
-            console.error("API Fetch Error:", e);
-            invoices = JSON.parse(localStorage.getItem("invoices")) || [];
-            purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            items = JSON.parse(localStorage.getItem("items")) || [];
-        }
+            try {
+                const [invRes, purRes, itemsRes] = await Promise.all([
+                    fetch('api/invoices').then(res => res.json()).catch(() => ({ success: false })),
+                    fetch('api/purchases').then(res => res.json()).catch(() => ({ success: false })),
+                    fetch('api/items').then(res => res.json()).catch(() => ({ success: false }))
+                ]);
+
+                if (invRes.success) invoices = invRes.data; else invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+                if (purRes.success) purchases = purRes.data; else purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                if (itemsRes.success) items = itemsRes.data; else items = JSON.parse(localStorage.getItem("items")) || [];
+            } catch (e) {
+                console.error("API Fetch Error:", e);
+                invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+                purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                items = JSON.parse(localStorage.getItem("items")) || [];
+            }
 
             // 1. KPIs
             const now = new Date();
@@ -3622,7 +3627,7 @@
 
         function loadFavorites() {
             let saved = [];
-            try { saved = JSON.parse(localStorage.getItem('user_favorites')) || []; } catch(e) { console.warn("Failed to parse favorites", e); }
+            try { saved = JSON.parse(localStorage.getItem('user_favorites')) || []; } catch (e) { console.warn("Failed to parse favorites", e); }
             const container = document.getElementById('favoritesContainer');
             const list = document.getElementById('favoritesList');
 
@@ -3743,7 +3748,7 @@
 
         function loadQuickActions() {
             let saved = null;
-            try { saved = JSON.parse(localStorage.getItem('user_quick_actions')); } catch(e) { console.warn("Failed to parse quick actions", e); }
+            try { saved = JSON.parse(localStorage.getItem('user_quick_actions')); } catch (e) { console.warn("Failed to parse quick actions", e); }
             const container = document.getElementById('quickActionsGrid');
             container.innerHTML = '';
 
@@ -3756,10 +3761,10 @@
                 actionsToShow = QUICK_ACTION_ITEMS.filter(i => defaultIds.includes(i.id));
             }
 
-        // Hide 'Update' action if running in a regular web browser
-        if (!window.electronAPI) {
-            actionsToShow = actionsToShow.filter(item => item.id !== 'qa_update');
-        }
+            // Hide 'Update' action if running in a regular web browser
+            if (!window.electronAPI) {
+                actionsToShow = actionsToShow.filter(item => item.id !== 'qa_update');
+            }
 
             const perms = getUIPermissions();
             const flags = typeof FeatureManager !== 'undefined' ? FeatureManager.getFlags() : {};
@@ -3908,12 +3913,12 @@
 
             const sortedItems = [...QUICK_ACTION_ITEMS].sort((a, b) => a.label.localeCompare(b.label));
 
-        let itemsToRender = sortedItems;
-        if (!window.electronAPI) {
-            itemsToRender = itemsToRender.filter(item => item.id !== 'qa_update');
-        }
+            let itemsToRender = sortedItems;
+            if (!window.electronAPI) {
+                itemsToRender = itemsToRender.filter(item => item.id !== 'qa_update');
+            }
 
-        itemsToRender.forEach(item => {
+            itemsToRender.forEach(item => {
                 let isFeatureDisabled = false;
                 if (item.perm && typeof UI_PERMISSION_REGISTRY !== 'undefined') {
                     const permDef = UI_PERMISSION_REGISTRY.find(p => p.id === item.perm);
@@ -4141,7 +4146,7 @@
             } else {
                 let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
                 let contactNumber = localStorage.getItem('contactNumber') || "";
-                
+
                 if (scriptUrl && scriptUrl.startsWith("http")) {
                     try {
                         const response = await fetch(scriptUrl, {
@@ -4721,9 +4726,41 @@
                         alert(res.message);
                     }
                 } else {
-                    console.warn("Running in browser, bypassing OTP check.");
-                    if (overlay) overlay.style.display = 'none';
-                    if (callback) callback();
+                    let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+                    let userEmail = localStorage.getItem('adminEmail');
+
+                    if (!userEmail) {
+                        showToast("Admin Email not configured in Settings. Bypassing OTP.", "#dc3545");
+                        console.warn("Running in browser without admin email, bypassing OTP check.");
+                        if (overlay) overlay.style.display = 'none';
+                        if (callback) callback();
+                        return;
+                    }
+
+                    if (scriptUrl && scriptUrl.startsWith("http")) {
+                        const tempOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                        sessionStorage.setItem("browser_temp_otp", tempOtp);
+
+                        let payload = { method: "send_generic_otp", email: userEmail, action: actionName, otp: tempOtp, machineId: "Browser Web Client" };
+
+                        const req = await fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+                        const data = await req.json();
+                        if (data.success) {
+                            document.getElementById('secureOtpInput').value = '';
+                            document.getElementById('otpEmailDisplay').innerText = maskEmail(userEmail);
+                            document.getElementById('secureOtpModal').style.display = 'flex';
+                            document.getElementById('secureOtpInput').focus();
+                            startSecureOtpTimer(600);
+                            startSecureResendTimer();
+                        } else {
+                            showToast(data.message || "Failed to send OTP via Cloud.", "#dc3545");
+                        }
+                    } else {
+                        showToast("Cloud URL not configured for Web OTP. Bypassing.", "#dc3545");
+                        console.warn("Running in browser without script URL, bypassing OTP check.");
+                        if (overlay) overlay.style.display = 'none';
+                        if (callback) callback();
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -4736,7 +4773,7 @@
         async function submitSecureOtp() {
             const otp = document.getElementById('secureOtpInput').value;
             if (otp.length !== 6) return alert("Please enter valid 6-digit OTP");
-            
+
             if (window.electronAPI && window.electronAPI.verifyOtp) {
                 const res = await window.electronAPI.verifyOtp(currentOtpAction, otp);
                 if (res.success) {
@@ -4748,16 +4785,24 @@
                     document.getElementById('secureOtpInput').value = '';
                 }
             } else {
-                const callback = currentOtpCallback;
-                closeSecureOtpModal();
-                if (callback) callback();
+                const stored = sessionStorage.getItem("browser_temp_otp");
+                if (stored && stored === otp) {
+                    const callback = currentOtpCallback;
+                    closeSecureOtpModal();
+                    sessionStorage.removeItem("browser_temp_otp");
+                    showToast("Verification Successful ✅", "#27ae60");
+                    if (callback) callback();
+                } else {
+                    showToast("Invalid OTP", "#dc3545");
+                    document.getElementById('secureOtpInput').value = '';
+                }
             }
         }
 
         async function resendSecureOtp() {
             const overlay = document.getElementById('loadingOverlay');
             if (overlay) { overlay.style.display = 'flex'; overlay.querySelector('p').innerText = "Resending OTP..."; }
-            
+
             if (window.electronAPI && window.electronAPI.requestOtp) {
                 const res = await window.electronAPI.requestOtp(currentOtpAction);
                 if (overlay) overlay.style.display = 'none';
@@ -4770,8 +4815,9 @@
                 }
             } else {
                 if (overlay) overlay.style.display = 'none';
-                alert("OTP Resent (Simulated)!");
+                initiateSecureAction(currentOtpAction, currentOtpCallback);
             }
+
         }
 
         function closeSecureOtpModal() {
@@ -5086,7 +5132,7 @@
                 const jsonString = JSON.stringify(backupData, null, 2);
                 const encrypted = CryptoJS.AES.encrypt(jsonString, '983042').toString();
                 const now = new Date();
-                
+
                 const brandEl = document.querySelector('[data-brand="name"]');
                 const companyName = (brandEl && brandEl.innerText !== "Company Name" ? brandEl.innerText : (localStorage.getItem('companyName') || 'RISE_Tech')).replace(/[^a-zA-Z0-9]/g, '_');
                 const fileName = `${companyName}_AllData-${now.toISOString().slice(0, 10)}.json`;
@@ -5143,7 +5189,7 @@
                 const now = new Date();
                 const datePart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
                 const timePart = String(now.getHours()).padStart(2, '0') + '-' + String(now.getMinutes()).padStart(2, '0') + '-' + String(now.getSeconds()).padStart(2, '0');
-                
+
                 const companyName = (localStorage.getItem('companyName') || 'RISE_Tech').replace(/[^a-zA-Z0-9]/g, '_');
                 const fileName = `${companyName}_AutoBackup-Logoff-${datePart}-${timePart}.json`;
 
@@ -5604,8 +5650,8 @@
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
             };
 
-        if (isWebMode) {
-            resultsContainer.innerHTML = `
+            if (isWebMode) {
+                resultsContainer.innerHTML = `
                 <table class="system-check-table">
                     <thead><tr><th>Browser Property</th><th>Detected Security Value</th></tr></thead>
                     <tbody>
@@ -5618,8 +5664,8 @@
                     </tbody>
                 </table>
             `;
-            return;
-        }
+                return;
+            }
 
             const checks = [
                 { key: 'os', value: info.os },
@@ -5743,7 +5789,7 @@
 
         function showDueReminders(options = { openModal: false }) {
             let reminders = [];
-            try { reminders = JSON.parse(localStorage.getItem('reminders')) || []; } catch(e) { console.warn("Failed to parse reminders", e); }
+            try { reminders = JSON.parse(localStorage.getItem('reminders')) || []; } catch (e) { console.warn("Failed to parse reminders", e); }
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
 
