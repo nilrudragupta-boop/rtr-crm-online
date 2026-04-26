@@ -1480,6 +1480,46 @@
                 return;
             }
 
+            let users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
+            let mainUser = localStorage.getItem('adminUser') || (users.length > 0 ? users[0].username : "Admin");
+            
+            const userIdx = users.findIndex(u => u.username === mainUser);
+            if (userIdx > -1) users[userIdx].password = newPass;
+            else if (users.length > 0) users[0].password = newPass;
+            else users.push({username: mainUser, password: newPass, role: "Admin"});
+            
+            // Synchronize the new password to the cloud
+            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            let contactNumber = localStorage.getItem('contactNumber') || "";
+            
+            if (scriptUrl && scriptUrl.startsWith("http")) {
+                // 1. Update in Licenses & RemoteUsers tabs
+                fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ 
+                        method: "update_password", 
+                        username: mainUser, 
+                        contactNumber: contactNumber, 
+                        newPassword: newPass 
+                    })
+                }).catch(e => console.log("Cloud password update failed", e));
+                
+                // 2. Update localCreds in CompanyDetails tab
+                let usersStr = users.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
+                let machineInfo = "Browser Web Client";
+                fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        method: "sync_company_details",
+                        contactNumber: contactNumber,
+                        machineInfo: machineInfo,
+                        localCreds: usersStr
+                    })
+                }).catch(e => console.log("Cloud sync failed", e));
+            }
+
             if (window.electronAPI && window.electronAPI.resetPassword) {
                 const res = await window.electronAPI.resetPassword({ newPassword: newPass, resetToken });
                 if (res.success) {
@@ -1491,12 +1531,6 @@
                 }
             } else {
                 localStorage.setItem("appPassword", newPass);
-                let users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
-                const mainUser = localStorage.getItem('adminUser') || "Admin";
-                const userIdx = users.findIndex(u => u.username === mainUser);
-                if (userIdx > -1) users[userIdx].password = newPass;
-                else if (users.length > 0) users[0].password = newPass;
-                else users.push({username: mainUser, password: newPass, role: "Admin"});
                 localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
                 
                 openSuccessModal("Password reset successfully. You can now login with your new password.");
