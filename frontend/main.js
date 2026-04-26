@@ -191,7 +191,7 @@ async function sendAndRemoveScheduled(emailJob) {
 
     const db = readLocalDatabase();
     const scheduledEmails = (db.scheduledEmails || []).filter(e => e.id !== emailJob.id);
-
+    
     // Log the successful scheduled email
     const sentEmails = db.sentEmails || [];
     sentEmails.unshift({
@@ -206,7 +206,7 @@ async function sendAndRemoveScheduled(emailJob) {
         sentAt: new Date().toISOString()
     });
     if (sentEmails.length > 100) sentEmails.length = 100; // Limit log size
-
+    
     db.scheduledEmails = scheduledEmails;
     db.sentEmails = sentEmails;
     fs.writeFileSync(localDbPath, JSON.stringify(db, null, 2), 'utf-8');
@@ -320,9 +320,9 @@ function getTransporter() {
 
 function parseEmailError(error) {
     if (!error) return "Unknown email error occurred.";
-
+    
     const errorString = String(error.message || "") + " " + String(error.response || "") + " " + String(error.code || "");
-
+    
     if (errorString.includes('EAUTH') || errorString.includes('535') || errorString.includes('Invalid login')) {
         return "Authentication failed. Please verify your Admin Email and App Password in Settings.";
     }
@@ -341,7 +341,7 @@ function parseEmailError(error) {
     if (errorString.includes('EENVELOPE')) {
         return "Invalid email address format in recipients.";
     }
-
+    
     return error.message || "Failed to send email due to an unknown error.";
 }
 
@@ -571,7 +571,7 @@ ipcMain.handle('request-otp', async (event, action, userEmail) => {
         return { success: true, targetEmail: recipient };
     } catch (error) {
         console.error("OTP Request Error:", error);
-        return { success: false, message: "Failed to send OTP: " + parseEmailError(error) };
+            return { success: false, message: "Failed to send OTP: " + parseEmailError(error) };
     }
 });
 
@@ -639,7 +639,7 @@ ipcMain.handle('test-email-config', async (event, { email, password, emailProvid
         return { success: true, message: "Success! Test email sent to your inbox." };
     } catch (error) {
         console.error("Email Test Error:", error);
-        return { success: false, message: parseEmailError(error) };
+            return { success: false, message: parseEmailError(error) };
     }
 });
 
@@ -716,7 +716,7 @@ ipcMain.handle('send-email', async (event, payload) => {
 
         // Send immediately
         await transporter.sendMail(mailOptions);
-
+        
         // Log the successful immediate email
         const db = readLocalDatabase();
         const sentEmails = db.sentEmails || [];
@@ -733,11 +733,11 @@ ipcMain.handle('send-email', async (event, payload) => {
         });
         if (sentEmails.length > 100) sentEmails.length = 100; // Limit log size
         writeToLocalDatabase('sentEmails', sentEmails);
-
+        
         return { success: true };
     } catch (error) {
         console.error("Send Email Error:", error);
-        return { success: false, error: parseEmailError(error) };
+            return { success: false, error: parseEmailError(error) };
     }
 });
 
@@ -773,7 +773,7 @@ ipcMain.handle('get-inbox-emails', async () => {
     if (!ImapFlow || !simpleParser) {
         return { success: false, error: "Receiving emails requires 'imapflow' and 'mailparser'. Please run: npm install imapflow mailparser" };
     }
-
+    
     try {
         const emailSettings = getEmailSettings();
         if (!emailSettings.user || !emailSettings.pass) {
@@ -795,14 +795,14 @@ ipcMain.handle('get-inbox-emails', async () => {
         await client.connect();
         let lock = await client.getMailboxLock('INBOX');
         const emails = [];
-
+        
         try {
             const exists = client.mailbox.exists;
             if (exists > 0) {
                 const startSeq = Math.max(1, exists - 14); // Fetch the last 15 emails
                 for await (let message of client.fetch(`${startSeq}:*`, { source: true, flags: true, uid: true })) {
                     const parsed = await simpleParser(message.source);
-
+                    
                     const emailAttachments = [];
                     if (parsed.attachments && parsed.attachments.length > 0) {
                         parsed.attachments.forEach(att => {
@@ -851,7 +851,7 @@ ipcMain.handle('check-new-emails', async () => {
     try {
         const emailSettings = getEmailSettings();
         if (!emailSettings.user || !emailSettings.pass) return { success: false };
-
+        
         const settings = getPersistentSettings();
         const imapHost = settings.EMAIL_PROVIDER === 'Custom' ? (settings.IMAP_HOST || 'imap.gmail.com') : 'imap.gmail.com';
         const imapPort = settings.EMAIL_PROVIDER === 'Custom' ? (parseInt(settings.IMAP_PORT) || 993) : 993;
@@ -887,7 +887,7 @@ ipcMain.handle('mark-email-read', async (event, uid) => {
     try {
         const emailSettings = getEmailSettings();
         if (!emailSettings.user || !emailSettings.pass) return { success: false };
-
+        
         const settings = getPersistentSettings();
         const imapHost = settings.EMAIL_PROVIDER === 'Custom' ? (settings.IMAP_HOST || 'imap.gmail.com') : 'imap.gmail.com';
         const imapPort = settings.EMAIL_PROVIDER === 'Custom' ? (parseInt(settings.IMAP_PORT) || 993) : 993;
@@ -1319,7 +1319,7 @@ ipcMain.handle('save-admin-creds', async (event, params) => {
         if (params.adminEmailPass) updates.ADMIN_EMAIL_PASS = String(params.adminEmailPass).trim();
         if (params.adminPass) updates.ADMIN_LOGIN_PASS = params.adminPass;
         if (params.adminUsers !== undefined) updates.ADMIN_USERS = params.adminUsers;
-
+        
         if (params.emailProvider !== undefined) updates.EMAIL_PROVIDER = params.emailProvider;
         if (params.smtpHost !== undefined) updates.SMTP_HOST = params.smtpHost;
         if (params.smtpPort !== undefined) updates.SMTP_PORT = params.smtpPort;
@@ -1693,21 +1693,20 @@ async function performDailyCloudBackup() {
 }
 
 
-function startHeartbeat(username, contactNumber) {
+function startHeartbeat(username) {
     // Replace this with your actual deployed Google Apps Script Web App URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
 
-    const sendPing = () => {
+    // Ping the server every 2 minutes (120,000 milliseconds)
+    setInterval(() => {
         fetch(SCRIPT_URL, {
             method: "POST",
-            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 method: "heartbeat",
-                username: username,
-                contactNumber: contactNumber
+                username: username // e.g., "Milan"
             })
         }).catch(err => console.error("Heartbeat failed:", err));
-    };
+    }, 120000);
 }
 
 // Example: Trigger this right after your license check passes
