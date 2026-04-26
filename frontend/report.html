@@ -1603,12 +1603,17 @@
             try {
                 const remoteData = await apiClient.getInvoices();
                 if (remoteData && remoteData.length > 0) {
+                    const localInvoiceMap = new Map();
+                    localInvoices.forEach((inv, index) => {
+                        localInvoiceMap.set(inv.invoice_no, index);
+                    });
                     remoteData.forEach(remoteInv => {
-                        const localIdx = localInvoices.findIndex(inv => inv.invoice_no === remoteInv.invoice_no);
-                        if (localIdx > -1) {
+                        if (localInvoiceMap.has(remoteInv.invoice_no)) {
+                            const localIdx = localInvoiceMap.get(remoteInv.invoice_no);
                             localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
                         } else {
                             localInvoices.push(remoteInv);
+                            localInvoiceMap.set(remoteInv.invoice_no, localInvoices.length - 1);
                         }
                     });
                     localStorage.setItem("invoices", JSON.stringify(localInvoices));
