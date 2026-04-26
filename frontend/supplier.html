@@ -698,16 +698,19 @@
         let suppliers = [];
 
         async function fetchSuppliersData() {
+            let localSuppliers = JSON.parse(localStorage.getItem("suppliers")) || [];
             const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.style.display = 'flex';
-            await new Promise(resolve => setTimeout(resolve, 15));
+            if (overlay && localSuppliers.length === 0) {
+                overlay.style.display = 'flex';
+                await new Promise(resolve => setTimeout(resolve, 15));
+            }
 
             const remoteData = await apiClient.getSuppliers();
             if (remoteData && remoteData.length > 0) {
                 suppliers = remoteData;
                 localStorage.setItem("suppliers", JSON.stringify(suppliers));
             } else {
-                suppliers = JSON.parse(localStorage.getItem("suppliers")) || [];
+                suppliers = localSuppliers;
             }
             if (!suppliers.some(s => s.name === "ANONYMOUS")) {
                 const anon = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), name: "ANONYMOUS", contact: "0000000000", gstin: "", address: "N/A", pin: "", district: "", state: "West Bengal", stateCode: "19", supplierType: "Retailer", createdAt: new Date().toISOString() };

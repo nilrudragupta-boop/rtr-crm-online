@@ -817,16 +817,19 @@
         let idsToDelete = [];
         
         async function fetchItemsData() {
+            let localItems = JSON.parse(localStorage.getItem("items")) || [];
             const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.style.display = 'flex';
-            await new Promise(resolve => setTimeout(resolve, 15));
+            if (overlay && localItems.length === 0) {
+                overlay.style.display = 'flex';
+                await new Promise(resolve => setTimeout(resolve, 15));
+            }
 
             const remoteData = await apiClient.getItems();
             if (remoteData && remoteData.length > 0) {
                 items = remoteData;
                 localStorage.setItem("items", JSON.stringify(items));
             } else {
-                items = JSON.parse(localStorage.getItem("items")) || [];
+                items = localItems;
             }
             populateCategoryFilter();
             populateItemNameList();

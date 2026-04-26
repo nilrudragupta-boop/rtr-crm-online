@@ -644,12 +644,14 @@
         let rowsPerPage = 20;
 
         async function fetchBankingData() {
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.style.display = 'flex';
-            await new Promise(resolve => setTimeout(resolve, 15));
-
             let localAccounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
             let localTransactions = JSON.parse(localStorage.getItem('bank_transactions')) || [];
+
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay && localAccounts.length === 0 && localTransactions.length === 0) {
+                overlay.style.display = 'flex';
+                await new Promise(resolve => setTimeout(resolve, 15));
+            }
 
             try {
                 const remoteAccounts = await apiClient.getBankAccounts();

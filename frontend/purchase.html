@@ -2245,17 +2245,19 @@
         }
 
         async function loadPurchases() {
+            let localPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            if (!Array.isArray(localPurchases)) localPurchases = [];
+
             const tbody = document.getElementById("purchaseTableBody");
-            if (tbody && (!currentFilteredPurchases || currentFilteredPurchases.length === 0)) {
+            if (tbody && localPurchases.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="34" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
             }
 
             const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.style.display = 'flex';
-            await new Promise(resolve => setTimeout(resolve, 15));
-
-            let localPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            if (!Array.isArray(localPurchases)) localPurchases = [];
+            if (overlay && localPurchases.length === 0) {
+                overlay.style.display = 'flex';
+                await new Promise(resolve => setTimeout(resolve, 15));
+            }
             try {
                 let remoteData = await apiClient.getPurchases();
                 if (remoteData && remoteData.length > 0) {

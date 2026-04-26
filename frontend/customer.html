@@ -1147,16 +1147,19 @@
 
 
         async function fetchCustomersData() {
+            let localCustomers = JSON.parse(localStorage.getItem("customers")) || [];
             const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.style.display = 'flex';
-            await new Promise(resolve => setTimeout(resolve, 15));
+            if (overlay && localCustomers.length === 0) {
+                overlay.style.display = 'flex';
+                await new Promise(resolve => setTimeout(resolve, 15));
+            }
 
             const remoteData = await apiClient.getCustomers();
             if (remoteData && remoteData.length > 0) {
                 customers = remoteData;
                 localStorage.setItem("customers", JSON.stringify(customers));
             } else {
-                customers = JSON.parse(localStorage.getItem("customers")) || [];
+                customers = localCustomers;
             }
             if (!customers.some(c => c.name === "ANONYMOUS")) {
                 const anon = {

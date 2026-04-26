@@ -713,8 +713,8 @@
                         <tr>
                             <th class="select-col"><input id="selectAll" type="checkbox"></th>
                             <th>Sl No</th>
-                            <th>Invoice No<br><input type="text" id="search_invNo" placeholder="Filter" oninput="applySearch()"
-                                    style="width:90%; font-size:12px; padding:4px;"></th>
+                            <th>Invoice No<br><input type="text" id="search_invNo" placeholder="Filter"
+                                    oninput="applySearch()" style="width:90%; font-size:12px; padding:4px;"></th>
                             <th style="cursor:pointer;"
                                 onclick="if(event.target.tagName !== 'INPUT') handleSort('invoiceType')">Invoice Type
                                 <span id="sort-icon-invoiceType" class="sort-icon"></span><br><input type="text"
@@ -734,16 +734,16 @@
                                     style="width:90%; font-size:12px; padding:4px;">
                             </th>
                             <th class="wrap-text">Address</th>
-                            <th>Contact<br><input type="text" id="search_contact" placeholder="Filter" oninput="applySearch()"
-                                    style="width:90%; font-size:12px; padding:4px;"></th>
+                            <th>Contact<br><input type="text" id="search_contact" placeholder="Filter"
+                                    oninput="applySearch()" style="width:90%; font-size:12px; padding:4px;"></th>
                             <th>PIN<br><input type="text" id="search_pin" placeholder="Filter" oninput="applySearch()"
                                     style="width:90%; font-size:12px; padding:4px;"></th>
                             <th>District</th>
                             <th>State</th>
-                            <th>GST No<br><input type="text" id="search_gst" placeholder="Filter" oninput="applySearch()"
-                                    style="width:90%; font-size:12px; padding:4px;"></th>
-                            <th class="wrap-text">Items<br><input type="text" id="search_items" placeholder="Filter" oninput="applySearch()"
-                                    style="width:90%; font-size:12px; padding:4px;"></th>
+                            <th>GST No<br><input type="text" id="search_gst" placeholder="Filter"
+                                    oninput="applySearch()" style="width:90%; font-size:12px; padding:4px;"></th>
+                            <th class="wrap-text">Items<br><input type="text" id="search_items" placeholder="Filter"
+                                    oninput="applySearch()" style="width:90%; font-size:12px; padding:4px;"></th>
                             <th>HSN/SAC</th>
                             <th>IMEI</th>
                             <th>Batch</th>
@@ -761,10 +761,10 @@
                             <th>Total Due (₹)</th>
                             <th>Payment Date</th>
                             <th>Remarks</th>
-                            <th>Created By<br><input type="text" id="search_createdBy" placeholder="Filter" oninput="applySearch()"
-                                    style="width:90%; font-size:12px; padding:4px;"></th>
-                            <th>Edited By<br><input type="text" id="search_editedBy" placeholder="Filter" oninput="applySearch()"
-                                    style="width:90%; font-size:12px; padding:4px;"></th>
+                            <th>Created By<br><input type="text" id="search_createdBy" placeholder="Filter"
+                                    oninput="applySearch()" style="width:90%; font-size:12px; padding:4px;"></th>
+                            <th>Edited By<br><input type="text" id="search_editedBy" placeholder="Filter"
+                                    oninput="applySearch()" style="width:90%; font-size:12px; padding:4px;"></th>
                             <th class="action-col">Actions</th>
                         </tr>
                     </thead>
@@ -1592,19 +1592,19 @@
 
         // --- load invoices ---
         async function loadInvoices() {
+            let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            if (!Array.isArray(localInvoices)) localInvoices = [];
+
             const tbody = document.querySelector("#reportTable tbody");
-            if (tbody && invoices.length === 0) {
+            if (tbody && localInvoices.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="33" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
             }
 
             const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.style.display = 'flex';
-            await new Promise(resolve => setTimeout(resolve, 15));
-
-
-
-            let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
-            if (!Array.isArray(localInvoices)) localInvoices = [];
+            if (overlay && localInvoices.length === 0) {
+                overlay.style.display = 'flex';
+                await new Promise(resolve => setTimeout(resolve, 15));
+            }
             try {
                 const remoteData = await apiClient.getInvoices();
                 if (remoteData && remoteData.length > 0) {
@@ -1624,7 +1624,7 @@
                     localStorage.setItem("invoices", JSON.stringify(localInvoices));
                 }
             } catch (e) { console.warn("Failed to fetch remote invoices, using local data."); }
-            
+
             invoices = localInvoices;
             populateDistrictFilter();
             populateInvoiceTypeFilter();
@@ -4042,7 +4042,7 @@
             const distFilter = document.getElementById("filterDistrict").value;
             const stateFilter = document.getElementById("filterState").value;
             const supplierFilter = document.getElementById("filterSupplier").value;
-            
+
             const from = document.getElementById("fromDate").value;
             const to = document.getElementById("toDate").value;
 
