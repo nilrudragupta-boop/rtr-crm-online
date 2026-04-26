@@ -347,7 +347,7 @@
         <h2 style="color: #0313f3; margin-bottom: 5px;" data-brand="name">RISE Tech Revolution - CRM</h2>
         <h3 style="color: #f706c3; margin-top: 0;">Login to Access the Dashboard</h3>
 
-        <div id="loginFormContainer">
+        <form id="loginFormContainer" onsubmit="event.preventDefault(); validateLogin();">
             <div class="password-wrapper">
                 <input type="password" id="username" placeholder="👤 Username" aria-label="Username">
                 <span class="toggle-icon" onclick="togglePassword('username', this)">🙈</span>
@@ -361,7 +361,7 @@
                 <label for="rememberMe"
                     style="color: #2c3e50; font-size: 14px; cursor: pointer; user-select: none;">Remember Me</label>
             </div>
-            <button onclick="validateLogin()" style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
+            <button type="submit" style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
                 Login</button>
             <button id="closeBtn" onclick="closeWindowWithWarning()" style="background:#ad2d2d;"> ❌ Close</button>
             <div style="margin-top: 15px; text-align: center; display: flex; justify-content: center; gap: 15px;">
@@ -372,7 +372,7 @@
                 <a href="javascript:void(0)" onclick="document.getElementById('registerModal').style.display='block'"
                     style="color: #28a745; text-decoration: none; font-weight: 600;">Create Account</a>
             </div>
-        </div>
+        </form>
 
         <div id="renewContainer"
             style="display:none; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px;">
@@ -482,16 +482,20 @@
             <h3 style="color: #0313f3;">📝 Create New Account</h3>
             <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Enter your details to register.</p>
 
-            <input type="text" id="regUsername" placeholder="👤 Choose a Username (No Spaces)" style="margin-bottom: 10px;" oninput="this.value = this.value.replace(/\s/g, '');">
-            <input type="text" id="regContact" placeholder="📱 10-Digit Mobile Number" style="margin-bottom: 10px;" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
+            <form onsubmit="event.preventDefault(); submitRegistration();">
+                <input type="text" id="regUsername" placeholder="👤 Choose a Username (No Spaces)"
+                    style="margin-bottom: 10px;" oninput="this.value = this.value.replace(/\s/g, '');">
+                <input type="text" id="regContact" placeholder="📱 10-Digit Mobile Number" style="margin-bottom: 10px;"
+                    oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
 
-            <div class="password-wrapper">
-                <input type="password" id="regPassword" placeholder="🗝️ Choose a Password">
-                <span class="toggle-icon" onclick="togglePassword('regPassword', this)">🙈</span>
-            </div>
+                <div class="password-wrapper">
+                    <input type="password" id="regPassword" placeholder="🗝️ Choose a Password">
+                    <span class="toggle-icon" onclick="togglePassword('regPassword', this)">🙈</span>
+                </div>
 
-            <button id="registerBtn" onclick="submitRegistration()"
-                style="background: #28a745; width: 100%; margin-top: 15px;">Register</button>
+                <button type="submit" id="registerBtn"
+                    style="background: #28a745; width: 100%; margin-top: 15px;">Register</button>
+            </form>
         </div>
     </div>
 
@@ -671,7 +675,7 @@
 
         async function registerNewUser(username, contactNumber, password) {
             let scriptUrl = "";
-            
+
             // 1. Try fetching from MongoDB first
             try {
                 const res = await fetch('/api/settings');
@@ -728,10 +732,10 @@
                 if (result.success) {
                     // Hide the registration modal
                     document.getElementById('registerModal').style.display = 'none';
-                    
+
                     // Temporarily add to local users list to allow immediate login
                     ADMIN_USERS.push({ username: username, password: password, role: "User" });
-                    
+
                     // Save persistently
                     if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                         window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
@@ -804,8 +808,8 @@
                         scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
                         if (!contactNumber) contactNumber = apiData.data.contactNumber || "";
                     }
-                } catch (e) {}
-                
+                } catch (e) { }
+
                 if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
 
                 if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -915,7 +919,7 @@
             } else {
                 const localUsers = localStorage.getItem('ADMIN_USERS');
                 if (localUsers) {
-                    try { ADMIN_USERS = JSON.parse(localUsers); } catch(e) {}
+                    try { ADMIN_USERS = JSON.parse(localUsers); } catch (e) { }
                 }
             }
 
@@ -982,7 +986,7 @@
 
             let scriptUrl = "";
             let contactNumber = "";
-            
+
             // 1. Try fetching from MongoDB first
             try {
                 const res = await fetch('/api/settings');
@@ -1087,10 +1091,10 @@
         }
 
         function promptForContactAndRetry(user, pass, isRetry = false) {
-            const msg = isRetry 
+            const msg = isRetry
                 ? "⚠️ No User account found for that Mobile Number, or it is incorrect.\n\nPlease carefully re-enter your Registered 10-Digit Mobile Number to sync your profile (or click Cancel to stop):"
                 : "Account not found locally.\n\nIf you created this account on another device, please enter your Registered 10-Digit Mobile Number to sync your profile:";
-                
+
             const contactPrompt = prompt(msg);
             if (contactPrompt !== null) {
                 const cleanContact = contactPrompt.replace(/\D/g, '');
@@ -1135,8 +1139,8 @@
                     document.getElementById('totpInput').focus();
                     return;
                 }
-            
-            setSpinning();
+
+                setSpinning();
                 initiateSecureAction('Developer Login', () => {
                     localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
                     localStorage.setItem("isDevLogin", "true");
@@ -1186,8 +1190,8 @@
                     document.getElementById('totpInput').focus();
                     return;
                 }
-            
-            setSpinning();
+
+                setSpinning();
                 localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
                 localStorage.removeItem("isDevLogin");
                 localStorage.setItem("currentUser", user);
@@ -1202,20 +1206,20 @@
                 }
 
                 // Update Last Login Timestamp
-            try {
-                if (window.electronAPI && window.electronAPI.saveAdminCreds) {
-                    await window.electronAPI.saveAdminCreds({ isLoginUpdate: true, usernameToUpdate: user });
-                } else {
-                    // Fallback for Browser Web Hosting
-                    await fetch('/api/auth/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username: user })
-                    });
+                try {
+                    if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+                        await window.electronAPI.saveAdminCreds({ isLoginUpdate: true, usernameToUpdate: user });
+                    } else {
+                        // Fallback for Browser Web Hosting
+                        await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: user })
+                        });
+                    }
+                } catch (e) {
+                    console.log("Web login history update failed", e);
                 }
-            } catch (e) {
-                console.log("Web login history update failed", e);
-            }
 
                 const appMode = localStorage.getItem('appMode');
                 if (appMode === "Educational Institute") {
@@ -1238,7 +1242,7 @@
             const loginBtn = document.querySelector('button[onclick="validateLogin()"]');
             const originalBtnText = loginBtn ? loginBtn.innerHTML : '🔓 Login';
             if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = 'Syncing Cloud...'; }
-            
+
             let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
 
             if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -1258,7 +1262,7 @@
                             localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
                         }
                         localStorage.setItem('contactNumber', contactNumber); // Set identifier for future auto-sync
-                        
+
                         if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = originalBtnText; }
                         validateLogin(); // Re-trigger the login process, it will pass this time
                         return;
@@ -1274,7 +1278,7 @@
             } else {
                 showToast("System Error: Cloud URL not configured.", "#dc3545");
             }
-            
+
             if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = originalBtnText; }
         }
 
@@ -1381,7 +1385,7 @@
             if (window.electronAPI) {
                 response = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                response = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ otp }) }).then(r => r.json());
+                response = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (response.success) {
                 const newExpiry = new Date(response.newExpiry);
@@ -1517,19 +1521,19 @@
                         if (apiData.success && apiData.data) {
                             scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
                         }
-                    } catch (e) {}
-                if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+                    } catch (e) { }
+                    if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
 
                     if (scriptUrl && scriptUrl.startsWith("http")) {
                         const tempOtp = Math.floor(100000 + Math.random() * 900000).toString();
                         sessionStorage.setItem("browser_temp_otp", tempOtp);
-                        
+
                         let secureMachineId = "Browser Web Client";
                         try {
                             const fpRes = await fetch('/api/system-info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }) });
                             const fpData = await fpRes.json();
                             if (fpData.success) secureMachineId = `IP: ${fpData.data.ip}`;
-                        } catch (e) {}
+                        } catch (e) { }
 
                         let payload = {};
                         if (actionName === 'Developer Login') {
@@ -1608,7 +1612,7 @@
                 showToast("Could not find email to resend. Please start over.", "#dc3545");
                 return;
             }
-            
+
             closeSecureOtpModal();
             initiateSecureAction(currentOtpAction, currentOtpCallback, email);
         }
