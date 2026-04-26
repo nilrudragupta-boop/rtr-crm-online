@@ -865,6 +865,14 @@
             <div class="pagination" id="paginationControls"></div>
         </div>
 
+    <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;"></div>
+        <p style="color:white; margin-top:15px; font-size:18px; font-weight:bold;">Processing...</p>
+    </div>
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+
         <!-- Edit Confirmation Modal -->
         <div id="editConfirmModal" class="modal">
             <div class="modal-content">
@@ -1923,8 +1931,14 @@
                 const file = input.files[0];
                 if (!file) return;
 
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.style.display = 'flex';
+
                 const reader = new FileReader();
                 reader.onload = async (e) => {
+                // Yield slightly to let the browser paint the spinner
+                await new Promise(resolve => setTimeout(resolve, 15));
+                
                     try {
                         const text = e.target.result;
                         const rows = parseCSV(text);
@@ -1939,6 +1953,11 @@
 
                         let added = 0;
                         let updated = 0;
+
+                    const customerMap = new Map();
+                    customers.forEach((c, index) => {
+                        if (c.name) customerMap.set(c.name.trim().toLowerCase(), index);
+                    });
 
                         for (let i = 1; i < rows.length; i++) {
                             const row = rows[i];
@@ -1968,7 +1987,7 @@
                                 updatedAt: new Date().toISOString()
                             };
 
-                            let idx = customers.findIndex(c => c.name.trim().toLowerCase() === name.toLowerCase());
+                        let idx = customerMap.has(name.toLowerCase()) ? customerMap.get(name.toLowerCase()) : -1;
 
                             if (idx > -1) {
                                 customers[idx] = { ...customers[idx], ...customerData };
@@ -1978,6 +1997,7 @@
                                 const newId = generateUniqueId();
                                 const newCustomer = { ...customerData, id: newId };
                                 customers.push(newCustomer);
+                            customerMap.set(name.toLowerCase(), customers.length - 1);
                                 if (db) db.collection('customers').doc(newId).set(newCustomer).catch(console.error);
                                 added++;
                             }
@@ -1989,8 +2009,10 @@
                     } catch (err) {
                         console.error("Import error:", err);
                         showToast("Error importing CSV: " + err.message);
-                    }
+                } finally {
+                    if (overlay) overlay.style.display = 'none';
                     input.value = "";
+                    }
                 };
                 reader.readAsText(file);
             }

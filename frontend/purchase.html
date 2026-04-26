@@ -2255,12 +2255,15 @@
             try {
                 let remoteData = await apiClient.getPurchases();
                 if (remoteData && remoteData.length > 0) {
+                    const localPurchaseMap = new Map();
+                    localPurchases.forEach((p, index) => localPurchaseMap.set(p.id, index));
                     remoteData.forEach(remoteP => {
-                        const localIdx = localPurchases.findIndex(p => p.id === remoteP.id);
-                        if (localIdx > -1) {
+                        if (localPurchaseMap.has(remoteP.id)) {
+                            const localIdx = localPurchaseMap.get(remoteP.id);
                             localPurchases[localIdx] = { ...localPurchases[localIdx], ...remoteP };
                         } else {
                             localPurchases.push(remoteP);
+                            localPurchaseMap.set(remoteP.id, localPurchases.length - 1);
                         }
                     });
                     localStorage.setItem("purchases", JSON.stringify(localPurchases));
@@ -2276,12 +2279,15 @@
             try {
                 let remoteInvoices = await apiClient.getInvoices();
                 if (remoteInvoices && remoteInvoices.length > 0) {
+                    const allInvoicesMap = new Map();
+                    allInvoices.forEach((inv, index) => allInvoicesMap.set(inv.invoice_no, index));
                     remoteInvoices.forEach(remoteInv => {
-                        const localIdx = allInvoices.findIndex(inv => inv.invoice_no === remoteInv.invoice_no);
-                        if (localIdx > -1) {
+                        if (allInvoicesMap.has(remoteInv.invoice_no)) {
+                            const localIdx = allInvoicesMap.get(remoteInv.invoice_no);
                             allInvoices[localIdx] = { ...allInvoices[localIdx], ...remoteInv };
                         } else {
                             allInvoices.push(remoteInv);
+                            allInvoicesMap.set(remoteInv.invoice_no, allInvoices.length - 1);
                         }
                     });
                     localStorage.setItem("invoices", JSON.stringify(allInvoices));
