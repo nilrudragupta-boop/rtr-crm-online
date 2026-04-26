@@ -47,14 +47,14 @@ const bankTransactionSchema = new mongoose.Schema({
 // --- 2. Supplier Schema ---
 const supplierSchema = new mongoose.Schema({
     id: String,
-    name: { type: String, required: true },
+    name: { type: String },
     address: String,
     contact: String,
     email: String,
     gstin: String,
     openingBalance: { type: Number, default: 0 },
     openingBalanceType: { type: String, enum: ['Dr', 'Cr'], default: 'Cr' } // Cr = Payable, Dr = Advance
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 // --- 3. Item (Inventory) Schema ---
 const itemSchema = new mongoose.Schema({
@@ -67,7 +67,7 @@ const itemSchema = new mongoose.Schema({
     batch: String,
     lot: String,
     serial: String,
-    name: { type: String, required: true },
+    name: { type: String },
     hsnCode: String,
     unit: String,
     purchasePrice: { type: Number, default: 0 },
@@ -75,21 +75,15 @@ const itemSchema = new mongoose.Schema({
     gstRate: { type: Number, default: 0 },
     openingStock: { type: Number, default: 0 },
     currentStock: { type: Number, default: 0 }
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 // --- 4. Invoice Schema ---
 const invoiceSchema = new mongoose.Schema({
-    invoiceNo: { type: String, required: true, unique: true },
-    date: { type: Date, required: true },
+    invoiceNo: { type: String },
+    date: { type: Date },
     customerName: String,
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
-    items: [{
-        itemName: String,
-        qty: Number,
-        price: Number,
-        gst: Number,
-        total: Number
-    }],
+    items: [],
     taxType: String, // e.g. IGST or Intra-State
     subTotal: { type: Number, default: 0 },
     cgstTotal: { type: Number, default: 0 },
@@ -99,7 +93,7 @@ const invoiceSchema = new mongoose.Schema({
     amountPaid: { type: Number, default: 0 },
     status: { type: String, default: 'UNPAID' }, // PAID, UNPAID, PARTIAL, CANCELLED
     remarks: String
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 // --- 5. Purchase Schema ---
 const purchaseSchema = new mongoose.Schema({
@@ -118,12 +112,12 @@ const purchaseSchema = new mongoose.Schema({
 // --- 6. Journal Voucher Schema ---
 const journalVoucherSchema = new mongoose.Schema({
     id: String,
-    voucherNo: { type: String, required: true },
+    voucherNo: { type: String },
     voucherType: String,
     date: String,
     entries: [], // Array of ledger entries
     narration: String
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 // --- 7. Credit & Debit Note Schema ---
 const creditDebitNoteSchema = new mongoose.Schema({
@@ -162,6 +156,16 @@ const productionSchema = new mongoose.Schema({
     materialsConsumed: Array,
 }, { timestamps: true, strict: false });
 
+// --- Expense Schema ---
+const expenseSchema = new mongoose.Schema({
+    id: { type: String }
+}, { timestamps: true, strict: false });
+
+// --- Employee Schema ---
+const employeeSchema = new mongoose.Schema({
+    id: { type: String }
+}, { timestamps: true, strict: false });
+
 module.exports = {
     Customer: mongoose.model('Customer', customerSchema),
     Supplier: mongoose.model('Supplier', supplierSchema),
@@ -173,5 +177,7 @@ module.exports = {
     BankAccount: mongoose.model('BankAccount', bankAccountSchema),
     BankTransaction: mongoose.model('BankTransaction', bankTransactionSchema),
     Scrap: mongoose.model('Scrap', scrapSchema),
-    Production: mongoose.model('Production', productionSchema)
+    Production: mongoose.model('Production', productionSchema),
+    Expense: mongoose.model('Expense', expenseSchema),
+    Employee: mongoose.model('Employee', employeeSchema)
 };

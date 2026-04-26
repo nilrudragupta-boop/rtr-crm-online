@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production } = require('./index');
+const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Expense, Employee } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -143,6 +143,15 @@ app.post('/api/invoices', async (req, res) => {
         }
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/invoices/:id', async (req, res) => {
+    try {
+        await Invoice.findOneAndDelete({ $or: [{ id: req.params.id }, { invoiceNo: req.params.id }, { invoice_no: req.params.id }] });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
@@ -432,9 +441,75 @@ app.get('/api/production', async (req, res) => {
     }
 });
 
+// --- Expense Routes ---
 app.get('/api/expenses', async (req, res) => {
-    // Placeholder for expenses if needed in other parts of the app
-    res.json({ success: true, data: [] });
+    try {
+        const expenses = await Expense.find().sort({ createdAt: -1 });
+        res.json({ success: true, data: expenses });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/expenses', async (req, res) => {
+    try {
+        const payload = req.body;
+        const lookupId = payload.expense_id || payload.id;
+        if (lookupId) {
+            const updated = await Expense.findOneAndUpdate({ $or: [{ id: lookupId }, { expense_id: lookupId }] }, payload, { new: true, upsert: true });
+            res.status(200).json({ success: true, data: updated });
+        } else {
+            const newExpense = new Expense(payload);
+            await newExpense.save();
+            res.status(201).json({ success: true, data: newExpense });
+        }
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/expenses/:id', async (req, res) => {
+    try {
+        await Expense.findOneAndDelete({ $or: [{ id: req.params.id }, { expense_id: req.params.id }] });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Employee Routes ---
+app.get('/api/employees', async (req, res) => {
+    try {
+        const employees = await Employee.find().sort({ createdAt: -1 });
+        res.json({ success: true, data: employees });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/employees', async (req, res) => {
+    try {
+        const payload = req.body;
+        if (payload.id) {
+            const updated = await Employee.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
+            res.status(200).json({ success: true, data: updated });
+        } else {
+            const newEmployee = new Employee(payload);
+            await newEmployee.save();
+            res.status(201).json({ success: true, data: newEmployee });
+        }
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/employees/:id', async (req, res) => {
+    try {
+        await Employee.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // --- System Info & Security Fingerprinting ---
