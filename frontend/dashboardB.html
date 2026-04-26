@@ -2184,6 +2184,27 @@
         let currentOtpCallback = null;
         let secureOtpTimerInterval = null;
 
+        let heartbeatInterval = null;
+
+        function startHeartbeat(username, contactNumber) {
+            let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            if (!scriptUrl || !scriptUrl.startsWith("http")) return;
+
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+            heartbeatInterval = setInterval(() => {
+                fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        method: 'heartbeat',
+                        username: username,
+                        contactNumber: contactNumber
+                    })
+                }).catch(e => console.error("Heartbeat failed", e));
+            }, 120000);
+        }
+
         function promptForContactAndSyncDashboard(isRetry = false) {
             const msg = isRetry
                 ? "⚠️ Contact Number mismatch or not found on server.\n\nPlease carefully re-enter your Registered 10-Digit Mobile Number to verify your license and sync data (or click Cancel to ignore):"
@@ -4187,6 +4208,11 @@
                     if (res.remotePermissions) {
                         localStorage.setItem("remotePermissions_" + currentUser, JSON.stringify(res.remotePermissions));
                         applyUIPermissions();
+                    }
+
+                    // Start Heartbeat for web client
+                    if (!window.electronAPI) {
+                        startHeartbeat(currentUser, localStorage.getItem('contactNumber') || "");
                     }
                 } else if (res.success === false && res.message && (res.message.toLowerCase().includes("contact") || res.message.toLowerCase().includes("mobile") || res.message.toLowerCase().includes("number") || res.message.toLowerCase().includes("not found"))) {
                     // Handle mismatch or missing number on dashboard

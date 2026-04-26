@@ -792,6 +792,27 @@
         let currentOtpCallback = null;
         let currentOtpEmail = null;
 
+        let heartbeatInterval = null;
+
+        function startHeartbeat(username, contactNumber) {
+            let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            if (!scriptUrl || !scriptUrl.startsWith("http")) return;
+
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+            heartbeatInterval = setInterval(() => {
+                fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        method: 'heartbeat',
+                        username: username,
+                        contactNumber: contactNumber
+                    })
+                }).catch(e => console.error("Heartbeat failed", e));
+            }, 120000);
+        }
+
         async function syncRemoteLicense() {
             const currentUser = localStorage.getItem("currentUser") || "Admin";
             let res = null;
@@ -844,6 +865,11 @@
                         localStorage.setItem("licenseExpiry", parsedDate.toISOString());
                         EXPIRY_DATE = parsedDate;
                         checkRenewButtonVisibility();
+                    }
+                    
+                    // Start Heartbeat for web client
+                    if (!window.electronAPI) {
+                        startHeartbeat(currentUser, localStorage.getItem('contactNumber') || "");
                     }
                 }
                 if (res.shouldShowAlert && res.alertMessage) {
@@ -1891,17 +1917,24 @@
                 return;
             }
 
-            // Check existing username in the local app environment
-            const isExisting = ADMIN_USERS.some(u => u.username.toLowerCase() === username.toLowerCase());
-            if (isExisting) {
-                showToast("This username is already taken. Please choose another.", "#dc3545");
-                return;
-            }
-
             // Clean and validate contact number (exactly 10 digits)
             const cleanContact = contact.replace(/\D/g, '');
             if (cleanContact.length !== 10) {
                 showToast("Please enter a valid 10-digit mobile number.", "#dc3545");
+                return;
+            }
+
+            // Check existing username in the local app environment
+            const isExisting = ADMIN_USERS.some(u => u.username.toLowerCase() === username.toLowerCase());
+            if (isExisting) {
+                showToast("This username is already taken locally. Please choose another.", "#dc3545");
+                return;
+            }
+
+            // Check existing contact number in the local app environment
+            const savedContact = localStorage.getItem("contactNumber") || "";
+            if (savedContact && savedContact.includes(cleanContact)) {
+                showToast("This mobile number is already registered locally.", "#dc3545");
                 return;
             }
 
