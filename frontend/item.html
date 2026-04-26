@@ -795,6 +795,11 @@
 
     <div id="toast" class="toast"></div>
 
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <p style="color:white; margin-top:15px; font-size:18px; font-weight:bold;">Processing...</p>
+    </div>
+
     <script>
         // --- Firebase Configuration ---
         const FIREBASE_CONFIG = {
@@ -812,6 +817,10 @@
         let idsToDelete = [];
         
         async function fetchItemsData() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.style.display = 'flex';
+            await new Promise(resolve => setTimeout(resolve, 15));
+
             const remoteData = await apiClient.getItems();
             if (remoteData && remoteData.length > 0) {
                 items = remoteData;
@@ -822,6 +831,8 @@
             populateCategoryFilter();
             populateItemNameList();
             applyFilters();
+
+            if (overlay) overlay.style.display = 'none';
         }
         let currentPage = 1;
         let rowsPerPage = 20;

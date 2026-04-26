@@ -547,6 +547,14 @@
         </div>
     </div>
 
+    <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;"></div>
+        <p style="color:white; margin-top:15px; font-size:18px; font-weight:bold;">Processing...</p>
+    </div>
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+
     <!-- Generic Action Confirmation Modal -->
     <div id="actionConfirmModal" class="modal">
         <div class="modal-content">
@@ -690,6 +698,10 @@
         let suppliers = [];
 
         async function fetchSuppliersData() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.style.display = 'flex';
+            await new Promise(resolve => setTimeout(resolve, 15));
+
             const remoteData = await apiClient.getSuppliers();
             if (remoteData && remoteData.length > 0) {
                 suppliers = remoteData;
@@ -705,6 +717,8 @@
             }
             populateFilters();
             applyFilters();
+
+            if (overlay) overlay.style.display = 'none';
         }
 
         // Column visibility state (14 columns total)
