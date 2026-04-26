@@ -1482,29 +1482,29 @@
 
             let users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
             let mainUser = localStorage.getItem('adminUser') || (users.length > 0 ? users[0].username : "Admin");
-            
+
             const userIdx = users.findIndex(u => u.username === mainUser);
             if (userIdx > -1) users[userIdx].password = newPass;
             else if (users.length > 0) users[0].password = newPass;
-            else users.push({username: mainUser, password: newPass, role: "Admin"});
-            
+            else users.push({ username: mainUser, password: newPass, role: "Admin" });
+
             // Synchronize the new password to the cloud
             let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
             let contactNumber = localStorage.getItem('contactNumber') || "";
-            
+
             if (scriptUrl && scriptUrl.startsWith("http")) {
                 // 1. Update in Licenses & RemoteUsers tabs
                 fetch(scriptUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({ 
-                        method: "update_password", 
-                        username: mainUser, 
-                        contactNumber: contactNumber, 
-                        newPassword: newPass 
+                    body: JSON.stringify({
+                        method: "update_password",
+                        username: mainUser,
+                        contactNumber: contactNumber,
+                        newPassword: newPass
                     })
                 }).catch(e => console.log("Cloud password update failed", e));
-                
+
                 // 2. Update localCreds in CompanyDetails tab
                 let usersStr = users.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
                 let machineInfo = "Browser Web Client";
@@ -1532,7 +1532,7 @@
             } else {
                 localStorage.setItem("appPassword", newPass);
                 localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
-                
+
                 openSuccessModal("Password reset successfully. You can now login with your new password.");
                 closeResetModal();
                 sessionStorage.removeItem('resetToken');
@@ -1587,10 +1587,10 @@
                         let payload = {};
                         if (actionName === 'Developer Login') {
                             payload = { method: "send_dev_login_otp", otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "Developer Admin", expiryDate: localStorage.getItem("licenseExpiry") || "N/A" };
-                            } else if (actionName === 'Forgot Password') {
-                                payload = { method: "send_forgot_otp", email: userEmail, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
+                        } else if (actionName === 'Forgot Password') {
+                            payload = { method: "send_forgot_otp", email: userEmail, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
                         } else {
-                                payload = { method: "send_generic_otp", email: userEmail, action: actionName, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
+                            payload = { method: "send_generic_otp", email: userEmail, action: actionName, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
                         }
 
                         const req = await fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
