@@ -320,22 +320,31 @@
 
             // Remove old quick entries for this date to avoid duplicates (acts as an Update)
             let existingInvoices = JSON.parse(localStorage.getItem('invoices')) || [];
-            existingInvoices = existingInvoices.filter(inv => !(inv.remarks === 'Quick Daily Entry' && (inv.invoice_date === date || inv.date === date)));
+            let oldInv = existingInvoices.find(inv => (inv.remarks === 'Quick Daily Entry' && (inv.invoice_date === date || inv.date === date)));
+            let invId = oldInv ? oldInv.id : 'inv_qd_' + timestamp;
+            existingInvoices = existingInvoices.filter(inv => inv.id !== invId);
             localStorage.setItem('invoices', JSON.stringify(existingInvoices));
+            if (oldInv && salesAmt === 0 && typeof apiClient !== 'undefined' && apiClient.deleteInvoice) apiClient.deleteInvoice(oldInv.id).catch(console.warn);
 
             let existingPurchases = JSON.parse(localStorage.getItem('purchases')) || [];
-            existingPurchases = existingPurchases.filter(p => !(p.remarks === 'Quick Daily Entry' && p.date === date));
+            let oldPur = existingPurchases.find(p => (p.remarks === 'Quick Daily Entry' && p.date === date));
+            let purId = oldPur ? oldPur.id : 'pur_qd_' + timestamp;
+            existingPurchases = existingPurchases.filter(p => p.id !== purId);
             localStorage.setItem('purchases', JSON.stringify(existingPurchases));
+            if (oldPur && purAmt === 0 && typeof apiClient !== 'undefined' && apiClient.deletePurchase) apiClient.deletePurchase(oldPur.id).catch(console.warn);
 
             let existingExpenses = JSON.parse(localStorage.getItem('expenses')) || [];
-            existingExpenses = existingExpenses.filter(e => !(e.remarks && e.remarks.startsWith('Quick Daily Entry') && (e.expense_date === date || e.date === date)));
+            let oldExp = existingExpenses.find(e => (e.remarks && e.remarks.startsWith('Quick Daily Entry') && (e.expense_date === date || e.date === date)));
+            let expId = oldExp ? (oldExp.expense_id || oldExp.id) : 'exp_qd_' + timestamp;
+            existingExpenses = existingExpenses.filter(e => e.expense_id !== expId && e.id !== expId);
             localStorage.setItem('expenses', JSON.stringify(existingExpenses));
+            if (oldExp && expAmt === 0 && typeof apiClient !== 'undefined' && apiClient.deleteExpense) apiClient.deleteExpense(oldExp.expense_id || oldExp.id).catch(console.warn);
 
             // 1.5 Process Purchases
             if (purAmt > 0) {
                 let purchases = JSON.parse(localStorage.getItem('purchases')) || [];
                 const dummyPurchase = {
-                    id: 'pur_qd_' + timestamp,
+                    id: purId,
                     date: date,
                     supplierName: 'Cash Supplier (Daily)',
                     supplierInv: 'QD-' + timestamp,
@@ -360,7 +369,7 @@
                 };
                 purchases.push(dummyPurchase);
                 localStorage.setItem('purchases', JSON.stringify(purchases));
-            if (typeof apiClient !== 'undefined' && apiClient.savePurchase) apiClient.savePurchase(dummyPurchase).catch(console.warn);
+                if (typeof apiClient !== 'undefined' && apiClient.savePurchase) apiClient.savePurchase(dummyPurchase).catch(console.warn);
             }
 
             // 1. Process Sales (Create a dummy consolidated invoice)
@@ -378,7 +387,7 @@
                 const nextInvNo = `INV-${String(max + 1).padStart(4, '0')}`;
 
                 const dummyInvoice = {
-                    id: 'inv_qd_' + timestamp,
+                    id: invId,
                     invoice_no: nextInvNo,
                     invoice_date: date,
                     customer_name: 'Cash Walk-in (Daily)',
@@ -408,14 +417,14 @@
                 };
                 invoices.push(dummyInvoice);
                 localStorage.setItem('invoices', JSON.stringify(invoices));
-            if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(dummyInvoice).catch(console.warn);
+                if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(dummyInvoice).catch(console.warn);
             }
 
             // 2. Process Expenses
             if (expAmt > 0) {
                 let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
                 const dummyExpense = {
-                    expense_id: 'exp_qd_' + timestamp,
+                    expense_id: expId,
                     expense_date: date,
                     expense_category: 'Daily Miscellaneous Expense',
                     expense_sub_category: '',
@@ -431,7 +440,7 @@
                 };
                 expenses.push(dummyExpense);
                 localStorage.setItem('expenses', JSON.stringify(expenses));
-            if (typeof apiClient !== 'undefined' && apiClient.saveExpense) apiClient.saveExpense(dummyExpense).catch(console.warn);
+                if (typeof apiClient !== 'undefined' && apiClient.saveExpense) apiClient.saveExpense(dummyExpense).catch(console.warn);
             }
 
             // Success & Reset
@@ -485,13 +494,19 @@
             if (!confirm(`Are you sure you want to delete the quick entry for ${new Date(date).toLocaleDateString('en-GB')}?`)) return;
 
             let existingInvoices = JSON.parse(localStorage.getItem('invoices')) || [];
-            localStorage.setItem('invoices', JSON.stringify(existingInvoices.filter(inv => !(inv.remarks === 'Quick Daily Entry' && (inv.invoice_date === date || inv.date === date)))));
+            let invToDelete = existingInvoices.find(inv => (inv.remarks === 'Quick Daily Entry' && (inv.invoice_date === date || inv.date === date)));
+            if (invToDelete && typeof apiClient !== 'undefined' && apiClient.deleteInvoice) apiClient.deleteInvoice(invToDelete.id).catch(console.warn);
+            localStorage.setItem('invoices', JSON.stringify(existingInvoices.filter(inv => inv !== invToDelete)));
 
             let existingPurchases = JSON.parse(localStorage.getItem('purchases')) || [];
-            localStorage.setItem('purchases', JSON.stringify(existingPurchases.filter(p => !(p.remarks === 'Quick Daily Entry' && p.date === date))));
+            let purToDelete = existingPurchases.find(p => (p.remarks === 'Quick Daily Entry' && p.date === date));
+            if (purToDelete && typeof apiClient !== 'undefined' && apiClient.deletePurchase) apiClient.deletePurchase(purToDelete.id).catch(console.warn);
+            localStorage.setItem('purchases', JSON.stringify(existingPurchases.filter(p => p !== purToDelete)));
 
             let existingExpenses = JSON.parse(localStorage.getItem('expenses')) || [];
-            localStorage.setItem('expenses', JSON.stringify(existingExpenses.filter(e => !(e.remarks && e.remarks.startsWith('Quick Daily Entry') && (e.expense_date === date || e.date === date)))));
+            let expToDelete = existingExpenses.find(e => (e.remarks && e.remarks.startsWith('Quick Daily Entry') && (e.expense_date === date || e.date === date)));
+            if (expToDelete && typeof apiClient !== 'undefined' && apiClient.deleteExpense) apiClient.deleteExpense(expToDelete.expense_id || expToDelete.id).catch(console.warn);
+            localStorage.setItem('expenses', JSON.stringify(existingExpenses.filter(e => e !== expToDelete)));
 
             loadTableData();
         }

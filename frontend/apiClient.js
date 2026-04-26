@@ -75,6 +75,7 @@ const apiClient = {
             return { success: false, message: error.message };
         }
     },
+    deleteInvoice: (id) => apiClient._deleteCollection('invoices', id),
 
     // --- Credit/Debit Notes ---
     getCreditDebitNotes: async () => {
@@ -150,6 +151,7 @@ const apiClient = {
 
     getExpenses: () => apiClient._getCollection('expenses'),
     saveExpense: (data) => apiClient._saveCollection('expenses', data),
+    deleteExpense: (id) => apiClient._deleteCollection('expenses', id),
 
     getEmployees: () => apiClient._getCollection('employees'),
     saveEmployee: (data) => apiClient._saveCollection('employees', data),
