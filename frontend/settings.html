@@ -1073,8 +1073,12 @@
                     const smtpPort = document.getElementById('smtpPort') ? document.getElementById('smtpPort').value : '';
 
                     if (!password) {
-                        const creds = await window.electronAPI.getAdminCreds();
-                        if (creds.success) password = creds.adminEmailPass;
+                        if (window.electronAPI && window.electronAPI.getAdminCreds) {
+                            const creds = await window.electronAPI.getAdminCreds();
+                            if (creds.success) password = creds.adminEmailPass;
+                        } else {
+                            password = localStorage.getItem('adminEmailPass') || '';
+                        }
                     }
 
                     if (!email || !password) {
@@ -1087,8 +1091,25 @@
                     btn.disabled = true;
 
                     try {
-                        const result = await window.electronAPI.testEmailConfig({ email, password, emailProvider, smtpHost, smtpPort });
-                        alert(result.success ? result.message : "Error: " + result.message);
+                        if (window.electronAPI && window.electronAPI.testEmailConfig) {
+                            const result = await window.electronAPI.testEmailConfig({ email, password, emailProvider, smtpHost, smtpPort });
+                            alert(result.success ? result.message : "Error: " + result.message);
+                        } else {
+                            // Web Browser Fallback using GAS
+                            let scriptUrl = document.getElementById('cloudBackupUrl').value || document.getElementById('updateServerUrl').value || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+                            
+                            if (scriptUrl && scriptUrl.startsWith("http")) {
+                                const response = await fetch(scriptUrl, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'text/plain' },
+                                    body: JSON.stringify({ method: "test_email", email: email })
+                                });
+                                const result = await response.json();
+                                alert((result.success || result.status === 'success') ? result.message : "Error: " + (result.message || "Test failed"));
+                            } else {
+                                alert("Error: Web browser email testing requires a configured Cloud Backup or Update Server URL.");
+                            }
+                        }
                     } catch (error) {
                         alert("Test failed: " + error.message);
                     } finally {
@@ -1345,6 +1366,11 @@ function doPost(e) {
       return deleteBackup(data.fileId);
     }
     
+    // 5. Handle Test Email
+    if (data.method == "test_email") {
+      return handleTestEmail(data);
+    }
+    
     return createResponse({ success: false, message: "Unknown method: " + data.method });
 
   } catch (error) {
@@ -1434,6 +1460,19 @@ function deleteBackup(fileId) {
     var file = DriveApp.getFileById(fileId);
     file.setTrashed(true);
     return createResponse({ status: "success", message: "Backup deleted" });
+  } catch (e) {
+    return createResponse({ status: "error", message: e.toString() });
+  }
+}
+
+function handleTestEmail(data) {
+  try {
+    MailApp.sendEmail({
+      to: data.email,
+      subject: "Test Email",
+      body: "Dear Valued User, if you are able to see this Test Email, it confirms that your software configuration for receiving 'OTP emails' is functioning correctly. -- Best regards, Support Team"
+    });
+    return createResponse({ status: "success", message: "Success! Test email sent to your inbox." });
   } catch (e) {
     return createResponse({ status: "error", message: e.toString() });
   }
