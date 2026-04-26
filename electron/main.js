@@ -1026,6 +1026,8 @@ ipcMain.handle('get-app-settings', async () => {
             loginHistory: s.LOGIN_HISTORY || [],
             appMode: s.APP_MODE || "Trading / Business",
             customFeatures: s.CUSTOM_FEATURES || {},
+                        cloudBackupUrl: s.CLOUD_BACKUP_URL || "",
+                        updateServerUrl: s.UPDATE_SERVER_URL || "",
             googleScriptUrl: GOOGLE_SCRIPT_URL
         };
     } catch (error) {
@@ -1161,6 +1163,8 @@ ipcMain.handle('save-app-settings', async (event, params) => {
         if (params.appMode !== undefined) updates.APP_MODE = params.appMode;
         if (params.customFeatures !== undefined) updates.CUSTOM_FEATURES = params.customFeatures;
         if (params.modifiedBy !== undefined) updates.LAST_MODIFIED_BY = params.modifiedBy;
+        if (params.cloudBackupUrl !== undefined) updates.CLOUD_BACKUP_URL = params.cloudBackupUrl;
+        if (params.updateServerUrl !== undefined) updates.UPDATE_SERVER_URL = params.updateServerUrl;
         updates.LAST_MODIFIED_DATE = new Date().toISOString();
 
         savePersistentSettings(updates);
