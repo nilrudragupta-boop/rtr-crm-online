@@ -1841,6 +1841,60 @@
         }
 
         // ─────────────────────────────────────────────────────────
+        // 8b. File Handling
+        // ─────────────────────────────────────────────────────────
+        function handleFileSelect(event, id) {
+            const file = event.target.files[0];
+            const hiddenInput = document.getElementById(id);
+            const previewDiv = document.getElementById(id + '_preview');
+
+            if (!file) {
+                clearFile(id);
+                return;
+            }
+
+            // Max 2MB limit to prevent large payloads freezing the browser/DB
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('File is too large. Maximum size is 2MB.', 'error');
+                clearFile(id);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const fileData = {
+                    name: file.name,
+                    type: file.type,
+                    data: e.target.result
+                };
+                hiddenInput.value = JSON.stringify(fileData);
+
+                if (file.type.startsWith('image/')) {
+                    previewDiv.innerHTML = `<img src="${e.target.result}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--neutral-200);"> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${id}')">Remove</button>`;
+                } else {
+                    previewDiv.innerHTML = `<span class="badge bg-light text-dark border"><i class="fas fa-file me-1"></i> ${file.name}</span> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${id}')">Remove</button>`;
+                }
+
+                applyCalculations();
+                applyVisibilityRules();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearFile(id) {
+            const hiddenInput = document.getElementById(id);
+            const fileInput = document.getElementById(id + '_file');
+            const previewDiv = document.getElementById(id + '_preview');
+
+            if (hiddenInput) hiddenInput.value = '';
+            if (fileInput) fileInput.value = '';
+            if (previewDiv) previewDiv.innerHTML = '';
+
+            applyCalculations();
+            applyVisibilityRules();
+        }
+
+        // ─────────────────────────────────────────────────────────
         // 9. Toggle form panel
         // ─────────────────────────────────────────────────────────
         function toggleForm() {
