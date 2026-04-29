@@ -712,6 +712,10 @@
             color: var(--neutral-400);
             font-family: var(--font-mono);
         }
+
+        .hover-bg-light:hover {
+            background-color: var(--primary-light);
+        }
     </style>
 </head>
 
@@ -1058,10 +1062,25 @@
                     break;
                 case 'multiselect':
                     const mOpts = (field.options || []).map(o => `<option value="${o}">${o}</option>`).join('');
-                    // Note: Using standard multiple select
-                    inputHTML = `<select id="${id}" class="form-select dynamic-input" ${data} ${reqAttr} multiple size="3" ${css}>
-                       ${mOpts}
-                     </select>`;
+                    const chkOpts = (field.options || []).map((o, idx) => `
+                        <li class="px-2 py-1 hover-bg-light" style="border-radius:4px;">
+                            <div class="form-check m-0">
+                                <input class="form-check-input" type="checkbox" value="${o}" id="chk_${id}_${idx}" onchange="syncMultiSelect('${id}')">
+                                <label class="form-check-label w-100" for="chk_${id}_${idx}" style="cursor:pointer; font-size:13px; margin-top:2px;">${o}</label>
+                            </div>
+                        </li>`).join('');
+
+                    inputHTML = `<div class="dropdown">
+                       <button class="form-select text-start text-muted text-truncate" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" id="btn_${id}" ${css} style="padding-right:30px;">
+                           — Select Options —
+                       </button>
+                       <ul class="dropdown-menu w-100 shadow-sm p-1" style="max-height: 220px; overflow-y: auto; border-radius:var(--radius-sm);">
+                           ${chkOpts}
+                       </ul>
+                       <select id="${id}" class="dynamic-input d-none" ${data} ${reqAttr} multiple>
+                           ${mOpts}
+                       </select>
+                     </div>`;
                     break;
                 case 'boolean':
                     inputHTML = `<div class="form-check mt-2">
@@ -1692,15 +1711,19 @@
                     payload[key] = input.value;
                 }
 
-                if (input.hasAttribute('required') && !input.value) {
+                if (input.hasAttribute('required') && (!input.value || (input.multiple && input.selectedOptions.length === 0))) {
                     input.classList.add('is-invalid');
                     const fileInput = document.getElementById(input.id + '_file');
                     if (fileInput) fileInput.classList.add('is-invalid');
+                    const multiBtn = document.getElementById('btn_' + input.id);
+                    if (multiBtn) multiBtn.classList.add('is-invalid', 'border-danger');
                     valid = false;
                 } else {
                     input.classList.remove('is-invalid');
                     const fileInput = document.getElementById(input.id + '_file');
                     if (fileInput) fileInput.classList.remove('is-invalid');
+                    const multiBtn = document.getElementById('btn_' + input.id);
+                    if (multiBtn) multiBtn.classList.remove('is-invalid', 'border-danger');
                 }
             });
 
@@ -1771,8 +1794,22 @@
                 if (input.type === 'checkbox') {
                     input.checked = record[key] === true;
                 } else if (input.multiple) {
-                    const vals = Array.isArray(record[key]) ? record[key] : [record[key]];
+                    const vals = Array.isArray(record[key]) ? record[key] : (record[key] ? [record[key]] : []);
                     Array.from(input.options).forEach(opt => opt.selected = vals.includes(opt.value));
+
+                    // Sync Checkboxes UI
+                    const btn = document.getElementById(`btn_${input.id}`);
+                    if (btn) {
+                        const checkboxes = document.querySelectorAll(`input[id^="chk_${input.id}_"]`);
+                        let selectedText = [];
+                        Array.from(checkboxes).forEach((chk, idx) => {
+                            chk.checked = input.options[idx] ? input.options[idx].selected : false;
+                            if (chk.checked) selectedText.push(chk.value);
+                        });
+                        btn.textContent = selectedText.length > 0 ? selectedText.join(', ') : '— Select Options —';
+                        if (selectedText.length > 0) { btn.classList.remove('text-muted'); btn.classList.add('text-dark'); }
+                        else { btn.classList.add('text-muted'); btn.classList.remove('text-dark'); }
+                    }
                 } else {
                     input.value = record[key] ?? '';
                     if (input.type === 'hidden' && input.id.startsWith('field_')) {
@@ -1834,8 +1871,15 @@
 
             document.querySelectorAll('.dynamic-input').forEach(input => {
                 if (input.type === 'checkbox') input.checked = false;
-                else if (input.multiple) Array.from(input.options).forEach(opt => opt.selected = false);
-                else input.value = '';
+                else if (input.multiple) {
+                    Array.from(input.options).forEach(opt => opt.selected = false);
+                    const btn = document.getElementById(`btn_${input.id}`);
+                    if (btn) {
+                        document.querySelectorAll(`input[id^="chk_${input.id}_"]`).forEach(chk => chk.checked = false);
+                        btn.textContent = '— Select Options —';
+                        btn.classList.add('text-muted'); btn.classList.remove('text-dark');
+                    }
+                } else input.value = '';
                 input.classList.remove('is-invalid');
 
                 const fileInput = document.getElementById(input.id + '_file');
@@ -1899,6 +1943,33 @@
 
             applyCalculations();
             applyVisibilityRules();
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // 8c. Sync Multi-Select UI
+        // ─────────────────────────────────────────────────────────
+        function syncMultiSelect(id) {
+            const select = document.getElementById(id);
+            const button = document.getElementById(`btn_${id}`);
+            if (!select || !button) return;
+
+            const checkboxes = document.querySelectorAll(`input[id^="chk_${id}_"]`);
+            const selectedValues = [];
+
+            Array.from(checkboxes).forEach((chk, idx) => {
+                if (select.options[idx]) select.options[idx].selected = chk.checked;
+                if (chk.checked) selectedValues.push(chk.value);
+            });
+
+            if (selectedValues.length === 0) {
+                button.textContent = '— Select Options —';
+                button.classList.add('text-muted'); button.classList.remove('text-dark');
+            } else {
+                button.textContent = selectedValues.join(', ');
+                button.classList.remove('text-muted'); button.classList.add('text-dark');
+            }
+
+            select.dispatchEvent(new Event('change'));
         }
 
         // ─────────────────────────────────────────────────────────
