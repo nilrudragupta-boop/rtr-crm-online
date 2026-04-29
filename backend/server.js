@@ -647,6 +647,53 @@ app.delete('/api/custom-records/:id', async (req, res) => {
     }
 });
 
+// --- Backup Restore Route ---
+app.post('/api/restore', async (req, res) => {
+    try {
+        const backupData = req.body;
+
+        const restoreCollection = async (Model, dataStr, idField = 'id') => {
+            if (!dataStr) return;
+            try {
+                const records = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
+                for (const record of records) {
+                    const query = {};
+                    if (idField === 'invoiceNo') query['invoiceNo'] = record.invoiceNo || record.invoice_no;
+                    else if (idField === 'noteNo') query['noteNo'] = record.noteNo || record.note_no;
+                    else if (idField === 'voucher_no') query['voucher_no'] = record.voucher_no || record.voucherNo;
+                    else query[idField] = record[idField] || record._id;
+                    
+                    if (Object.values(query)[0]) {
+                        await Model.findOneAndUpdate(query, record, { new: true, upsert: true });
+                    } else {
+                        await new Model(record).save();
+                    }
+                }
+            } catch (e) { console.error("Error restoring collection", e); }
+        };
+
+        await restoreCollection(Customer, backupData['customers']);
+        await restoreCollection(Invoice, backupData['invoices'], 'invoiceNo');
+        await restoreCollection(Item, backupData['items']);
+        await restoreCollection(Supplier, backupData['suppliers']);
+        await restoreCollection(Purchase, backupData['purchases']);
+        await restoreCollection(Expense, backupData['expenses']);
+        await restoreCollection(CreditDebitNote, backupData['credit_debit_notes'], 'noteNo');
+        await restoreCollection(BankAccount, backupData['bank-accounts']);
+        await restoreCollection(BankTransaction, backupData['bank-transactions']);
+        await restoreCollection(JournalVoucher, backupData['journal-vouchers'], 'voucher_no');
+        await restoreCollection(CustomField, backupData['CUSTOM_FIELDS'], '_id');
+        
+        for (const key of Object.keys(backupData)) {
+            if (key.startsWith('CUSTOM_RECORDS_')) await restoreCollection(CustomRecord, backupData[key], '_id');
+        }
+
+        res.json({ success: true, message: 'Cloud database restored successfully!' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- System Info & Security Fingerprinting ---
 // Replaces Electron's os.cpus(), os.networkInterfaces() and MAC address tracking
 app.post('/api/system-info', (req, res) => {
