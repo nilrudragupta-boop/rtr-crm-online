@@ -19,6 +19,7 @@ var APP_SETTINGS = {
     FINANCIAL_YEAR_LOCK: false,
     APP_MODE: "Trading / Business",
     CUSTOM_FEATURES: {},
+    CUSTOM_FIELDS: {}, // Registry for Dynamic Schema Fields
     ADMIN_USERS: [
         { username: "", password: "", role: "Admin" }
     ],
@@ -411,7 +412,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_banking', label: 'Banking Module' },
     { id: 'perm_journal_voucher', label: 'Journal Voucher' },
     { id: 'perm_day_book', label: 'Day Book' },
-    { id: 'perm_cash_flow', label: 'Cash Flow' }
+    { id: 'perm_cash_flow', label: 'Cash Flow' },
+    { id: 'perm_custom_fields', label: 'Custom Field Settings' }
 ];
 
 function getCurrentUser() {

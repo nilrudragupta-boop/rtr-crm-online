@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Expense, Employee } = require('./index');
+const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Expense, Employee, CustomField, CustomRecord } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -87,6 +87,15 @@ app.post('/api/admin-creds', async (req, res) => {
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
     }
+});
+
+// --- General App Settings Routes ---
+app.get('/api/settings', (req, res) => {
+    res.json({ success: true, data: {} });
+});
+
+app.post('/api/settings', (req, res) => {
+    res.json({ success: true, data: req.body });
 });
 
 // --- Customer Routes ---
@@ -441,6 +450,25 @@ app.get('/api/production', async (req, res) => {
     }
 });
 
+app.post('/api/production', async (req, res) => {
+    try {
+        const payload = req.body;
+        const updated = await Production.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
+        res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/production/:id', async (req, res) => {
+    try {
+        await Production.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- Expense Routes ---
 app.get('/api/expenses', async (req, res) => {
     try {
@@ -506,6 +534,90 @@ app.post('/api/employees', async (req, res) => {
 app.delete('/api/employees/:id', async (req, res) => {
     try {
         await Employee.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Custom Field Routes ---
+app.get('/api/custom-fields', async (req, res) => {
+    try {
+        const fields = await CustomField.find().sort({ moduleName: 1, order: 1 });
+        res.json({ success: true, data: fields });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/custom-fields', async (req, res) => {
+    try {
+        const payload = req.body;
+        if (payload._id) {
+            const updated = await CustomField.findByIdAndUpdate(payload._id, payload, { new: true });
+            res.status(200).json({ success: true, data: updated });
+        } else {
+            const newField = new CustomField(payload);
+            await newField.save();
+            res.status(201).json({ success: true, data: newField });
+        }
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/custom-fields/:id', async (req, res) => {
+    try {
+        await CustomField.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/custom-fields/reorder', async (req, res) => {
+    try {
+        const updates = req.body; // Expecting array of [{_id, order}]
+        const bulkOps = updates.map(update => ({
+            updateOne: {
+                filter: { _id: update._id },
+                update: { $set: { order: update.order } }
+            }
+        }));
+        await CustomField.bulkWrite(bulkOps);
+        res.json({ success: true, message: 'Order updated successfully.' });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// --- Generic Custom Records Routes (For entirely new UI Pages) ---
+app.get('/api/custom-records/:module', async (req, res) => {
+    try {
+        const records = await CustomRecord.find({ moduleName: req.params.module }).sort({ createdAt: -1 });
+        res.json({ success: true, data: records });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/custom-records', async (req, res) => {
+    try {
+        const payload = req.body;
+        if (payload._id) {
+            const updated = await CustomRecord.findByIdAndUpdate(payload._id, payload, { new: true, upsert: true });
+            res.status(200).json({ success: true, data: updated });
+        } else {
+            const newRecord = new CustomRecord(payload);
+            await newRecord.save();
+            res.status(201).json({ success: true, data: newRecord });
+        }
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/custom-records/:id', async (req, res) => {
+    try {
+        await CustomRecord.findByIdAndDelete(req.params.id);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

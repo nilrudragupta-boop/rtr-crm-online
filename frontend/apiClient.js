@@ -5,8 +5,8 @@
 
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
 const API_BASE_URL = localStorage.getItem('backendApiUrl') || (isLocal
-    ? 'http://localhost:5000/api'
-    : 'https://rtr-crm-online.onrender.com/api'); // Fallback Render URL
+    ? 'https://rtr-crm-online.onrender.com/api'
+    : window.location.origin + '/api'); // Dynamically point to the hosted origin
 
 const apiClient = {
     // --- Authentication ---
@@ -162,6 +162,38 @@ const apiClient = {
     deleteScrap: (id) => apiClient._deleteCollection('scraps', id),
 
     getProductions: () => apiClient._getCollection('production'),
+    saveProduction: (data) => apiClient._saveCollection('production', data),
+    deleteProduction: (id) => apiClient._deleteCollection('production', id),
+
+    // --- Custom Fields & Dynamic Schema Records ---
+    getCustomFields: () => apiClient._getCollection('custom-fields'),
+    saveCustomField: (data) => apiClient._saveCollection('custom-fields', data),
+    deleteCustomField: (id) => apiClient._deleteCollection('custom-fields', id),
+    reorderCustomFields: async (data) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/custom-fields/reorder`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error reordering custom fields:', error);
+            return { success: false, message: error.message };
+        }
+    },
+    getCustomRecords: async (moduleName) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/custom-records/${moduleName}`);
+            const result = await response.json();
+            return result.success ? result.data : [];
+        } catch (error) {
+            console.error(`Error fetching custom records for ${moduleName}:`, error);
+            return [];
+        }
+    },
+    saveCustomRecord: (data) => apiClient._saveCollection('custom-records', data),
+    deleteCustomRecord: (id) => apiClient._deleteCollection('custom-records', id),
 
     // --- Replaced Electron IPC Calls ---
     sendEmail: async (payload) => {

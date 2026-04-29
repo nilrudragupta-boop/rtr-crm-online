@@ -1496,6 +1496,79 @@
             else if (action === "receipt") handleCustomerReceipt(id);
         });
 
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const moduleFields = allFields.filter(f => f.moduleName === 'Customer' && f.isActive);
+
+            if (moduleFields.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'flex';
+            container.innerHTML = '<div style="flex-basis: 100%; font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px;">Additional Details</div>';
+
+            moduleFields.sort((a, b) => a.order - b.order).forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'flex: 1; min-width: 150px; display: flex; flex-direction: column;';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+                label.style.cssText = 'font-size: 12px; margin-bottom: 2px; color: #666; font-weight: bold;';
+                
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    input.style.cssText = 'padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%;';
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.style.cssText = 'width: auto; margin-right: 8px; cursor: pointer;';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType; // 'text', 'number', 'date'
+                    input.placeholder = field.fieldLabel;
+                    input.style.cssText = 'padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%; box-sizing: border-box;';
+                }
+
+                input.className = 'dynamic-field';
+                input.dataset.fieldName = field.fieldName;
+                if (field.isRequired) input.required = true;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
+
         function editCustomer(id) {
             const cust = customers.find(c => String(c.id) === String(id));
             if (!cust) return showToast("Customer not found");
@@ -1520,6 +1593,7 @@
             document.getElementById("custOpeningBalanceType").value = cust.openingBalanceType || "Dr";
             currentCustomerAttachments = cust.attachments || [];
             renderCustomerAttachments();
+            renderDynamicFields(cust);
             document.getElementById("custName").focus();
         }
 

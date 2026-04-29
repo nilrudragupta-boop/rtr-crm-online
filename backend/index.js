@@ -166,6 +166,29 @@ const employeeSchema = new mongoose.Schema({
     id: { type: String }
 }, { timestamps: true, strict: false });
 
+// --- Dynamic Field Definition Schema ---
+const customFieldSchema = new mongoose.Schema({
+    moduleName: { type: String, required: true }, // e.g., 'Customer', 'Invoice', 'Item'
+    fieldName: { type: String, required: true },  // internal key (e.g., 'blood_group')
+    fieldLabel: { type: String, required: true }, // UI Label (e.g., 'Blood Group')
+    fieldType: { type: String, enum: ['text', 'number', 'date', 'select', 'boolean', 'calculated'], default: 'text' },
+    options: [String], // for 'select' type (e.g., ['A+', 'O+', 'B-'])
+    isRequired: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
+    visibilityCondition: { type: String },
+    calculationFormula: { type: String },
+    prefix: { type: String },
+    suffix: { type: String },
+    showTotal: { type: Boolean, default: false },
+    order: { type: Number, default: 0 }
+}, { timestamps: true });
+
+// --- Generic Custom Record Schema (For entirely new UI Pages) ---
+const customRecordSchema = new mongoose.Schema({
+    _id: { type: String },
+    moduleName: { type: String, required: true, index: true }
+}, { timestamps: true, strict: false });
+
 module.exports = {
     Customer: mongoose.model('Customer', customerSchema),
     Supplier: mongoose.model('Supplier', supplierSchema),
@@ -179,5 +202,7 @@ module.exports = {
     Scrap: mongoose.model('Scrap', scrapSchema),
     Production: mongoose.model('Production', productionSchema),
     Expense: mongoose.model('Expense', expenseSchema),
-    Employee: mongoose.model('Employee', employeeSchema)
+    Employee: mongoose.model('Employee', employeeSchema),
+    CustomField: mongoose.model('CustomField', customFieldSchema),
+    CustomRecord: mongoose.model('CustomRecord', customRecordSchema)
 };
