@@ -669,6 +669,16 @@
             }
         }
 
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
         /* ─── Saving indicator ────────────────────── */
         .saving-indicator {
             display: none;
@@ -906,6 +916,15 @@
 
     <!-- ══ PRINT FRAME (hidden) ══════════════════════════════ -->
     <div id="printFrame" style="display:none;"></div>
+
+    <!-- ══ LOADING OVERLAY ═══════════════════════════════════ -->
+    <div id="loadingOverlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+        <div
+            style="border: 5px solid #f3f3f3; border-top: 5px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;">
+        </div>
+        <p style="color:white; margin-top:15px; font-size:18px; font-weight:bold;">Loading...</p>
+    </div>
 
     <!-- ══════════════════════════════════════════════════════ -->
     <script>
@@ -1361,6 +1380,9 @@
         async function fetchData() {
             document.getElementById('tableBody').innerHTML = skeletonRows(5, moduleFields.length + 2);
 
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.style.display = 'flex';
+
             try {
                 let fetchedData = null;
                 if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
@@ -1410,6 +1432,7 @@
 
             applyFilters();
             updateStats();
+            if (overlay) overlay.style.display = 'none';
         }
 
         function skeletonRows(rows, cols) {
