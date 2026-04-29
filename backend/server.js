@@ -89,13 +89,36 @@ app.post('/api/admin-creds', async (req, res) => {
     }
 });
 
+// --- General App Settings Schema ---
+const settingSchema = new mongoose.Schema({
+    id: { type: String, default: 'global_settings', unique: true },
+    data: { type: mongoose.Schema.Types.Mixed }
+}, { strict: false });
+const Setting = mongoose.model('Setting', settingSchema);
+
 // --- General App Settings Routes ---
-app.get('/api/settings', (req, res) => {
-    res.json({ success: true, data: {} });
+app.get('/api/settings', async (req, res) => {
+    try {
+        const settings = await Setting.findOne({ id: 'global_settings' });
+        res.json({ success: true, data: settings ? settings.data : {} });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
-app.post('/api/settings', (req, res) => {
-    res.json({ success: true, data: req.body });
+app.post('/api/settings', async (req, res) => {
+    try {
+        const current = await Setting.findOne({ id: 'global_settings' });
+        const mergedData = { ...(current ? current.data : {}), ...req.body };
+        const updated = await Setting.findOneAndUpdate(
+            { id: 'global_settings' },
+            { data: mergedData },
+            { new: true, upsert: true }
+        );
+        res.json({ success: true, data: updated.data });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // --- Customer Routes ---
