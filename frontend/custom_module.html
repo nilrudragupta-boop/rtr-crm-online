@@ -1168,7 +1168,13 @@
         function applyVisibilityRules() {
             const currentState = {};
             document.querySelectorAll('.dynamic-input').forEach(el => {
-                currentState[el.dataset.fieldName] = el.type === 'checkbox' ? el.checked : el.value;
+                if (el.type === 'checkbox') {
+                    currentState[el.dataset.fieldName] = el.checked;
+                } else if (el.multiple) {
+                    currentState[el.dataset.fieldName] = Array.from(el.selectedOptions).map(o => o.value);
+                } else {
+                    currentState[el.dataset.fieldName] = el.value;
+                }
             });
 
             moduleFields.forEach(field => {
@@ -1458,7 +1464,8 @@
                 if (!query) return true;
                 const fieldNames = filterFld ? [filterFld] : moduleFields.map(f => f.fieldName);
                 return fieldNames.some(fn => {
-                    const v = String(row[fn] ?? '').toLowerCase();
+                    const rawVal = row[fn];
+                    const v = Array.isArray(rawVal) ? rawVal.join(' ').toLowerCase() : String(rawVal ?? '').toLowerCase();
                     return v.includes(query);
                 });
             });
@@ -2008,6 +2015,7 @@
                 moduleFields.map(f => {
                     let v = row[f.fieldName] ?? '';
                     if (f.fieldType === 'boolean') v = v ? 'Yes' : 'No';
+                    else if (f.fieldType === 'multiselect' && Array.isArray(v)) v = v.join('; ');
                     else if (f.fieldType === 'file' && v) {
                         try {
                             const fileObj = JSON.parse(v);

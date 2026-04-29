@@ -171,7 +171,7 @@ const customFieldSchema = new mongoose.Schema({
     moduleName: { type: String, required: true }, // e.g., 'Customer', 'Invoice', 'Item'
     fieldName: { type: String, required: true },  // internal key (e.g., 'blood_group')
     fieldLabel: { type: String, required: true }, // UI Label (e.g., 'Blood Group')
-    fieldType: { type: String, enum: ['text', 'number', 'date', 'select', 'boolean', 'calculated'], default: 'text' },
+    fieldType: { type: String, default: 'text' },
     options: [String], // for 'select' type (e.g., ['A+', 'O+', 'B-'])
     isRequired: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
