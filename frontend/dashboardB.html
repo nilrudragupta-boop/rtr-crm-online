@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intro.js/7.2.0/introjs.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
@@ -973,6 +974,8 @@
                         <span id="reminderCount"
                             style="display: none; position: absolute; top: -5px; right: -5px; background: var(--danger-color); color: white; border-radius: 50%; padding: 2px 5px; font-size: 10px; font-weight: bold; line-height: 1;">0</span>
                     </button>
+                    <button class="btn-icon" onclick="startGuidedTour(true)" title="Guided Tour"><i
+                            class="fas fa-map-signs"></i></button>
                     <button class="btn-icon" onclick="toggleTheme()" title="Toggle Theme"><i
                             class="fas fa-moon"></i></button>
                     <button class="btn-icon" onclick="window.location.href='logout.html'" title="Logout"><i
@@ -1994,6 +1997,7 @@
         </div>
         <p style="color:white; margin-top:15px; font-size:18px; font-weight:bold;">Processing...</p>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/intro.js/7.2.0/intro.min.js"></script>
     <style>
         @keyframes spin {
             0% {
@@ -2558,6 +2562,65 @@
             }
         }
 
+        // --- Guided Tour (Intro.js) ---
+        function startGuidedTour(force = false) {
+            if (!force && localStorage.getItem('hasSeenDashboardTour') === 'true') {
+                return;
+            }
+            if (typeof introJs === 'undefined') {
+                console.warn("Intro.js not loaded");
+                return;
+            }
+
+            const intro = introJs();
+            intro.setOptions({
+                steps: [
+                    {
+                        title: 'Welcome to RTR CRM! 👋',
+                        intro: 'Let us take a quick tour to help you get familiar with the system.'
+                    },
+                    {
+                        element: document.querySelector('#sidebar'),
+                        title: 'Navigation Menu',
+                        intro: 'Access all operations, reports, and tools from this sidebar. You can collapse it to save space.'
+                    },
+                    {
+                        element: document.querySelector('.sidebar-search-container'),
+                        title: 'Quick Search',
+                        intro: 'Looking for something specific? Search for any menu item directly here.'
+                    },
+                    {
+                        element: document.querySelector('.topbar-right'),
+                        title: 'Top Controls',
+                        intro: 'Toggle data visibility, check notifications, start a tour, change themes, and access quick settings.'
+                    },
+                    {
+                        element: document.querySelector('.stats-grid'),
+                        title: 'Business Overview',
+                        intro: 'Your key performance indicators (KPIs) and system health at a glance.'
+                    },
+                    {
+                        element: document.querySelector('#quickActionsGrid'),
+                        title: 'Quick Actions',
+                        intro: 'Drag and drop your favorite actions here for fast access. Click the gear icon to customize.'
+                    }
+                ],
+                showProgress: true,
+                showBullets: false,
+                exitOnOverlayClick: false,
+                disableInteraction: true
+            });
+
+            intro.oncomplete(function () {
+                localStorage.setItem('hasSeenDashboardTour', 'true');
+            });
+            intro.onexit(function () {
+                localStorage.setItem('hasSeenDashboardTour', 'true');
+            });
+
+            intro.start();
+        }
+
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             const lastSync = localStorage.getItem('lastAutoSync');
@@ -2601,6 +2664,8 @@
                 }
             });
 
+            // Start guided tour for first-time users after a short delay
+            setTimeout(() => startGuidedTour(false), 1500);
 
 
             // Load zoom on startup
