@@ -741,6 +741,11 @@
                         window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                     } else {
                         localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                        fetch('/api/admin-creds', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ adminUsers: ADMIN_USERS })
+                        }).catch(console.error);
                     }
 
                     // Auto-fill login fields and trigger the login process
@@ -917,9 +922,22 @@
                     }
                 } catch (e) { console.error(e); }
             } else {
-                const localUsers = localStorage.getItem('ADMIN_USERS');
-                if (localUsers) {
-                    try { ADMIN_USERS = JSON.parse(localUsers); } catch (e) { }
+                try {
+                    const res = await fetch('/api/admin-creds');
+                    const creds = await res.json();
+                    if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
+                        ADMIN_USERS = creds.adminUsers;
+                        localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                    }
+                    if (creds.success && creds.adminPass) {
+                        localStorage.setItem("appPassword", creds.adminPass);
+                    }
+                } catch (e) {
+                    console.warn("Failed to fetch admin creds from DB", e);
+                    const localUsers = localStorage.getItem('ADMIN_USERS');
+                    if (localUsers) {
+                        try { ADMIN_USERS = JSON.parse(localUsers); } catch (err) { }
+                    }
                 }
             }
 
@@ -1027,6 +1045,11 @@
                                 window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                             } else {
                                 localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                                fetch('/api/admin-creds', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ adminUsers: ADMIN_USERS })
+                                }).catch(console.error);
                             }
                         }
 
@@ -1216,6 +1239,17 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ username: user })
                         });
+                        
+                        const userIdx = ADMIN_USERS.findIndex(u => u.username.toLowerCase() === user.toLowerCase());
+                        if (userIdx > -1) {
+                            ADMIN_USERS[userIdx].lastLogin = new Date().toISOString();
+                            localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                            fetch('/api/admin-creds', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ adminUsers: ADMIN_USERS })
+                            }).catch(console.error);
+                        }
                     }
                 } catch (e) {
                     console.log("Web login history update failed", e);
@@ -1260,6 +1294,11 @@
                             window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                         } else {
                             localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                            fetch('/api/admin-creds', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ adminUsers: ADMIN_USERS })
+                            }).catch(console.error);
                         }
                         localStorage.setItem('contactNumber', contactNumber); // Set identifier for future auto-sync
 
@@ -1532,6 +1571,12 @@
             } else {
                 localStorage.setItem("appPassword", newPass);
                 localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
+                
+                fetch('/api/admin-creds', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminUsers: users, adminPass: newPass })
+                }).catch(console.error);
                 
                 openSuccessModal("Password reset successfully. You can now login with your new password.");
                 closeResetModal();

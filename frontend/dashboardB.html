@@ -909,9 +909,10 @@
                         <span class="nav-text">What's New</span>
                     </button>
                 </div>
-                
+
                 <!-- Dynamic Custom Pages injected here -->
-                <div id="dynamicPagesWrapper" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;"></div>
+                <div id="dynamicPagesWrapper"
+                    style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;"></div>
 
             </div>
 
@@ -2701,25 +2702,25 @@
                     if (vaultBtn) vaultBtn.click(); // Open window on key up
                 }
             });
-        
-        // Inject Dynamic Custom Pages
-        function loadDynamicCustomPages() {
-            const customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
-            // Any module not in this array is treated as a Custom Page
-            const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier']; 
-            const customModules = [...new Set(customFields.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
-            
-            const wrapper = document.getElementById('dynamicPagesWrapper');
-            if (wrapper) {
-                wrapper.innerHTML = customModules.map(m => `
+
+            // Inject Dynamic Custom Pages
+            function loadDynamicCustomPages() {
+                const customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                // Any module not in this array is treated as a Custom Page
+                const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier'];
+                const customModules = [...new Set(customFields.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
+
+                const wrapper = document.getElementById('dynamicPagesWrapper');
+                if (wrapper) {
+                    wrapper.innerHTML = customModules.map(m => `
                     <button class="nav-item" onclick="openWindow('custom_module.html?module=${encodeURIComponent(m)}', 1000, 700)" title="${m}">
                         <i class="fas fa-folder-open" style="color: #f39c12;"></i>
                         <span class="nav-text">${m}</span>
                     </button>
                 `).join('');
+                }
             }
-        }
-        loadDynamicCustomPages();
+            loadDynamicCustomPages();
         });
 
         async function syncRemoteConfig() {
@@ -4932,6 +4933,14 @@
                         users[userIdx].password = newPass;
                         localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
                     }
+
+                    fetch('/api/admin-creds', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ adminUsers: users, adminPass: newPass })
+                    }).catch(console.error);
+
+
                     document.getElementById('changePasswordModal').style.display = 'none';
                     alert("Password updated successfully (Local Browser)!");
                 }
@@ -5150,7 +5159,7 @@
                     try {
                         const res = await fetch(ep.url);
                         if (res.ok) { const data = await res.json(); if (data.success) localStorage.setItem(ep.key, JSON.stringify(data.data)); }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
                 const cfData = JSON.parse(localStorage.getItem('CUSTOM_FIELDS') || '[]');
                 const modules = [...new Set(cfData.map(f => f.moduleName))];
@@ -5160,7 +5169,7 @@
                         try {
                             const res = await fetch(`api/custom-records/${mod}`);
                             if (res.ok) { const data = await res.json(); if (data.success) localStorage.setItem(`CUSTOM_RECORDS_${mod}`, JSON.stringify(data.data)); }
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                 }
             } catch (e) { console.warn("Could not sync all remote data before backup", e); }
@@ -5177,7 +5186,7 @@
                 }
             }
             if (!confirm("This will export all application data to a JSON file. Proceed?")) return;
-            
+
             const overlay = document.getElementById('loadingOverlay');
             if (overlay) { overlay.style.display = 'flex'; overlay.querySelector('p').innerText = "Fetching latest data & Preparing Backup..."; }
             try {

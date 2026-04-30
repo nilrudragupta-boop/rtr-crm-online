@@ -1258,9 +1258,9 @@
                         // 1. Load General Settings
                         let settings = {};
                         try {
-                            const res = await fetch(`${API_BASE_URL}/settings`);
+                        const res = await fetch('/api/settings');
                             const apiData = await res.json();
-                            if (apiData.success && apiData.data) settings = apiData.data;
+                        if (apiData.success && apiData.data) settings = apiData.data || {};
                         } catch (e) {
                             console.warn("MongoDB fetch failed, falling back to local files", e);
                         }
@@ -1287,7 +1287,19 @@
                         document.getElementById('updateServerUrl').value = settings.updateServerUrl || localStorage.getItem('updateServerUrl') || "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
 
                         // 2. Load Admin Username/Email (Passwords are hidden)
-                        const creds = await window.electronAPI.getAdminCreds();
+                    let creds = {};
+                    if (window.electronAPI && window.electronAPI.getAdminCreds) {
+                        creds = await window.electronAPI.getAdminCreds();
+                    } else {
+                        try {
+                            const res = await fetch('/api/admin-creds');
+                            creds = await res.json();
+                        } catch(e) {
+                            console.error("Failed to fetch admin creds from API", e);
+                            creds = { success: false };
+                        }
+                    }
+
                         if (creds.success) {
                             document.getElementById('adminUser').value = creds.adminUser || '';
                             document.getElementById('adminEmail').value = creds.adminEmail || '';
@@ -1351,7 +1363,7 @@
 
                     // Save to MongoDB via API
                     try {
-                        await fetch(`${API_BASE_URL}/settings`, {
+                        await fetch('/api/settings', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(data)
@@ -1492,6 +1504,12 @@
                         localStorage.setItem('adminEmail', data.adminEmail);
                         if (data.adminEmailPass) localStorage.setItem('adminEmailPass', data.adminEmailPass);
                         localStorage.setItem('ADMIN_USERS', JSON.stringify(data.adminUsers));
+                        
+                        fetch('/api/admin-creds', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        }).catch(console.error);
                         
                         alert("Security credentials updated successfully!");
                         document.getElementById('devId').value = '';
