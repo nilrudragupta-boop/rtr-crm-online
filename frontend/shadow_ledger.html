@@ -405,7 +405,9 @@
     </div>
 
     <script>
-        let shadowData = JSON.parse(localStorage.getItem('shadow_ledger_data')) || [];
+        const currentVaultUser = localStorage.getItem('currentUser') || 'System';
+        const shadowStorageKey = `shadow_ledger_data_${currentVaultUser}`;
+        let shadowData = JSON.parse(localStorage.getItem(shadowStorageKey)) || [];
         let currentPage = 1;
         let rowsPerPage = 20;
         let ledgerChartInstance = null;
@@ -420,13 +422,8 @@
             btn.disabled = true;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/shadow_ledger`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ shadow_ledger_data: shadowData })
-                });
-
-                if (response.ok) alert("Vault Ledger synced to Server successfully! ✅");
+                const resData = await apiClient.saveShadowLedger(shadowData);
+                if (resData && resData.success) alert("Vault Ledger synced to Server successfully! ✅");
                 else alert("Failed to sync Vault Ledger to Server. ❌");
             } catch (error) {
                 console.error("Error syncing to Server:", error);
@@ -610,11 +607,10 @@
             enableColumnResizing();
 
             try {
-                const response = await fetch(`${API_BASE_URL}/shadow_ledger`);
-                const resData = await response.json();
-                if (resData.success && resData.data && resData.data.length > 0) {
-                    shadowData = resData.data;
-                    localStorage.setItem('shadow_ledger_data', JSON.stringify(shadowData));
+                const resData = await apiClient.getShadowLedger();
+                if (resData && resData.length > 0) {
+                    shadowData = resData;
+                    localStorage.setItem(shadowStorageKey, JSON.stringify(shadowData));
                 }
             } catch (error) {
                 console.warn("Failed to fetch shadow ledger from cloud", error);
@@ -754,7 +750,7 @@
                 shadowData.push(entry);
             }
 
-            localStorage.setItem('shadow_ledger_data', JSON.stringify(shadowData));
+            localStorage.setItem(shadowStorageKey, JSON.stringify(shadowData));
 
             document.getElementById('entryId').value = '';
             document.getElementById('entryDetails').value = '';
@@ -769,7 +765,7 @@
         function deleteEntry(id) {
             if (confirm("Delete this entry permanently?")) {
                 shadowData = shadowData.filter(e => e.id !== id);
-                localStorage.setItem('shadow_ledger_data', JSON.stringify(shadowData));
+                localStorage.setItem(shadowStorageKey, JSON.stringify(shadowData));
                 renderLedger();
             }
         }
@@ -779,7 +775,7 @@
         function clearAll() {
             if (confirm("WARNING: This will permanently delete ALL entries in the Vault. Are you absolutely sure?")) {
                 shadowData = [];
-                localStorage.setItem('shadow_ledger_data', JSON.stringify(shadowData));
+                localStorage.setItem(shadowStorageKey, JSON.stringify(shadowData));
                 renderLedger();
             }
         }
@@ -1056,7 +1052,7 @@
                         }
                     });
 
-                    localStorage.setItem('shadow_ledger_data', JSON.stringify(shadowData));
+                    localStorage.setItem(shadowStorageKey, JSON.stringify(shadowData));
                     renderLedger();
                     alert(`Import successful! ${added} new entries added.`);
                 } catch (err) {

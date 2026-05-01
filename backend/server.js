@@ -124,7 +124,8 @@ app.post('/api/settings', async (req, res) => {
 // --- Shadow Ledger / Vault Routes ---
 app.get('/api/shadow_ledger', async (req, res) => {
     try {
-        const doc = await Setting.findOne({ id: 'shadow_ledger' });
+        const user = req.query.user || 'System';
+        const doc = await Setting.findOne({ id: `shadow_ledger_${user}` });
         res.json({ success: true, data: doc ? doc.data : [] });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -133,9 +134,10 @@ app.get('/api/shadow_ledger', async (req, res) => {
 
 app.post('/api/shadow_ledger', async (req, res) => {
     try {
+        const user = req.query.user || req.body.user || 'System';
         const data = req.body.shadow_ledger_data;
         const updated = await Setting.findOneAndUpdate(
-            { id: 'shadow_ledger' },
+            { id: `shadow_ledger_${user}` },
             { data: data },
             { new: true, upsert: true }
         );
@@ -663,6 +665,9 @@ app.get('/api/custom-records/:module', async (req, res) => {
 app.post('/api/custom-records', async (req, res) => {
     try {
         const payload = req.body;
+        if (!payload.createdBy && req.query.user) {
+            payload.createdBy = req.query.user;
+        }
         if (payload._id) {
             const updated = await CustomRecord.findByIdAndUpdate(payload._id, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });

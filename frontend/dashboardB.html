@@ -2526,11 +2526,16 @@
                 const customModules = [...new Set(cfData.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
                 
                 const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                const currentUser = localStorage.getItem('currentUser') || 'System';
+                const userRole = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]').find(u => u.username === currentUser)?.role || 'User';
+                const authQuery = `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
+                
                 for (const mod of customModules) {
                     const localRecords = JSON.parse(localStorage.getItem(`CUSTOM_RECORDS_${mod}`)) || [];
                     localRecords.forEach(record => {
+                        if (!record.createdBy) record.createdBy = currentUser; // Enforce Ownership
                         promises.push(
-                            fetch(`${baseUrl}/custom-records`, {
+                            fetch(`${baseUrl}/custom-records${authQuery}`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(record)
@@ -5301,14 +5306,23 @@
         // --- Backup / Restore ---
         async function fetchLatestDataForBackup() {
             try {
+                const currentUser = localStorage.getItem('currentUser') || 'System';
+                let userRole = 'User';
+                try {
+                    const adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
+                    const userMatch = adminUsers.find(u => u.username === currentUser);
+                    if (userMatch) userRole = userMatch.role || 'User';
+                } catch(e) {}
+                const authQuery = `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
+
                 const endpoints = [
-                    { url: 'api/customers', key: 'customers' }, { url: 'api/suppliers', key: 'suppliers' },
-                    { url: 'api/items', key: 'items' }, { url: 'api/invoices', key: 'invoices' },
-                    { url: 'api/purchases', key: 'purchases' }, { url: 'api/expenses', key: 'expenses' },
-                    { url: 'api/credit-debit-notes', key: 'credit_debit_notes' }, { url: 'api/bank-accounts', key: 'bank_accounts' },
-                    { url: 'api/bank-transactions', key: 'bank_transactions' }, { url: 'api/journal-vouchers', key: 'journal_vouchers' },
-                    { url: 'api/scraps', key: 'scraps' }, { url: 'api/production', key: 'production' },
-                    { url: 'api/employees', key: 'employees' }, { url: 'api/custom-fields', key: 'CUSTOM_FIELDS' }
+                    { url: `api/customers${authQuery}`, key: 'customers' }, { url: `api/suppliers${authQuery}`, key: 'suppliers' },
+                    { url: `api/items${authQuery}`, key: 'items' }, { url: `api/invoices${authQuery}`, key: 'invoices' },
+                    { url: `api/purchases${authQuery}`, key: 'purchases' }, { url: `api/expenses${authQuery}`, key: 'expenses' },
+                    { url: `api/credit-debit-notes${authQuery}`, key: 'credit_debit_notes' }, { url: `api/bank-accounts${authQuery}`, key: 'bank_accounts' },
+                    { url: `api/bank-transactions${authQuery}`, key: 'bank_transactions' }, { url: `api/journal-vouchers${authQuery}`, key: 'journal_vouchers' },
+                    { url: `api/scraps${authQuery}`, key: 'scraps' }, { url: `api/production${authQuery}`, key: 'production' },
+                    { url: `api/employees${authQuery}`, key: 'employees' }, { url: `api/custom-fields`, key: 'CUSTOM_FIELDS' }
                 ];
                 for (const ep of endpoints) {
                     try {
@@ -5322,7 +5336,7 @@
                 for (const mod of modules) {
                     if (!standardModules.includes(mod)) {
                         try {
-                            const res = await fetch(`api/custom-records/${mod}`);
+                            const res = await fetch(`api/custom-records/${mod}${authQuery}`);
                             if (res.ok) { const data = await res.json(); if (data.success) localStorage.setItem(`CUSTOM_RECORDS_${mod}`, JSON.stringify(data.data)); }
                         } catch (e) { }
                     }

@@ -17,7 +17,7 @@ const apiClient = {
             const adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
             const userMatch = adminUsers.find(u => u.username === currentUser);
             if (userMatch) userRole = userMatch.role || 'User';
-        } catch(e) {}
+        } catch (e) { }
         return `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
     },
 
@@ -209,6 +209,33 @@ const apiClient = {
     },
     saveCustomRecord: (data) => apiClient._saveCollection('custom-records', data),
     deleteCustomRecord: (id) => apiClient._deleteCollection('custom-records', id),
+
+    // --- Shadow Ledger / Vault ---
+    getShadowLedger: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/shadow_ledger${apiClient._getAuthQuery()}`);
+            const result = await response.json();
+            return result.success ? result.data : [];
+        } catch (error) {
+            console.error('Error fetching shadow ledger:', error);
+            return [];
+        }
+    },
+    saveShadowLedger: async (data) => {
+        try {
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const response = await fetch(`${API_BASE_URL}/shadow_ledger${apiClient._getAuthQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shadow_ledger_data: data, user: currentUser })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving shadow ledger:', error);
+            return { success: false, message: error.message };
+        }
+    },
+
 
     // --- Replaced Electron IPC Calls ---
     sendEmail: async (payload) => {
