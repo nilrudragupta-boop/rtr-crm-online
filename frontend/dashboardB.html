@@ -3553,14 +3553,54 @@
             }
 
             versionSpan.innerText = currentVer;
-
-            if (typeof RELEASE_NOTES !== 'undefined') {
-                contentDiv.innerHTML = RELEASE_NOTES.replace(/\n/g, "<br>");
-            } else {
-                contentDiv.innerText = "Release notes not available.";
-            }
-
+            contentDiv.innerText = "Loading release notes...";
             modal.style.display = 'flex';
+
+            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            
+            if (scriptUrl) {
+                try {
+                    const fetchUrl = scriptUrl.includes('?') ? `${scriptUrl}&action=check_update` : `${scriptUrl}?action=check_update`;
+                    const response = await fetch(fetchUrl);
+                    const data = await response.json();
+
+                    if (data.version) {
+                        currentVer = data.version;
+                        versionSpan.innerText = currentVer;
+                    }
+
+                    if (data.release_data) {
+                        let html = '';
+                        if (data.release_data.newFeatures && data.release_data.newFeatures.length > 0) {
+                            html += '<h4 style="color:#27ae60; margin-bottom:5px; margin-top:0;"><i class="fas fa-star"></i> New Features</h4><ul style="margin-top:0; padding-left:20px; margin-bottom:10px;">' + data.release_data.newFeatures.map(i => `<li>${i}</li>`).join('') + '</ul>';
+                        }
+                        if (data.release_data.improvements && data.release_data.improvements.length > 0) {
+                            html += '<h4 style="color:#f39c12; margin-bottom:5px; margin-top:10px;"><i class="fas fa-rocket"></i> Improvements</h4><ul style="margin-top:0; padding-left:20px; margin-bottom:10px;">' + data.release_data.improvements.map(i => `<li>${i}</li>`).join('') + '</ul>';
+                        }
+                        if (data.release_data.bugfixes && data.release_data.bugfixes.length > 0) {
+                            html += '<h4 style="color:#e74c3c; margin-bottom:5px; margin-top:10px;"><i class="fas fa-bug"></i> Bug Fixes</h4><ul style="margin-top:0; padding-left:20px; margin-bottom:10px;">' + data.release_data.bugfixes.map(i => `<li>${i}</li>`).join('') + '</ul>';
+                        }
+                        contentDiv.innerHTML = html || (data.notes ? data.notes.replace(/\n/g, "<br>") : "No release notes.");
+                    } else if (data.notes) {
+                        contentDiv.innerHTML = data.notes.replace(/\n/g, "<br>");
+                    } else {
+                        contentDiv.innerText = "Release notes not available.";
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch release notes:", e);
+                    if (typeof RELEASE_NOTES !== 'undefined') {
+                        contentDiv.innerHTML = RELEASE_NOTES.replace(/\n/g, "<br>");
+                    } else {
+                        contentDiv.innerText = "Release notes not available (Offline).";
+                    }
+                }
+            } else {
+                if (typeof RELEASE_NOTES !== 'undefined') {
+                    contentDiv.innerHTML = RELEASE_NOTES.replace(/\n/g, "<br>");
+                } else {
+                    contentDiv.innerText = "Release notes not available.";
+                }
+            }
         }
 
         async function checkWhatsNew() {
