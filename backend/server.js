@@ -121,6 +121,30 @@ app.post('/api/settings', async (req, res) => {
     }
 });
 
+// --- Shadow Ledger / Vault Routes ---
+app.get('/api/shadow_ledger', async (req, res) => {
+    try {
+        const doc = await Setting.findOne({ id: 'shadow_ledger' });
+        res.json({ success: true, data: doc ? doc.data : [] });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/shadow_ledger', async (req, res) => {
+    try {
+        const data = req.body.shadow_ledger_data;
+        const updated = await Setting.findOneAndUpdate(
+            { id: 'shadow_ledger' },
+            { data: data },
+            { new: true, upsert: true }
+        );
+        res.json({ success: true, message: 'Vault Ledger synced successfully' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- Customer Routes ---
 // Fetch all customers
 app.get('/api/customers', async (req, res) => {

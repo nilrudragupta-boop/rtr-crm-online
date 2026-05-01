@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="settings.js"></script>
+    <script src="apiClient.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -267,7 +269,8 @@
                     class="fas fa-user-secret"></i>
                 Vault Ledger</h2>
             <div>
-                <button onclick="syncShadowLedger()" style="background: #2980b9;" title="Sync data securely to MongoDB"><i class="fas fa-cloud-upload-alt"></i> Sync to Cloud</button>
+                <button onclick="syncShadowLedger()" style="background: #2980b9;"
+                    title="Sync data securely to MongoDB"><i class="fas fa-cloud-upload-alt"></i> Sync to Cloud</button>
                 <button onclick="toggleChart()" style="background: #8e44ad;"><i class="fas fa-chart-bar"></i> Toggle
                     Chart</button>
                 <button onclick="changeVaultPassword()" style="background: #34495e;"
@@ -415,14 +418,14 @@
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
             btn.disabled = true;
-            
+
             try {
                 const response = await fetch(`${API_BASE_URL}/shadow_ledger`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ shadow_ledger_data: shadowData })
                 });
-                
+
                 if (response.ok) alert("Vault Ledger synced to MongoDB successfully! ✅");
                 else alert("Failed to sync Vault Ledger to MongoDB. ❌");
             } catch (error) {
@@ -598,12 +601,26 @@
             }
         }
 
-        const initializePage = () => {
+        const initializePage = async () => {
+
             document.getElementById('appContent').style.display = 'block';
             document.getElementById('entryDate').valueAsDate = new Date();
             if (localStorage.getItem('appThemeMode') === 'dark') document.body.classList.add('dark-mode');
             loadColumnWidths();
             enableColumnResizing();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/shadow_ledger`);
+                const resData = await response.json();
+                if (resData.success && resData.data && resData.data.length > 0) {
+                    shadowData = resData.data;
+                    localStorage.setItem('shadow_ledger_data', JSON.stringify(shadowData));
+                }
+            } catch (error) {
+                console.warn("Failed to fetch shadow ledger from cloud", error);
+            }
+
+
             renderLedger();
         };
 
