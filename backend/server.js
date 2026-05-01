@@ -125,7 +125,8 @@ app.post('/api/settings', async (req, res) => {
 // Fetch all customers
 app.get('/api/customers', async (req, res) => {
     try {
-        const customers = await Customer.find().sort({ createdAt: -1 }); // Newest first
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const customers = await Customer.find(query).sort({ createdAt: -1 }); // Newest first
         res.json({ success: true, data: customers });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -153,7 +154,8 @@ app.post('/api/customers', async (req, res) => {
 // Fetch all invoices
 app.get('/api/invoices', async (req, res) => {
     try {
-        const invoices = await Invoice.find().sort({ date: -1 }); // Newest date first
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const invoices = await Invoice.find(query).sort({ date: -1 }); // Newest date first
         res.json({ success: true, data: invoices });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -190,7 +192,8 @@ app.delete('/api/invoices/:id', async (req, res) => {
 // --- Supplier Routes ---
 app.get('/api/suppliers', async (req, res) => {
     try {
-        const suppliers = await Supplier.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const suppliers = await Supplier.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: suppliers });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -225,7 +228,8 @@ app.delete('/api/suppliers/:id', async (req, res) => {
 // --- Item Routes ---
 app.get('/api/items', async (req, res) => {
     try {
-        const items = await Item.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const items = await Item.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: items });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -260,7 +264,8 @@ app.delete('/api/items/:id', async (req, res) => {
 // --- Purchase Routes ---
 app.get('/api/purchases', async (req, res) => {
     try {
-        const purchases = await Purchase.find().sort({ date: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const purchases = await Purchase.find(query).sort({ date: -1 });
         res.json({ success: true, data: purchases });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -295,7 +300,8 @@ app.delete('/api/purchases/:id', async (req, res) => {
 // --- Credit/Debit Note Routes ---
 app.get('/api/credit-debit-notes', async (req, res) => {
     try {
-        const notes = await CreditDebitNote.find().sort({ date: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const notes = await CreditDebitNote.find(query).sort({ date: -1 });
         res.json({ success: true, data: notes });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -330,7 +336,8 @@ app.delete('/api/credit-debit-notes/:id', async (req, res) => {
 // --- Bank Account Routes ---
 app.get('/api/bank-accounts', async (req, res) => {
     try {
-        const accounts = await BankAccount.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const accounts = await BankAccount.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: accounts });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -365,7 +372,8 @@ app.delete('/api/bank-accounts/:id', async (req, res) => {
 // --- Bank Transaction Routes ---
 app.get('/api/bank-transactions', async (req, res) => {
     try {
-        const transactions = await BankTransaction.find().sort({ date: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const transactions = await BankTransaction.find(query).sort({ date: -1 });
         res.json({ success: true, data: transactions });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -400,7 +408,8 @@ app.delete('/api/bank-transactions/:id', async (req, res) => {
 // --- Journal Voucher Routes ---
 app.get('/api/journal-vouchers', async (req, res) => {
     try {
-        const vouchers = await JournalVoucher.find().sort({ date: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const vouchers = await JournalVoucher.find(query).sort({ date: -1 });
         res.json({ success: true, data: vouchers });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -435,7 +444,8 @@ app.delete('/api/journal-vouchers/:id', async (req, res) => {
 // --- Scrap Routes ---
 app.get('/api/scraps', async (req, res) => {
     try {
-        const scraps = await Scrap.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const scraps = await Scrap.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: scraps });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -466,7 +476,8 @@ app.delete('/api/scraps/:id', async (req, res) => {
 // This is read-only for the scrap page's stock calculation
 app.get('/api/production', async (req, res) => {
     try {
-        const productions = await Production.find().sort({ date: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const productions = await Production.find(query).sort({ date: -1 });
         res.json({ success: true, data: productions });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -495,7 +506,8 @@ app.delete('/api/production/:id', async (req, res) => {
 // --- Expense Routes ---
 app.get('/api/expenses', async (req, res) => {
     try {
-        const expenses = await Expense.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const expenses = await Expense.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: expenses });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -531,7 +543,8 @@ app.delete('/api/expenses/:id', async (req, res) => {
 // --- Employee Routes ---
 app.get('/api/employees', async (req, res) => {
     try {
-        const employees = await Employee.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const employees = await Employee.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: employees });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -615,7 +628,8 @@ app.post('/api/custom-fields/reorder', async (req, res) => {
 // --- Generic Custom Records Routes (For entirely new UI Pages) ---
 app.get('/api/custom-records/:module', async (req, res) => {
     try {
-        const records = await CustomRecord.find({ moduleName: req.params.module }).sort({ createdAt: -1 });
+        const query = req.query.user ? { moduleName: req.params.module, createdBy: req.query.user } : { moduleName: req.params.module };
+        const records = await CustomRecord.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: records });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

@@ -9,6 +9,18 @@ const API_BASE_URL = localStorage.getItem('backendApiUrl') || (isLocal
     : window.location.origin + '/api'); // Dynamically point to the hosted origin
 
 const apiClient = {
+    // --- Helper for Multi-Tenant Auth ---
+    _getAuthQuery: () => {
+        const currentUser = localStorage.getItem('currentUser') || 'System';
+        let userRole = 'User';
+        try {
+            const adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
+            const userMatch = adminUsers.find(u => u.username === currentUser);
+            if (userMatch) userRole = userMatch.role || 'User';
+        } catch(e) {}
+        return `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
+    },
+
     // --- Authentication ---
     login: async (username, password) => {
         try {
@@ -27,7 +39,7 @@ const apiClient = {
     // --- Customers ---
     getCustomers: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/customers`);
+            const response = await fetch(`${API_BASE_URL}/customers${apiClient._getAuthQuery()}`);
             const result = await response.json();
             return result.success ? result.data : [];
         } catch (error) {
@@ -38,6 +50,7 @@ const apiClient = {
 
     saveCustomer: async (customerData) => {
         try {
+            if (!customerData.createdBy) customerData.createdBy = localStorage.getItem('currentUser') || 'System';
             const response = await fetch(`${API_BASE_URL}/customers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -53,7 +66,7 @@ const apiClient = {
     // --- Invoices ---
     getInvoices: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/invoices`);
+            const response = await fetch(`${API_BASE_URL}/invoices${apiClient._getAuthQuery()}`);
             const result = await response.json();
             return result.success ? result.data : [];
         } catch (error) {
@@ -64,6 +77,7 @@ const apiClient = {
 
     saveInvoice: async (invoiceData) => {
         try {
+            if (!invoiceData.createdBy) invoiceData.createdBy = localStorage.getItem('currentUser') || 'System';
             const response = await fetch(`${API_BASE_URL}/invoices`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -80,7 +94,7 @@ const apiClient = {
     // --- Credit/Debit Notes ---
     getCreditDebitNotes: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/credit-debit-notes`);
+            const response = await fetch(`${API_BASE_URL}/credit-debit-notes${apiClient._getAuthQuery()}`);
             const result = await response.json();
             return result.success ? result.data : [];
         } catch (error) {
@@ -94,7 +108,7 @@ const apiClient = {
     // --- Generic Fetch / Save for other collections ---
     _getCollection: async (collectionName) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/${collectionName}`);
+            const response = await fetch(`${API_BASE_URL}/${collectionName}${apiClient._getAuthQuery()}`);
             const result = await response.json();
             return result.success ? result.data : [];
         } catch (error) {
@@ -104,6 +118,7 @@ const apiClient = {
     },
     _saveCollection: async (collectionName, data) => {
         try {
+            if (!data.createdBy) data.createdBy = localStorage.getItem('currentUser') || 'System';
             const response = await fetch(`${API_BASE_URL}/${collectionName}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -184,7 +199,7 @@ const apiClient = {
     },
     getCustomRecords: async (moduleName) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/custom-records/${moduleName}`);
+            const response = await fetch(`${API_BASE_URL}/custom-records/${moduleName}${apiClient._getAuthQuery()}`);
             const result = await response.json();
             return result.success ? result.data : [];
         } catch (error) {

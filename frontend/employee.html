@@ -786,10 +786,9 @@
 
         async function loadEmployeesData() {
             try {
-                const res = await fetch('http://localhost:5000/api/employees');
-                const data = await res.json();
-                if (data.success && data.data) {
-                    employees = data.data;
+                const remoteData = await apiClient.getEmployees();
+                if (remoteData && remoteData.length > 0) {
+                    employees = remoteData;
                     localStorage.setItem("employees", JSON.stringify(employees));
                 }
             } catch (e) {
@@ -904,15 +903,7 @@
             };
 
             // Save to MongoDB via API
-            try {
-                await fetch('http://localhost:5000/api/employees', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(empData)
-                });
-            } catch (e) {
-                console.error('Failed to sync employee to DB', e);
-            }
+            apiClient.saveEmployee(empData).catch(e => console.error('Failed to sync employee to DB', e));
 
             if (id) {
                 const index = employees.findIndex(e => e.id === id);
@@ -1084,7 +1075,7 @@
         async function deleteEmployee(id) {
             if (confirm("Are you sure you want to delete this employee?")) {
                 try {
-                    await fetch(`http://localhost:5000/api/employees/${id}`, { method: 'DELETE' });
+                    await apiClient._deleteCollection('employees', id);
                 } catch (e) {
                     console.error('Failed to delete employee from DB', e);
                 }

@@ -3239,15 +3239,13 @@
             let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
             try {
-                const [invRes, purRes, itemsRes] = await Promise.all([
-                    fetch('api/invoices').then(res => res.json()).catch(() => ({ success: false })),
-                    fetch('api/purchases').then(res => res.json()).catch(() => ({ success: false })),
-                    fetch('api/items').then(res => res.json()).catch(() => ({ success: false }))
-                ]);
+                const fetchedInvoices = await apiClient.getInvoices();
+                const fetchedPurchases = await apiClient.getPurchases();
+                const fetchedItems = await apiClient.getItems();
 
-                if (invRes.success) invoices = invRes.data; else invoices = JSON.parse(localStorage.getItem("invoices")) || [];
-                if (purRes.success) purchases = purRes.data; else purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-                if (itemsRes.success) items = itemsRes.data; else items = JSON.parse(localStorage.getItem("items")) || [];
+                invoices = (fetchedInvoices && fetchedInvoices.length > 0) ? fetchedInvoices : JSON.parse(localStorage.getItem("invoices")) || [];
+                purchases = (fetchedPurchases && fetchedPurchases.length > 0) ? fetchedPurchases : JSON.parse(localStorage.getItem("purchases")) || [];
+                items = (fetchedItems && fetchedItems.length > 0) ? fetchedItems : JSON.parse(localStorage.getItem("items")) || [];
             } catch (e) {
                 console.error("API Fetch Error:", e);
                 invoices = JSON.parse(localStorage.getItem("invoices")) || [];
