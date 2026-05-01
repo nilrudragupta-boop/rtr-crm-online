@@ -366,6 +366,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_restaurant_pos', label: 'Restaurant POS' },
     { id: 'perm_restaurant_kds', label: 'Kitchen Display (KDS)' },
     { id: 'perm_invoice_report', label: 'Invoice Report', feature: 'invoice' },
+    { id: 'perm_invoice_analytics', label: 'Invoice Analytics', feature: 'invoice' },
     { id: 'perm_manage_customers', label: 'Manage Customers' }, // Core feature
     { id: 'perm_manage_items', label: 'Manage Items', feature: 'inventory' },
     { id: 'perm_purchase_entries', label: 'Purchase Entries', feature: 'inventory' },
@@ -373,6 +374,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_production_entry', label: 'Production Entries', feature: 'inventory' },
     { id: 'perm_order_sheet', label: 'Order Sheet', feature: 'inventory' },
     { id: 'perm_stock_report', label: 'Stock Report', feature: 'inventory' },
+    { id: 'perm_production_report', label: 'Production Report', feature: 'inventory' },
+    { id: 'perm_production_stock_report', label: 'Production Stock Report', feature: 'inventory' },
     { id: 'perm_profit_loss', label: 'Profit & Loss', feature: 'invoice' },
     { id: 'perm_balance_sheet', label: 'Balance Sheet', feature: 'invoice' },
     { id: 'perm_expense_manager', label: 'Expense Manager', feature: 'invoice' },
