@@ -1091,6 +1091,9 @@
                                 }
                                 const brandElements = document.querySelectorAll('[data-brand="name"]');
                                 brandElements.forEach(el => { if (appSettingsUpdates.companyName) el.innerText = appSettingsUpdates.companyName; });
+                                if (typeof window.BrandService !== 'undefined' && window.BrandService.applyBrand) {
+                                    window.BrandService.applyBrand();
+                                }
                             }
                         }
                         if (cloudStatusEl) {
@@ -1313,6 +1316,26 @@
                             }).catch(console.error);
                         }
                         localStorage.setItem('contactNumber', contactNumber); // Set identifier for future auto-sync
+
+                        // Sync Company Details immediately
+                        if (data.config.company && Object.keys(data.config.company).length > 0) {
+                            const c = data.config.company;
+                            const lowerC = {};
+                            for (let k in c) { lowerC[k.toLowerCase().replace(/[\s_-]/g, '')] = c[k]; }
+                            const appSettingsUpdates = {};
+                            if (lowerC.companyname) appSettingsUpdates.companyName = lowerC.companyname;
+                            if (lowerC.addressline1) appSettingsUpdates.addressLine1 = lowerC.addressline1;
+                            if (lowerC.addressline2) appSettingsUpdates.addressLine2 = lowerC.addressline2;
+                            if (lowerC.contactnumber) appSettingsUpdates.contactNumber = lowerC.contactnumber;
+                            if (lowerC.companyemail || lowerC.email) appSettingsUpdates.companyEmail = lowerC.companyemail || lowerC.email;
+                            if (lowerC.companywebsite || lowerC.website) appSettingsUpdates.companyWebsite = lowerC.companywebsite || lowerC.website;
+                            if (lowerC.companygstin || lowerC.gstin) appSettingsUpdates.companyGstin = lowerC.companygstin || lowerC.gstin;
+                            if (lowerC.sellerstate || lowerC.state) appSettingsUpdates.sellerState = lowerC.sellerstate || lowerC.state;
+                            if (lowerC.district) appSettingsUpdates.district = lowerC.district;
+                            if (lowerC.currency) appSettingsUpdates.currency = lowerC.currency;
+                            
+                            Object.keys(appSettingsUpdates).forEach(k => localStorage.setItem(k, appSettingsUpdates[k]));
+                        }
 
                         if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = originalBtnText; }
                         validateLogin(); // Re-trigger the login process, it will pass this time
