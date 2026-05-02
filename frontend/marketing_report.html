@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>marketing_expenses</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <script src="apiClient.js"></script>
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            padding: 18px
+        }
+
+        h2 {
+            margin-top: 0
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px
+        }
+
+        th {
+            background: #c1f1eb
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            box-sizing: border-box
+        }
+
+        .btn {
+            padding: 6px 10px;
+            margin: 4px;
+            cursor: pointer
+        }
+
+        .toast {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            color: #fff;
+            display: none
+        }
+
+        .header-center {
+            text-align: center;
+            font-weight: bold;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header-sub {
+            text-align: center;
+            margin-top: 2px;
+            font-size: 16px;
+        }
+
+        .pro-table th {
+            background: #3992eb;
+            color: #fff;
+            padding: 8px;
+            border: 1px solid #ccc;
+            font-weight: 600;
+        }
+
+        .pro-table td {
+            padding: 6px;
+            border: 1px solid #ccc;
+        }
+
+        .pro-table input {
+            padding: 4px 6px;
+            border: 1px solid #888;
+            border-radius: 3px;
+            width: 100%;
+        }
+
+        .add-btn {
+            background-color: #f1783f;
+            color: #fff;
+            border: none;
+            padding: 8px 14px;
+            margin-top: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .add-btn:hover {
+            background-color: #0d7e02;
+        }
+
+        .toast {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            padding: 10px 15px;
+            border-radius: 4px;
+            color: #fff;
+            font-weight: 600;
+            display: none;
+            z-index: 999;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            text-align: left;
+            min-width: 300px;
+        }
+
+        /* Dark Mode Support */
+        body.dark-mode {
+            background: #121212;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .modal-content,
+        body.dark-mode #deletePopup>div {
+            background: #2c2c2c !important;
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode input,
+        body.dark-mode select,
+        body.dark-mode textarea {
+            background: #3a3a3a;
+            color: #fff;
+            border: 1px solid #555;
+        }
+
+        body.dark-mode table th,
+        body.dark-mode .pro-table th {
+            background: #333;
+            color: #fff;
+            border-color: #444;
+        }
+
+        body.dark-mode table td {
+            border-color: #444;
+        }
+
+        /* Grey Mode Support */
+        body.grey-mode .btn,
+        body.grey-mode .add-btn {
+            background-color: #6c757d !important;
+            color: #fff !important;
+            border-color: #6c757d !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2 class="header-center"><span data-brand="name"></span> - Marketing Report & Expenses</h2>
+    <h2 class="header-sub">-----------------------</h2>
+
+    <div style="display:flex;gap:18px;align-items:center;margin-bottom:14px">
+        <div style="width:240px">
+            <div style="display:flex; justify-content:space-between; align-items:end;">
+                <label>SR Visit No</label>
+                <span style="font-size:11px; color:#888; margin-bottom: 2px;">Last: <b id="lastVisitNoDisplay"
+                        style="color:#3992eb;">N/A</b></span>
+            </div>
+            <input id="srVisitNo" />
+        </div>
+        <div style="width:240px">
+            <label>Customer Name</label>
+            <input id="customerName" />
+        </div>
+        <div style="width:200px">
+            <label>Visit Date</label>
+            <input id="srVisitDate" type="date" />
+        </div>
+        <div>
+            <button class="btn" id="refreshVisitsBtn">Refresh</button>
+        </div>
+        <div style="margin-left:auto; display:flex; gap:8px;">
+            <button class="btn" style="background:#607d8b; color:#fff; border:none; border-radius:4px;"
+                onclick="openSettingsModal()">⚙️ Settings</button>
+            <button class="btn" id="exportExcelBtn">Export Excel</button>
+            <button class="btn" id="exportPdfBtn">Export PDF</button>
+            <button class="btn" id="saveVisitBtn">Save Visit</button>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+        <input type="date" id="filterStartDate"
+            style="width:130px; padding:6px; border:1px solid #ccc; border-radius:4px;" title="From Date">
+        <span style="font-weight:bold; color:#555;">to</span>
+        <input type="date" id="filterEndDate"
+            style="width:130px; padding:6px; border:1px solid #ccc; border-radius:4px;" title="To Date">
+        <button class="btn" style="padding:6px 12px; background:#4e73df; color:#fff; border:none; border-radius:4px;"
+            onclick="loadVisits()">Filter</button>
+        <div style="border-left: 1px solid #ccc; height:24px; margin: 0 5px;"></div>
+        <input type="text" id="visitSearch" placeholder="🔍 Search Customer or Date..."
+            style="width:100%; max-width:250px; padding:6px; border:1px solid #ccc; border-radius:4px;"
+            oninput="filterVisits()">
+        <select id="visitSelect"
+            style="width:100%; max-width:420px; padding:6px; border:1px solid #ccc; border-radius:4px;">
+            <option value="">-- Select saved visit --</option>
+        </select>
+    </div>
+
+    <table id="expenseTable">
+        <thead>
+            <tr>
+                <th>SL</th>
+                <th>Date</th>
+                <th>Expense Type</th>
+                <th>Mode</th>
+                <th>Amount</th>
+                <th>Remarks</th>
+                <th>Attachments</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <button class="btn add-btn" id="addExpenseBtn">➕ Add New Expense</button>
+
+    <p style="margin-top:8px">Total Expense:
+        <input id="totalExpense" readonly value="0.00" style="width:160px" />
+    </p>
+
+    <div style="margin-top:8px;font-weight:bold;padding:6px;border:1px dashed #444;">
+        Total in words: <span id="totalWords"></span>
+    </div>
+
+    <!-- Contact Table -->
+    <div style="margin-top:20px;">
+        <h3 style="margin-bottom:6px;text-decoration:underline;">Contact Details</h3>
+
+        <table id="contactTable" class="pro-table">
+            <thead>
+                <tr>
+                    <th>SL</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Department</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th>Remarks</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <button class="add-btn" id="addContactBtn">➕ Add Contact</button>
+    </div>
+
+    <!-- Purpose of Visit -->
+    <div style="margin-top:20px;">
+        <h3 style="margin-bottom:6px;text-decoration:underline;">Purpose of Visit</h3>
+        <textarea id="purposeVisit" rows="4" placeholder="Enter Purpose of Visit..."
+            style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
+    </div>
+
+    <!-- Customer Requirement -->
+    <div style="margin-top:20px;">
+        <h3 style="margin-bottom:6px;text-decoration:underline;">Customer Requirement</h3>
+        <textarea id="customerRequirement" rows="4" placeholder="Enter customer requirement..."
+            style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
+    </div>
+
+    <!-- Main Remarks -->
+    <div style="margin-top:20px;">
+        <h3 style="margin-bottom:6px;text-decoration:underline;">Main Remarks</h3>
+        <textarea id="mainRemarks" rows="4" placeholder="Enter any special remarks..."
+            style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="width: 400px; max-width: 90%;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin:0; color: #607d8b;">⚙️ Settings</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeSettingsModal()">&times;</span>
+            </div>
+            <div style="text-align: left; margin-bottom: 15px;">
+                <div style="margin-bottom:15px; display:flex; align-items:center; gap:10px;">
+                    <label style="font-weight:bold; font-size:14px; margin:0;">Theme:</label>
+                    <select id="themeSelect" onchange="changeTheme()"
+                        style="padding:6px; border-radius:4px; border:1px solid #ccc; font-size:13px; width:auto;">
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                        <option value="system">System Default</option>
+                    </select>
+                </div>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:8px; font-weight:bold; font-size:14px;">
+                    <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"
+                        style="width:auto; margin:0;"> Grey Buttons Mode
+                </label>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn"
+                    style="background:#6c757d; color:#fff; border:none; border-radius:4px; padding:6px 16px;"
+                    onclick="closeSettingsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- libs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        /* ================= GLOBAL DATA ================= */
+        const API = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+        let expenseData = [];
+        let contactData = [];
+        let currentVisitId = null;
+        let toastTimer = null;
+        let allVisits = [];
+
+        /* ================= TOAST ================= */
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+
+            if (type === 'error') {
+                t.style.background = '#d40000';     // Red
+            } else if (type === 'warning') {
+                t.style.background = '#ff9800';     // Orange
+            } else {
+                t.style.background = '#4caf50';     // Green
+            }
+
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 5000);
+        }
+
+
+
+        /* ========= NUMBER TO WORDS ========= */
+        function convertToWords(num) {
+            const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven',
+                'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+            const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+            num = Number(num) || 0; if (num === 0) return 'Zero Only';
+            if (num.toString().length > 9) return 'Overflow';
+            let n = ('000000000' + Math.floor(num)).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{3})$/);
+            if (!n) return '';
+            let str = ''; str += (n[1] != 0) ? ((a[+n[1]] || (b[n[1][0]] + " " + a[n[1][1]])) + " Crore ") : "";
+            str += (n[2] != 0) ? ((a[+n[2]] || (b[n[2][0]] + " " + a[n[2][1]])) + " Lakh ") : "";
+            str += (n[3] != 0) ? ((a[+n[3]] || (b[n[3][0]] + " " + a[n[3][1]])) + " Thousand ") : "";
+            str += (n[4][0] != 0) ? (a[n[4][0]] + " Hundred ") : "";
+            let lastTwo = +n[4].substr(1);
+            if (lastTwo > 0) { str += (str !== "" ? "and " : ""); str += (a[lastTwo] || (b[n[4][1]] + " " + a[n[4][2]])); }
+            return str.trim() + " Only";
+        }
+
+
+
+        /* ================= EXPENSE TABLE ================= */
+        function addExpenseRow() {
+            expenseData.push({ date: '', expense_type: '', mode: '', amount: 0, remarks: '', attachments: [] });
+            renderExpenseTable();
+            showToast('New expense row added');
+        }
+        function updateExpenseRow(i, field, value) {
+            if (!expenseData[i]) return;
+            if (field === 'amount') {
+                const num = parseFloat(value);
+                expenseData[i][field] = isNaN(num) ? 0 : num;
+            } else {
+                expenseData[i][field] = value;
+            }
+            recalcTotal();
+        }
+        function deleteExpenseRow(i) {
+            if (!expenseData[i]) return;
+            if (!confirm('Delete this expense row?')) return;
+            expenseData.splice(i, 1);
+            renderExpenseTable();
+            showToast('Expense row deleted', 'error');  // RED TOAST
+        }
+        function handleExpenseAttachments(i, input) {
+            const files = Array.from(input.files || []);
+            if (!expenseData[i]) return;
+            if (!expenseData[i].attachments) expenseData[i].attachments = [];
+            files.forEach(f => {
+                const objUrl = URL.createObjectURL(f);
+                expenseData[i].attachments.push({ name: f.name, file: f, url: objUrl, isObjectUrl: true });
+            });
+            renderExpenseTable();
+        }
+        function renderExpenseTable() {
+            const tbody = document.querySelector('#expenseTable tbody');
+            tbody.innerHTML = '';
+
+            expenseData.forEach((row, i) => {
+                const tr = document.createElement('tr');
+
+                /* SL */
+                tr.appendChild(document.createElement('td')).innerText = i + 1;
+
+                /* Date */
+                const tdDate = document.createElement('td');
+                tdDate.innerHTML = `<input type="date" value="${row.date || ''}" onchange="updateExpenseRow(${i}, 'date', this.value)">`;
+                tr.appendChild(tdDate);
+
+                /* Expense Type Dropdown */
+                const tdType = document.createElement('td');
+                const selType = document.createElement('select');
+                ['', 'Travel', 'Local Transport', 'Hotel', 'Fooding', 'Lodging'].forEach(optText => {
+                    const o = document.createElement('option');
+                    o.value = optText;
+                    o.textContent = optText || 'Select';
+                    if (optText === row.expense_type) o.selected = true;
+                    selType.appendChild(o);
+                });
+                selType.addEventListener('change', (e) => updateExpenseRow(i, 'expense_type', e.target.value));
+                tdType.appendChild(selType);
+                tr.appendChild(tdType);
+
+                /* Mode Dropdown */
+                const tdMode = document.createElement('td');
+                const selMode = document.createElement('select');
+                ['', 'Breakfast', 'Lunch', 'Dinner', 'Tiffin', 'Hotel', 'Train', 'Bus', 'Auto', 'Toto', 'Cab', 'Own Vehicle']
+                    .forEach(optText => {
+                        const o = document.createElement('option');
+                        o.value = optText;
+                        o.textContent = optText || 'Select';
+                        if (optText === row.mode) o.selected = true;
+                        selMode.appendChild(o);
+                    });
+                selMode.addEventListener('change', (e) => updateExpenseRow(i, 'mode', e.target.value));
+                tdMode.appendChild(selMode);
+                tr.appendChild(tdMode);
+
+                /* Amount */
+                const tdAmt = document.createElement('td');
+                tdAmt.innerHTML = `<input type="number" value="${row.amount || 0}" onchange="updateExpenseRow(${i}, 'amount', this.value)">`;
+                tr.appendChild(tdAmt);
+
+                /* Remarks */
+                const tdRem = document.createElement('td');
+                tdRem.innerHTML = `<input type="text" value="${row.remarks || ''}" onchange="updateExpenseRow(${i}, 'remarks', this.value)">`;
+                tr.appendChild(tdRem);
+
+                /* Attachments */
+                /* Attachments */
+                const tdFile = document.createElement("td");
+
+                let html = `<input type="file" multiple onchange="handleExpenseAttachments(${i}, this)">`;
+
+                if (row.attachments && row.attachments.length > 0) {
+                    html += `<div style="margin-top:4px;">`;
+                    row.attachments.forEach(a => {
+                        if (!a.isObjectUrl) {
+                            html += `<a href="${a.url}" target="_blank" style="display:block;color:blue;">${a.name}</a>`;
+                        }
+                    });
+                    html += `</div>`;
+                }
+
+                tdFile.innerHTML = html;
+                tr.appendChild(tdFile);
+
+
+                /* Delete Button */
+                const tdDel = document.createElement('td');
+                tdDel.innerHTML = `<button class="btn" style="background:#b30000;color:#fff;" onclick="deleteExpenseRow(${i})">Delete</button>`;
+                tr.appendChild(tdDel);
+
+                tbody.appendChild(tr);
+            });
+
+            recalcTotal();
+        }
+
+
+
+        loadVisits();
+
+
+
+
+        /* ================= TOTAL ================= */
+        function recalcTotal() {
+            const total = expenseData.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+            document.getElementById('totalExpense').value = total.toFixed(2);
+            document.getElementById("totalWords").innerText = convertToWords(Math.round(total));
+        }
+
+        /* ================= CONTACT TABLE ================= */
+        function renderContactTable() {
+            const tbody = document.querySelector('#contactTable tbody');
+            tbody.innerHTML = "";
+            contactData.forEach((c, i) => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td><input type="text" value="${c.name || ''}" onchange="contactData[${i}].name=this.value"></td>
+      <td><input type="text" value="${c.designation || ''}" onchange="contactData[${i}].designation=this.value"></td>
+      <td><input type="text" value="${c.department || ''}" onchange="contactData[${i}].department=this.value"></td>
+      <td><input type="text" value="${c.mobile || ''}" onchange="contactData[${i}].mobile=this.value"></td>
+      <td><input type="text" value="${c.email || ''}" onchange="contactData[${i}].email=this.value"></td>
+      <td><input type="text" value="${c.remarks || ''}" onchange="contactData[${i}].remarks=this.value"></td>
+      <td><button class='btn' style="background:#b30000;color:#fff;" onclick="deleteContact(${i})">Delete</button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        function addContact() {
+            contactData.push({ name: "", designation: "", department: "", mobile: "", email: "", remarks: "" });
+            renderContactTable();
+            showToast('New Contact row added');
+        }
+        function deleteContact(i) {
+            if (!confirm("Delete this contact?")) return;
+            contactData.splice(i, 1);
+            renderContactTable();
+            showToast('Contact row deleted', 'error');  // RED TOAST
+        }
+        document.getElementById("addContactBtn").addEventListener("click", addContact);
+        renderContactTable();
+
+
+
+        /* ================= SAVE LOAD BACKEND ================= */
+        async function saveVisit() {
+            const visitNo = document.getElementById("srVisitNo").value.trim();
+            const visitDate = document.getElementById("srVisitDate").value;
+            const customerName = document.getElementById("customerName").value.trim();
+
+            if (!visitNo || !visitDate || !customerName) {
+                showToast("Visit No, Date & Customer Name are required", "warning");
+                return;
+            }
+
+            const payload = {
+                id: currentVisitId || 'visit_' + Date.now(),
+                visitNo: visitNo,
+                visitDate: visitDate,
+                customerName: customerName,
+                mainRemarks: document.getElementById("mainRemarks").value,
+                purposeVisit: document.getElementById("purposeVisit").value,
+                customerRequirement: document.getElementById("customerRequirement").value,
+                contacts: contactData,
+                expenses: (expenseData || []).map(r => ({
+                    date: r.date || '',
+                    expense_type: r.expense_type || '',
+                    mode: r.mode || '',
+                    amount: r.amount || 0,
+                    remarks: r.remarks || '',
+                    attachments: (r.attachments || []).map(a => ({ name: a.name, originalName: a.name }))
+                }))
+            };
+
+            try {
+                let visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+                const existingIdx = visits.findIndex(v => v.id === payload.id);
+                if (existingIdx > -1) {
+                    visits[existingIdx] = payload;
+                } else {
+                    visits.push(payload);
+                }
+                localStorage.setItem('marketing_visits', JSON.stringify(visits));
+
+                // --- Sync with Backend ---
+                if (typeof apiClient !== 'undefined' && apiClient.saveMarketingVisit) {
+                    apiClient.saveMarketingVisit(payload).catch(err => console.warn("Backend sync failed:", err));
+                }
+
+                // --- Link to Main Expense Tracker ---
+                let totalMarketingExpense = 0;
+                payload.expenses.forEach(e => totalMarketingExpense += parseFloat(e.amount) || 0);
+
+                let expensesList = JSON.parse(localStorage.getItem('expenses')) || [];
+                const expenseId = 'exp_mkt_' + payload.id;
+                const existingExpIdx = expensesList.findIndex(e => e.expense_id === expenseId);
+
+                if (totalMarketingExpense > 0) {
+                    const expEntry = {
+                        expense_id: expenseId,
+                        expense_date: payload.visitDate,
+                        expense_category: "Marketing",
+                        expense_sub_category: "Marketing Visit",
+                        vendor_name: payload.customerName,
+                        payment_mode: "Cash",
+                        accountId: "",
+                        invoice_number: payload.visitNo,
+                        debit_amount: totalMarketingExpense,
+                        gst_amount: 0,
+                        total_amount: totalMarketingExpense,
+                        remarks: `Auto-generated from Marketing Visit No: ${payload.visitNo}`,
+                        created_at: new Date().toISOString()
+                    };
+
+                    if (existingExpIdx > -1) {
+                        expensesList[existingExpIdx] = expEntry;
+                    } else {
+                        expensesList.push(expEntry);
+                    }
+                    localStorage.setItem('expenses', JSON.stringify(expensesList));
+
+                    if (typeof apiClient !== 'undefined' && apiClient.saveExpense) {
+                        apiClient.saveExpense(expEntry).catch(e => console.warn("Backend expense sync failed:", e));
+                    }
+                } else if (existingExpIdx > -1) {
+                    // If total is 0 but an entry exists, delete it
+                    expensesList.splice(existingExpIdx, 1);
+                    localStorage.setItem('expenses', JSON.stringify(expensesList));
+                    if (typeof apiClient !== 'undefined' && apiClient.deleteExpense) {
+                        apiClient.deleteExpense(expenseId).catch(e => console.warn("Backend expense delete failed:", e));
+                    }
+                }
+
+                currentVisitId = payload.id;
+                showToast("Visit Saved Successfully");
+                loadVisits();
+            } catch (err) {
+                console.error(err);
+                showToast("Failed to save visit", "error");
+            }
+        }
+
+
+
+        /* ================= LOAD SAVED VISITS INTO DROPDOWN ================= */
+        async function loadVisits() {
+            try {
+                const sDate = document.getElementById('filterStartDate') ? document.getElementById('filterStartDate').value : null;
+                const eDate = document.getElementById('filterEndDate') ? document.getElementById('filterEndDate').value : null;
+
+                // --- Fetch from Backend first ---
+                if (typeof apiClient !== 'undefined' && apiClient.getMarketingVisits) {
+                    try {
+                        const remoteVisits = await apiClient.getMarketingVisits(sDate, eDate);
+                        if (remoteVisits) {
+                            allVisits = remoteVisits;
+                            // Only update entire local storage cache if no date filter is active
+                            if (!sDate && !eDate && remoteVisits.length > 0) {
+                                localStorage.setItem('marketing_visits', JSON.stringify(remoteVisits));
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Could not fetch remote visits. Using local data.", e);
+                        allVisits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+                    }
+                } else {
+                    allVisits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+                }
+
+                // If working purely offline or falling back, apply local filtering to allVisits
+                if (sDate || eDate) {
+                    allVisits = allVisits.filter(v => {
+                        let match = true;
+                        if (sDate && v.visitDate < sDate) match = false;
+                        if (eDate && v.visitDate > eDate) match = false;
+                        return match;
+                    });
+                }
+
+                filterVisits();
+                updateLastVisitNoDisplay();
+                showToast("Visits loaded successfully");
+            }
+            catch (err) {
+                console.error(err);
+                showToast("Failed to load visits", "error");
+            }
+        }
+
+        function renderVisitDropdown(visitsArray) {
+            const sel = document.getElementById("visitSelect");
+            const currentVal = sel.value;
+            sel.innerHTML = `<option value="">-- Select saved visit --</option>`;
+            visitsArray.forEach(v => {
+                const opt = document.createElement("option");
+                opt.value = v.id;
+                opt.textContent = `${v.visitNo} — ${v.customerName} (${v.visitDate})`;
+                if (v.id === currentVal) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        function filterVisits() {
+            const term = document.getElementById("visitSearch") ? document.getElementById("visitSearch").value.toLowerCase() : "";
+            if (!term) {
+                renderVisitDropdown(allVisits);
+                return;
+            }
+            const filtered = allVisits.filter(v =>
+                (v.customerName || "").toLowerCase().includes(term) ||
+                (v.visitDate || "").toLowerCase().includes(term) ||
+                (v.visitNo || "").toLowerCase().includes(term)
+            );
+            renderVisitDropdown(filtered);
+        }
+
+        function updateLastVisitNoDisplay() {
+            const displayEl = document.getElementById('lastVisitNoDisplay');
+            if (!displayEl) return;
+
+            const rawVisits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+            if (rawVisits.length > 0) {
+                // Sort by ID descending to get the newest (IDs are typically 'visit_' + timestamp)
+                rawVisits.sort((a, b) => {
+                    const timeA = parseInt((a.id || "").replace("visit_", "")) || 0;
+                    const timeB = parseInt((b.id || "").replace("visit_", "")) || 0;
+                    return timeB - timeA;
+                });
+                displayEl.innerText = rawVisits[0].visitNo || 'N/A';
+            } else {
+                displayEl.innerText = 'N/A';
+            }
+        }
+
+        /* ================= LOAD A SPECIFIC VISIT ================= */
+        async function loadVisitById(id) {
+            if (!id) {
+                currentVisitId = null;
+                return;
+            }
+
+            try {
+                const visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+                const v = visits.find(visit => visit.id === id);
+
+                if (!v || !v.visitNo) {
+                    showToast("Visit not found", "warning");
+                    currentVisitId = null;
+                    return;
+                }
+
+                // Store current visit ID for updates
+                currentVisitId = v.id;
+
+                // Set main fields
+                document.getElementById("srVisitNo").value = v.visitNo;
+                document.getElementById("customerName").value = v.customerName;
+                document.getElementById("srVisitDate").value = v.visitDate;
+                document.getElementById("mainRemarks").value = v.mainRemarks || "";
+                document.getElementById("purposeVisit").value = v.purposeVisit || "";
+                document.getElementById("customerRequirement").value = v.customerRequirement || "";
+
+                // Load contacts
+                contactData = v.contacts || [];
+                renderContactTable();
+
+                // Load expenses + attachments
+                expenseData = (v.expenses || []).map(row => ({
+                    date: row.date,
+                    expense_type: row.expense_type,
+                    mode: row.mode,
+                    amount: row.amount,
+                    remarks: row.remarks,
+                    attachments: (row.attachments || []).map(a => ({
+                        name: a.originalName,
+                        file: null,
+                        url: "",
+                        isObjectUrl: false
+                    }))
+                }));
+
+                renderExpenseTable();
+
+                showToast("Visit loaded successfully");
+            }
+            catch (err) {
+                console.error(err);
+                showToast("Error loading visit", "error");
+            }
+        }
+
+
+
+
+        // When user selects a visit
+        document.getElementById("visitSelect").addEventListener("change", function () {
+            const visitId = this.value;
+
+            // Check if there is existing data in the form to prevent accidental loss
+            const hasData = document.getElementById("srVisitNo").value.trim() !== "" ||
+                document.getElementById("customerName").value.trim() !== "" ||
+                expenseData.length > 0 ||
+                contactData.length > 0;
+
+            if (hasData) {
+                if (!confirm("Current form data will be replaced. Any unsaved changes will be lost. Proceed?")) {
+                    this.value = currentVisitId || "";
+                    return;
+                }
+            }
+
+            if (!visitId) {
+                // Reset form for new visit
+                currentVisitId = null;
+                document.getElementById("srVisitNo").value = "";
+                document.getElementById("customerName").value = "";
+                document.getElementById("srVisitDate").value = "";
+                document.getElementById("mainRemarks").value = "";
+                document.getElementById("purposeVisit").value = "";
+                document.getElementById("customerRequirement").value = "";
+                expenseData = [];
+                contactData = [];
+                renderExpenseTable();
+                renderContactTable();
+                showToast("Form cleared for new visit");
+            } else {
+                loadVisitById(visitId);
+            }
+        });
+
+
+
+
+        /* ========= PDF EXPORT ========= */
+        function exportToPDF() {
+            if (!window.jspdf) return showToast('jsPDF not loaded', 'warning');
+            const { jsPDF } = window.jspdf; const doc = new jsPDF("p", "mm", "a4");
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            const visitNo = document.getElementById('srVisitNo').value.trim();
+            const visitDate = document.getElementById('srVisitDate').value;
+            const customerName = document.getElementById('customerName').value.trim();
+            if (!visitNo || !visitDate) return showToast('Visit No, Customer Name & Date Required', 'warning');
+
+            const totalWords = document.getElementById('totalWords').innerText;
+
+            let companyName = "Company Name";
+            if (window.BrandService) {
+                companyName = window.BrandService.getBrand().name || companyName;
+            } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
+                companyName = APP_SETTINGS.COMPANY_NAME;
+            }
+
+            /* Header */
+            doc.setFont('helvetica', 'bold').setFontSize(14);
+            doc.text(companyName, pageWidth / 2, 14, { align: "center" });
+            doc.setFontSize(11);
+            doc.text(`Marketing Report & Expenses No. - ${visitNo}`, pageWidth / 2, 20, { align: "center" });
+            doc.text(`Customer Name - ${customerName}`, pageWidth / 2, 26, { align: "center" });
+            const d = new Date(visitDate);
+            doc.text(`Visit Date: ${("0" + d.getDate()).slice(-2)}-${("0" + (d.getMonth() + 1)).slice(-2)}-${d.getFullYear()}`, pageWidth / 2, 32, { align: "center" });
+
+            /* Table */
+            const expRows = expenseData.map((r, i) => [i + 1, r.date, r.expense_type, r.mode, r.amount, r.remarks, '']);
+            expRows.push(['', '', '', 'Total', document.getElementById('totalExpense').value, '', '']);
+            doc.autoTable({
+                head: [['SL', 'Date', 'Type', 'Mode', 'Amount', 'Remarks', 'Attachments']],
+                body: expRows, startY: 38, styles: { fontSize: 9 }
+            });
+
+            let y = doc.lastAutoTable.finalY + 10;
+            doc.setFont("helvetica", "bold");
+            doc.text("Total (in words): ", 14, y);
+            doc.setFont("helvetica", "normal");
+            doc.text(totalWords, 50, y);
+
+            /* Contacts */
+            y += 10; doc.setFont("helvetica", "bold");
+            doc.text("Contact Details:", 14, y);
+            const contactRows = contactData.map((c, i) => [i + 1, c.name, c.designation, c.department, c.mobile, c.email, c.remarks]);
+            doc.autoTable({
+                head: [['SL', 'Name', 'Designation', 'Department', 'Mobile', 'Email', 'Remarks']],
+                body: contactRows, startY: y + 4, styles: { fontSize: 9 }
+            });
+
+            /* Purpose of Visit */
+            y = doc.lastAutoTable.finalY + 10;
+            doc.setFont("helvetica", "bold");
+            doc.text("Purpose of Visit:", 14, y);
+            let pv = document.getElementById('purposeVisit').value.trim() || "No data";
+            doc.autoTable({ startY: y + 5, body: [{ pv }], theme: "grid", styles: { fontSize: 10, cellPadding: 4, halign: "left" }, columnStyles: { pv: { cellWidth: "auto" } } });
+
+            /* Requirement */
+            y = doc.lastAutoTable.finalY + 10;
+            doc.setFont("helvetica", "bold");
+            doc.text("Customer Requirement:", 14, y);
+            let cr = document.getElementById('customerRequirement').value.trim() || "No data";
+            doc.autoTable({ startY: y + 5, body: [{ cr }], theme: "grid", styles: { fontSize: 10, cellPadding: 4 }, columnStyles: { cr: { cellWidth: "auto" } } });
+
+            /* Remarks */
+            y = doc.lastAutoTable.finalY + 10;
+            doc.setFont("helvetica", "bold");
+            doc.text("Main Remarks:", 14, y);
+            let mr = document.getElementById('mainRemarks').value.trim() || "No remarks";
+            doc.autoTable({ startY: y + 5, body: [{ mr }], theme: "grid", styles: { fontSize: 10, cellPadding: 4 }, columnStyles: { mr: { cellWidth: "auto" } } });
+
+            doc.save(`${visitNo}_Expenses.pdf`);
+        }
+
+        /* ================= INIT ================= */
+        document.getElementById('addExpenseBtn').addEventListener('click', addExpenseRow);
+        document.getElementById('exportExcelBtn').addEventListener('click', () => showToast("Excel Export Coming Soon"));
+        document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
+        document.getElementById('saveVisitBtn').addEventListener('click', saveVisit);
+        document.getElementById('refreshVisitsBtn').addEventListener('click', () => {
+            if (document.getElementById('filterStartDate')) document.getElementById('filterStartDate').value = '';
+            if (document.getElementById('filterEndDate')) document.getElementById('filterEndDate').value = '';
+            if (document.getElementById('visitSearch')) document.getElementById('visitSearch').value = '';
+            loadVisits();
+            showToast("Refreshing...");
+        });
+        renderExpenseTable();
+
+        /* ================= SETTINGS / THEME LOGIC ================= */
+        let currentTheme = localStorage.getItem("appThemeMode") || "system";
+        let isGreyButtons = localStorage.getItem("marketingGreyButtons") === "true";
+
+        function openSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'flex';
+            document.getElementById('themeSelect').value = currentTheme;
+            document.getElementById('greyButtonsToggle').checked = isGreyButtons;
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function changeTheme() {
+            currentTheme = document.getElementById("themeSelect").value;
+            localStorage.setItem("appThemeMode", currentTheme);
+            applyTheme();
+        }
+
+        function applyTheme() {
+            const isDark = currentTheme === "dark" || (currentTheme === "system" && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (isDark) document.body.classList.add("dark-mode");
+            else document.body.classList.remove("dark-mode");
+        }
+
+        function toggleGreyButtons() {
+            isGreyButtons = document.getElementById("greyButtonsToggle").checked;
+            localStorage.setItem("marketingGreyButtons", isGreyButtons);
+            applyGreyButtons();
+        }
+
+        function applyGreyButtons() {
+            if (isGreyButtons) document.body.classList.add("grey-mode");
+            else document.body.classList.remove("grey-mode");
+        }
+
+        // Initialize themes
+        applyTheme();
+        applyGreyButtons();
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            if (currentTheme === "system") applyTheme();
+        });
+
+        function closeDeletePopup() {
+            document.getElementById('deletePopup').style.display = 'none';
+        }
+    </script>
+
+
+
+
+    <div id="deletePopup" style="
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center;
+  z-index:9999;">
+
+        <div style="background:#fff; padding:20px; border-radius:8px; width:300px; font-family:Arial;">
+            <h3 style="margin-top:0; font-size:18px; color:#b30000;">Delete Confirmation</h3>
+            <p id="deleteMsg" style="font-size:14px; margin-bottom:20px;">
+                Are you sure you want to delete this item?
+            </p>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button style="padding:6px 12px; background:#ccc;" onclick="closeDeletePopup()">No</button>
+                <button style="padding:6px 12px; background:#b30000; color:#fff;" id="yesDeleteBtn">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

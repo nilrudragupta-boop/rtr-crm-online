@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Contacts Directory</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            margin-bottom: 15px;
+        }
+
+        input,
+        button {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+
+        button {
+            cursor: pointer;
+            color: white;
+            border: none;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background: #0d6efd;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: #000;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        th {
+            background: #2c3e50;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #f1f3f5;
+        }
+
+        .highlight {
+            background-color: #fff176;
+            font-weight: bold;
+            color: #000;
+        }
+
+        /* Pagination Styles */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .pagination {
+            display: flex;
+            gap: 5px;
+        }
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #333;
+        }
+        .pagination button.active {
+            background: #0d6efd;
+            color: #fff;
+            border-color: #0d6efd;
+        }
+        .pagination button:disabled {
+            background: #e9ecef;
+            cursor: not-allowed;
+            color: #999;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .close-modal {
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+            color: #aaa;
+            line-height: 1;
+        }
+
+        .close-modal:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Dark Mode Support */
+        body.dark-mode {
+            background: #121212;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .controls,
+        body.dark-mode table,
+        body.dark-mode .modal-content {
+            background: #2c2c2c;
+            color: #e0e0e0;
+            border-color: #444;
+        }
+
+        body.dark-mode th {
+            background: #1f1f1f;
+        }
+
+        body.dark-mode td {
+            border-bottom-color: #444;
+        }
+
+        body.dark-mode tr:hover {
+            background: #3a3a3a;
+        }
+
+        body.dark-mode input,
+        body.dark-mode select {
+            background: #3a3a3a;
+            color: #fff;
+            border-color: #555;
+        }
+        body.dark-mode .pagination-container {
+            background: #2c2c2c;
+            border-color: #444;
+        }
+        body.dark-mode .pagination button {
+            background: #3a3a3a;
+            color: #fff;
+            border-color: #555;
+        }
+        body.dark-mode .pagination button.active {
+            background: #0d6efd;
+            color: #fff;
+            border-color: #0d6efd;
+        }
+        body.dark-mode .pagination button:disabled {
+            background: #222;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h2><i class="fas fa-address-book"></i> Contacts Directory</h2>
+        <div>
+            <button class="btn-primary" onclick="openContactModal()"><i class="fas fa-plus"></i> New Contact</button>
+            <button class="btn-warning" onclick="exportContactsPDF()"><i class="fas fa-file-pdf"></i> Export
+                PDF</button>
+            <button class="btn-success" onclick="exportContactsCSV()"><i class="fas fa-file-csv"></i> Export
+                CSV</button>
+            <button class="btn-info" onclick="document.getElementById('importCsvInput').click()"><i
+                    class="fas fa-file-import"></i> Import CSV</button>
+            <input type="file" id="importCsvInput" accept=".csv" style="display:none"
+                onchange="importContactsCSV(this)">
+            <button class="btn-secondary" onclick="fetchContacts()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <select id="filterTypeBox" onchange="handleSearchInput()" style="min-width: 150px; cursor: pointer;">
+            <option value="">All Types</option>
+            <option value="Customer">Customers</option>
+            <option value="Supplier">Suppliers</option>
+            <option value="Employee">Employees</option>
+            <option value="Internal">Internal</option>
+            <option value="Other">Other</option>
+        </select>
+        <div style="flex: 1; position: relative;">
+            <i class="fas fa-search"
+                style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #888;"></i>
+            <input type="text" id="searchBox" placeholder="Search any field (Name, Dept, Mobile, Remarks)..."
+                style="width: 100%; padding-left: 35px; box-sizing: border-box;" oninput="handleSearchInput()">
+        </div>
+    </div>
+
+    <div
+        style="overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-height: 70vh;">
+        <table id="contactsTable">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">SL</th>
+                    <th>Name</th>
+                    <th>Company</th>
+                    <th>Type</th>
+                    <th>Designation</th>
+                    <th>Department</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th>Remarks</th>
+                    <th style="width: 180px; text-align: center;">Action</th>
+                </tr>
+            </thead>
+            <tbody id="contactsBody">
+                <tr>
+                    <td colspan="10" style="text-align: center; padding: 20px;">Loading contacts...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="pagination-container">
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <span id="totalContactsDisplay" style="font-weight: bold; color: #0d6efd; margin-right: 8px;"></span>
+            <select id="rowsPerPageSelect" onchange="changeRowsPerPage()"
+                style="width: auto; padding: 4px; border: 1px solid #ccc; border-radius: 4px; margin: 0;">
+                <option value="10">10 rows</option>
+                <option value="20" selected>20 rows</option>
+                <option value="50">50 rows</option>
+            </select>
+            <input type="number" id="goToPageInput"
+                style="width: 60px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Go to"
+                min="1" onchange="goToPage()">
+        </div>
+        <div id="paginationInfo" style="color: #666; font-size: 14px;"></div>
+        <div class="pagination" id="paginationControls"></div>
+    </div>
+
+    <!-- Add/Edit Contact Modal -->
+    <div id="contactModal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #2c3e50;" id="modalTitle">Add Contact</h3>
+                <span class="close-modal" onclick="closeContactModal()">&times;</span>
+            </div>
+            <input type="hidden" id="contactId">
+
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="width: 100px;">
+                    <label>Prefix</label>
+                    <select id="cPrefix"
+                        style="width: 100%; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                        <option value="">None</option>
+                        <option value="Mr.">Mr.</option>
+                        <option value="Mrs.">Mrs.</option>
+                        <option value="Ms.">Ms.</option>
+                        <option value="Dr.">Dr.</option>
+                        <option value="Prof.">Prof.</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Name *</label>
+                    <input type="text" id="cName" placeholder="Full Name" list="nameList">
+                    <datalist id="nameList"></datalist>
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Company</label>
+                    <input type="text" id="cCompany" placeholder="e.g. Acme Corp" list="companyList">
+                    <datalist id="companyList"></datalist>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Type</label>
+                    <select id="cContactType"
+                        style="width: 100%; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                        <option value="">Select...</option>
+                        <option value="Customer">Customer</option>
+                        <option value="Supplier">Supplier</option>
+                        <option value="Internal">Internal</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Designation</label>
+                    <input type="text" id="cDesignation" placeholder="e.g. Manager">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Department</label>
+                    <input type="text" id="cDepartment" placeholder="e.g. Sales">
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Mobile(s)</label>
+                    <input type="text" id="cMobile" placeholder="Comma separated for multiple">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Email</label>
+                    <input type="email" id="cEmail" placeholder="Email Address">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Remarks</label>
+                <input type="text" id="cRemarks" placeholder="Additional Notes">
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn-secondary" onclick="closeContactModal()">Cancel</button>
+                <button class="btn-success" onclick="saveContact()">Save Contact</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Attachments Modal -->
+    <div id="attachmentsModal" class="modal" style="z-index: 1050;">
+        <div class="modal-content" style="width: 500px; max-width: 90%;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin:0; color: #2c3e50;">📎 Attachments for <span id="attachContactName"
+                        style="color: #0d6efd;"></span></h3>
+                <span class="close-modal" onclick="closeAttachmentsModal()">&times;</span>
+            </div>
+            <input type="hidden" id="manageAttachId">
+            <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                <label style="font-size: 13px; font-weight: bold; color: #555;">Add Files (Max 500KB each)</label>
+                <input type="file" id="attachmentsInput" multiple onchange="handleAttachmentsSelect(this)"
+                    accept="image/*,.pdf"
+                    style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box;">
+
+                <div id="attachmentPreviews"
+                    style="display: flex; gap: 10px; flex-wrap: wrap; max-height: 250px; overflow-y: auto; padding: 10px; border: 1px solid #eee; border-radius: 4px; background: #f9f9f9; margin-top: 10px;">
+                    <!-- Previews injected here -->
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn-primary" onclick="saveAttachments()">💾 Save Attachments</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attachment Preview/Download Modal -->
+    <div id="filePreviewModal" class="modal" style="z-index: 1100;">
+        <div class="modal-content" style="max-width: 800px; width: 90%; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; color: #0d6efd;" id="previewFileName">File Preview</h3>
+                <span class="close-modal"
+                    onclick="document.getElementById('filePreviewModal').style.display='none'">&times;</span>
+            </div>
+            <div id="previewFileContent"
+                style="flex: 1; overflow: auto; text-align: center; background: #eee; border-radius: 4px; padding: 10px; min-height: 200px;">
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="btn-primary" id="downloadFileBtn"><i class="fas fa-download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MODULE_NAME = "Contacts";
+        let contactsData = [];
+        let currentAttachments = [];
+        let currentPage = 1;
+        let rowsPerPage = 20;
+
+        // Init Theme
+        if (localStorage.getItem("appThemeMode") === "dark") {
+            document.body.classList.add("dark-mode");
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchContacts();
+            populateCompanyList();
+            populateNameList();
+        });
+
+        // --- API & Data Handling ---
+        async function fetchContacts() {
+            try {
+                const res = await fetch(`/api/custom-records/${MODULE_NAME}`);
+                const json = await res.json();
+                if (json.success) {
+                    contactsData = json.data;
+                    localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                } else {
+                    throw new Error("Failed to fetch");
+                }
+            } catch (e) {
+                console.warn("API offline, loading from local storage.");
+                contactsData = JSON.parse(localStorage.getItem(`CUSTOM_RECORDS_${MODULE_NAME}`)) || [];
+            }
+            applySearch(); // Renders table
+        }
+
+        async function saveContact() {
+            const id = document.getElementById('contactId').value;
+            const name = document.getElementById('cName').value.trim();
+
+            if (!name) return alert("Name is required!");
+
+            const payload = {
+                moduleName: MODULE_NAME,
+                prefix: document.getElementById('cPrefix').value,
+                name: name,
+                company: document.getElementById('cCompany').value.trim(),
+                contactType: document.getElementById('cContactType').value,
+                designation: document.getElementById('cDesignation').value.trim(),
+                department: document.getElementById('cDepartment').value.trim(),
+                mobile: document.getElementById('cMobile').value.trim(),
+                email: document.getElementById('cEmail').value.trim(),
+                remarks: document.getElementById('cRemarks').value.trim(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (id) {
+                payload._id = id;
+                // Retain existing attachments if editing main data
+                const existing = contactsData.find(c => c._id === id);
+                if (existing && existing.attachments) {
+                    payload.attachments = existing.attachments;
+                }
+            } else {
+                payload._id = 'cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                payload.attachments = [];
+                payload.createdAt = new Date().toISOString();
+            }
+
+            try {
+                const res = await fetch(`/api/custom-records`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const json = await res.json();
+                if (json.success) {
+                    if (json.data && json.data._id) payload._id = json.data._id;
+                }
+            } catch (e) {
+                console.warn("Saved locally (API Offline)");
+            }
+
+            // Local update
+            const idx = contactsData.findIndex(c => c._id === payload._id);
+            if (idx > -1) contactsData[idx] = payload;
+            else contactsData.push(payload);
+
+            localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+
+            closeContactModal();
+            applySearch();
+        }
+
+        async function deleteContact(id) {
+            if (!confirm("Are you sure you want to delete this contact?")) return;
+
+            try {
+                await fetch(`/api/custom-records/${id}`, { method: 'DELETE' });
+            } catch (e) {
+                console.warn("Deleted locally (API Offline)");
+            }
+
+            contactsData = contactsData.filter(c => c._id !== id);
+            localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+            applySearch();
+        }
+
+        function populateCompanyList() {
+            const customers = JSON.parse(localStorage.getItem('customers')) || [];
+            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            const list = document.getElementById('companyList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const companies = new Set();
+            customers.forEach(c => { if (c.name) companies.add(c.name); });
+            suppliers.forEach(s => { if (s.name) companies.add(s.name); });
+
+            Array.from(companies).sort().forEach(company => {
+                const opt = document.createElement('option');
+                opt.value = company;
+                list.appendChild(opt);
+            });
+        }
+
+        function populateNameList() {
+            const customers = JSON.parse(localStorage.getItem('customers')) || [];
+            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            const list = document.getElementById('nameList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const names = new Set();
+            customers.forEach(c => { if (c.name) names.add(c.name); });
+            suppliers.forEach(s => { if (s.name) names.add(s.name); });
+
+            Array.from(names).sort().forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                list.appendChild(opt);
+            });
+        }
+
+        // --- Export / Import CSV ---
+        function exportContactsCSV() {
+            if (contactsData.length === 0) return alert("No contacts to export.");
+
+            const headers = ["Prefix", "Name", "Company", "Type", "Designation", "Department", "Mobile", "Email", "Remarks"];
+            const rows = contactsData.map(c => {
+                const escape = (t) => `"${String(t || "").replace(/"/g, '""')}"`;
+                return [
+                    escape(c.prefix),
+                    escape(c.name),
+                    escape(c.company),
+                    escape(c.contactType),
+                    escape(c.designation),
+                    escape(c.department),
+                    escape(c.mobile),
+                    escape(c.email),
+                    escape(c.remarks)
+                ].join(",");
+            });
+
+            const csvContent = [headers.join(",")].concat(rows).join("\n");
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "Contacts_Export.csv";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function importContactsCSV(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const text = e.target.result;
+                    const rows = parseCSV(text);
+                    if (rows.length < 2) throw new Error("Invalid CSV format (no data)");
+
+                    const headers = rows[0].map(h => h.trim().toLowerCase());
+                    const prefixIdx = headers.indexOf('prefix');
+                    const nameIdx = headers.indexOf('name');
+                    const companyIdx = headers.indexOf('company');
+                    const typeIdx = headers.indexOf('type');
+                    const desigIdx = headers.indexOf('designation');
+                    const deptIdx = headers.indexOf('department');
+                    const mobileIdx = headers.indexOf('mobile');
+                    const emailIdx = headers.indexOf('email');
+                    const remarksIdx = headers.indexOf('remarks');
+
+                    if (nameIdx === -1) throw new Error("CSV must have a 'Name' column");
+
+                    let added = 0, updated = 0;
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (row.length < 1 || !row[nameIdx]) continue;
+
+                        const name = row[nameIdx].trim();
+                        const getVal = (idx) => (idx > -1 && row[idx]) ? row[idx].trim() : "";
+
+                        const payload = {
+                            moduleName: MODULE_NAME,
+                            prefix: getVal(prefixIdx),
+                            name: name,
+                            company: getVal(companyIdx),
+                            contactType: getVal(typeIdx),
+                            designation: getVal(desigIdx),
+                            department: getVal(deptIdx),
+                            mobile: getVal(mobileIdx),
+                            email: getVal(emailIdx),
+                            remarks: getVal(remarksIdx),
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        let existingIdx = contactsData.findIndex(c => c.name.toLowerCase() === name.toLowerCase() && (c.company || "").toLowerCase() === getVal(companyIdx).toLowerCase());
+
+                        if (existingIdx > -1) {
+                            payload._id = contactsData[existingIdx]._id;
+                            payload.attachments = contactsData[existingIdx].attachments || [];
+                            contactsData[existingIdx] = { ...contactsData[existingIdx], ...payload };
+                            updated++;
+                        } else {
+                            payload._id = 'cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                            payload.attachments = [];
+                            payload.createdAt = new Date().toISOString();
+                            contactsData.push(payload);
+                            added++;
+                        }
+
+                        fetch(`/api/custom-records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        }).catch(e => { });
+                    }
+
+                    localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                    applySearch();
+                    alert(`Import successful! Added: ${added}, Updated: ${updated}`);
+                } catch (err) {
+                    alert("Import Error: " + err.message);
+                }
+                input.value = "";
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(text) {
+            const rows = [];
+            let row = [];
+            let cur = '';
+            let inQuote = false;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (inQuote) {
+                    if (c === '"') {
+                        if (i + 1 < text.length && text[i + 1] === '"') { cur += '"'; i++; }
+                        else inQuote = false;
+                    } else cur += c;
+                } else {
+                    if (c === '"') inQuote = true;
+                    else if (c === ',') { row.push(cur); cur = ''; }
+                    else if (c === '\n' || c === '\r') {
+                        if (cur || row.length > 0) row.push(cur);
+                        if (row.length > 0) rows.push(row);
+                        row = []; cur = '';
+                        if (c === '\r' && i + 1 < text.length && text[i + 1] === '\n') i++;
+                    } else cur += c;
+                }
+            }
+            if (cur || row.length > 0) { row.push(cur); rows.push(row); }
+            return rows;
+        }
+
+        // --- UI Rendering & Search ---
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        }
+
+        function highlightMatch(text, term) {
+            if (!text) return "";
+            text = String(text);
+            if (!term) return escapeHtml(text);
+            const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.split(regex).map(part => part.toLowerCase() === term.toLowerCase() ? `<span class="highlight">${escapeHtml(part)}</span>` : escapeHtml(part)).join('');
+        }
+
+        function handleSearchInput() {
+            currentPage = 1;
+            applySearch();
+        }
+
+        function applySearch() {
+            const term = document.getElementById('searchBox').value.toLowerCase().trim();
+            const filterType = document.getElementById('filterTypeBox').value;
+            const tbody = document.getElementById('contactsBody');
+            tbody.innerHTML = '';
+
+            const filtered = contactsData.filter(c => {
+                if (filterType && c.contactType !== filterType) return false;
+                if (!term) return true;
+                const rowText = [c.prefix, c.name, c.company, c.contactType, c.designation, c.department, c.mobile, c.email, c.remarks].join(' ').toLowerCase();
+                return rowText.includes(term);
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 20px; color: #666;">No contacts found.</td></tr>`;
+                renderPagination(0, 0, 0, 1);
+                return;
+            }
+
+            const totalItems = filtered.length;
+            const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+            
+            const paginatedData = filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '')).slice(startIndex, endIndex);
+
+            paginatedData.forEach((c, index) => {
+                const attachCount = c.attachments ? c.attachments.length : 0;
+                const attachBadge = attachCount > 0 ? `<span style="background:#17a2b8; color:white; padding:2px 6px; border-radius:12px; font-size:11px; margin-left:4px;">${attachCount}</span>` : '';
+
+                const fullName = c.prefix ? `${c.prefix} ${c.name}` : c.name;
+
+                let mobileHtml = '-';
+                if (c.mobile) {
+                    const numbers = c.mobile.split(',').map(n => n.trim()).filter(n => n);
+                    mobileHtml = numbers.map(num => {
+                        const cleanNum = num.replace(/\D/g, '');
+                        let waNum = cleanNum;
+                        if (waNum.length === 10) waNum = '91' + waNum; // Default to India country code if 10 digits
+
+                        const callLink = cleanNum ? `<a href="tel:${cleanNum}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt" style="font-size:12px;"></i></a>` : '';
+                        const waLink = cleanNum ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:#25D366; text-decoration:none; margin-left:6px;" title="WhatsApp"><i class="fab fa-whatsapp" style="font-size:14px;"></i></a>` : '';
+
+                        return `<div style="margin-bottom: 2px; white-space: nowrap;">${callLink}${highlightMatch(num, term)}${waLink}</div>`;
+                    }).join('');
+                }
+
+                let typeBadge = '-';
+                if (c.contactType) {
+                    let badgeColor = '#6c757d'; // Default Secondary Grey
+                    if (c.contactType === 'Customer') badgeColor = '#27ae60'; // Success Green
+                    else if (c.contactType === 'Supplier') badgeColor = '#0d6efd'; // Primary Blue
+                    else if (c.contactType === 'Internal') badgeColor = '#f39c12'; // Warning Orange
+                    typeBadge = `<span style="background-color:${badgeColor}; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">${highlightMatch(c.contactType, term)}</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align: center;">${startIndex + index + 1}</td>
+                    <td style="font-weight: bold; color: #2c3e50;">${highlightMatch(fullName, term)}</td>
+                    <td>${highlightMatch(c.company, term) || '-'}</td>
+                    <td>${typeBadge}</td>
+                    <td>${highlightMatch(c.designation, term) || '-'}</td>
+                    <td>${highlightMatch(c.department, term) || '-'}</td>
+                    <td>${mobileHtml}</td>
+                    <td>${c.email ? `<a href="mailto:${c.email}" style="color:#0d6efd; text-decoration:none;">${highlightMatch(c.email, term)}</a>` : '-'}</td>
+                    <td>${highlightMatch(c.remarks, term) || '-'}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-info" style="padding: 4px 8px; font-size: 12px;" onclick="openAttachmentsModal('${c._id}')" title="Attachments"><i class="fas fa-paperclip"></i>${attachBadge}</button>
+                        <button class="btn-warning" style="padding: 4px 8px; font-size: 12px; margin: 0 4px;" onclick="editContact('${c._id}')" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button class="btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteContact('${c._id}')" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+        }
+
+        function renderPagination(totalItems, start, end, totalPages) {
+            const info = document.getElementById("paginationInfo");
+            const controls = document.getElementById("paginationControls");
+            const totalDisplay = document.getElementById("totalContactsDisplay");
+
+            if (totalDisplay) totalDisplay.innerText = `Total Contacts: ${totalItems}`;
+
+            if (totalItems === 0) {
+                if (info) info.innerText = "No contacts found";
+                if (controls) controls.innerHTML = "";
+                return;
+            }
+
+            if (info) info.innerText = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+            let html = "";
+            html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const activeStyle = i === currentPage ? 'class="active"' : '';
+                    html += `<button ${activeStyle} onclick="changePage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span style="padding: 0 5px;">...</span>`;
+                }
+            }
+
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+
+            if (controls) controls.innerHTML = html;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            applySearch();
+        }
+
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rowsPerPageSelect').value);
+            currentPage = 1;
+            applySearch();
+        }
+
+        function goToPage() {
+            const pageInput = document.getElementById("goToPageInput");
+            const page = parseInt(pageInput.value);
+            if (page >= 1) {
+                currentPage = page;
+                applySearch();
+            }
+            pageInput.value = "";
+        }
+        
+        function exportContactsPDF() {
+            if (!window.jspdf) {
+                alert("jsPDF library not loaded!");
+                return;
+            }
+            if (contactsData.length === 0) return alert("No contacts to export.");
+
+            const term = document.getElementById('searchBox').value.toLowerCase().trim();
+            const filterType = document.getElementById('filterTypeBox').value;
+
+            const filtered = contactsData.filter(c => {
+                if (filterType && c.contactType !== filterType) return false;
+                if (!term) return true;
+                const rowText = [c.prefix, c.name, c.company, c.contactType, c.designation, c.department, c.mobile, c.email, c.remarks].join(' ').toLowerCase();
+                return rowText.includes(term);
+            });
+
+            if (filtered.length === 0) return alert("No contacts match current filters.");
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+
+            doc.setFontSize(16);
+            doc.text("Contacts Directory", 148.5, 15, { align: "center" });
+            
+            doc.setFontSize(10);
+            doc.text("Generated on: " + new Date().toLocaleString('en-GB'), 14, 22);
+
+            const headers = [["Sl No", "Name", "Company", "Type", "Designation", "Department", "Mobile", "Email", "Remarks"]];
+            const data = filtered.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map((c, i) => [
+                i + 1,
+                c.prefix ? `${c.prefix} ${c.name}` : c.name,
+                c.company || '-',
+                c.contactType || '-',
+                c.designation || '-',
+                c.department || '-',
+                c.mobile || '-',
+                c.email || '-',
+                c.remarks || '-'
+            ]);
+
+            doc.autoTable({
+                startY: 28,
+                head: headers,
+                body: data,
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+                styles: { fontSize: 8, cellPadding: 2, valign: 'middle' },
+                columnStyles: { 0: { halign: 'center' } }
+            });
+
+            doc.save("Contacts_Directory.pdf");
+        }
+
+        // --- Modals Logic ---
+        function openContactModal() {
+            document.getElementById('modalTitle').innerText = "Add New Contact";
+            document.getElementById('contactId').value = "";
+            document.getElementById('cPrefix').value = "";
+            document.getElementById('cName').value = "";
+            document.getElementById('cCompany').value = "";
+            document.getElementById('cContactType').value = "";
+            document.getElementById('cDesignation').value = "";
+            document.getElementById('cDepartment').value = "";
+            document.getElementById('cMobile').value = "";
+            document.getElementById('cEmail').value = "";
+            document.getElementById('cRemarks').value = "";
+            document.getElementById('contactModal').style.display = 'flex';
+            document.getElementById('cName').focus();
+        }
+
+        function editContact(id) {
+            const c = contactsData.find(x => x._id === id);
+            if (!c) return;
+
+            document.getElementById('modalTitle').innerText = "Edit Contact";
+            document.getElementById('contactId').value = c._id;
+            document.getElementById('cPrefix').value = c.prefix || "";
+            document.getElementById('cName').value = c.name || "";
+            document.getElementById('cCompany').value = c.company || "";
+            document.getElementById('cContactType').value = c.contactType || "";
+            document.getElementById('cDesignation').value = c.designation || "";
+            document.getElementById('cDepartment').value = c.department || "";
+            document.getElementById('cMobile').value = c.mobile || "";
+            document.getElementById('cEmail').value = c.email || "";
+            document.getElementById('cRemarks').value = c.remarks || "";
+
+            document.getElementById('contactModal').style.display = 'flex';
+        }
+
+        function closeContactModal() {
+            document.getElementById('contactModal').style.display = 'none';
+        }
+
+        // --- Attachments Logic ---
+        function openAttachmentsModal(id) {
+            const c = contactsData.find(x => x._id === id);
+            if (!c) return;
+
+            document.getElementById('manageAttachId').value = id;
+            document.getElementById('attachContactName').innerText = c.name;
+            currentAttachments = c.attachments ? JSON.parse(JSON.stringify(c.attachments)) : [];
+            document.getElementById('attachmentsInput').value = '';
+
+            renderAttachmentPreviews();
+            document.getElementById('attachmentsModal').style.display = 'flex';
+        }
+
+        function closeAttachmentsModal() {
+            document.getElementById('attachmentsModal').style.display = 'none';
+        }
+
+        function handleAttachmentsSelect(input) {
+            const files = input.files;
+            if (!files.length) return;
+            Array.from(files).forEach(file => {
+                if (file.size > 500 * 1024) {
+                    alert(`File ${file.name} is too large (Max 500KB).`);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    currentAttachments.push({ name: file.name, data: e.target.result, type: file.type });
+                    renderAttachmentPreviews();
+                };
+                reader.readAsDataURL(file);
+            });
+            input.value = "";
+        }
+
+        function renderAttachmentPreviews() {
+            const container = document.getElementById("attachmentPreviews");
+            container.innerHTML = "";
+            if (currentAttachments.length === 0) return container.innerHTML = "<p style='color:#999; font-size:13px; margin:0;'>No attachments found.</p>";
+
+            currentAttachments.forEach((att, index) => {
+                const div = document.createElement("div");
+                div.style.cssText = "position: relative; border: 1px solid #ccc; padding: 5px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; width: 80px; background: #fff;";
+
+                let previewHtml = "";
+                if (att.type && att.type.startsWith("image/")) {
+                    previewHtml = `<img src="${att.data}" style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;" onclick="previewFile(${index})" title="${att.name}">`;
+                } else if (att.type === "application/pdf") {
+                    previewHtml = `<div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #eef2f5; cursor: pointer; font-weight: bold; color: #dc3545;" onclick="previewFile(${index})" title="${att.name}">PDF</div>`;
+                } else {
+                    previewHtml = `<div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #eef2f5; cursor: pointer; font-size: 10px; overflow: hidden;" onclick="previewFile(${index})" title="${att.name}">FILE</div>`;
+                }
+
+                div.innerHTML = `${previewHtml}<span style="font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; margin-top:4px;" title="${att.name}">${att.name}</span><button onclick="removeAttachment(${index})" style="position: absolute; top: -8px; right: -8px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px; padding: 0; line-height:1; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">X</button>`;
+                container.appendChild(div);
+            });
+        }
+
+        function removeAttachment(index) {
+            currentAttachments.splice(index, 1);
+            renderAttachmentPreviews();
+        }
+
+        async function saveAttachments() {
+            const id = document.getElementById('manageAttachId').value;
+            const idx = contactsData.findIndex(c => c._id === id);
+            if (idx > -1) {
+                contactsData[idx].attachments = currentAttachments;
+                contactsData[idx].updatedAt = new Date().toISOString();
+
+                try {
+                    await fetch(`/api/custom-records`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(contactsData[idx])
+                    });
+                } catch (e) { }
+
+                localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                closeAttachmentsModal();
+                applySearch(); // Update badge count
+            }
+        }
+
+        function previewFile(index) {
+            const att = currentAttachments[index];
+            if (!att) return;
+
+            document.getElementById('previewFileName').innerText = att.name;
+            const content = document.getElementById('previewFileContent');
+
+            if (att.type && att.type.startsWith('image/')) {
+                content.innerHTML = `<img src="${att.data}" style="max-width: 100%; max-height: 60vh; object-fit: contain;">`;
+            } else if (att.type === 'application/pdf') {
+                content.innerHTML = `<iframe src="${att.data}" style="width: 100%; height: 60vh; border: none;"></iframe>`;
+            } else {
+                content.innerHTML = `<p style="padding: 20px;">Preview not available for this file type.</p>`;
+            }
+
+            document.getElementById('downloadFileBtn').onclick = () => {
+                const a = document.createElement('a');
+                a.href = att.data;
+                a.download = att.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            document.getElementById('filePreviewModal').style.display = 'flex';
+        }
+    </script>
+</body>
+
+</html>

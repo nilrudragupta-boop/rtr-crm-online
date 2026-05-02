@@ -171,6 +171,23 @@ const apiClient = {
     getEmployees: () => apiClient._getCollection('employees'),
     saveEmployee: (data) => apiClient._saveCollection('employees', data),
 
+    // --- Marketing Visits ---
+    getMarketingVisits: async (startDate, endDate) => {
+        let qs = apiClient._getAuthQuery();
+        if (startDate) qs += `&startDate=${encodeURIComponent(startDate)}`;
+        if (endDate) qs += `&endDate=${encodeURIComponent(endDate)}`;
+        try {
+            const response = await fetch(`${API_BASE_URL}/marketing-visits${qs}`);
+            const result = await response.json();
+            return result.success ? result.data : [];
+        } catch (error) {
+            console.error('Error fetching marketing-visits:', error);
+            return [];
+        }
+    },
+    saveMarketingVisit: (data) => apiClient._saveCollection('marketing-visits', data),
+    deleteMarketingVisit: (id) => apiClient._deleteCollection('marketing-visits', id),
+
     // --- Scraps & Production (for stock calculation) ---
     getScraps: () => apiClient._getCollection('scraps'),
     saveScrap: (data) => apiClient._saveCollection('scraps', data),

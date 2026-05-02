@@ -59,6 +59,21 @@ const adminCredsSchema = new mongoose.Schema({
 });
 const AdminCreds = mongoose.model('AdminCreds', adminCredsSchema);
 
+// --- Marketing Visit Schema ---
+const marketingVisitSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    visitNo: { type: String, required: true },
+    visitDate: { type: String, required: true },
+    customerName: { type: String, required: true },
+    mainRemarks: { type: String, default: '' },
+    purposeVisit: { type: String, default: '' },
+    customerRequirement: { type: String, default: '' },
+    contacts: { type: Array, default: [] },
+    expenses: { type: Array, default: [] },
+    createdBy: { type: String, default: 'System' }
+}, { timestamps: true });
+const MarketingVisit = mongoose.model('MarketingVisit', marketingVisitSchema);
+
 // --- API Routes ---
 app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });
@@ -602,6 +617,45 @@ app.delete('/api/employees/:id', async (req, res) => {
     }
 });
 
+// --- Marketing Visit Routes ---
+app.get('/api/marketing-visits', async (req, res) => {
+    try {
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        if (req.query.startDate || req.query.endDate) {
+            query.visitDate = {};
+            if (req.query.startDate) query.visitDate.$gte = req.query.startDate;
+            if (req.query.endDate) query.visitDate.$lte = req.query.endDate;
+        }
+        const visits = await MarketingVisit.find(query).sort({ createdAt: -1 });
+        res.json({ success: true, data: visits });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/marketing-visits', async (req, res) => {
+    try {
+        const payload = req.body;
+        if (!payload.createdBy && req.query.user) {
+            payload.createdBy = req.query.user;
+        }
+        const updated = await MarketingVisit.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
+        res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/marketing-visits/:id', async (req, res) => {
+    try {
+        await MarketingVisit.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
 // --- Custom Field Routes ---
 app.get('/api/custom-fields', async (req, res) => {
     try {
@@ -712,7 +766,7 @@ app.post('/api/restore', async (req, res) => {
                     else if (idField === 'noteNo') query['noteNo'] = record.noteNo || record.note_no;
                     else if (idField === 'voucher_no') query['voucher_no'] = record.voucher_no || record.voucherNo;
                     else query[idField] = record[idField] || record._id;
-                    
+
                     if (Object.values(query)[0]) {
                         await Model.findOneAndUpdate(query, record, { new: true, upsert: true });
                     } else {
@@ -733,7 +787,7 @@ app.post('/api/restore', async (req, res) => {
         await restoreCollection(BankTransaction, backupData['bank-transactions']);
         await restoreCollection(JournalVoucher, backupData['journal-vouchers'], 'voucher_no');
         await restoreCollection(CustomField, backupData['CUSTOM_FIELDS'], '_id');
-        
+
         for (const key of Object.keys(backupData)) {
             if (key.startsWith('CUSTOM_RECORDS_')) await restoreCollection(CustomRecord, backupData[key], '_id');
         }
