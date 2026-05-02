@@ -2863,10 +2863,9 @@ function createResponse(obj) {
                 // ── Fetch & render ──
                 async function fetchCustomFields() {
                     try {
-                        const res = await fetch(`${API_BASE_URL}/custom-fields`);
-                        const result = await res.json();
-                        if (result.success) {
-                            customFieldsCache = result.data;
+                        const fields = await apiClient.getCustomFields();
+                        if (fields) {
+                            customFieldsCache = fields;
                             localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFieldsCache));
                         }
                     } catch (e) {
@@ -3079,12 +3078,7 @@ function createResponse(obj) {
                     if (errs.length) { cfmToast(errs[0], 'error'); return; }
 
                     try {
-                        const res = await fetch(`${API_BASE_URL}/custom-fields`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        const result = await res.json();
+                        const result = await apiClient.saveCustomField(payload);
                         if (result.success) {
                             cfmToast(id ? 'Field updated.' : 'Field created.', 'success');
                             clearCustomFieldForm();
@@ -3168,7 +3162,7 @@ function createResponse(obj) {
                 async function deleteCustomField(id) {
                     if (!confirm('Delete this field? Existing data in records will remain but this field will disappear from forms.')) return;
                     try {
-                        await fetch(`${API_BASE_URL}/custom-fields/${id}`, { method: 'DELETE' });
+                        await apiClient.deleteCustomField(id);
                         cfmToast('Field deleted.', 'success');
                         fetchCustomFields();
                     } catch (e) {
@@ -3188,8 +3182,9 @@ function createResponse(obj) {
                     if (!confirm(`Delete ALL fields in module "${mod}"? This cannot be undone.`)) return;
                     const toDelete = customFieldsCache.filter(f => f.moduleName === mod);
                     try {
-                        for (const f of toDelete)
-                            await fetch(`${API_BASE_URL}/custom-fields/${f._id}`, { method: 'DELETE' });
+                        for (const f of toDelete) {
+                            await apiClient.deleteCustomField(f._id);
+                        }
                         cfmToast(`Module "${mod}" deleted.`, 'success');
                         fetchCustomFields();
                     } catch (e) {

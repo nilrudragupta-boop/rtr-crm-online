@@ -605,7 +605,8 @@ app.delete('/api/employees/:id', async (req, res) => {
 // --- Custom Field Routes ---
 app.get('/api/custom-fields', async (req, res) => {
     try {
-        const fields = await CustomField.find().sort({ moduleName: 1, order: 1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const fields = await CustomField.find(query).sort({ moduleName: 1, order: 1 });
         res.json({ success: true, data: fields });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -615,6 +616,10 @@ app.get('/api/custom-fields', async (req, res) => {
 app.post('/api/custom-fields', async (req, res) => {
     try {
         const payload = req.body;
+        // Inject user ownership
+        if (!payload.createdBy && req.query.user) {
+            payload.createdBy = req.query.user;
+        }
         if (payload._id) {
             const updated = await CustomField.findByIdAndUpdate(payload._id, payload, { new: true });
             res.status(200).json({ success: true, data: updated });

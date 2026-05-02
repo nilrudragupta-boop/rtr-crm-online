@@ -186,7 +186,7 @@ const apiClient = {
     deleteCustomField: (id) => apiClient._deleteCollection('custom-fields', id),
     reorderCustomFields: async (data) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/custom-fields/reorder`, {
+            const response = await fetch(`${API_BASE_URL}/custom-fields/reorder${apiClient._getAuthQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)

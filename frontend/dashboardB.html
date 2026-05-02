@@ -2827,14 +2827,10 @@
             
             async function fetchCustomFieldsConfig() {
                 try {
-                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
-                    const res = await fetch(`${baseUrl}/custom-fields`);
-                    if (res.ok) {
-                        const result = await res.json();
-                        if (result.success && result.data) {
-                            localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(result.data));
-                            loadDynamicCustomPages();
-                        }
+                    const fields = await apiClient.getCustomFields();
+                    if (fields) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields));
+                        loadDynamicCustomPages();
                     }
                 } catch (error) {
                     console.warn("Failed to fetch custom fields config from server:", error);
