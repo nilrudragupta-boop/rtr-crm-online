@@ -119,7 +119,7 @@ const apiClient = {
     _saveCollection: async (collectionName, data) => {
         try {
             if (!data.createdBy) data.createdBy = localStorage.getItem('currentUser') || 'System';
-            const response = await fetch(`${API_BASE_URL}/${collectionName}`, {
+            const response = await fetch(`${API_BASE_URL}/${collectionName}${apiClient._getAuthQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -132,7 +132,7 @@ const apiClient = {
     },
     _deleteCollection: async (collectionName, id) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/${collectionName}/${id}`, { method: 'DELETE' });
+            const response = await fetch(`${API_BASE_URL}/${collectionName}/${id}${apiClient._getAuthQuery()}`, { method: 'DELETE' });
             return await response.json();
         } catch (error) {
             console.error(`Error deleting from ${collectionName}:`, error);

@@ -621,10 +621,11 @@ app.post('/api/custom-fields', async (req, res) => {
             payload.createdBy = req.query.user;
         }
         if (payload._id) {
-            const updated = await CustomField.findByIdAndUpdate(payload._id, payload, { new: true });
+            const updated = await CustomField.findByIdAndUpdate(payload._id, payload, { new: true, strict: false });
             res.status(200).json({ success: true, data: updated });
         } else {
             const newField = new CustomField(payload);
+            if (payload.createdBy) newField.set('createdBy', payload.createdBy, { strict: false });
             await newField.save();
             res.status(201).json({ success: true, data: newField });
         }
@@ -674,10 +675,11 @@ app.post('/api/custom-records', async (req, res) => {
             payload.createdBy = req.query.user;
         }
         if (payload._id) {
-            const updated = await CustomRecord.findByIdAndUpdate(payload._id, payload, { new: true, upsert: true });
+            const updated = await CustomRecord.findByIdAndUpdate(payload._id, payload, { new: true, upsert: true, strict: false });
             res.status(200).json({ success: true, data: updated });
         } else {
             const newRecord = new CustomRecord(payload);
+            if (payload.createdBy) newRecord.set('createdBy', payload.createdBy, { strict: false });
             await newRecord.save();
             res.status(201).json({ success: true, data: newRecord });
         }
