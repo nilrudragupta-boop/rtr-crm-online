@@ -171,6 +171,17 @@
             border-color: #444;
         }
 
+        body.dark-mode #listView {
+            background: #2c2c2c !important;
+            border-color: #444 !important;
+        }
+
+        body.dark-mode #listView input {
+            background: #3a3a3a !important;
+            color: #fff !important;
+            border: 1px solid #555 !important;
+        }
+
         /* Grey Mode Support */
         body.grey-mode .btn,
         body.grey-mode .add-btn {
@@ -186,121 +197,188 @@
     <h2 class="header-center"><span data-brand="name"></span> - Marketing Report & Expenses</h2>
     <h2 class="header-sub">-----------------------</h2>
 
-    <div style="display:flex;gap:18px;align-items:center;margin-bottom:14px">
-        <div style="width:240px">
-            <div style="display:flex; justify-content:space-between; align-items:end;">
-                <label>SR Visit No</label>
-                <span style="font-size:11px; color:#888; margin-bottom: 2px;">Last: <b id="lastVisitNoDisplay"
-                        style="color:#3992eb;">N/A</b></span>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:15px;" class="no-print">
+        <button class="btn" id="viewToggleBtn" style="background:#6f42c1; color:#fff; border:none; border-radius:4px;"
+            onclick="toggleView()">📋 View Reports</button>
+        <button class="btn" style="background:#607d8b; color:#fff; border:none; border-radius:4px;"
+            onclick="openSettingsModal()">⚙️ Settings</button>
+    </div>
+
+    <div id="formView">
+
+        <div style="display:flex;gap:18px;align-items:center;margin-bottom:14px">
+            <div style="width:240px">
+                <div style="display:flex; justify-content:space-between; align-items:end;">
+                    <label>SR Visit No</label>
+                    <span style="font-size:11px; color:#888; margin-bottom: 2px;">Last: <b id="lastVisitNoDisplay"
+                            style="color:#3992eb;">N/A</b></span>
+                </div>
+                <input id="srVisitNo" />
             </div>
-            <input id="srVisitNo" />
+            <div style="width:240px">
+                <label>Customer Name</label>
+                <input id="customerName" />
+            </div>
+            <div style="width:240px">
+                <label>Address</label>
+                <input id="customerAddress" />
+            </div>
+            <div style="width:200px">
+                <label>Visit Date</label>
+                <input id="srVisitDate" type="date" />
+            </div>
+            <div>
+                <button class="btn" id="refreshVisitsBtn">Refresh</button>
+            </div>
+            <div style="margin-left:auto; display:flex; gap:8px;">
+
+                <button class="btn" style="background:#17a2b8; color:#fff; border:none; border-radius:4px;"
+                    onclick="openReminderForVisit(currentVisitId)">🔔 Reminder</button>
+                <button class="btn" id="exportExcelBtn">Export Excel</button>
+                <button class="btn" id="exportPdfBtn">Export PDF</button>
+                <button class="btn" id="saveVisitBtn">Save Visit</button>
+            </div>
         </div>
-        <div style="width:240px">
-            <label>Customer Name</label>
-            <input id="customerName" />
+
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+            <input type="date" id="filterStartDate"
+                style="width:130px; padding:6px; border:1px solid #ccc; border-radius:4px;" title="From Date">
+            <span style="font-weight:bold; color:#555;">to</span>
+            <input type="date" id="filterEndDate"
+                style="width:130px; padding:6px; border:1px solid #ccc; border-radius:4px;" title="To Date">
+            <button class="btn"
+                style="padding:6px 12px; background:#4e73df; color:#fff; border:none; border-radius:4px;"
+                onclick="loadVisits()">Filter</button>
+            <div style="border-left: 1px solid #ccc; height:24px; margin: 0 5px;"></div>
+            <input type="text" id="visitSearch" placeholder="🔍 Search Customer, Address or Date..."
+                style="width:100%; max-width:250px; padding:6px; border:1px solid #ccc; border-radius:4px;"
+                oninput="filterVisits()">
+            <select id="visitSelect"
+                style="width:100%; max-width:420px; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                <option value="">-- Select saved visit --</option>
+            </select>
         </div>
-        <div style="width:200px">
-            <label>Visit Date</label>
-            <input id="srVisitDate" type="date" />
-        </div>
-        <div>
-            <button class="btn" id="refreshVisitsBtn">Refresh</button>
-        </div>
-        <div style="margin-left:auto; display:flex; gap:8px;">
-            <button class="btn" style="background:#607d8b; color:#fff; border:none; border-radius:4px;"
-                onclick="openSettingsModal()">⚙️ Settings</button>
-            <button class="btn" id="exportExcelBtn">Export Excel</button>
-            <button class="btn" id="exportPdfBtn">Export PDF</button>
-            <button class="btn" id="saveVisitBtn">Save Visit</button>
-        </div>
-    </div>
 
-    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
-        <input type="date" id="filterStartDate"
-            style="width:130px; padding:6px; border:1px solid #ccc; border-radius:4px;" title="From Date">
-        <span style="font-weight:bold; color:#555;">to</span>
-        <input type="date" id="filterEndDate"
-            style="width:130px; padding:6px; border:1px solid #ccc; border-radius:4px;" title="To Date">
-        <button class="btn" style="padding:6px 12px; background:#4e73df; color:#fff; border:none; border-radius:4px;"
-            onclick="loadVisits()">Filter</button>
-        <div style="border-left: 1px solid #ccc; height:24px; margin: 0 5px;"></div>
-        <input type="text" id="visitSearch" placeholder="🔍 Search Customer or Date..."
-            style="width:100%; max-width:250px; padding:6px; border:1px solid #ccc; border-radius:4px;"
-            oninput="filterVisits()">
-        <select id="visitSelect"
-            style="width:100%; max-width:420px; padding:6px; border:1px solid #ccc; border-radius:4px;">
-            <option value="">-- Select saved visit --</option>
-        </select>
-    </div>
-
-    <table id="expenseTable">
-        <thead>
-            <tr>
-                <th>SL</th>
-                <th>Date</th>
-                <th>Expense Type</th>
-                <th>Mode</th>
-                <th>Amount</th>
-                <th>Remarks</th>
-                <th>Attachments</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-
-    <button class="btn add-btn" id="addExpenseBtn">➕ Add New Expense</button>
-
-    <p style="margin-top:8px">Total Expense:
-        <input id="totalExpense" readonly value="0.00" style="width:160px" />
-    </p>
-
-    <div style="margin-top:8px;font-weight:bold;padding:6px;border:1px dashed #444;">
-        Total in words: <span id="totalWords"></span>
-    </div>
-
-    <!-- Contact Table -->
-    <div style="margin-top:20px;">
-        <h3 style="margin-bottom:6px;text-decoration:underline;">Contact Details</h3>
-
-        <table id="contactTable" class="pro-table">
+        <table id="expenseTable">
             <thead>
                 <tr>
                     <th>SL</th>
-                    <th>Name</th>
-                    <th>Designation</th>
-                    <th>Department</th>
-                    <th>Mobile</th>
-                    <th>Email</th>
+                    <th>Date</th>
+                    <th>Expense Type</th>
+                    <th>Mode</th>
+                    <th>Amount</th>
                     <th>Remarks</th>
+                    <th>Attachments</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody></tbody>
         </table>
 
-        <button class="add-btn" id="addContactBtn">➕ Add Contact</button>
-    </div>
+        <button class="btn add-btn" id="addExpenseBtn">➕ Add New Expense</button>
 
-    <!-- Purpose of Visit -->
-    <div style="margin-top:20px;">
-        <h3 style="margin-bottom:6px;text-decoration:underline;">Purpose of Visit</h3>
-        <textarea id="purposeVisit" rows="4" placeholder="Enter Purpose of Visit..."
-            style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
-    </div>
+        <p style="margin-top:8px">Total Expense:
+            <input id="totalExpense" readonly value="0.00" style="width:160px" />
+        </p>
 
-    <!-- Customer Requirement -->
-    <div style="margin-top:20px;">
-        <h3 style="margin-bottom:6px;text-decoration:underline;">Customer Requirement</h3>
-        <textarea id="customerRequirement" rows="4" placeholder="Enter customer requirement..."
-            style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
-    </div>
+        <div style="margin-top:8px;font-weight:bold;padding:6px;border:1px dashed #444;">
+            Total in words: <span id="totalWords"></span>
+        </div>
 
-    <!-- Main Remarks -->
-    <div style="margin-top:20px;">
-        <h3 style="margin-bottom:6px;text-decoration:underline;">Main Remarks</h3>
-        <textarea id="mainRemarks" rows="4" placeholder="Enter any special remarks..."
-            style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
+        <!-- Contact Table -->
+        <div style="margin-top:20px;">
+            <h3 style="margin-bottom:6px;text-decoration:underline;">Contact Details</h3>
+
+            <table id="contactTable" class="pro-table">
+                <thead>
+                    <tr>
+                        <th>SL</th>
+                        <th>Name</th>
+                        <th>Designation</th>
+                        <th>Department</th>
+                        <th>Mobile</th>
+                        <th>Email</th>
+                        <th>Remarks</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <button class="add-btn" id="addContactBtn">➕ Add Contact</button>
+        </div>
+
+        <!-- Purpose of Visit -->
+        <div style="margin-top:20px;">
+            <h3 style="margin-bottom:6px;text-decoration:underline;">Purpose of Visit</h3>
+            <textarea id="purposeVisit" rows="4" placeholder="Enter Purpose of Visit..."
+                style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
+        </div>
+
+        <!-- Customer Requirement -->
+        <div style="margin-top:20px;">
+            <h3 style="margin-bottom:6px;text-decoration:underline;">Customer Requirement</h3>
+            <textarea id="customerRequirement" rows="4" placeholder="Enter customer requirement..."
+                style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
+        </div>
+
+        <!-- Main Remarks -->
+        <div style="margin-top:20px;">
+            <h3 style="margin-bottom:6px;text-decoration:underline;">Main Remarks</h3>
+            <textarea id="mainRemarks" rows="4" placeholder="Enter any special remarks..."
+                style="width:100%; padding:10px; border:1px solid #444; border-radius:4px;"></textarea>
+        </div>
+
+    </div> <!-- End formView -->
+
+    <div id="listView"
+        style="display:none; padding:15px; background:#fff; border-radius:8px; border:1px solid #ccc; margin-top:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0; color:#2c3e50;">Saved Reports</h3>
+            <div style="display:flex; gap:10px;">
+                <button class="btn" style="background:#28a745; color:#fff; border:none; border-radius:4px;" onclick="printReportList()">🖨️ Print List</button>
+                <button class="btn" style="background:#e74c3c; color:#fff; border:none; border-radius:4px;" onclick="exportListToPDF()">📄 Export PDF</button>
+                <input type="text" id="listSearch" placeholder="Search Customer, Address or Visit No..."
+                    oninput="handleListSearch()"
+                    style="padding:6px; border:1px solid #ccc; border-radius:4px; width:250px;">
+            </div>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="pro-table" id="reportListTable"
+                style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                    <tr>
+                        <th style="padding:8px; cursor:pointer;" onclick="sortReportList('visitDate')">Date <span
+                                id="sort-icon-visitDate"></span></th>
+                        <th style="padding:8px; cursor:pointer;" onclick="sortReportList('visitNo')">Visit No <span
+                                id="sort-icon-visitNo"></span></th>
+                        <th style="padding:8px; cursor:pointer;" onclick="sortReportList('customerName')">Customer Name
+                            <span id="sort-icon-customerName"></span></th>
+                        <th style="padding:8px; cursor:pointer;" onclick="sortReportList('customerAddress')">Address
+                            <span id="sort-icon-customerAddress"></span></th>
+                        <th style="padding:8px; text-align:right; cursor:pointer;" onclick="sortReportList('expenses')">
+                            Expenses (₹) <span id="sort-icon-expenses"></span></th>
+                        <th style="padding:8px; text-align:center;">Contacts</th>
+                        <th style="padding:8px; text-align:center; width:150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="reportListBody"></tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div class="pagination-container" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="listPaginationInfo" style="font-size: 14px; color: #666;"></span>
+                <select id="listRowsPerPage" onchange="changeListRowsPerPage()" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; cursor:pointer;">
+                    <option value="10">10 rows</option>
+                    <option value="20">20 rows</option>
+                    <option value="50">50 rows</option>
+                    <option value="-1">All</option>
+                </select>
+            </div>
+            <div id="listPaginationControls" style="display: flex; gap: 5px; align-items: center;"></div>
+        </div>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -328,6 +406,13 @@
                     <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"
                         style="width:auto; margin:0;"> Grey Buttons Mode
                 </label>
+            </div>
+            <p style="font-size:14px; color:#666; margin-bottom:10px; text-align: left;">Select columns to display:</p>
+            <div style="margin-bottom: 10px; display: flex; gap: 10px; justify-content: center;">
+                <button class="btn" onclick="toggleAllColumns(true)" style="background:#0d6efd; color:white; padding: 6px 12px; font-size: 12px; border:none; border-radius:4px;">Select All</button>
+                <button class="btn" onclick="toggleAllColumns(false)" style="background:#6c757d; color:white; padding: 6px 12px; font-size: 12px; border:none; border-radius:4px;">Deselect All</button>
+            </div>
+            <div id="columnToggles" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:left; max-height:300px; overflow-y:auto; margin-bottom: 15px;">
             </div>
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn"
@@ -561,6 +646,7 @@
             const visitNo = document.getElementById("srVisitNo").value.trim();
             const visitDate = document.getElementById("srVisitDate").value;
             const customerName = document.getElementById("customerName").value.trim();
+            const customerAddress = document.getElementById("customerAddress").value.trim();
 
             if (!visitNo || !visitDate || !customerName) {
                 showToast("Visit No, Date & Customer Name are required", "warning");
@@ -572,6 +658,7 @@
                 visitNo: visitNo,
                 visitDate: visitDate,
                 customerName: customerName,
+                customerAddress: customerAddress,
                 mainRemarks: document.getElementById("mainRemarks").value,
                 purposeVisit: document.getElementById("purposeVisit").value,
                 customerRequirement: document.getElementById("customerRequirement").value,
@@ -722,6 +809,7 @@
             }
             const filtered = allVisits.filter(v =>
                 (v.customerName || "").toLowerCase().includes(term) ||
+                (v.customerAddress || "").toLowerCase().includes(term) ||
                 (v.visitDate || "").toLowerCase().includes(term) ||
                 (v.visitNo || "").toLowerCase().includes(term)
             );
@@ -769,6 +857,7 @@
                 // Set main fields
                 document.getElementById("srVisitNo").value = v.visitNo;
                 document.getElementById("customerName").value = v.customerName;
+                document.getElementById("customerAddress").value = v.customerAddress || "";
                 document.getElementById("srVisitDate").value = v.visitDate;
                 document.getElementById("mainRemarks").value = v.mainRemarks || "";
                 document.getElementById("purposeVisit").value = v.purposeVisit || "";
@@ -828,6 +917,7 @@
                 currentVisitId = null;
                 document.getElementById("srVisitNo").value = "";
                 document.getElementById("customerName").value = "";
+                document.getElementById("customerAddress").value = "";
                 document.getElementById("srVisitDate").value = "";
                 document.getElementById("mainRemarks").value = "";
                 document.getElementById("purposeVisit").value = "";
@@ -854,6 +944,7 @@
             const visitNo = document.getElementById('srVisitNo').value.trim();
             const visitDate = document.getElementById('srVisitDate').value;
             const customerName = document.getElementById('customerName').value.trim();
+            const customerAddress = document.getElementById('customerAddress').value.trim();
             if (!visitNo || !visitDate) return showToast('Visit No, Customer Name & Date Required', 'warning');
 
             const totalWords = document.getElementById('totalWords').innerText;
@@ -871,15 +962,20 @@
             doc.setFontSize(11);
             doc.text(`Marketing Report & Expenses No. - ${visitNo}`, pageWidth / 2, 20, { align: "center" });
             doc.text(`Customer Name - ${customerName}`, pageWidth / 2, 26, { align: "center" });
+            let nextY = 32;
+            if (customerAddress) {
+                doc.text(`Address - ${customerAddress}`, pageWidth / 2, nextY, { align: "center" });
+                nextY += 6;
+            }
             const d = new Date(visitDate);
-            doc.text(`Visit Date: ${("0" + d.getDate()).slice(-2)}-${("0" + (d.getMonth() + 1)).slice(-2)}-${d.getFullYear()}`, pageWidth / 2, 32, { align: "center" });
+            doc.text(`Visit Date: ${("0" + d.getDate()).slice(-2)}-${("0" + (d.getMonth() + 1)).slice(-2)}-${d.getFullYear()}`, pageWidth / 2, nextY, { align: "center" });
 
             /* Table */
             const expRows = expenseData.map((r, i) => [i + 1, r.date, r.expense_type, r.mode, r.amount, r.remarks, '']);
             expRows.push(['', '', '', 'Total', document.getElementById('totalExpense').value, '', '']);
             doc.autoTable({
                 head: [['SL', 'Date', 'Type', 'Mode', 'Amount', 'Remarks', 'Attachments']],
-                body: expRows, startY: 38, styles: { fontSize: 9 }
+                body: expRows, startY: nextY + 6, styles: { fontSize: 9 }
             });
 
             let y = doc.lastAutoTable.finalY + 10;
@@ -938,11 +1034,69 @@
         /* ================= SETTINGS / THEME LOGIC ================= */
         let currentTheme = localStorage.getItem("appThemeMode") || "system";
         let isGreyButtons = localStorage.getItem("marketingGreyButtons") === "true";
+        let columnVisibility = JSON.parse(localStorage.getItem("marketingColumnVisibility")) || new Array(6).fill(true);
 
         function openSettingsModal() {
             document.getElementById('settingsModal').style.display = 'flex';
             document.getElementById('themeSelect').value = currentTheme;
             document.getElementById('greyButtonsToggle').checked = isGreyButtons;
+            renderColumnToggles();
+        }
+
+        function renderColumnToggles() {
+            const container = document.getElementById("columnToggles");
+            container.innerHTML = "";
+            const headers = ["Date", "Visit No", "Customer Name", "Address", "Expenses (₹)", "Contacts"];
+
+            headers.forEach((text, index) => {
+                const label = document.createElement("label");
+                label.style.cursor = "pointer";
+                label.style.display = "flex";
+                label.style.alignItems = "center";
+                label.style.gap = "5px";
+                label.style.fontSize = "13px";
+
+                const cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.checked = columnVisibility[index] !== false; // true by default
+                cb.style.margin = "0";
+                cb.onchange = () => toggleColumn(index, cb.checked);
+
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(text));
+                container.appendChild(label);
+            });
+        }
+
+        function toggleAllColumns(isVisible) {
+            for (let i = 0; i < columnVisibility.length; i++) {
+                columnVisibility[i] = isVisible;
+            }
+            localStorage.setItem("marketingColumnVisibility", JSON.stringify(columnVisibility));
+            updateColumnStyles();
+            renderColumnToggles();
+        }
+
+        function toggleColumn(index, isVisible) {
+            columnVisibility[index] = isVisible;
+            localStorage.setItem("marketingColumnVisibility", JSON.stringify(columnVisibility));
+            updateColumnStyles();
+        }
+
+        function updateColumnStyles() {
+            let style = document.getElementById('dynamicColumnStyles');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'dynamicColumnStyles';
+                document.head.appendChild(style);
+            }
+            let css = '';
+            for(let i = 0; i < 6; i++) {
+                if (columnVisibility[i] === false) {
+                    css += `#reportListTable th:nth-child(${i + 1}), #reportListTable td:nth-child(${i + 1}) { display: none; }\n`;
+                }
+            }
+            style.textContent = css;
         }
 
         function closeSettingsModal() {
@@ -972,9 +1126,393 @@
             else document.body.classList.remove("grey-mode");
         }
 
+        /* ================= LIST VIEW LOGIC ================= */
+        let currentMode = 'form';
+        let listSortCol = 'visitDate';
+        let listSortAsc = false;
+        let listCurrentPage = 1;
+        let listRowsPerPage = 10;
+
+        function sortReportList(col) {
+            if (listSortCol === col) {
+                listSortAsc = !listSortAsc;
+            } else {
+                listSortCol = col;
+                listSortAsc = true;
+            }
+            listCurrentPage = 1;
+            renderReportList();
+        }
+
+        function handleListSearch() {
+            listCurrentPage = 1;
+            renderReportList();
+        }
+
+        function changeListPage(page) {
+            listCurrentPage = page;
+            renderReportList();
+        }
+
+        function changeListRowsPerPage() {
+            listRowsPerPage = parseInt(document.getElementById('listRowsPerPage').value);
+            listCurrentPage = 1;
+            renderReportList();
+        }
+
+        function renderListPaginationControls(totalItems, start, end, totalPages) {
+            const info = document.getElementById("listPaginationInfo");
+            const controls = document.getElementById("listPaginationControls");
+            if (!info || !controls) return;
+
+            if (totalItems === 0) {
+                info.innerText = "No reports found";
+                controls.innerHTML = "";
+                return;
+            }
+
+            info.innerText = `Showing ${start + 1} to ${end} of ${totalItems} reports`;
+
+            let html = "";
+            html += `<button class="btn" style="padding: 4px 10px; background: #17a2b8; color: #fff; border: none; border-radius: 4px;" onclick="changeListPage(${listCurrentPage - 1})" ${listCurrentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+            html += `<span style="font-size: 13px; font-weight: bold; margin: 0 5px;">Page ${listCurrentPage} of ${totalPages}</span>`;
+            html += `<button class="btn" style="padding: 4px 10px; background: #17a2b8; color: #fff; border: none; border-radius: 4px;" onclick="changeListPage(${listCurrentPage + 1})" ${listCurrentPage === totalPages || totalPages === 0 ? 'disabled' : ''}>Next</button>`;
+            controls.innerHTML = html;
+        }
+
+        function toggleView() {
+            const formView = document.getElementById('formView');
+            const listView = document.getElementById('listView');
+            const toggleBtn = document.getElementById('viewToggleBtn');
+
+            if (currentMode === 'form') {
+                formView.style.display = 'none';
+                listView.style.display = 'block';
+                toggleBtn.innerHTML = '➕ New Report';
+                currentMode = 'list';
+                renderReportList();
+            } else {
+                formView.style.display = 'block';
+                listView.style.display = 'none';
+                toggleBtn.innerHTML = '📋 View Reports';
+                currentMode = 'form';
+            }
+        }
+
+        function renderReportList() {
+            const tbody = document.getElementById('reportListBody');
+            tbody.innerHTML = '';
+
+            const term = document.getElementById('listSearch').value.toLowerCase();
+            let visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+
+            const filtered = visits.filter(v =>
+                (v.customerName || "").toLowerCase().includes(term) ||
+                (v.customerAddress || "").toLowerCase().includes(term) ||
+                (v.visitNo || "").toLowerCase().includes(term) ||
+                (v.visitDate || "").toLowerCase().includes(term)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No reports found.</td></tr>';
+                renderListPaginationControls(0, 0, 0, 0);
+                return;
+            }
+
+            filtered.sort((a, b) => {
+                let valA, valB;
+                if (listSortCol === 'expenses') {
+                    valA = (a.expenses || []).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                    valB = (b.expenses || []).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                    return listSortAsc ? valA - valB : valB - valA;
+                } else if (listSortCol === 'visitDate') {
+                    valA = new Date(a.visitDate).getTime() || 0;
+                    valB = new Date(b.visitDate).getTime() || 0;
+                    return listSortAsc ? valA - valB : valB - valA;
+                } else {
+                    valA = (a[listSortCol] || '').toLowerCase();
+                    valB = (b[listSortCol] || '').toLowerCase();
+                    if (valA < valB) return listSortAsc ? -1 : 1;
+                    if (valA > valB) return listSortAsc ? 1 : -1;
+                    return 0;
+                }
+            });
+
+            // Update icons
+            document.querySelectorAll("[id^='sort-icon-']").forEach(icon => icon.innerHTML = '');
+            const activeIcon = document.getElementById(`sort-icon-${listSortCol}`);
+            if (activeIcon) {
+                activeIcon.innerHTML = listSortAsc ? ' ▲' : ' ▼';
+            }
+
+            // Pagination bounds
+            const totalItems = filtered.length;
+            const totalPages = listRowsPerPage === -1 ? 1 : Math.ceil(totalItems / listRowsPerPage);
+            if (listCurrentPage > totalPages) listCurrentPage = totalPages || 1;
+            if (listCurrentPage < 1) listCurrentPage = 1;
+
+            const startIndex = (listCurrentPage - 1) * listRowsPerPage;
+            const endIndex = listRowsPerPage === -1 ? totalItems : Math.min(startIndex + listRowsPerPage, totalItems);
+            const pageData = listRowsPerPage === -1 ? filtered : filtered.slice(startIndex, endIndex);
+
+            pageData.forEach(v => {
+                const expenseTotal = (v.expenses || []).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                const contactCount = (v.contacts || []).length;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td style="padding:8px;">${v.visitDate ? new Date(v.visitDate).toLocaleDateString('en-GB') : '-'}</td>
+                <td style="padding:8px;"><strong>${v.visitNo || '-'}</strong></td>
+                <td style="padding:8px;">${v.customerName || '-'}</td>
+                <td style="padding:8px;">${v.customerAddress || '-'}</td>
+                <td style="padding:8px; text-align:right;">₹ ${expenseTotal.toFixed(2)}</td>
+                <td style="padding:8px; text-align:center;">${contactCount}</td>
+                <td style="padding:8px; text-align:center;">
+                    <button class="btn" style="background:#17a2b8; color:#fff; padding:4px 8px; font-size:12px; margin: 2px;" onclick="openReminderForVisit('${v.id}')" title="Set Reminder">🔔</button>
+                    <button class="btn" style="background:#ffc107; color:#000; padding:4px 8px; font-size:12px; margin: 2px;" onclick="editReportFromList('${v.id}')">✏️ Edit</button>
+                    <button class="btn" style="background:#dc3545; color:#fff; padding:4px 8px; font-size:12px; margin: 2px;" onclick="deleteReportFromList('${v.id}')">🗑️ Delete</button>
+                </td>
+            `;
+                tbody.appendChild(tr);
+            });
+
+            renderListPaginationControls(totalItems, startIndex, endIndex, totalPages);
+        }
+
+        function exportListToPDF() {
+            if (!window.jspdf) return showToast('jsPDF not loaded', 'warning');
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF("p", "mm", "a4");
+
+            const term = document.getElementById('listSearch').value.toLowerCase();
+            let visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+
+            const filtered = visits.filter(v =>
+                (v.customerName || "").toLowerCase().includes(term) ||
+                (v.customerAddress || "").toLowerCase().includes(term) ||
+                (v.visitNo || "").toLowerCase().includes(term) ||
+                (v.visitDate || "").toLowerCase().includes(term)
+            );
+
+            if (filtered.length === 0) return showToast("No reports to export", "warning");
+
+            filtered.sort((a, b) => {
+                let valA, valB;
+                if (listSortCol === 'expenses') {
+                    valA = (a.expenses || []).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                    valB = (b.expenses || []).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                    return listSortAsc ? valA - valB : valB - valA;
+                } else if (listSortCol === 'visitDate') {
+                    valA = new Date(a.visitDate).getTime() || 0;
+                    valB = new Date(b.visitDate).getTime() || 0;
+                    return listSortAsc ? valA - valB : valB - valA;
+                } else {
+                    valA = (a[listSortCol] || '').toLowerCase();
+                    valB = (b[listSortCol] || '').toLowerCase();
+                    if (valA < valB) return listSortAsc ? -1 : 1;
+                    if (valA > valB) return listSortAsc ? 1 : -1;
+                    return 0;
+                }
+            });
+
+            let companyName = "Company Name";
+            if (window.BrandService) {
+                companyName = window.BrandService.getBrand().name || companyName;
+            } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
+                companyName = APP_SETTINGS.COMPANY_NAME;
+            }
+
+            doc.setFontSize(16);
+            doc.text("Marketing Reports List", 105, 15, { align: "center" });
+            doc.setFontSize(10);
+            doc.text("Company: " + companyName, 105, 22, { align: "center" });
+
+            const allHeaders = ["Date", "Visit No", "Customer Name", "Address", "Expenses (Rs)", "Contacts"];
+            const headers = [];
+            allHeaders.forEach((h, i) => {
+                if (columnVisibility[i] !== false) headers.push(h);
+            });
+
+            const data = filtered.map(v => {
+                const expenseTotal = (v.expenses || []).reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                const contactCount = (v.contacts || []).length;
+                const fullRow = [
+                    v.visitDate ? new Date(v.visitDate).toLocaleDateString('en-GB') : '-',
+                    v.visitNo || '-',
+                    v.customerName || '-',
+                    v.customerAddress || '-',
+                    expenseTotal.toFixed(2),
+                    contactCount
+                ];
+                return fullRow.filter((_, i) => columnVisibility[i] !== false);
+            });
+
+            let columnStyles = {};
+            let expensesColIdx = -1;
+            let contactsColIdx = -1;
+            let currentIdx = 0;
+            allHeaders.forEach((h, i) => {
+                if (columnVisibility[i] !== false) {
+                    if (i === 4) expensesColIdx = currentIdx;
+                    if (i === 5) contactsColIdx = currentIdx;
+                    currentIdx++;
+                }
+            });
+            if (expensesColIdx > -1) columnStyles[expensesColIdx] = { halign: 'right' };
+            if (contactsColIdx > -1) columnStyles[contactsColIdx] = { halign: 'center' };
+
+            doc.autoTable({
+                startY: 28,
+                head: [headers],
+                body: data,
+                theme: 'striped',
+                headStyles: { fillColor: [52, 58, 64], textColor: 255 },
+                styles: { fontSize: 9, cellPadding: 3 },
+                columnStyles: columnStyles
+            });
+
+            doc.save("Marketing_Reports_List.pdf");
+        }
+
+        function printReportList() {
+            const printContent = document.getElementById('listView').cloneNode(true);
+            
+            // Remove actions column and pagination
+            const ths = printContent.querySelectorAll('th');
+            if (ths.length > 0) ths[ths.length - 1].remove(); // Remove Actions th
+            
+            printContent.querySelectorAll('tbody tr').forEach(tr => {
+                if (tr.children.length > 0) tr.children[tr.children.length - 1].remove(); // Remove Actions td
+            });
+
+            const pagination = printContent.querySelector('.pagination-container');
+            if (pagination) pagination.remove();
+            
+            const searchBar = printContent.querySelector('div > div > input');
+            if (searchBar) searchBar.parentElement.parentElement.remove(); // Remove header controls
+
+            let companyName = "Company Name";
+            if (window.BrandService) {
+                companyName = window.BrandService.getBrand().name || companyName;
+            } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
+                companyName = APP_SETTINGS.COMPANY_NAME;
+            }
+
+            const printWindow = window.open('', '', 'height=800,width=900');
+            printWindow.document.write('<html><head><title>Print Report List</title>');
+            printWindow.document.write('<style>');
+            printWindow.document.write('body{font-family: "Segoe UI", sans-serif; padding: 20px; color: #333;}');
+            printWindow.document.write('table{width:100%; border-collapse:collapse; text-align:left; font-size:13px; margin-top:10px;}');
+            printWindow.document.write('th, td{border:1px solid #ddd; padding:5px;}');
+            printWindow.document.write('th{background:#f9f9f9;}');
+            printWindow.document.write('.no-print{display:none !important;}');
+            
+            // Apply column visibility CSS in print window
+            let css = '';
+            for(let i = 0; i < 6; i++) {
+                if (columnVisibility[i] === false) {
+                    css += `table th:nth-child(${i + 1}), table td:nth-child(${i + 1}) { display: none; }\n`;
+                }
+            }
+            printWindow.document.write(css);
+            
+            printWindow.document.write('</style></head><body>');
+            printWindow.document.write('<h2 style="text-align:center; color:#2c3e50; margin-bottom: 5px;">' + (companyName ? companyName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;") : "Company Name") + '</h2>');
+            printWindow.document.write('<h3 style="text-align:center; color:#555; margin-top: 0;">Marketing Reports List</h3>');
+            printWindow.document.write(printContent.outerHTML);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+
+        function editReportFromList(id) {
+            toggleView();
+            const sel = document.getElementById('visitSelect');
+            if (sel) {
+                sel.value = id;
+            }
+            loadVisitById(id);
+        }
+
+        function deleteReportFromList(id) {
+            if (!confirm("Are you sure you want to delete this marketing report?")) return;
+
+            let visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+            visits = visits.filter(v => v.id !== id);
+            localStorage.setItem('marketing_visits', JSON.stringify(visits));
+
+            if (typeof apiClient !== 'undefined' && apiClient.deleteMarketingVisit) {
+                apiClient.deleteMarketingVisit(id).catch(e => console.warn(e));
+            }
+
+            let expensesList = JSON.parse(localStorage.getItem('expenses')) || [];
+            const expenseId = 'exp_mkt_' + id;
+            const existingExpIdx = expensesList.findIndex(e => e.expense_id === expenseId);
+            if (existingExpIdx > -1) {
+                expensesList.splice(existingExpIdx, 1);
+                localStorage.setItem('expenses', JSON.stringify(expensesList));
+                if (typeof apiClient !== 'undefined' && apiClient.deleteExpense) {
+                    apiClient.deleteExpense(expenseId).catch(e => console.warn(e));
+                }
+            }
+
+            if (currentVisitId === id) {
+                currentVisitId = null;
+                document.getElementById("srVisitNo").value = "";
+                document.getElementById("customerName").value = "";
+                document.getElementById("customerAddress").value = "";
+                document.getElementById("srVisitDate").value = "";
+                document.getElementById("mainRemarks").value = "";
+                document.getElementById("purposeVisit").value = "";
+                document.getElementById("customerRequirement").value = "";
+                expenseData = [];
+                contactData = [];
+                renderExpenseTable();
+                renderContactTable();
+            }
+
+            loadVisits();
+            renderReportList();
+            showToast("Report deleted successfully", "error");
+        }
+
+        function openReminderForVisit(id) {
+            let v = null;
+            if (id) {
+                const visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+                v = visits.find(visit => visit.id === id);
+            } else if (document.getElementById('customerName').value) {
+                v = {
+                    customerName: document.getElementById('customerName').value,
+                    customerAddress: document.getElementById('customerAddress').value,
+                    visitNo: document.getElementById('srVisitNo').value
+                };
+            }
+
+            if (!v || !v.customerName) {
+                showToast("Please select a visit or fill out the form first.", "warning");
+                return;
+            }
+
+            const qs = new URLSearchParams({
+                cname: v.customerName || '',
+                address: v.customerAddress || '',
+                bno: v.visitNo || '',
+                type: 'Follow-up'
+            }).toString();
+
+            const url = `reminder.html?${qs}`;
+            window.open(url, 'Reminder_' + Date.now(), 'width=1100,height=700,resizable=yes,scrollbars=yes');
+        }
+
         // Initialize themes
         applyTheme();
         applyGreyButtons();
+        updateColumnStyles();
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
             if (currentTheme === "system") applyTheme();
         });
