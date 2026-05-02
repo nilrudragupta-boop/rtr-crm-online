@@ -327,6 +327,18 @@
                 transform: rotate(360deg);
             }
         }
+
+        .btn-spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
     </style>
 </head>
 
@@ -361,7 +373,7 @@
                 <label for="rememberMe"
                     style="color: #2c3e50; font-size: 14px; cursor: pointer; user-select: none;">Remember Me</label>
             </div>
-            <button type="submit" style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
+            <button type="submit" id="loginBtn" style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
                 Login</button>
             <button id="closeBtn" onclick="closeWindowWithWarning()" style="background:#ad2d2d;"> ❌ Close</button>
             <div style="margin-top: 15px; text-align: center; display: flex; justify-content: center; gap: 15px;">
@@ -772,7 +784,7 @@
 
         // Constants
         let savedExpiry = localStorage.getItem("licenseExpiry");
-        let EXPIRY_DATE = new Date("2026-06-23T23:59:59"); // Default fallback
+        let EXPIRY_DATE = null; // Automatically pull from Cloud (Google Sheets)
         if (savedExpiry) {
             let parsedDate = new Date(savedExpiry);
             if (!isNaN(parsedDate.getTime())) { // Only use it if it's a valid date
@@ -1135,12 +1147,12 @@
         }
 
         async function validateLogin() {
-            const loginBtn = document.getElementById('loginBtn');
+            const loginBtn = document.getElementById('loginBtn') || document.querySelector('button[type="submit"]');
             const originalBtnText = loginBtn ? loginBtn.innerHTML : '🔓 Login';
             const setSpinning = () => {
                 if (loginBtn) {
                     loginBtn.disabled = true;
-                    loginBtn.innerHTML = '<span class="login-spinner"></span> Authenticating...';
+                    loginBtn.innerHTML = '<span class="btn-spinner"></span> Authenticating...';
                 }
             };
 
@@ -1187,7 +1199,7 @@
                 }
             }
 
-            if (today > EXPIRY_DATE) {
+        if (EXPIRY_DATE && today > EXPIRY_DATE) {
                 window.location.href = 'expired.html';
                 return;
             }
@@ -1273,9 +1285,9 @@
         }
 
         async function fetchAndRetryLogin(username, password, contactNumber) {
-            const loginBtn = document.querySelector('button[onclick="validateLogin()"]');
+            const loginBtn = document.getElementById('loginBtn');
             const originalBtnText = loginBtn ? loginBtn.innerHTML : '🔓 Login';
-            if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = 'Syncing Cloud...'; }
+            if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = '<span class="btn-spinner"></span> Syncing Cloud...'; }
 
             let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
 
@@ -1324,6 +1336,7 @@
         function checkRenewButtonVisibility() {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            if (!EXPIRY_DATE) return;
             const timeDiff = EXPIRY_DATE - today;
             const daysLeft = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
             const renewBtn = document.getElementById('renewLicenseBtn');

@@ -2187,7 +2187,7 @@
         let currentUserForLicense = localStorage.getItem("currentUser") || "Admin";
         let userExpiries = JSON.parse(localStorage.getItem("userExpiries") || "{}");
         let savedExpiry = userExpiries[currentUserForLicense] || localStorage.getItem("licenseExpiry"); // Fallback to global
-        let EXPIRY_DATE = new Date("2026-06-23T23:59:59"); // Default fallback
+        let EXPIRY_DATE = null; // Automatically pull from Cloud (Google Sheets)
         if (savedExpiry) {
             let parsedDate = new Date(savedExpiry);
             if (!isNaN(parsedDate.getTime())) { // Only use it if it's a valid date
@@ -2410,6 +2410,7 @@
         function updateLicenseDisplay() {
             const display = document.getElementById('licenseExpiryDisplay');
             if (!display) return;
+            if (!EXPIRY_DATE) { display.innerText = 'Syncing cloud...'; return; }
 
             const daysLeft = Math.ceil((EXPIRY_DATE - new Date()) / (1000 * 60 * 60 * 24));
             display.innerText = EXPIRY_DATE.toLocaleDateString() + ` (${daysLeft} days left)`;
@@ -2427,6 +2428,7 @@
         }
 
         function enforceLicenseExpiry() {
+            if (!EXPIRY_DATE) return; // Wait for cloud sync
             const today = new Date();
             if (today > EXPIRY_DATE) {
                 window.location.href = 'expired.html';
@@ -4162,6 +4164,7 @@
         }
 
         function checkExpiryWarning() {
+            if (!EXPIRY_DATE) return;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const timeDiff = EXPIRY_DATE - today;
