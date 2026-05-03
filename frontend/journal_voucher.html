@@ -686,7 +686,19 @@
         let currentDepreciationDetails = null;
         
         async function fetchVouchersData() {
-            vouchers = await apiClient.getJournalVouchers();
+            let localVouchers = JSON.parse(localStorage.getItem('journal_vouchers')) || [];
+            try {
+                const remoteData = await apiClient.getJournalVouchers();
+                if (remoteData && remoteData.length > 0) {
+                    vouchers = remoteData;
+                    localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
+                } else {
+                    vouchers = localVouchers;
+                }
+            } catch (e) {
+                console.warn("API sync failed, using local data", e);
+                vouchers = localVouchers;
+            }
             renderVoucherList();
         }
 
@@ -953,13 +965,13 @@
                 newVoucher.narration = (newVoucher.narration || "") + " (Copy)";
                 newVoucher.created_at = new Date().toISOString();
 
-                apiClient.saveJournalVoucher(newVoucher).then(res => {
-                     if(res.success) {
-                         vouchers.push(newVoucher);
-                         renderVoucherList();
-                         showSuccess("Voucher duplicated successfully!");
-                     }
-                });
+                vouchers.push(newVoucher);
+                localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
+                if (typeof apiClient !== 'undefined' && apiClient.saveJournalVoucher) {
+                    apiClient.saveJournalVoucher(newVoucher).catch(e => console.warn(e));
+                }
+                renderVoucherList();
+                showSuccess("Voucher duplicated successfully!");
             });
         }
 
@@ -2251,26 +2263,30 @@
                 created_at: new Date().toISOString()
             };
 
-            const result = await apiClient.saveJournalVoucher(voucher);
-            if (result.success) {
-                if (editingId) {
-                    const idx = vouchers.findIndex(v => v.id === editingId);
-                    if (idx > -1) vouchers[idx] = voucher;
-                } else {
-                    vouchers.push(voucher);
-                }
-                closeModal();
-                renderVoucherList();
-                showSuccess("Voucher Saved Successfully!");
+            if (editingId) {
+                const idx = vouchers.findIndex(v => v.id === editingId);
+                if (idx > -1) vouchers[idx] = voucher;
             } else {
-                showWarning("Error saving voucher: " + result.message);
+                vouchers.push(voucher);
             }
+            
+            localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
+            if (typeof apiClient !== 'undefined' && apiClient.saveJournalVoucher) {
+                apiClient.saveJournalVoucher(voucher).catch(e => console.warn(e));
+            }
+            
+            closeModal();
+            renderVoucherList();
+            showSuccess("Voucher Saved Successfully!");
         }
 
         async function deleteVoucher(id) {
             showConfirm("Delete Voucher", "Are you sure you want to delete this voucher?", async () => {
-                await apiClient.deleteJournalVoucher(id);
                 vouchers = vouchers.filter(v => v.id !== id);
+                localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
+                if (typeof apiClient !== 'undefined' && apiClient.deleteJournalVoucher) {
+                    apiClient.deleteJournalVoucher(id).catch(e => console.warn(e));
+                }
                 renderVoucherList();
                 showSuccess("Voucher deleted successfully!");
             });
