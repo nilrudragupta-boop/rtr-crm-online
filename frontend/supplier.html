@@ -1255,7 +1255,11 @@
                 const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(String(num))}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
                 return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(String(num), searchTerm)}${waLink}</div>`;
             }).join('') : '-'}</td>
-            <td>${s.email ? `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(s.email)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(s.email, searchTerm)}</a>` : '-'}</td>
+            <td>${s.email ? String(s.email).split(/[, ]+/).filter(e => e).map(em => {
+                const mailLink = `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(em)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(String(em), searchTerm)}</a>`;
+                const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); showToast('Email copied to clipboard', 'success');" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy"></i></a>`;
+                return `<div style="white-space:nowrap; margin-bottom:2px;">${mailLink}${copyLink}</div>`;
+            }).join('') : '-'}</td>
             <td>${highlightMatch(s.gstin, searchTerm)}</td>
             <td>${highlightMatch(s.address, searchTerm)}</td>
             <td>${highlightMatch(s.pin, searchTerm)}</td>

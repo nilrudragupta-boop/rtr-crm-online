@@ -826,7 +826,11 @@
                     <td>${highlightMatch(c.designation, term) || '-'}</td>
                     <td>${highlightMatch(c.department, term) || '-'}</td>
                     <td>${mobileHtml}</td>
-                    <td>${c.email ? `<a href="mailto:${c.email}" style="color:#0d6efd; text-decoration:none;">${highlightMatch(c.email, term)}</a>` : '-'}</td>
+                    <td>${c.email ? String(c.email).split(/[, ]+/).filter(e => e).map(em => {
+                        const mailLink = `<a href="mailto:${em}" style="color:#0d6efd; text-decoration:none;"><i class="fas fa-envelope" style="font-size:12px; margin-right:4px;"></i>${highlightMatch(String(em), term)}</a>`;
+                        const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); this.style.color='#27ae60'; setTimeout(()=>this.style.color='#6c757d', 1000);" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy" style="font-size:12px;"></i></a>`;
+                        return `<div style="margin-bottom: 2px; white-space: nowrap;">${mailLink}${copyLink}</div>`;
+                    }).join('') : '-'}</td>
                     <td>${highlightMatch(c.remarks, term) || '-'}</td>
                     <td style="text-align: center;">
                         <button class="btn-info" style="padding: 4px 8px; font-size: 12px;" onclick="openAttachmentsModal('${c._id}')" title="Attachments"><i class="fas fa-paperclip"></i>${attachBadge}</button>
