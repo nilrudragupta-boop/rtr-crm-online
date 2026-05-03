@@ -1498,7 +1498,12 @@
           <td>${startIndex + i + 1}</td>
           <td>${highlightMatch(c.name, searchTerm)}</td>
           <td>${highlightMatch(c.address, searchTerm)}</td>
-          <td>${c.contact ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(c.contact)}')" style="color:#27ae60; text-decoration:none; font-weight:bold;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i> ${highlightMatch(c.contact, [searchTerm, searchContact])}</a>` : '-'}</td>
+          <td>${c.contact ? c.contact.split(/[, ]+/).filter(n => n).map(num => {
+              const cleanNo = num.replace(/\D/g, '');
+              const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt"></i></a>` : '';
+              const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(num)}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
+              return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(num, [searchTerm, searchContact])}${waLink}</div>`;
+          }).join('') : '-'}</td>
           <td>${c.email ? `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(c.email)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(c.email, searchTerm)}</a>` : '-'}</td>
           <td>${highlightMatch(c.pin || '', searchTerm)}</td>
           <td>${highlightMatch(c.district || '', searchTerm)}</td>
