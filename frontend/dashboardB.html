@@ -5795,41 +5795,50 @@
             tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">Loading...</td></tr>';
             modal.style.display = 'flex';
 
-            if (window.electronAPI && window.electronAPI.getAppSettings) {
-                try {
+            let history = [];
+            try {
+                if (window.electronAPI && window.electronAPI.getAppSettings) {
                     const settings = await window.electronAPI.getAppSettings();
-                    const history = settings.loginHistory || [];
-
-                    // Filter last 7 days
-                    const sevenDaysAgo = new Date();
-                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-                    const filtered = history.filter(entry => {
-                        const entryDate = new Date(entry.timestamp);
-                        return entryDate >= sevenDaysAgo;
-                    }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                    tbody.innerHTML = '';
-                    if (filtered.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">No logins in last 7 days.</td></tr>';
+                    history = settings.loginHistory || [];
+                } else {
+                    let settingsData = null;
+                    if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
+                        settingsData = await apiClient.getSettings();
                     } else {
-                        filtered.forEach(entry => {
-                            const dateStr = new Date(entry.timestamp).toLocaleString('en-GB');
-                            const tr = document.createElement('tr');
-                            tr.innerHTML = `
-                                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.username || 'Unknown'}</td>
-                                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${dateStr}</td>
-                                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.machine || '-'}</td>
-                            `;
-                            tbody.appendChild(tr);
-                        });
+                        const res = await fetch('/api/settings');
+                        const json = await res.json();
+                        if (json.success) settingsData = json.data;
                     }
-                } catch (e) {
-                    console.error(e);
-                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px; color:red;">Error loading history</td></tr>';
+                    history = (settingsData && (settingsData.loginHistory || settingsData.LOGIN_HISTORY)) || JSON.parse(localStorage.getItem('LOGIN_HISTORY') || '[]');
                 }
+            } catch (e) {
+                console.error("Error loading history:", e);
+                history = JSON.parse(localStorage.getItem('LOGIN_HISTORY') || '[]');
+            }
+
+            // Filter last 7 days
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+            const filtered = history.filter(entry => {
+                const entryDate = new Date(entry.timestamp);
+                return entryDate >= sevenDaysAgo;
+            }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            tbody.innerHTML = '';
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">No logins in last 7 days.</td></tr>';
             } else {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">History not available (API missing)</td></tr>';
+                filtered.forEach(entry => {
+                    const dateStr = new Date(entry.timestamp).toLocaleString('en-GB');
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.username || 'Unknown'}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${dateStr}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.machine || '-'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
             }
         }
 

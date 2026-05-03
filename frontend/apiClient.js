@@ -36,6 +36,18 @@ const apiClient = {
         }
     },
 
+    // --- Settings ---
+    getSettings: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/settings${apiClient._getAuthQuery()}`);
+            const result = await response.json();
+            return result.success ? result.data : null;
+        } catch (error) {
+            console.error('Error fetching settings:', error);
+            return null;
+        }
+    },
+
     // --- Customers ---
     getCustomers: async () => {
         try {
