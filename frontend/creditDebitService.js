@@ -223,12 +223,12 @@ class CreditDebitService {
         let addressLine2 = "";
         let contact = "";
 
-        if (window.getBrandSettings) {
-            const brand = window.getBrandSettings();
-            if (brand.companyName) companyName = brand.companyName;
+        if (typeof window.BrandService !== 'undefined') {
+            const brand = window.BrandService.getBrand();
+            if (brand.name) companyName = brand.name;
             if (brand.addressLine1) addressLine1 = brand.addressLine1;
             if (brand.addressLine2) addressLine2 = brand.addressLine2;
-            if (brand.contactNumber) contact = brand.contactNumber;
+            if (brand.phone) contact = brand.phone;
         }
 
         // Header

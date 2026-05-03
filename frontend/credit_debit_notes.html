@@ -604,7 +604,19 @@
         });
 
         async function fetchNotesData() {
-            notes = await apiClient.getCreditDebitNotes();
+            let localNotes = JSON.parse(localStorage.getItem('credit_debit_notes')) || [];
+            try {
+                const remoteData = await apiClient.getCreditDebitNotes();
+                if (remoteData && remoteData.length > 0) {
+                    notes = remoteData;
+                    localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
+                } else {
+                    notes = localNotes;
+                }
+            } catch (e) {
+                console.warn("API sync failed, using local data", e);
+                notes = localNotes;
+            }
             renderTable();
         }
 
@@ -964,14 +976,14 @@
 
             const newNote = window.creditDebitService.createNoteObject(type, selectedInvoice, noteData);
 
-            const result = await apiClient.saveCreditDebitNote(newNote);
-            if (result.success) {
-                alert("Note Saved Successfully!");
-                closeCreateModal();
-                await fetchNotesData();
-            } else {
-                alert("Error saving note: " + result.message);
+            notes.push(newNote);
+            localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
+            if (typeof apiClient !== 'undefined' && apiClient.saveCreditDebitNote) {
+                apiClient.saveCreditDebitNote(newNote).catch(e => console.warn(e));
             }
+            alert("Note Saved Successfully!");
+            closeCreateModal();
+            renderTable();
         }
 
         async function cancelNote(id) {
@@ -979,8 +991,11 @@
             const idx = notes.findIndex(n => n.id === id);
             if (idx > -1) {
                 notes[idx].status = 'CANCELLED';
-                await apiClient.saveCreditDebitNote(notes[idx]);
-                await fetchNotesData();
+                localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
+                if (typeof apiClient !== 'undefined' && apiClient.saveCreditDebitNote) {
+                    apiClient.saveCreditDebitNote(notes[idx]).catch(e => console.warn(e));
+                }
+                renderTable();
             }
         }
 
@@ -1003,9 +1018,9 @@
             const gstin = note.gstin || party.gst || party.gstin || '-';
 
             let companyName = "Company Name";
-            if (window.getBrandSettings) {
-                const brand = window.getBrandSettings();
-                if (brand.companyName) companyName = brand.companyName;
+            if (typeof window.BrandService !== 'undefined') {
+                const brand = window.BrandService.getBrand();
+                if (brand.name) companyName = brand.name;
             }
 
             let html = `
