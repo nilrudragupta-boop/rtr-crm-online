@@ -1440,10 +1440,11 @@
                 if (window.electronAPI) {
                     response = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, scriptUrl, currentExpiry);
                 } else {
-                    response = await fetch('/api/request-renewal-otp', {
+                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                    response = await fetch(`${baseUrl}/request-renewal-otp`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry })
+                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry, scriptUrl })
                     }).then(res => res.json());
                 }
                 if (response.success) {
@@ -1472,7 +1473,8 @@
             if (window.electronAPI) {
                 response = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                response = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
+                const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                response = await fetch(`${baseUrl}/verify-renewal-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (response.success) {
                 const newExpiry = new Date(response.newExpiry);

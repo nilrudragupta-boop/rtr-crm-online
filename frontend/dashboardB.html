@@ -4261,14 +4261,16 @@
 
             try {
                 const currentExpiry = localStorage.getItem("licenseExpiry");
+                const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
                 let res;
                 if (window.electronAPI) {
-                    res = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, null, currentExpiry);
+                    res = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, scriptUrl, currentExpiry);
                 } else {
-                    res = await fetch('/api/request-renewal-otp', {
+                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                    res = await fetch(`${baseUrl}/request-renewal-otp`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry })
+                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry, scriptUrl })
                     }).then(r => r.json());
                 }
                 if (res.success) {
@@ -4315,7 +4317,8 @@
             if (window.electronAPI) {
                 res = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                res = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
+                const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                res = await fetch(`${baseUrl}/verify-renewal-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (res.success) {
                 closeRenewalOtpModal();
