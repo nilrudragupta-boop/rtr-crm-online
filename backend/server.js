@@ -178,6 +178,12 @@ app.get('/api/customers', async (req, res) => {
 app.post('/api/customers', async (req, res) => {
     try {
         const payload = req.body;
+        if (payload.name === "ANONYMOUS") {
+            const query = { name: "ANONYMOUS" };
+            if (payload.createdBy) query.createdBy = payload.createdBy;
+            const updated = await Customer.findOneAndUpdate(query, payload, { new: true, upsert: true });
+            return res.status(200).json({ success: true, data: updated });
+        }
         if (payload.id) {
             const updated = await Customer.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });
@@ -244,6 +250,12 @@ app.get('/api/suppliers', async (req, res) => {
 app.post('/api/suppliers', async (req, res) => {
     try {
         const payload = req.body;
+        if (payload.name === "ANONYMOUS") {
+            const query = { name: "ANONYMOUS" };
+            if (payload.createdBy) query.createdBy = payload.createdBy;
+            const updated = await Supplier.findOneAndUpdate(query, payload, { new: true, upsert: true });
+            return res.status(200).json({ success: true, data: updated });
+        }
         if (payload.id) {
             const updated = await Supplier.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
             res.status(200).json({ success: true, data: updated });
@@ -261,6 +273,39 @@ app.delete('/api/suppliers/:id', async (req, res) => {
     try {
         await Supplier.findOneAndDelete({ id: req.params.id });
         res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Database Maintenance Routes ---
+app.post('/api/cleanup-anonymous', async (req, res) => {
+    try {
+        let deletedCustomerIds = [];
+        let deletedSupplierIds = [];
+        
+        // Cleanup duplicate anonymous Customers (Keep the oldest one)
+        const anonCustomers = await Customer.find({ name: "ANONYMOUS" }).sort({ createdAt: 1 });
+        if (anonCustomers.length > 1) {
+            const toDelete = anonCustomers.slice(1);
+            deletedCustomerIds = toDelete.map(c => c.id);
+            await Customer.deleteMany({ _id: { $in: toDelete.map(c => c._id) } });
+        }
+
+        // Cleanup duplicate anonymous Suppliers (Keep the oldest one)
+        const anonSuppliers = await Supplier.find({ name: "ANONYMOUS" }).sort({ createdAt: 1 });
+        if (anonSuppliers.length > 1) {
+            const toDelete = anonSuppliers.slice(1);
+            deletedSupplierIds = toDelete.map(s => s.id);
+            await Supplier.deleteMany({ _id: { $in: toDelete.map(s => s._id) } });
+        }
+
+        res.json({ 
+            success: true, 
+            message: `Cleaned up ${deletedCustomerIds.length} duplicate customers and ${deletedSupplierIds.length} duplicate suppliers.`, 
+            deletedCustomerIds, 
+            deletedSupplierIds 
+        });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

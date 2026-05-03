@@ -1162,7 +1162,9 @@
                 customers = localCustomers;
             }
             if (!customers.some(c => c.name === "ANONYMOUS")) {
+                const anonId = generateUniqueId();
                 const anon = {
+                    id: anonId,
                     name: "ANONYMOUS",
                     address: "N/A",
                     contact: "0000000000",
@@ -1176,6 +1178,9 @@
                 customers.push(anon);
                 localStorage.setItem("customers", JSON.stringify(customers));
                 apiClient.saveCustomer(anon).catch(e => console.warn(e));
+                if (typeof db !== 'undefined' && db) {
+                    db.collection('customers').doc(anonId).set(anon).catch(e => console.error("Firestore save error", e));
+                }
             }
             applyFilters();
 
@@ -1622,6 +1627,11 @@
             const openingBalance = parseFloat(document.getElementById("custOpeningBalance").value) || 0;
             const openingBalanceType = document.getElementById("custOpeningBalanceType").value;
             if (!name) return showToast("Name required");
+        
+        if (name.toUpperCase() === "ANONYMOUS" && (!id || (id && customers.find(c => String(c.id) === String(id))?.name !== "ANONYMOUS"))) {
+            return openWarningModal("ANONYMOUS is a reserved system record and cannot be duplicated.");
+        }
+
             if (contact && !/^\d{10}$/.test(contact)) {
                 return openWarningModal("Contact Number must be exactly 10 digits.");
             }

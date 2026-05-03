@@ -254,6 +254,31 @@ const apiClient = {
     },
 
 
+    // --- Maintenance ---
+    cleanupAnonymousRecords: async (firestoreDb) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/cleanup-anonymous${apiClient._getAuthQuery()}`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                if (firestoreDb && result.deletedCustomerIds && result.deletedCustomerIds.length > 0) {
+                    result.deletedCustomerIds.forEach(id => firestoreDb.collection('customers').doc(id).delete().catch(e => console.warn(e)));
+                }
+                if (firestoreDb && result.deletedSupplierIds && result.deletedSupplierIds.length > 0) {
+                    result.deletedSupplierIds.forEach(id => firestoreDb.collection('suppliers').doc(id).delete().catch(e => console.warn(e)));
+                }
+                console.log(result.message);
+            }
+            return result;
+        } catch (error) {
+            console.error('Error cleaning up anonymous records:', error);
+            return { success: false, message: error.message };
+        }
+    },
+
+
     // --- Replaced Electron IPC Calls ---
     sendEmail: async (payload) => {
         try {

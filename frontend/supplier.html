@@ -728,6 +728,9 @@
                 suppliers.push(anon);
                 localStorage.setItem("suppliers", JSON.stringify(suppliers));
                 apiClient.saveSupplier(anon).catch(e => console.warn(e));
+                if (typeof db !== 'undefined' && db) {
+                    db.collection('suppliers').doc(anon.id).set(anon).catch(e => console.error("Firestore save error", e));
+                }
             }
             populateFilters();
             applyFilters();
@@ -1151,6 +1154,11 @@
             const description = document.getElementById("newDescription").value.trim();
 
             if (!name) return openWarningModal("Supplier name cannot be empty");
+        
+        if (name.toUpperCase() === "ANONYMOUS" && (!id || (id && suppliers.find(s => String(s.id) === String(id))?.name !== "ANONYMOUS"))) {
+            return openWarningModal("ANONYMOUS is a reserved system record and cannot be duplicated.");
+        }
+
             if (contact && !/^\d{10}$/.test(contact)) {
                 return openWarningModal("Contact Number must be exactly 10 digits.");
             }
