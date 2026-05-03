@@ -170,6 +170,7 @@ const apiClient = {
 
     getEmployees: () => apiClient._getCollection('employees'),
     saveEmployee: (data) => apiClient._saveCollection('employees', data),
+    deleteEmployee: (id) => apiClient._deleteCollection('employees', id),
 
     // --- Marketing Visits ---
     getMarketingVisits: async (startDate, endDate) => {
