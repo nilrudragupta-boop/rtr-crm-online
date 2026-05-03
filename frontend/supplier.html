@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>Supplier Entries</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
@@ -1248,11 +1249,11 @@
             <td><input type="checkbox" class="supplier-checkbox" value="${s.id}"></td>
             <td>${startIndex + i + 1}</td>
             <td>${highlightMatch(s.name, searchTerm)}</td>
-            <td>${s.contact ? s.contact.split(/[, ]+/).filter(n => n).map(num => {
-                const cleanNo = num.replace(/\D/g, '');
-                const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt"></i></a>` : '';
-                const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(num)}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
-                return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(num, searchTerm)}${waLink}</div>`;
+            <td>${s.contact ? String(s.contact).split(/[, ]+/).filter(n => n).map(num => {
+                const cleanNo = String(num).replace(/\D/g, '');
+                const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone"></i></a>` : '';
+                const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(String(num))}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
+                return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(String(num), searchTerm)}${waLink}</div>`;
             }).join('') : '-'}</td>
             <td>${s.email ? `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(s.email)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(s.email, searchTerm)}</a>` : '-'}</td>
             <td>${highlightMatch(s.gstin, searchTerm)}</td>
@@ -1290,7 +1291,7 @@
 
         function openWhatsApp(number) {
             if (!number) return;
-            const cleanNo = number.replace(/\D/g, '');
+            const cleanNo = String(number).replace(/\D/g, '');
             if (!cleanNo) return showToast("Invalid contact number");
             const url = `https://wa.me/91${cleanNo}`;
             window.open(url, '_blank');
