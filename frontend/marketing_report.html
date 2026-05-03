@@ -189,6 +189,67 @@
             color: #fff !important;
             border-color: #6c757d !important;
         }
+
+        /* Action Dropdown Menu */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .action-btn-main {
+            background-color: #607d8b;
+            color: white;
+            padding: 6px 12px;
+            font-size: 13px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .action-dropdown-content {
+            display: none;
+            position: fixed;
+            background-color: #fff;
+            min-width: 140px;
+            box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 0;
+            text-align: left;
+        }
+        .action-dropdown-content button {
+            color: #333 !important;
+            background: none !important;
+            padding: 8px 16px !important;
+            text-decoration: none !important;
+            display: block !important;
+            width: 100% !important;
+            text-align: left !important;
+            border: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            font-weight: normal !important;
+            font-size: 13px !important;
+        }
+        .action-dropdown-content button:hover {
+            background-color: #f1f1f1 !important;
+            color: #000 !important;
+        }
+        .action-dropdown.active .action-dropdown-content {
+            display: block;
+        }
+        body.dark-mode .action-dropdown-content {
+            background-color: #2c2c2c;
+            border-color: #444;
+        }
+        body.dark-mode .action-dropdown-content button {
+            color: #e0e0e0 !important;
+        }
+        body.dark-mode .action-dropdown-content button:hover {
+            background-color: #3a3a3a !important;
+            color: #fff !important;
+        }
     </style>
 </head>
 
@@ -382,6 +443,21 @@
     </div>
 
     <div id="toast" class="toast"></div>
+
+    <!-- View Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content" style="width: 800px; max-width: 95%;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <h3 style="margin:0; color:#2c3e50;">Report Details</h3>
+                <span style="cursor:pointer; font-size:24px;" onclick="closeViewModal()">&times;</span>
+            </div>
+            <div id="viewContent" style="text-align:left; max-height: 60vh; overflow-y:auto; border:1px solid #ccc; padding:15px; border-radius: 4px;">
+            </div>
+            <div style="margin-top:15px; text-align:right;">
+                <button class="btn" style="background:#6c757d; color:#fff;" onclick="closeViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
@@ -1268,9 +1344,15 @@
                 <td style="padding:8px; text-align:right;">₹ ${expenseTotal.toFixed(2)}</td>
                 <td style="padding:8px; text-align:center;">${contactCount}</td>
                 <td style="padding:8px; text-align:center;">
-                    <button class="btn" style="background:#17a2b8; color:#fff; padding:4px 8px; font-size:12px; margin: 2px;" onclick="openReminderForVisit('${v.id}')" title="Set Reminder">🔔</button>
-                    <button class="btn" style="background:#ffc107; color:#000; padding:4px 8px; font-size:12px; margin: 2px;" onclick="editReportFromList('${v.id}')">✏️ Edit</button>
-                    <button class="btn" style="background:#dc3545; color:#fff; padding:4px 8px; font-size:12px; margin: 2px;" onclick="deleteReportFromList('${v.id}')">🗑️ Delete</button>
+                    <div class="action-dropdown">
+                        <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
+                        <div class="action-dropdown-content">
+                            <button onclick="viewReportFromList('${v.id}')">👁️ View</button>
+                            <button onclick="openReminderForVisit('${v.id}')">🔔 Reminder</button>
+                            <button onclick="editReportFromList('${v.id}')">✏️ Edit</button>
+                            <button onclick="deleteReportFromList('${v.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
+                        </div>
+                    </div>
                 </td>
             `;
                 tbody.appendChild(tr);
@@ -1479,6 +1561,131 @@
             renderReportList();
             showToast("Report deleted successfully", "error");
         }
+
+        function viewReportFromList(id) {
+            let visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+            const v = visits.find(visit => visit.id === id);
+            if (!v) return showToast("Report not found", "warning");
+
+            let expensesHtml = '';
+            if (v.expenses && v.expenses.length > 0) {
+                expensesHtml = `
+                    <table class="pro-table" style="width:100%; margin-top: 10px;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Mode</th>
+                                <th style="text-align:right;">Amount</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${v.expenses.map(e => `
+                                <tr>
+                                    <td>${e.date || '-'}</td>
+                                    <td>${e.expense_type || '-'}</td>
+                                    <td>${e.mode || '-'}</td>
+                                    <td style="text-align:right;">${e.amount || 0}</td>
+                                    <td>${e.remarks || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                expensesHtml = '<p style="color:#666;">No expenses recorded.</p>';
+            }
+
+            let contactsHtml = '';
+            if (v.contacts && v.contacts.length > 0) {
+                contactsHtml = `
+                    <table class="pro-table" style="width:100%; margin-top: 10px;">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Designation</th>
+                                <th>Dept</th>
+                                <th>Mobile</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${v.contacts.map(c => `
+                                <tr>
+                                    <td>${c.name || '-'}</td>
+                                    <td>${c.designation || '-'}</td>
+                                    <td>${c.department || '-'}</td>
+                                    <td>${c.mobile || '-'}</td>
+                                    <td>${c.email || '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                contactsHtml = '<p style="color:#666;">No contacts recorded.</p>';
+            }
+
+            const html = `
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px; font-size:14px; background:#f9f9f9; padding:15px; border-radius:6px; border:1px solid #eee;">
+                    <div>
+                        <strong>Visit No:</strong> ${v.visitNo || '-'}<br>
+                        <strong>Date:</strong> ${v.visitDate ? new Date(v.visitDate).toLocaleDateString('en-GB') : '-'}
+                    </div>
+                    <div style="text-align:right;">
+                        <strong>Customer Name:</strong> ${v.customerName || '-'}<br>
+                        <strong>Address:</strong> ${v.customerAddress || '-'}
+                    </div>
+                </div>
+                <h4 style="margin-bottom: 5px; margin-top:20px; color: #2c3e50;">Purpose of Visit:</h4>
+                <p style="margin-top: 0; font-size: 14px;">${v.purposeVisit || '-'}</p>
+                <h4 style="margin-bottom: 5px; margin-top:15px; color: #2c3e50;">Customer Requirement:</h4>
+                <p style="margin-top: 0; font-size: 14px;">${v.customerRequirement || '-'}</p>
+                <h4 style="margin-bottom: 5px; margin-top:15px; color: #2c3e50;">Main Remarks:</h4>
+                <p style="margin-top: 0; font-size: 14px;">${v.mainRemarks || '-'}</p>
+                <h4 style="margin-bottom: 5px; margin-top:20px; color: #2c3e50; border-bottom:1px solid #eee; padding-bottom:5px;">Contacts</h4>
+                ${contactsHtml}
+                <h4 style="margin-bottom: 5px; margin-top:20px; color: #2c3e50; border-bottom:1px solid #eee; padding-bottom:5px;">Expenses</h4>
+                ${expensesHtml}
+            `;
+
+            document.getElementById('viewContent').innerHTML = html;
+            document.getElementById('viewModal').style.display = 'flex';
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
+        }
+
+        function toggleActionMenu(btn) {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => {
+                if (d !== btn.parentElement) d.classList.remove('active');
+            });
+            const dropdown = btn.parentElement;
+            dropdown.classList.toggle('active');
+            if (dropdown.classList.contains('active')) {
+                const content = dropdown.querySelector('.action-dropdown-content');
+                content.style.display = 'block';
+                const rect = btn.getBoundingClientRect();
+                let top = rect.bottom;
+                let left = rect.right - content.offsetWidth;
+                if (top + content.offsetHeight > window.innerHeight) { top = rect.top - content.offsetHeight; }
+                content.style.top = top + 'px';
+                content.style.left = left + 'px';
+                content.style.display = '';
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.matches('.action-btn-main')) {
+                document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
+            }
+        });
+
+        window.addEventListener('scroll', function () {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
+        }, true);
 
         function openReminderForVisit(id) {
             let v = null;
