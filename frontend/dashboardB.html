@@ -5809,12 +5809,35 @@
                         const json = await res.json();
                         if (json.success) settingsData = json.data;
                     }
-                    history = (settingsData && (settingsData.loginHistory || settingsData.LOGIN_HISTORY)) || JSON.parse(localStorage.getItem('LOGIN_HISTORY') || '[]');
+                    history = (settingsData && (settingsData.loginHistory || settingsData.LOGIN_HISTORY)) || JSON.parse(localStorage.getItem('LOGIN_HISTORY') || 'null');
+                    
+                    if (typeof apiClient !== 'undefined' && apiClient.getLoginHistory && (!history || history.length === 0)) {
+                        const apiHistory = await apiClient.getLoginHistory();
+                        if (apiHistory && apiHistory.length > 0) history = apiHistory;
+                    }
+                    
+                    if (!history || history.length === 0) {
+                        let adminUsers = [];
+                        if (typeof apiClient !== 'undefined' && apiClient.getAdminCreds) {
+                            const credsRes = await apiClient.getAdminCreds();
+                            if (credsRes && credsRes.success && credsRes.adminUsers) adminUsers = credsRes.adminUsers;
+                        }
+                        if (!adminUsers || adminUsers.length === 0) {
+                            adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
+                        }
+                        history = adminUsers.filter(u => u.lastLogin).map(u => ({
+                            username: u.username,
+                            timestamp: u.lastLogin,
+                            machine: 'Browser Web Client'
+                        }));
+                    }
                 }
             } catch (e) {
                 console.error("Error loading history:", e);
                 history = JSON.parse(localStorage.getItem('LOGIN_HISTORY') || '[]');
             }
+            
+            history = history || [];
 
             // Filter last 7 days
             const sevenDaysAgo = new Date();

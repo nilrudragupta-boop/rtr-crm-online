@@ -48,6 +48,28 @@ const apiClient = {
         }
     },
 
+    getAdminCreds: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`);
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error('Error fetching admin creds:', error);
+            return null;
+        }
+    },
+
+    getLoginHistory: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/login-history${apiClient._getAuthQuery()}`);
+            const result = await response.json();
+            return result.success ? result.data : [];
+        } catch (error) {
+            console.error('Error fetching login history:', error);
+            return [];
+        }
+    },
+
     // --- Customers ---
     getCustomers: async () => {
         try {
