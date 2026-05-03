@@ -123,6 +123,29 @@
             bottom: 50px;
         }
 
+        #toast.toast-warning {
+            background-color: #f39c12;
+        }
+
+        #toast.toast-error {
+            background-color: #dc3545;
+        }
+
+        #toast.toast-success {
+            background-color: #27ae60;
+        }
+
+        .po-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .po-item:hover {
+            background: #f1f1f1;
+        }
+
         /* Modal Styles */
         .modal {
             display: none;
@@ -300,6 +323,14 @@
         body.dark-mode .action-dropdown-content button:hover {
             background-color: #3a3a3a !important;
             color: #fff !important;
+        }
+
+        body.dark-mode .po-item {
+            border-bottom-color: #444;
+        }
+
+        body.dark-mode .po-item:hover {
+            background: #3a3a3a;
         }
     </style>
     <!-- Payment Receipt Modal -->
@@ -736,9 +767,16 @@
         <input type="hidden" id="custId">
         <input type="text" id="custName" placeholder="Name">
         <input type="text" id="custAddress" placeholder="Address">
-        <input type="text" id="custContact" placeholder="Contact">
+        <input type="text" id="custContact" placeholder="Contact (comma separated)"
+            oninput="this.value = this.value.replace(/[^0-9, ]/g, '')">
         <input type="email" id="custEmail" placeholder="Email ID">
-        <input type="text" id="custPin" placeholder="PIN No">
+        <div style="display:flex; align-items:center;">
+            <input type="text" id="custPin" placeholder="PIN No" oninput="this.value = this.value.replace(/\D/g, '')"
+                maxlength="6" style="border-top-right-radius:0; border-bottom-right-radius:0; flex:1;">
+            <button class="action" onclick="lookupPincode('custPin', 'custDistrict', 'custState')"
+                title="Lookup Pincode"
+                style="border-top-left-radius:0; border-bottom-left-radius:0; background: #6c757d; margin-left:-1px; padding: 6px 10px;">🔍</button>
+        </div>
         <select id="custDistrict">
             <option value="">Select District</option>
             <option>Purba Bardhaman</option>
@@ -882,6 +920,21 @@
             }
         }
     </style>
+
+    <!-- Pincode Selection Modal -->
+    <div id="pincodeModal" class="modal">
+        <div class="modal-content" style="width: 400px; max-height: 80vh; display: flex; flex-direction: column;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <h3 style="margin:0; color: #2c3e50;">Select Post Office</h3>
+                <button class="close-btn" onclick="document.getElementById('pincodeModal').style.display='none'"
+                    style="padding: 2px 8px;">&times;</button>
+            </div>
+            <div id="pincodeList" style="flex: 1; overflow-y: auto; text-align: left;">
+                <!-- List of post offices -->
+            </div>
+        </div>
+    </div>
 
     <!-- Edit Confirmation Modal -->
     <div id="editConfirmModal" class="modal">
@@ -1627,13 +1680,16 @@
             const openingBalance = parseFloat(document.getElementById("custOpeningBalance").value) || 0;
             const openingBalanceType = document.getElementById("custOpeningBalanceType").value;
             if (!name) return showToast("Name required");
-        
-        if (name.toUpperCase() === "ANONYMOUS" && (!id || (id && customers.find(c => String(c.id) === String(id))?.name !== "ANONYMOUS"))) {
-            return openWarningModal("ANONYMOUS is a reserved system record and cannot be duplicated.");
-        }
 
-            if (contact && !/^\d{10}$/.test(contact)) {
-                return openWarningModal("Contact Number must be exactly 10 digits.");
+            if (name.toUpperCase() === "ANONYMOUS" && (!id || (id && customers.find(c => String(c.id) === String(id))?.name !== "ANONYMOUS"))) {
+                return openWarningModal("ANONYMOUS is a reserved system record and cannot be duplicated.");
+            }
+
+            if (contact) {
+                const numbers = contact.split(/[, ]+/).filter(n => n);
+                if (numbers.some(n => !/^\d{10}$/.test(n))) {
+                    return openWarningModal("Each Contact Number must be exactly 10 digits (separate multiple with commas).");
+                }
             }
             if (pin && !/^\d{6}$/.test(pin)) {
                 return openWarningModal("PIN Code must be exactly 6 digits.");
@@ -1987,10 +2043,18 @@
         }
 
         function showToast(msg) {
+            showToast(msg, 'info');
+        }
+
+        function showToast(msg, type = 'info') {
             const t = document.getElementById("toast");
             t.innerText = msg;
-            t.className = "show";
-            setTimeout(() => (t.className = ""), 3000);
+            let classes = "show";
+            if (type === 'success') classes += ' toast-success';
+            else if (type === 'warning') classes += ' toast-warning';
+            else if (type === 'error') classes += ' toast-error';
+            t.className = classes;
+            setTimeout(() => { t.className = ''; }, 3000);
         }
 
         // Export CSV
@@ -2399,6 +2463,75 @@
             } else {
                 window.open('https://services.gst.gov.in/services/searchtp', '_blank');
             }
+        }
+
+        async function lookupPincode(pinId, districtId, stateId) {
+            const pin = document.getElementById(pinId).value;
+            if (pin.length !== 6) {
+                return showToast("Please enter a valid 6-digit Pincode.", "warning");
+            }
+            showToast("Looking up pincode...");
+            try {
+                const response = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+                const data = await response.json();
+
+                if (data && data[0].Status === "Success") {
+                    const postOffices = data[0].PostOffice;
+                    if (postOffices.length === 1) {
+                        selectPostOffice(postOffices[0], districtId, stateId);
+                    } else {
+                        showPostOfficeModal(postOffices, districtId, stateId);
+                    }
+                } else {
+                    showToast(data[0].Message || "Pincode not found.", "error");
+                }
+            } catch (error) {
+                console.error("Pincode lookup error:", error);
+                showToast("Pincode lookup failed. Check internet connection.", "error");
+            }
+        }
+
+        function showPostOfficeModal(postOffices, districtId, stateId) {
+            const modal = document.getElementById('pincodeModal');
+            const list = document.getElementById('pincodeList');
+            list.innerHTML = '';
+            postOffices.forEach(po => {
+                const div = document.createElement('div');
+                div.className = 'po-item';
+                div.innerHTML = `<strong>${po.Name}</strong><br><small>${po.District}, ${po.State}</small>`;
+                div.onclick = () => {
+                    selectPostOffice(po, districtId, stateId);
+                    modal.style.display = 'none';
+                };
+                list.appendChild(div);
+            });
+            modal.style.display = 'flex';
+        }
+
+        function selectPostOffice(postOffice, districtId, stateId) {
+            const district = postOffice.District;
+            const state = postOffice.State;
+
+            const districtSelect = document.getElementById(districtId);
+            const stateSelect = document.getElementById(stateId);
+
+            if (stateSelect) {
+                stateSelect.value = state;
+                stateSelect.dispatchEvent(new Event('change'));
+            }
+
+            setTimeout(() => {
+                if (districtSelect) {
+                    let optionExists = Array.from(districtSelect.options).some(opt => opt.value === district);
+                    if (!optionExists) {
+                        const newOpt = new Option(district, district, false, true);
+                        districtSelect.add(newOpt);
+                    }
+                    districtSelect.value = district;
+                }
+            }, 100);
+
+            showToast(`Pincode selected: ${postOffice.Name}, ${district}, ${state}.`, "success");
         }
 
         // --- Action Dropdown Logic ---
