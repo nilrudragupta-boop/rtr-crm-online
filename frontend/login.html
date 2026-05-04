@@ -272,8 +272,8 @@
             color: #ffffff;
         }
 
-        /* Message Ticker */
-        .rtr-ticker-wrapper {
+        /* Message Bar */
+        .rtr-message-wrapper {
             width: 100%;
             overflow: hidden;
             background-color: var(--primary-color);
@@ -288,24 +288,24 @@
             z-index: 1000;
         }
 
-        .rtr-ticker-wrapper:hover .rtr-ticker-track {
+        .rtr-message-wrapper:hover .rtr-message-track {
             animation-play-state: paused;
         }
 
-        .rtr-ticker-track {
+        .rtr-message-track {
             display: flex;
             width: max-content;
-            animation: rtr-ticker-scroll 25s linear infinite;
+            animation: rtr-message-scroll 25s linear infinite;
         }
 
-        .rtr-ticker-text {
+        .rtr-message-text {
             white-space: nowrap;
             padding-right: 50px;
             font-weight: bold;
             font-size: 14px;
         }
 
-        @keyframes rtr-ticker-scroll {
+        @keyframes rtr-message-scroll {
             0% {
                 transform: translateX(0);
             }
@@ -340,12 +340,12 @@
 </head>
 
 <body>
-    <!-- Seamless Message Ticker -->
-    <div id="rtrTickerWrapper" class="rtr-ticker-wrapper" style="display: none;">
-        <div id="rtrTickerTrack" class="rtr-ticker-track">
+    <!-- Seamless Message Bar -->
+    <div id="rtrMessageWrapper" class="rtr-message-wrapper" style="display: none;">
+        <div id="rtrMessageTrack" class="rtr-message-track">
             <!-- Injected by JS -->
         </div>
-        <button onclick="dismissTicker()"
+        <button onclick="dismissMessageBar()"
             style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #222; border: none; color: white; font-size: 16px; cursor: pointer; z-index: 10; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; opacity: 0.7;"
             title="Dismiss for session">&times;</button>
     </div>
@@ -827,7 +827,7 @@
             } else {
                 // Web Browser Fallback
                 let scriptUrl = "";
-                let contactNumber = localStorage.getItem("contactNumber") || "";
+                let contactNumber = localStorage.getItem('contactNumber') || (typeof APP_SETTINGS !== 'undefined' ? APP_SETTINGS.CONTACT_NUMBER : "");
                 try {
                     const dbRes = await fetch('/api/settings');
                     const apiData = await dbRes.json();
@@ -879,9 +879,9 @@
                     document.getElementById('cloudAlertModal').style.display = 'block';
                 }
 
-                // Show Cloud Alerts as a scrolling ticker (with dynamic color logic)
-                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0 && sessionStorage.getItem('tickerDismissed') !== 'true') {
-                    initMessageTicker(res.alertMessages);
+                // Show Cloud Alerts as a scrolling message bar (with dynamic color logic)
+                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0 && sessionStorage.getItem('messageBarDismissed') !== 'true') {
+                    initMessageBar(res.alertMessages);
                 }
             }
         }
@@ -1927,20 +1927,20 @@
 
 
 
-        function dismissTicker() {
-            const wrapper = document.getElementById('rtrTickerWrapper');
+        function dismissMessageBar() {
+            const wrapper = document.getElementById('rtrMessageWrapper');
             if (wrapper) wrapper.style.display = 'none';
-            sessionStorage.setItem('tickerDismissed', 'true');
+            sessionStorage.setItem('messageBarDismissed', 'true');
         }
 
-        function initMessageTicker(messages) {
-            const tickerWrapper = document.getElementById('rtrTickerWrapper');
-            const tickerTrack = document.getElementById('rtrTickerTrack');
+        function initMessageBar(messages) {
+            const wrapper = document.getElementById('rtrMessageWrapper');
+            const track = document.getElementById('rtrMessageTrack');
 
-            if (!tickerWrapper || !tickerTrack) return;
+            if (!wrapper || !track) return;
 
             if (!messages || messages.length === 0) {
-                tickerWrapper.style.display = 'none';
+                wrapper.style.display = 'none';
                 return;
             }
 
@@ -1971,18 +1971,18 @@
 
             const combinedMessage = parsedMessages.join(' &nbsp; | &nbsp; ');
 
-            tickerTrack.innerHTML = `
-                <div class="rtr-ticker-text">${combinedMessage}</div>
-                <div class="rtr-ticker-text" aria-hidden="true">${combinedMessage}</div>
+            track.innerHTML = `
+                <div class="rtr-message-text">${combinedMessage}</div>
+                <div class="rtr-message-text" aria-hidden="true">${combinedMessage}</div>
             `;
 
-            tickerWrapper.style.backgroundColor = containerColor;
-            tickerWrapper.style.color = 'white';
-            tickerWrapper.style.display = 'flex';
+            wrapper.style.backgroundColor = containerColor;
+            wrapper.style.color = 'white';
+            wrapper.style.display = 'flex';
 
             const totalMessageLength = combinedMessage.replace(/<[^>]*>?/gm, '').length;
             const duration = Math.max(15, totalMessageLength / 5);
-            tickerTrack.style.animationDuration = `${duration}s`;
+            track.style.animationDuration = `${duration}s`;
         }
 
         function submitRegistration() {
