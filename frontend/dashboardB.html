@@ -508,7 +508,7 @@
             font-weight: bold;
         }
 
-        /* Message Bar */
+        /* Message Ticker */
         .ticker-container {
             width: 100%;
             overflow: hidden;
@@ -556,8 +556,8 @@
             }
         }
 
-        /* Continuous Seamless Message Bar Styles */
-        .rtr-message-wrapper {
+        /* Continuous Seamless Ticker Styles */
+        .rtr-ticker-wrapper {
             width: 100%;
             overflow: hidden;
             background-color: #ffcc00;
@@ -569,14 +569,14 @@
             box-sizing: border-box;
         }
 
-        .rtr-message-track {
+        .rtr-ticker-track {
             display: flex;
             width: max-content;
             /* 'linear' ensures no pause, 'infinite' ensures continuous loop */
-            animation: rtr-message-scroll 25s linear infinite;
+            animation: rtr-ticker-scroll 25s linear infinite;
         }
 
-        .rtr-message-text {
+        .rtr-ticker-text {
             white-space: nowrap;
             padding-right: 50px;
             /* Space between the tail of the first and head of the second */
@@ -585,7 +585,7 @@
         }
 
         /* Moves exactly 50% of the track (which equals one full text block), then snaps back seamlessly */
-        @keyframes rtr-message-scroll {
+        @keyframes rtr-ticker-scroll {
             0% {
                 transform: translateX(0);
             }
@@ -595,8 +595,8 @@
             }
         }
 
-        /* Optional: Pause the message bar when the user hovers over it for easy reading */
-        .rtr-message-wrapper:hover .rtr-message-track {
+        /* Optional: Pause the ticker when the user hovers over it for easy reading */
+        .rtr-ticker-wrapper:hover .rtr-ticker-track {
             animation-play-state: paused;
         }
     </style>
@@ -818,8 +818,7 @@
                         <i class="fas fa-shopping-bag" style="color: #e74a3b;"></i>
                         <span class="nav-text">Purchase Analytics</span>
                     </button>
-                    <button class="nav-item" id="navMarketingReportBtn"
-                        onclick="openWindow('marketing_report.html', 1100, 800)"
+                    <button class="nav-item" id="navMarketingReportBtn" onclick="openWindow('marketing_report.html', 1100, 800)"
                         data-permission-id="perm_marketing_report" title="Marketing Report">
                         <i class="fas fa-bullhorn" style="color: #f39c12;"></i>
                         <span class="nav-text">Marketing Report</span>
@@ -1000,13 +999,15 @@
             <iframe id="spaIframe"
                 style="display:none; width:100%; height:calc(100vh - 75px); border:none; background: var(--bg-color);"></iframe>
 
-            <!-- Seamless Message Bar -->
-            <div id="rtrMessageWrapper" class="rtr-message-wrapper" style="display: none; position: relative;">
-                <div id="rtrMessageTrack" class="rtr-message-track">
-                    <!-- Injected by JS -->
+            <!-- Message Ticker -->
+            <div id="messageTickerContainer" class="ticker-container" style="display: none;">
+                <div class="ticker-wrap" style="padding-right: 40px;">
+                    <div class="ticker-move" id="tickerMove">
+                        <!-- Messages injected by JS -->
+                    </div>
                 </div>
-                <button onclick="dismissMessageBar()"
-                    style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #222; border: none; color: white; font-size: 16px; cursor: pointer; z-index: 10; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; opacity: 0.7;"
+                <button onclick="dismissTicker()"
+                    style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: white; font-size: 20px; cursor: pointer; z-index: 10;"
                     title="Dismiss for session">&times;</button>
             </div>
 
@@ -2536,12 +2537,12 @@
                 const cfData = JSON.parse(localStorage.getItem('CUSTOM_FIELDS') || '[]');
                 const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier', 'Purchase', 'Scrap', 'Production', 'Expense', 'Employee', 'Bank', 'Journal'];
                 const customModules = [...new Set(cfData.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
-
+                
                 const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
                 const currentUser = localStorage.getItem('currentUser') || 'System';
                 const userRole = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]').find(u => u.username === currentUser)?.role || 'User';
                 const authQuery = `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
-
+                
                 for (const mod of customModules) {
                     const localRecords = JSON.parse(localStorage.getItem(`CUSTOM_RECORDS_${mod}`)) || [];
                     localRecords.forEach(record => {
@@ -2592,12 +2593,12 @@
             const collectionsToCheck = ["customers", "invoices", "purchases", "items", "suppliers", "expenses", "credit_debit_notes", "bank_accounts", "bank_transactions", "journal_vouchers", "scraps", "production", "marketing_visits"];
             let currentStateStr = "";
             collectionsToCheck.forEach(c => currentStateStr += (localStorage.getItem(c) || "[]"));
-
+            
             const cfData = JSON.parse(localStorage.getItem('CUSTOM_FIELDS') || '[]');
             const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier', 'Purchase', 'Scrap', 'Production', 'Expense', 'Employee', 'Bank', 'Journal'];
             const customModules = [...new Set(cfData.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
             customModules.forEach(m => currentStateStr += (localStorage.getItem(`CUSTOM_RECORDS_${m}`) || "[]"));
-
+            
             const currentHash = typeof CryptoJS !== 'undefined' ? CryptoJS.MD5(currentStateStr).toString() : currentStateStr.length.toString();
             const lastHash = localStorage.getItem('lastSyncedHash');
 
@@ -2836,7 +2837,7 @@
                 `).join('');
                 }
             }
-
+            
             async function fetchCustomFieldsConfig() {
                 try {
                     const fields = await apiClient.getCustomFields();
@@ -2848,7 +2849,7 @@
                     console.warn("Failed to fetch custom fields config from server:", error);
                 }
             }
-
+            
             loadDynamicCustomPages();
             fetchCustomFieldsConfig();
         });
@@ -4260,16 +4261,14 @@
 
             try {
                 const currentExpiry = localStorage.getItem("licenseExpiry");
-                const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
                 let res;
                 if (window.electronAPI) {
-                    res = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, scriptUrl, currentExpiry);
+                    res = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, null, currentExpiry);
                 } else {
-                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
-                    res = await fetch(`${baseUrl}/request-renewal-otp`, {
+                    res = await fetch('/api/request-renewal-otp', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry, scriptUrl })
+                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry })
                     }).then(r => r.json());
                 }
                 if (res.success) {
@@ -4316,8 +4315,7 @@
             if (window.electronAPI) {
                 res = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
-                res = await fetch(`${baseUrl}/verify-renewal-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
+                res = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (res.success) {
                 closeRenewalOtpModal();
@@ -4345,7 +4343,7 @@
                 res = await window.electronAPI.checkRemoteLicense(currentUser);
             } else {
                 let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
-                let contactNumber = localStorage.getItem('contactNumber') || (typeof APP_SETTINGS !== 'undefined' ? APP_SETTINGS.CONTACT_NUMBER : "");
+                let contactNumber = localStorage.getItem('contactNumber') || "";
 
                 if (scriptUrl && scriptUrl.startsWith("http")) {
                     try {
@@ -4393,26 +4391,68 @@
                     promptForContactAndSyncDashboard(true);
                 }
 
-                // Show Cloud Alerts as a scrolling message bar
-                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0 && sessionStorage.getItem('messageBarDismissed') !== 'true') {
-                    initMessageBar(res.alertMessages);
+                // Show Cloud Alerts as a scrolling ticker
+                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0 && sessionStorage.getItem('tickerDismissed') !== 'true') {
+                    const tickerContainer = document.getElementById('messageTickerContainer');
+                    const tickerMove = document.getElementById('tickerMove');
+                    if (tickerContainer && tickerMove) {
+                        // Clear previous messages and build new ones
+                        tickerMove.innerHTML = '';
+                        let totalMessageLength = 0;
+
+                        res.alertMessages.forEach(message => {
+                            let text = message;
+                            let type = 'normal';
+
+                            const match = text.match(/^\[TYPE:(.*?)\]([\s\S]*)$/);
+                            if (match) {
+                                type = match[1].toLowerCase();
+                                text = match[2];
+                            }
+
+                            let textColor = '#fff';
+                            if (type === 'warning') textColor = '#ff4d4d';
+                            else if (type === 'attention') textColor = '#ffc107';
+                            else if (type === 'normal') textColor = '#64b5f6';
+
+                            const tickerItem = document.createElement('div');
+                            tickerItem.className = 'ticker-item';
+                            tickerItem.style.color = textColor;
+                            tickerItem.innerHTML = `<i class="fas fa-bullhorn"></i> ${text}`;
+                            tickerMove.appendChild(tickerItem);
+                            totalMessageLength += text.length;
+                        });
+
+                        tickerContainer.style.backgroundColor = '#1a1a1a';
+                        tickerContainer.style.borderBottom = '2px solid #333';
+
+                        const dismissBtn = tickerContainer.querySelector('button');
+                        if (dismissBtn) {
+                            dismissBtn.style.color = '#fff';
+                        }
+
+                        tickerContainer.style.display = 'block';
+
+                        // Adjust animation speed based on total text length for a professional feel
+                        // Base speed: 10 chars/sec, min duration 15s, plus buffer for item spacing
+                        const duration = Math.max(15, (totalMessageLength + res.alertMessages.length * 5) / 10);
+                        tickerMove.style.animationDuration = `${duration}s`;
+                    }
                 }
             }
         }
 
         /**
- * Initializes the seamless message bar.
+ * Initializes the seamless message ticker.
  * @param {Array} messages - Array of strings received from Google Apps Script.
  */
-        function initMessageBar(messages) {
-            const wrapper = document.getElementById('rtrMessageWrapper');
-            const track = document.getElementById('rtrMessageTrack');
+        function initMessageTicker(messages) {
+            const tickerWrapper = document.getElementById('rtrTickerWrapper');
+            const tickerTrack = document.getElementById('rtrTickerTrack');
 
-            if (!wrapper || !track) return;
-
-            // Hide message bar if there are no messages
+            // Hide ticker if there are no messages
             if (!messages || messages.length === 0) {
-                wrapper.style.display = 'none';
+                tickerWrapper.style.display = 'none';
                 return;
             }
 
@@ -4445,21 +4485,15 @@
             const combinedMessage = parsedMessages.join(' &nbsp; | &nbsp; ');
 
             // Inject exactly TWO identical copies of the message to achieve the "head-tail-head" seamless loop
-            track.innerHTML = `
-        <div class="rtr-message-text">${combinedMessage}</div>
-        <div class="rtr-message-text" aria-hidden="true">${combinedMessage}</div>
+            tickerTrack.innerHTML = `
+        <div class="rtr-ticker-text">${combinedMessage}</div>
+        <div class="rtr-ticker-text" aria-hidden="true">${combinedMessage}</div>
     `;
 
-            // Show the message bar
-            wrapper.style.backgroundColor = containerColor;
-            wrapper.style.color = 'white';
-            wrapper.style.display = 'flex';
-
-
-            // Adjust animation speed based on total text length
-            const totalMessageLength = combinedMessage.replace(/<[^>]*>?/gm, '').length;
-            const duration = Math.max(15, totalMessageLength / 5);
-            track.style.animationDuration = `${duration}s`;
+            // Show the ticker
+            tickerWrapper.style.backgroundColor = containerColor;
+            tickerWrapper.style.color = priority === 2 ? '#333' : 'white';
+            tickerWrapper.style.display = 'flex';
         }
 
         // Example usage when you call your checkRemoteLicense IPC:
@@ -4470,11 +4504,9 @@
         // });
 
 
-        function dismissMessageBar() {
-            const wrapper = document.getElementById('rtrMessageWrapper');
-
-            if (wrapper) wrapper.style.display = 'none';
-            sessionStorage.setItem('messageBarDismissed', 'true');
+        function dismissTicker() {
+            document.getElementById('messageTickerContainer').style.display = 'none';
+            sessionStorage.setItem('tickerDismissed', 'true');
         }
 
         function openPaymentModal() {
@@ -5294,7 +5326,7 @@
                     const adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
                     const userMatch = adminUsers.find(u => u.username === currentUser);
                     if (userMatch) userRole = userMatch.role || 'User';
-                } catch (e) { }
+                } catch(e) {}
                 const authQuery = `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
 
                 const endpoints = [
@@ -5763,73 +5795,41 @@
             tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">Loading...</td></tr>';
             modal.style.display = 'flex';
 
-            let history = [];
-            try {
-                if (window.electronAPI && window.electronAPI.getAppSettings) {
+            if (window.electronAPI && window.electronAPI.getAppSettings) {
+                try {
                     const settings = await window.electronAPI.getAppSettings();
-                    history = settings.loginHistory || [];
-                } else {
-                    let settingsData = null;
-                    if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
-                        settingsData = await apiClient.getSettings();
+                    const history = settings.loginHistory || [];
+
+                    // Filter last 7 days
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+                    const filtered = history.filter(entry => {
+                        const entryDate = new Date(entry.timestamp);
+                        return entryDate >= sevenDaysAgo;
+                    }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                    tbody.innerHTML = '';
+                    if (filtered.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">No logins in last 7 days.</td></tr>';
                     } else {
-                        const res = await fetch('/api/settings');
-                        const json = await res.json();
-                        if (json.success) settingsData = json.data;
+                        filtered.forEach(entry => {
+                            const dateStr = new Date(entry.timestamp).toLocaleString('en-GB');
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.username || 'Unknown'}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${dateStr}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.machine || '-'}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
                     }
-                    history = (settingsData && (settingsData.loginHistory || settingsData.LOGIN_HISTORY)) || JSON.parse(localStorage.getItem('LOGIN_HISTORY') || 'null');
-
-                    if (typeof apiClient !== 'undefined' && apiClient.getLoginHistory && (!history || history.length === 0)) {
-                        const apiHistory = await apiClient.getLoginHistory();
-                        if (apiHistory && apiHistory.length > 0) history = apiHistory;
-                    }
-
-                    if (!history || history.length === 0) {
-                        let adminUsers = [];
-                        if (typeof apiClient !== 'undefined' && apiClient.getAdminCreds) {
-                            const credsRes = await apiClient.getAdminCreds();
-                            if (credsRes && credsRes.success && credsRes.adminUsers) adminUsers = credsRes.adminUsers;
-                        }
-                        if (!adminUsers || adminUsers.length === 0) {
-                            adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
-                        }
-                        history = adminUsers.filter(u => u.lastLogin).map(u => ({
-                            username: u.username,
-                            timestamp: u.lastLogin,
-                            machine: 'Browser Web Client'
-                        }));
-                    }
+                } catch (e) {
+                    console.error(e);
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px; color:red;">Error loading history</td></tr>';
                 }
-            } catch (e) {
-                console.error("Error loading history:", e);
-                history = JSON.parse(localStorage.getItem('LOGIN_HISTORY') || '[]');
-            }
-
-            history = history || [];
-
-            // Filter last 7 days
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-            const filtered = history.filter(entry => {
-                const entryDate = new Date(entry.timestamp);
-                return entryDate >= sevenDaysAgo;
-            }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-            tbody.innerHTML = '';
-            if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">No logins in last 7 days.</td></tr>';
             } else {
-                filtered.forEach(entry => {
-                    const dateStr = new Date(entry.timestamp).toLocaleString('en-GB');
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.username || 'Unknown'}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${dateStr}</td>
-                        <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${entry.machine || '-'}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:10px;">History not available (API missing)</td></tr>';
             }
         }
 
