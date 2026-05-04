@@ -271,50 +271,42 @@
             color: #ffffff;
         }
 
-        /* Message Ticker */
-        .ticker-container {
+        /* Continuous Seamless Ticker Styles */
+        .rtr-ticker-wrapper {
             width: 100%;
             overflow: hidden;
             background-color: var(--primary-color);
             color: white;
-            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            height: 35px;
+            box-sizing: border-box;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            position: fixed;
-            top: 0;
-            left: 0;
-            z-index: 1000;
         }
 
-        .ticker-wrap {
-            width: 100%;
-            padding-left: 100%;
-            box-sizing: content-box;
-        }
-
-        .ticker-wrap:hover .ticker-move {
+        .rtr-ticker-wrapper:hover .rtr-ticker-track {
             animation-play-state: paused;
         }
 
-        .ticker-move {
-            display: inline-block;
+        .rtr-ticker-track {
+            display: flex;
+            width: max-content;
+            animation: rtr-ticker-scroll 25s linear infinite;
+        }
+
+        .rtr-ticker-text {
             white-space: nowrap;
-            animation: ticker 20s linear infinite;
-        }
-
-        .ticker-item {
-            display: inline-block;
-            padding: 0 2rem;
-            font-size: 18px;
+            padding-right: 50px;
             font-weight: bold;
+            font-size: 14px;
         }
 
-        @keyframes ticker {
+        @keyframes rtr-ticker-scroll {
             0% {
-                transform: translate3d(0, 0, 0);
+                transform: translateX(0);
             }
-
             100% {
-                transform: translate3d(-100%, 0, 0);
+                transform: translateX(-50%);
             }
         }
 
@@ -344,11 +336,9 @@
 
 <body>
     <!-- Message Ticker -->
-    <div id="messageTickerContainer" class="ticker-container" style="display: none;">
-        <div class="ticker-wrap" style="padding-right: 40px;">
-            <div class="ticker-move" id="tickerMove">
-                <!-- Messages injected by JS -->
-            </div>
+    <div id="rtrTickerWrapper" class="rtr-ticker-wrapper" style="display: none; position: fixed; top: 0; left: 0; z-index: 1000;">
+        <div id="rtrTickerTrack" class="rtr-ticker-track">
+            <!-- Messages injected by JS -->
         </div>
         <button onclick="dismissTicker()"
             style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: white; font-size: 20px; cursor: pointer; z-index: 10; width: auto; padding: 0; box-shadow: none; margin: 0;"
@@ -400,6 +390,7 @@
                     style="font-size: 13px; color: #28a745; text-align: center; margin: 5px 0 10px 0; font-weight: bold;">
                 </p>
                 <button onclick="requestRenewalOtp()" style="background: #0313f3; width: 100%;">Request OTP</button>
+                <button onclick="openPaymentModal()" type="button" style="background: #9c27b0; width: 100%; margin-top: 10px;">📱 Make Payment</button>
             </div>
             <div id="renewStep2" style="display:none;">
                 <p style="color: #555; font-size: 13px;">OTP sent to Developer Email. <span id="otpTimer"
@@ -883,51 +874,63 @@
 
                 // Show Cloud Alerts as a scrolling ticker (with dynamic color logic)
                 if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0 && sessionStorage.getItem('tickerDismissed') !== 'true') {
-                    const tickerContainer = document.getElementById('messageTickerContainer');
-                    const tickerMove = document.getElementById('tickerMove');
-                    if (tickerContainer && tickerMove) {
-                        tickerMove.innerHTML = '';
-                        let totalMessageLength = 0;
-                        let containerColor = 'var(--primary-color)';
-                        let priority = 0;
-
-                        res.alertMessages.forEach(message => {
-                            let text = message;
-                            let type = 'normal';
-
-                            const match = text.match(/^\[TYPE:(.*?)\]([\s\S]*)$/);
-                            if (match) {
-                                type = match[1].toLowerCase();
-                                text = match[2];
-                            }
-
-                            let textColor = '#fff';
-                            if (type === 'warning') textColor = '#ff4d4d';
-                            else if (type === 'attention') textColor = '#ffc107';
-                            else if (type === 'normal') textColor = '#64b5f6';
-
-                            const tickerItem = document.createElement('div');
-                            tickerItem.className = 'ticker-item';
-                            tickerItem.style.color = textColor;
-                            tickerItem.innerHTML = `📢 ${text}`; // Using an emoji as fallback since FontAwesome isn't loaded on login.html
-                            tickerMove.appendChild(tickerItem);
-                            totalMessageLength += text.length;
-                        });
-
-                        tickerContainer.style.backgroundColor = '#1a1a1a';
-                        tickerContainer.style.borderBottom = '2px solid #333';
-
-                        const dismissBtn = tickerContainer.querySelector('button');
-                        if (dismissBtn) {
-                            dismissBtn.style.color = '#fff';
-                        }
-
-                        tickerContainer.style.display = 'block';
-                        const duration = Math.max(15, (totalMessageLength + res.alertMessages.length * 5) / 10);
-                        tickerMove.style.animationDuration = `${duration}s`;
-                    }
+                    initMessageTicker(res.alertMessages);
                 }
             }
+        }
+
+        function initMessageTicker(messages) {
+            const tickerWrapper = document.getElementById('rtrTickerWrapper');
+            const tickerTrack = document.getElementById('rtrTickerTrack');
+
+            if (!tickerWrapper || !tickerTrack) return;
+
+            if (!messages || messages.length === 0) {
+                tickerWrapper.style.display = 'none';
+                return;
+            }
+
+            let priority = 0;
+            let containerColor = 'var(--primary-color)';
+
+            const parsedMessages = messages.map(msg => {
+                let text = msg;
+                let type = 'normal';
+                const match = text.match(/^\[TYPE:(.*?)\]([\s\S]*)$/);
+                if (match) {
+                    type = match[1].toLowerCase();
+                    text = match[2];
+                }
+
+                let currentPriority = 1;
+                if (type === 'warning') currentPriority = 3;
+                else if (type === 'attention') currentPriority = 2;
+
+                if (currentPriority > priority) {
+                    priority = currentPriority;
+                    if (type === 'warning') containerColor = 'var(--danger-color)';
+                    else if (type === 'attention') containerColor = 'var(--warning-color)';
+                    else containerColor = 'var(--primary-color)';
+                }
+                return `📢 ${text}`;
+            });
+
+            const combinedMessage = parsedMessages.join(' &nbsp; | &nbsp; ');
+
+            tickerTrack.innerHTML = `
+                <div class="rtr-ticker-text">${combinedMessage}</div>
+                <div class="rtr-ticker-text" aria-hidden="true">${combinedMessage}</div>
+            `;
+
+            tickerWrapper.style.backgroundColor = containerColor;
+            tickerWrapper.style.color = priority === 2 ? '#333' : 'white';
+            tickerWrapper.style.display = 'flex';
+        }
+
+        function dismissTicker() {
+            const tickerWrapper = document.getElementById('rtrTickerWrapper');
+            if (tickerWrapper) tickerWrapper.style.display = 'none';
+            sessionStorage.setItem('tickerDismissed', 'true');
         }
 
         document.addEventListener("DOMContentLoaded", async () => {
@@ -1429,7 +1432,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             const duration = document.getElementById('renewDuration').value;
             const amount = document.getElementById('renewAmount').value;
-            const scriptUrl = localStorage.getItem('backupUrl') || GOOGLE_SCRIPT_URL;
+            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
 
             if (!adminId || !renewalCode || !duration || !amount) { openWarningModal("Please fill all fields."); return; }
 
@@ -1440,10 +1443,11 @@
                 if (window.electronAPI) {
                     response = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, scriptUrl, currentExpiry);
                 } else {
-                    response = await fetch('/api/request-renewal-otp', {
+                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                    response = await fetch(`${baseUrl}/request-renewal-otp`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry })
+                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry, scriptUrl })
                     }).then(res => res.json());
                 }
                 if (response.success) {
@@ -1472,7 +1476,8 @@
             if (window.electronAPI) {
                 response = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                response = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
+                const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                response = await fetch(`${baseUrl}/verify-renewal-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (response.success) {
                 const newExpiry = new Date(response.newExpiry);
@@ -1941,7 +1946,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             document.getElementById('paymentAmountDisplay').innerText = '₹ ' + amount;
             const upiId = "arindammemari-1@okicici";
-            const payeeName = brand - name;
+            const payeeName = "Arindam Ghosh";
             const note = `License Renewal for ${renewalCode} of ${duration} Days`;
             const qrData = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
             const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
