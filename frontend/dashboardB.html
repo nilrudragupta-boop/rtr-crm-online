@@ -552,7 +552,7 @@
             }
 
             100% {
-                transform: translate3d(calc(-100% - 100vw), 0, 0);
+                transform: translate3d(-100%, 0, 0);
             }
         }
 
@@ -818,8 +818,7 @@
                         <i class="fas fa-shopping-bag" style="color: #e74a3b;"></i>
                         <span class="nav-text">Purchase Analytics</span>
                     </button>
-                    <button class="nav-item" id="navMarketingReportBtn"
-                        onclick="openWindow('marketing_report.html', 1100, 800)"
+                    <button class="nav-item" id="navMarketingReportBtn" onclick="openWindow('marketing_report.html', 1100, 800)"
                         data-permission-id="perm_marketing_report" title="Marketing Report">
                         <i class="fas fa-bullhorn" style="color: #f39c12;"></i>
                         <span class="nav-text">Marketing Report</span>
@@ -2538,12 +2537,12 @@
                 const cfData = JSON.parse(localStorage.getItem('CUSTOM_FIELDS') || '[]');
                 const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier', 'Purchase', 'Scrap', 'Production', 'Expense', 'Employee', 'Bank', 'Journal'];
                 const customModules = [...new Set(cfData.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
-
+                
                 const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
                 const currentUser = localStorage.getItem('currentUser') || 'System';
                 const userRole = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]').find(u => u.username === currentUser)?.role || 'User';
                 const authQuery = `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
-
+                
                 for (const mod of customModules) {
                     const localRecords = JSON.parse(localStorage.getItem(`CUSTOM_RECORDS_${mod}`)) || [];
                     localRecords.forEach(record => {
@@ -2594,12 +2593,12 @@
             const collectionsToCheck = ["customers", "invoices", "purchases", "items", "suppliers", "expenses", "credit_debit_notes", "bank_accounts", "bank_transactions", "journal_vouchers", "scraps", "production", "marketing_visits"];
             let currentStateStr = "";
             collectionsToCheck.forEach(c => currentStateStr += (localStorage.getItem(c) || "[]"));
-
+            
             const cfData = JSON.parse(localStorage.getItem('CUSTOM_FIELDS') || '[]');
             const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier', 'Purchase', 'Scrap', 'Production', 'Expense', 'Employee', 'Bank', 'Journal'];
             const customModules = [...new Set(cfData.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
             customModules.forEach(m => currentStateStr += (localStorage.getItem(`CUSTOM_RECORDS_${m}`) || "[]"));
-
+            
             const currentHash = typeof CryptoJS !== 'undefined' ? CryptoJS.MD5(currentStateStr).toString() : currentStateStr.length.toString();
             const lastHash = localStorage.getItem('lastSyncedHash');
 
@@ -2838,7 +2837,7 @@
                 `).join('');
                 }
             }
-
+            
             async function fetchCustomFieldsConfig() {
                 try {
                     const fields = await apiClient.getCustomFields();
@@ -2850,7 +2849,7 @@
                     console.warn("Failed to fetch custom fields config from server:", error);
                 }
             }
-
+            
             loadDynamicCustomPages();
             fetchCustomFieldsConfig();
         });
@@ -4393,56 +4392,51 @@
                 }
 
                 // Show Cloud Alerts as a scrolling ticker
-                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0) {
-                    const hasCriticalWarning = res.alertMessages.some(msg => msg.match(/^\[TYPE:(warning|attention)\]/i));
-                    if (hasCriticalWarning || sessionStorage.getItem('tickerDismissed') !== 'true') {
-                        const tickerContainer = document.getElementById('messageTickerContainer');
-                        const tickerMove = document.getElementById('tickerMove');
-                        if (tickerContainer && tickerMove) {
-                            // Clear previous messages and build new ones
-                            tickerMove.innerHTML = '';
-                            let totalMessageLength = 0;
+                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0 && sessionStorage.getItem('tickerDismissed') !== 'true') {
+                    const tickerContainer = document.getElementById('messageTickerContainer');
+                    const tickerMove = document.getElementById('tickerMove');
+                    if (tickerContainer && tickerMove) {
+                        // Clear previous messages and build new ones
+                        tickerMove.innerHTML = '';
+                        let totalMessageLength = 0;
 
-                            res.alertMessages.forEach(message => {
-                                let text = message;
-                                let type = 'normal';
+                        res.alertMessages.forEach(message => {
+                            let text = message;
+                            let type = 'normal';
 
-                                const match = text.match(/^\[TYPE:(.*?)\]([\s\S]*)$/);
-                                if (match) {
-                                    type = match[1].toLowerCase();
-                                    text = match[2];
-                                }
-
-                                let textColor = '#fff';
-                                if (type === 'warning') textColor = '#ff4d4d';
-                                else if (type === 'attention') textColor = '#ffc107';
-                                else if (type === 'normal') textColor = '#64b5f6';
-
-                                const tickerItem = document.createElement('div');
-                                tickerItem.className = 'ticker-item';
-                                tickerItem.style.color = textColor;
-                                tickerItem.innerHTML = `<i class="fas fa-bullhorn"></i> ${text}`;
-                                tickerMove.appendChild(tickerItem);
-                                totalMessageLength += text.length;
-                            });
-
-                            tickerContainer.style.backgroundColor = '#1a1a1a';
-                            tickerContainer.style.borderBottom = '2px solid #333';
-
-                            const dismissBtn = tickerContainer.querySelector('button');
-                            if (dismissBtn) {
-                                dismissBtn.style.color = '#fff';
-                                dismissBtn.style.display = hasCriticalWarning ? 'none' : 'block';
+                            const match = text.match(/^\[TYPE:(.*?)\]([\s\S]*)$/);
+                            if (match) {
+                                type = match[1].toLowerCase();
+                                text = match[2];
                             }
 
+                            let textColor = '#fff';
+                            if (type === 'warning') textColor = '#ff4d4d';
+                            else if (type === 'attention') textColor = '#ffc107';
+                            else if (type === 'normal') textColor = '#64b5f6';
 
-                            tickerContainer.style.display = 'block';
+                            const tickerItem = document.createElement('div');
+                            tickerItem.className = 'ticker-item';
+                            tickerItem.style.color = textColor;
+                            tickerItem.innerHTML = `<i class="fas fa-bullhorn"></i> ${text}`;
+                            tickerMove.appendChild(tickerItem);
+                            totalMessageLength += text.length;
+                        });
 
-                            // Adjust animation speed based on total text length for a professional feel
-                            // Base speed: 10 chars/sec, min duration 15s, plus buffer for item spacing
-                            const duration = Math.max(15, (totalMessageLength + res.alertMessages.length * 5) / 10);
-                            tickerMove.style.animationDuration = `${duration}s`;
+                        tickerContainer.style.backgroundColor = '#1a1a1a';
+                        tickerContainer.style.borderBottom = '2px solid #333';
+
+                        const dismissBtn = tickerContainer.querySelector('button');
+                        if (dismissBtn) {
+                            dismissBtn.style.color = '#fff';
                         }
+
+                        tickerContainer.style.display = 'block';
+
+                        // Adjust animation speed based on total text length for a professional feel
+                        // Base speed: 10 chars/sec, min duration 15s, plus buffer for item spacing
+                        const duration = Math.max(15, (totalMessageLength + res.alertMessages.length * 5) / 10);
+                        tickerMove.style.animationDuration = `${duration}s`;
                     }
                 }
             }
@@ -5332,7 +5326,7 @@
                     const adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
                     const userMatch = adminUsers.find(u => u.username === currentUser);
                     if (userMatch) userRole = userMatch.role || 'User';
-                } catch (e) { }
+                } catch(e) {}
                 const authQuery = `?user=${encodeURIComponent(currentUser)}&role=${encodeURIComponent(userRole)}`;
 
                 const endpoints = [
@@ -5816,12 +5810,12 @@
                         if (json.success) settingsData = json.data;
                     }
                     history = (settingsData && (settingsData.loginHistory || settingsData.LOGIN_HISTORY)) || JSON.parse(localStorage.getItem('LOGIN_HISTORY') || 'null');
-
+                    
                     if (typeof apiClient !== 'undefined' && apiClient.getLoginHistory && (!history || history.length === 0)) {
                         const apiHistory = await apiClient.getLoginHistory();
                         if (apiHistory && apiHistory.length > 0) history = apiHistory;
                     }
-
+                    
                     if (!history || history.length === 0) {
                         let adminUsers = [];
                         if (typeof apiClient !== 'undefined' && apiClient.getAdminCreds) {
@@ -5842,7 +5836,7 @@
                 console.error("Error loading history:", e);
                 history = JSON.parse(localStorage.getItem('LOGIN_HISTORY') || '[]');
             }
-
+            
             history = history || [];
 
             // Filter last 7 days
