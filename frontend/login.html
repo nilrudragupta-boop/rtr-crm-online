@@ -882,7 +882,10 @@
                 }
 
                 // Show Cloud Alerts as a scrolling ticker (with dynamic color logic)
-                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0 && sessionStorage.getItem('tickerDismissed') !== 'true') {
+                if (res.alertMessages && Array.isArray(res.alertMessages) && res.alertMessages.length > 0) {
+                    // Force show if it contains a high-priority warning, regardless of session storage
+                    const hasCriticalWarning = res.alertMessages.some(msg => msg.match(/^\[TYPE:(warning|attention)\]/i));
+                    if (hasCriticalWarning || sessionStorage.getItem('tickerDismissed') !== 'true') {
                     const tickerContainer = document.getElementById('messageTickerContainer');
                     const tickerMove = document.getElementById('tickerMove');
                     if (tickerContainer && tickerMove) {
@@ -920,11 +923,14 @@
                         const dismissBtn = tickerContainer.querySelector('button');
                         if (dismissBtn) {
                             dismissBtn.style.color = '#fff';
+                            // Hide the dismiss button if the message is critical
+                            dismissBtn.style.display = hasCriticalWarning ? 'none' : 'block';
                         }
 
                         tickerContainer.style.display = 'block';
                         const duration = Math.max(15, (totalMessageLength + res.alertMessages.length * 5) / 10);
                         tickerMove.style.animationDuration = `${duration}s`;
+                    }
                     }
                 }
             }
