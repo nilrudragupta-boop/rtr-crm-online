@@ -314,7 +314,7 @@
             }
 
             100% {
-                transform: translate3d(-100%, 0, 0);
+                transform: translate3d(calc(-100% - 100vw), 0, 0);
             }
         }
 
@@ -373,7 +373,8 @@
                 <label for="rememberMe"
                     style="color: #2c3e50; font-size: 14px; cursor: pointer; user-select: none;">Remember Me</label>
             </div>
-            <button type="submit" id="loginBtn" style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
+            <button type="submit" id="loginBtn"
+                style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
                 Login</button>
             <button id="closeBtn" onclick="closeWindowWithWarning()" style="background:#ad2d2d;"> ❌ Close</button>
             <div style="margin-top: 15px; text-align: center; display: flex; justify-content: center; gap: 15px;">
@@ -400,6 +401,8 @@
                     style="font-size: 13px; color: #28a745; text-align: center; margin: 5px 0 10px 0; font-weight: bold;">
                 </p>
                 <button onclick="requestRenewalOtp()" style="background: #0313f3; width: 100%;">Request OTP</button>
+                <button onclick="openPaymentModal()" type="button"
+                    style="background: #9c27b0; width: 100%; margin-top: 10px;">📱 Make Payment</button>
             </div>
             <div id="renewStep2" style="display:none;">
                 <p style="color: #555; font-size: 13px;">OTP sent to Developer Email. <span id="otpTimer"
@@ -1214,7 +1217,7 @@
                 }
             }
 
-        if (EXPIRY_DATE && today > EXPIRY_DATE) {
+            if (EXPIRY_DATE && today > EXPIRY_DATE) {
                 window.location.href = 'expired.html';
                 return;
             }
@@ -1345,7 +1348,7 @@
                             if (lowerC.sellerstate || lowerC.state) appSettingsUpdates.sellerState = lowerC.sellerstate || lowerC.state;
                             if (lowerC.district) appSettingsUpdates.district = lowerC.district;
                             if (lowerC.currency) appSettingsUpdates.currency = lowerC.currency;
-                            
+
                             Object.keys(appSettingsUpdates).forEach(k => localStorage.setItem(k, appSettingsUpdates[k]));
                         }
 
@@ -1429,7 +1432,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             const duration = document.getElementById('renewDuration').value;
             const amount = document.getElementById('renewAmount').value;
-            const scriptUrl = localStorage.getItem('backupUrl') || GOOGLE_SCRIPT_URL;
+            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
 
             if (!adminId || !renewalCode || !duration || !amount) { openWarningModal("Please fill all fields."); return; }
 
@@ -1440,10 +1443,11 @@
                 if (window.electronAPI) {
                     response = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, scriptUrl, currentExpiry);
                 } else {
-                    response = await fetch('/api/request-renewal-otp', {
+                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                    response = await fetch(`${baseUrl}/request-renewal-otp`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry })
+                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry, scriptUrl })
                     }).then(res => res.json());
                 }
                 if (response.success) {
@@ -1472,7 +1476,8 @@
             if (window.electronAPI) {
                 response = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                response = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
+                const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                response = await fetch(`${baseUrl}/verify-renewal-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (response.success) {
                 const newExpiry = new Date(response.newExpiry);
@@ -1543,7 +1548,7 @@
             const isDrive = document.getElementById('loginBtnDrive').checked;
             const isChrome = document.getElementById('loginBtnChrome').checked;
             const isFirefox = document.getElementById('loginBtnFirefox').checked;
-            
+
             if (isUltra) {
                 window.open('https://www.ultraviewer.net/en/download.html', '_blank');
             } else if (isDrive) {
@@ -1941,7 +1946,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             document.getElementById('paymentAmountDisplay').innerText = '₹ ' + amount;
             const upiId = "arindammemari-1@okicici";
-            const payeeName = brand - name;
+            const payeeName = "Arindam Ghosh";
             const note = `License Renewal for ${renewalCode} of ${duration} Days`;
             const qrData = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
             const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
