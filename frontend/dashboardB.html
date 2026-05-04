@@ -3284,11 +3284,19 @@
                 if (res.companyName) {
                     document.querySelectorAll('[data-brand="name"]').forEach(el => el.innerText = res.companyName);
                 }
+                
+                if (typeof window.BrandService !== 'undefined' && window.BrandService.applyBrand) {
+                    window.BrandService.applyBrand();
+                }
             } else {
                 // Web Browser Fallback
                 const companyName = localStorage.getItem('companyName') || (typeof APP_SETTINGS !== 'undefined' ? APP_SETTINGS.COMPANY_NAME : null);
                 if (companyName) {
                     document.querySelectorAll('[data-brand="name"]').forEach(el => el.innerText = companyName);
+                }
+                
+                if (typeof window.BrandService !== 'undefined' && window.BrandService.applyBrand) {
+                    window.BrandService.applyBrand();
                 }
             }
         }
@@ -4370,7 +4378,13 @@
                     let parsedDate = new Date(res.expiry);
                     if (isNaN(parsedDate.getTime()) && typeof res.expiry === 'string') {
                         const parts = res.expiry.split(/[\/\-]/);
-                        if (parts.length === 3) parsedDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
+                        if (parts.length === 3) {
+                            let day = parts[0];
+                            let month = parts[1];
+                            let year = parts[2];
+                            if (year.length < 4) { year = parts[0]; day = parts[2]; }
+                            parsedDate = new Date(`${year}-${month}-${day}T00:00:00`);
+                        }
                     }
                     if (!isNaN(parsedDate.getTime())) {
                         let userExpiries = JSON.parse(localStorage.getItem("userExpiries") || "{}");
@@ -4399,6 +4413,8 @@
                         // Clear previous messages and build new ones
                         tickerMove.innerHTML = '';
                         let totalMessageLength = 0;
+                        let priority = 0;
+                        let containerColor = 'var(--primary-color)';
 
                         res.alertMessages.forEach(message => {
                             let text = message;
@@ -4410,25 +4426,32 @@
                                 text = match[2];
                             }
 
-                            let textColor = '#fff';
-                            if (type === 'warning') textColor = '#ff4d4d';
-                            else if (type === 'attention') textColor = '#ffc107';
-                            else if (type === 'normal') textColor = '#64b5f6';
+                            let currentPriority = 1;
+                            if (type === 'warning') currentPriority = 3;
+                            else if (type === 'attention') currentPriority = 2;
+
+                            if (currentPriority > priority) {
+                                priority = currentPriority;
+                                if (type === 'warning') containerColor = 'var(--danger-color)';
+                                else if (type === 'attention') containerColor = 'var(--warning-color)';
+                                else containerColor = 'var(--primary-color)';
+                            }
 
                             const tickerItem = document.createElement('div');
                             tickerItem.className = 'ticker-item';
-                            tickerItem.style.color = textColor;
+                            tickerItem.style.color = priority === 2 ? '#333' : '#fff';
                             tickerItem.innerHTML = `<i class="fas fa-bullhorn"></i> ${text}`;
                             tickerMove.appendChild(tickerItem);
                             totalMessageLength += text.length;
                         });
 
-                        tickerContainer.style.backgroundColor = '#1a1a1a';
-                        tickerContainer.style.borderBottom = '2px solid #333';
+                        tickerContainer.style.backgroundColor = containerColor;
+                        tickerContainer.style.color = priority === 2 ? '#333' : 'white';
+                        tickerContainer.style.borderBottom = '2px solid rgba(0,0,0,0.2)';
 
                         const dismissBtn = tickerContainer.querySelector('button');
                         if (dismissBtn) {
-                            dismissBtn.style.color = '#fff';
+                            dismissBtn.style.color = priority === 2 ? '#333' : 'white';
                         }
 
                         tickerContainer.style.display = 'block';
