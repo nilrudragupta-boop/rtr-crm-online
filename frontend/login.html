@@ -400,7 +400,6 @@
                     style="font-size: 13px; color: #28a745; text-align: center; margin: 5px 0 10px 0; font-weight: bold;">
                 </p>
                 <button onclick="requestRenewalOtp()" style="background: #0313f3; width: 100%;">Request OTP</button>
-                <button onclick="openPaymentModal()" type="button" style="background: #9c27b0; width: 100%; margin-top: 10px;">📱 Make Payment</button>
             </div>
             <div id="renewStep2" style="display:none;">
                 <p style="color: #555; font-size: 13px;">OTP sent to Developer Email. <span id="otpTimer"
@@ -1430,7 +1429,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             const duration = document.getElementById('renewDuration').value;
             const amount = document.getElementById('renewAmount').value;
-            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            const scriptUrl = localStorage.getItem('backupUrl') || GOOGLE_SCRIPT_URL;
 
             if (!adminId || !renewalCode || !duration || !amount) { openWarningModal("Please fill all fields."); return; }
 
@@ -1441,11 +1440,10 @@
                 if (window.electronAPI) {
                     response = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, scriptUrl, currentExpiry);
                 } else {
-                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
-                    response = await fetch(`${baseUrl}/request-renewal-otp`, {
+                    response = await fetch('/api/request-renewal-otp', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry, scriptUrl })
+                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry })
                     }).then(res => res.json());
                 }
                 if (response.success) {
@@ -1474,8 +1472,7 @@
             if (window.electronAPI) {
                 response = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
-                response = await fetch(`${baseUrl}/verify-renewal-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
+                response = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (response.success) {
                 const newExpiry = new Date(response.newExpiry);
@@ -1944,7 +1941,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             document.getElementById('paymentAmountDisplay').innerText = '₹ ' + amount;
             const upiId = "arindammemari-1@okicici";
-            const payeeName = "Arindam Ghosh";
+            const payeeName = brand - name;
             const note = `License Renewal for ${renewalCode} of ${duration} Days`;
             const qrData = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
             const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
