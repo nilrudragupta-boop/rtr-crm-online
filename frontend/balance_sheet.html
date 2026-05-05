@@ -772,10 +772,43 @@
                 return total;
             }, 0);
 
+            // 7. Process Journal Vouchers (JVs) for Balance Sheet Accounts
+            const journalVouchers = JSON.parse(localStorage.getItem("journal_vouchers")) || [];
+            const nonAccountingTypes = ['Memorandum', 'Purchase Order', 'Sales Order', 'Delivery Note', 'Receipt Note'];
+            
+            let jvCapital = 0;
+            let jvDrawings = 0;
+            let jvLoans = 0;
+            let jvTaxes = 0;
+
+            journalVouchers.forEach(jv => {
+                if (nonAccountingTypes.includes(jv.voucher_type)) return; // Exclude non-accounting
+                if (jv.date > toDate) return;
+
+                jv.entries.forEach(entry => {
+                    const isDr = entry.type === 'Dr';
+                    const amt = parseFloat(entry.debit || entry.credit || 0);
+                    if (amt === 0) return;
+                    
+                    const acc = entry.account;
+
+                    if (acc === 'Cash') cashInHand += isDr ? amt : -amt;
+                    else if (bankAccounts.some(b => b.name === acc)) bankBalance += isDr ? amt : -amt;
+                    else if (customers.some(c => c.name === acc)) sundryDebtors += isDr ? amt : -amt;
+                    else if (suppliers.some(s => s.name === acc)) sundryCreditors += isDr ? -amt : amt; // Cr increases liability
+                    else if (acc === 'Capital Account') jvCapital += isDr ? -amt : amt; // Cr increases capital
+                    else if (acc === 'Drawings') jvDrawings += isDr ? amt : -amt; // Dr increases drawings
+                    else if (acc === 'Loans (Liability)' || acc.includes('Loan')) jvLoans += isDr ? -amt : amt; // Cr increases loan liability
+                    else if (acc === 'Duties & Taxes' || acc.includes('GST')) jvTaxes += isDr ? -amt : amt; // Cr increases payable tax
+                });
+            });
+
+            dutiesAndTaxes += jvTaxes;
+
             return {
                 liabilities: {
                     capital: {
-                        opening: 0, // Placeholder
+                        opening: jvCapital, // Captures JV Capital Injections
                         retainedEarnings: retainedEarnings,
                         retainedBreakdown: {
                             revenue: retainedRevenue,
@@ -783,9 +816,9 @@
                             expenses: retainedExpenses
                         },
                         netProfit: netProfit,
-                        drawings: 0
+                        drawings: jvDrawings // Captures JV Drawings
                     },
-                    loans: 0,
+                    loans: jvLoans, // Captures JV Loans
                     currentLiabilities: {
                         sundryCreditors: sundryCreditors,
                         dutiesTaxes: dutiesAndTaxes
