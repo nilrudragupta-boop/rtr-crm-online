@@ -74,6 +74,22 @@ const marketingVisitSchema = new mongoose.Schema({
 }, { timestamps: true });
 const MarketingVisit = mongoose.model('MarketingVisit', marketingVisitSchema);
 
+// --- Quotation Schema ---
+const quotationSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    refNo: { type: String },
+    date: { type: String },
+    custName: { type: String },
+    status: { type: String },
+    custContact: { type: String },
+    custAddress: { type: String },
+    items: { type: Array, default: [] },
+    grandTotal: { type: String },
+    terms: { type: String },
+    createdBy: { type: String, default: 'System' }
+}, { timestamps: true });
+const Quotation = mongoose.model('Quotation', quotationSchema);
+
 // --- API Routes ---
 app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });
@@ -200,6 +216,36 @@ app.post('/api/customers', async (req, res) => {
 app.delete('/api/customers/:id', async (req, res) => {
     try {
         await Customer.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Quotation Routes ---
+app.get('/api/quotations', async (req, res) => {
+    try {
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const quotations = await Quotation.find(query).sort({ createdAt: -1 });
+        res.json({ success: true, data: quotations });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/quotations', async (req, res) => {
+    try {
+        const payload = req.body;
+        const updated = await Quotation.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
+        res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/quotations/:id', async (req, res) => {
+    try {
+        await Quotation.findOneAndDelete({ id: req.params.id });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -831,6 +877,7 @@ app.post('/api/restore', async (req, res) => {
         };
 
         await restoreCollection(Customer, backupData['customers']);
+        await restoreCollection(Quotation, backupData['quotations']);
         await restoreCollection(Invoice, backupData['invoices'], 'invoiceNo');
         await restoreCollection(Item, backupData['items']);
         await restoreCollection(Supplier, backupData['suppliers']);

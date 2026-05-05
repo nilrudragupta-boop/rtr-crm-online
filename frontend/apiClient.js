@@ -98,6 +98,11 @@ const apiClient = {
     },
     deleteCustomer: (id) => apiClient._deleteCollection('customers', id),
 
+    // --- Quotations ---
+    getQuotations: () => apiClient._getCollection('quotations'),
+    saveQuotation: (data) => apiClient._saveCollection('quotations', data),
+    deleteQuotation: (id) => apiClient._deleteCollection('quotations', id),
+
     // --- Invoices ---
     getInvoices: async () => {
         try {
