@@ -96,6 +96,7 @@ const apiClient = {
             return { success: false, message: error.message };
         }
     },
+    deleteCustomer: (id) => apiClient._deleteCollection('customers', id),
 
     // --- Invoices ---
     getInvoices: async () => {

@@ -197,6 +197,15 @@ app.post('/api/customers', async (req, res) => {
     }
 });
 
+app.delete('/api/customers/:id', async (req, res) => {
+    try {
+        await Customer.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- Invoice Routes ---
 // Fetch all invoices
 app.get('/api/invoices', async (req, res) => {
@@ -283,7 +292,7 @@ app.post('/api/cleanup-anonymous', async (req, res) => {
     try {
         let deletedCustomerIds = [];
         let deletedSupplierIds = [];
-        
+
         // Cleanup duplicate anonymous Customers (Keep the oldest one)
         const anonCustomers = await Customer.find({ name: "ANONYMOUS" }).sort({ createdAt: 1 });
         if (anonCustomers.length > 1) {
@@ -300,11 +309,11 @@ app.post('/api/cleanup-anonymous', async (req, res) => {
             await Supplier.deleteMany({ _id: { $in: toDelete.map(s => s._id) } });
         }
 
-        res.json({ 
-            success: true, 
-            message: `Cleaned up ${deletedCustomerIds.length} duplicate customers and ${deletedSupplierIds.length} duplicate suppliers.`, 
-            deletedCustomerIds, 
-            deletedSupplierIds 
+        res.json({
+            success: true,
+            message: `Cleaned up ${deletedCustomerIds.length} duplicate customers and ${deletedSupplierIds.length} duplicate suppliers.`,
+            deletedCustomerIds,
+            deletedSupplierIds
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
