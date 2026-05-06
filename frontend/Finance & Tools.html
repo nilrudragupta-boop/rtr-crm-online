@@ -444,10 +444,7 @@
             }
         }
 
-        /* Invert TradingView Ticker Colors in Dark Mode */
-        [data-theme="dark"] .tradingview-widget-container {
-            filter: invert(1) hue-rotate(180deg);
-        }
+        /* TradingView ticker dark/light colorTheme is set dynamically via buildTicker() */
 
         /* Modal Styles */
         .modal {
@@ -519,11 +516,61 @@
             width: auto;
             margin-left: 10px;
         }
+
+        .tradingview-widget-container {
+    height: 60px !important;
+}
+
+        .loading-blur {
+            filter: blur(4px);
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Custom API Ticker Styles */
+        .custom-ticker-wrapper {
+            display: flex;
+            overflow: hidden;
+            background: var(--card-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            height: 56px;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+            white-space: nowrap;
+        }
+        .custom-ticker-track {
+            display: flex;
+            width: max-content;
+            animation: customTickerScroll 25s linear infinite;
+        }
+        .custom-ticker-wrapper:hover .custom-ticker-track {
+            animation-play-state: paused;
+        }
+        @keyframes customTickerScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .custom-ticker-item {
+            display: inline-flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .custom-ticker-price { margin-left: 8px; font-family: monospace; font-size: 15px; }
+        .custom-ticker-change { margin-left: 6px; font-size: 13px; }
+        .custom-ticker-up { color: #10b981; }
+        .custom-ticker-down { color: #ef4444; }
     </style>
 </head>
 
 <body>
     <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle Dark Mode">🌙</button>
+    <button class="theme-toggle" onclick="toggleTickerMode()" aria-label="Toggle Custom Ticker" style="right: 70px;" title="Switch Ticker Mode">📊</button>
 
     <div class="app-container">
         <!-- Sidebar Navigation -->
@@ -550,47 +597,17 @@
         <div class="main-content">
 
             <!-- Live Market Ticker -->
-            <div class="tradingview-widget-container" style="margin-bottom: 20px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); background: var(--card-bg); min-height: 44px; width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <div class="tradingview-widget-container__widget"></div>
-                <!-- prettier-ignore -->
+            <div id="tickerContainer">
+                <div id="tickerWrapper" class="tradingview-widget-container" style="margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: var(--card-bg); width: 100%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-height: 56px;">
+                    <div class="tradingview-widget-container__widget"></div>
+                </div>
 
-                <script type="text/javascript" src="https://s.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-                {
-                    "symbols": [
-                        { "description": "NIFTY 50", "proName": "NSE:NIFTY" },
-                        { "description": "SENSEX", "proName": "BSE:SENSEX" },
-                        { "description": "NIFTY BANK", "proName": "NSE:BANKNIFTY" },
-                        { "description": "NIFTY IT", "proName": "NSE:CNXIT" },
-                        { "description": "RELIANCE", "proName": "BSE:RELIANCE" },
-                        { "description": "HDFC BANK", "proName": "BSE:HDFCBANK" },
-                        { "description": "TCS", "proName": "BSE:TCS" },
-                        { "description": "INFY", "proName": "BSE:INFY" },
-                        { "description": "ITC", "proName": "BSE:ITC" },
-                        { "description": "SUNPHARMA", "proName": "BSE:SUNPHARMA" },
-                        { "description": "HINDUNILVR", "proName": "BSE:HINDUNILVR" },
-                        { "description": "TATAMOTORS", "proName": "BSE:TATAMOTORS" },
-                        { "description": "TATASTEEL", "proName": "BSE:TATASTEEL" },
-                        { "description": "HINDALCO", "proName": "BSE:HINDALCO" },
-                        { "description": "ICICIBANK", "proName": "BSE:ICICIBANK" },
-                        { "description": "MARUTI", "proName": "BSE:MARUTI" },
-                        { "description": "AXIS BANK", "proName": "BSE:AXISBANK" },
-                        { "description": "WIPRO", "proName": "BSE:WIPRO" },
-                        { "description": "KOTAK BANK", "proName": "BSE:KOTAKBANK" },
-                        { "description": "BAJFINANCE", "proName": "BSE:BAJFINANCE" },
-                        { "description": "ADANIPORTS", "proName": "BSE:ADANIPORTS" },
-                        { "description": "ADANIPOWER", "proName": "BSE:ADANIPOWER" },
-                        { "description": "ADANIGREEN", "proName": "BSE:ADANIGREEN" },
-                        { "description": "ASIANPAINT", "proName": "BSE:ASIANPAINT" },
-                        { "description": "BAJAJ-AUTO", "proName": "BSE:BAJAJ-AUTO" },
-                        { "description": "BAJAJFINSV", "proName": "BSE:BAJAJFINSV" }
-                    ],
-                    "showSymbolLogo": true,
-                    "isTransparent": false,
-                    "displayMode": "regular",
-                    "colorTheme": "light",
-                    "locale": "in"
-                }
-                </script>
+                <div id="customTickerWrapper" class="custom-ticker-wrapper" style="display: none;">
+                    <div class="custom-ticker-track" id="customTickerTrack">
+                        <!-- Custom data injected here -->
+                    </div>
+                    <button onclick="openCustomTickerSettings()" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; cursor: pointer; z-index: 10; width: auto; margin: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--text);" title="Configure Ticker">⚙️</button>
+                </div>
             </div>
 
             <!-- SCIENTIFIC CALCULATOR -->
@@ -832,11 +849,11 @@
                     <h3 style="margin:0; border:none; padding:0;">Market Overview</h3>
                     <div style="display: flex; gap: 10px;">
                         <button id="googleFinanceBtn" style="width: auto; padding: 8px 16px; margin: 0; background: #3b82f6; border-color: #2563eb;" onclick="window.open('https://www.google.com/finance/quote/NIFTY_50:INDEXNSE', '_blank')" title="Open Google Finance in new tab">↗️ Google Finance</button>
-                        <button style="width: auto; padding: 8px 16px; margin: 0;" onclick="document.getElementById('marketFrame').src = document.getElementById('marketFrame').src">🔄 Refresh</button>
+                        <button style="width: auto; padding: 8px 16px; margin: 0;" onclick="const f = document.getElementById('marketFrame'); if(f.src && f.src.startsWith('http')) { f.classList.add('loading-blur'); f.src = f.src; }">🔄 Refresh</button>
                         <button style="width: auto; padding: 8px 16px; margin: 0; background: #6366f1; border-color: #4f46e5;" onclick="toggleFullScreen('marketFrame')">🔲 Full Screen</button>
                     </div>
                 </div>
-                <iframe id="marketFrame" src="" width="100%" height="600" style="border:1px solid var(--border); border-radius: 8px; background: white;" allowfullscreen></iframe>
+                <iframe id="marketFrame" src="" width="100%" height="600" style="border:1px solid var(--border); border-radius: 8px; background: white; transition: filter 0.3s ease, opacity 0.3s ease;" allowfullscreen></iframe>
             </div>
         </div>
     </div>
@@ -861,6 +878,30 @@
         </div>
     </div>
 
+    <!-- Custom Ticker Settings Modal -->
+    <div id="customTickerSettingsModal" class="modal">
+        <div class="modal-content" style="width: 400px; text-align: left;">
+            <div class="modal-header">
+                <h3 style="margin: 0; border: none; padding: 0;">⚙️ Custom Ticker Settings</h3>
+                <span style="cursor: pointer; font-size: 1.5rem;" onclick="closeCustomTickerSettings()">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 10px 0;">
+                <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Add Yahoo Finance symbols (e.g., RELIANCE.NS, ^NSEI, BTC-USD).</p>
+                <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                    <input type="text" id="newTickerSymbol" placeholder="Symbol (e.g. INFY.NS)" style="flex: 1; margin: 0;">
+                    <input type="text" id="newTickerName" placeholder="Display Name" style="flex: 1; margin: 0;">
+                    <button onclick="addCustomTickerSymbol()" style="width: auto; background: #10b981; margin: 0;">Add</button>
+                </div>
+                <ul id="customTickerList" style="list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+                </ul>
+            </div>
+            <div style="margin-top: 15px; display: flex; justify-content: space-between;">
+                <button onclick="resetCustomTickerSymbols()" style="width: auto; background: #ef4444; margin: 0;">Reset Default</button>
+                <button onclick="closeCustomTickerSettings()" style="width: auto; background: #64748b; margin: 0;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let sipChartInstance;
         const formatCurrency = (value) => {
@@ -870,6 +911,161 @@
             }).format(value);
         };
 
+    let isCustomTicker = localStorage.getItem('useCustomTicker') === 'true';
+
+    function toggleTickerMode() {
+        isCustomTicker = !isCustomTicker;
+        localStorage.setItem('useCustomTicker', isCustomTicker);
+        applyTickerMode(document.documentElement.getAttribute('data-theme'));
+    }
+
+    function applyTickerMode(theme) {
+        const tvWrapper = document.getElementById('tickerWrapper');
+        const customWrapper = document.getElementById('customTickerWrapper');
+        
+        if (isCustomTicker) {
+            if (tvWrapper) tvWrapper.style.display = 'none';
+            if (customWrapper) customWrapper.style.display = 'flex';
+            buildCustomTicker();
+        } else {
+            if (tvWrapper) tvWrapper.style.display = 'block';
+            if (customWrapper) customWrapper.style.display = 'none';
+            buildTicker(theme);
+        }
+    }
+
+    const defaultTickerSymbols = [
+        { symbol: '^NSEI', name: 'NIFTY 50' },
+        { symbol: '^BSESN', name: 'SENSEX' },
+        { symbol: 'RELIANCE.NS', name: 'RELIANCE' },
+        { symbol: 'HDFCBANK.NS', name: 'HDFC BANK' },
+        { symbol: 'TCS.NS', name: 'TCS' },
+        { symbol: 'INR=X', name: 'USD/INR' }
+    ];
+
+    function getCustomTickerSymbols() {
+        const stored = localStorage.getItem('customTickerSymbols');
+        return stored ? JSON.parse(stored) : defaultTickerSymbols;
+    }
+
+    function saveCustomTickerSymbols(symbols) {
+        localStorage.setItem('customTickerSymbols', JSON.stringify(symbols));
+        buildCustomTicker();
+    }
+
+    function openCustomTickerSettings() {
+        renderCustomTickerList();
+        document.getElementById('customTickerSettingsModal').style.display = 'flex';
+    }
+
+    function closeCustomTickerSettings() {
+        document.getElementById('customTickerSettingsModal').style.display = 'none';
+    }
+
+    function renderCustomTickerList() {
+        const list = document.getElementById('customTickerList');
+        list.innerHTML = '';
+        const symbols = getCustomTickerSymbols();
+        symbols.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border);";
+            li.innerHTML = `
+                <span><strong>${item.name}</strong> <small style="color: var(--text-muted);">(${item.symbol})</small></span>
+                <button onclick="removeCustomTickerSymbol(${index})" style="width: auto; background: transparent; color: #ef4444; border: none; cursor: pointer; padding: 4px; margin: 0;" title="Delete">🗑️</button>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    function addCustomTickerSymbol() {
+        const sym = document.getElementById('newTickerSymbol').value.trim();
+        const name = document.getElementById('newTickerName').value.trim();
+        if (!sym || !name) return alert('Please enter both symbol and name');
+        
+        const symbols = getCustomTickerSymbols();
+        symbols.push({ symbol: sym, name: name });
+        saveCustomTickerSymbols(symbols);
+        renderCustomTickerList();
+        
+        document.getElementById('newTickerSymbol').value = '';
+        document.getElementById('newTickerName').value = '';
+    }
+
+    function removeCustomTickerSymbol(index) {
+        const symbols = getCustomTickerSymbols();
+        symbols.splice(index, 1);
+        saveCustomTickerSymbols(symbols);
+        renderCustomTickerList();
+    }
+
+    function resetCustomTickerSymbols() {
+        if(confirm('Reset to default symbols?')) {
+            localStorage.removeItem('customTickerSymbols');
+            renderCustomTickerList();
+            buildCustomTicker();
+        }
+    }
+
+
+    async function buildCustomTicker() {
+        const track = document.getElementById('customTickerTrack');
+        if (!track) return;
+        track.innerHTML = '<span style="padding: 0 20px;">Fetching Live Market Data...</span>';
+        
+        try {
+            const indices = getCustomTickerSymbols();
+            
+            const promises = indices.map(async (item) => {
+                try {
+                    const apiUrl = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${item.symbol}?interval=1d`);
+                    const proxyUrl = `https://api.allorigins.win/get?url=${apiUrl}`;
+                    
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) return '';
+                    
+                    const proxyData = await response.json();
+                    const data = JSON.parse(proxyData.contents);
+                    
+                    const result = data.chart.result[0];
+                    const meta = result.meta;
+                    
+                    const currentPrice = meta.regularMarketPrice;
+                    const prevClose = meta.chartPreviousClose;
+                    const change = currentPrice - prevClose;
+                    const changePercent = (change / prevClose) * 100;
+                    
+                    const isUp = change >= 0;
+                    const colorClass = isUp ? 'custom-ticker-up' : 'custom-ticker-down';
+                    const icon = isUp ? '▲' : '▼';
+                    
+                    return `<div class="custom-ticker-item">
+                        <span>${item.name}</span>
+                        <span class="custom-ticker-price">${currentPrice.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span class="custom-ticker-change ${colorClass}">${icon} ${Math.abs(change).toFixed(2)} (${Math.abs(changePercent).toFixed(2)}%)</span>
+                    </div>`;
+                } catch (err) {
+                    console.warn(`Failed to fetch ${item.symbol}`, err);
+                    return '';
+                }
+            });
+            
+            const itemsHtmlArray = await Promise.all(promises);
+            const validItems = itemsHtmlArray.filter(html => html !== '');
+            const spacer = ' <span style="color:var(--border); margin: 0 15px;">|</span> ';
+            const combinedHtml = validItems.join(spacer);
+            
+            if (validItems.length > 0) {
+                track.innerHTML = `<div style="display:flex;">${combinedHtml}${spacer}</div><div style="display:flex;">${combinedHtml}${spacer}</div>`;
+            } else {
+                track.innerHTML = '<span style="padding: 0 20px; color: #ef4444;">No market data available.</span>';
+            }
+            
+        } catch (error) {
+            console.error("Custom ticker fetch error:", error);
+            track.innerHTML = '<span style="padding: 0 20px; color: #ef4444;">Failed to fetch live data. Please check your connection.</span>';
+        }
+    }
+
         function toggleTheme() {
             const html = document.documentElement;
             const current = html.getAttribute('data-theme');
@@ -877,6 +1073,35 @@
             html.setAttribute('data-theme', next);
             localStorage.setItem('theme', next);
             document.querySelector('.theme-toggle').innerHTML = next === 'dark' ? '☀️' : '🌙';
+            setTimeout(() => applyTickerMode(next), 100);
+        }
+
+        function buildTicker(theme) {
+    const wrapper = document.getElementById('tickerWrapper');
+    if (!wrapper) return;
+
+            wrapper.innerHTML = '<div class="tradingview-widget-container__widget"></div>';
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://s.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
+            script.async = true;
+            script.innerHTML = JSON.stringify({
+                "symbols": [
+                    {"description":"NIFTY 50","proName":"NSE:NIFTY"},
+                    {"description":"SENSEX","proName":"BSE:SENSEX"},
+                    {"description":"BANK NIFTY","proName":"NSE:BANKNIFTY"},
+                    {"description":"RELIANCE","proName":"BSE:RELIANCE"},
+                    {"description":"TCS","proName":"BSE:TCS"},
+                    {"description":"INFY","proName":"BSE:INFY"},
+                    {"description":"S&P 500","proName":"FOREXCOM:SPXUSD"}
+                ],
+                "showSymbolLogo": true,
+                "colorTheme": theme || 'light',
+                "isTransparent": false,
+                "displayMode": "regular",
+                "locale": "in"
+            });
+            wrapper.appendChild(script);
         }
 
         function loadMarket(url, btn, financeUrl, icon) {
@@ -886,7 +1111,10 @@
             document.querySelectorAll('.calc-view').forEach(view => view.classList.remove('active'));
             document.getElementById('market-view').classList.add('active');
             
-            document.getElementById('marketFrame').src = url;
+            const frame = document.getElementById('marketFrame');
+            frame.classList.add('loading-blur');
+            frame.src = url;
+            frame.onload = () => frame.classList.remove('loading-blur');
             
             const financeBtn = document.getElementById('googleFinanceBtn');
             if (financeBtn && financeUrl) {
@@ -924,6 +1152,7 @@
         document.documentElement.setAttribute('data-theme', savedTheme);
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelector('.theme-toggle').innerHTML = savedTheme === 'dark' ? '☀️' : '🌙';
+            applyTickerMode(savedTheme);
             updateUnitOptions();
             initCurrency();
         });

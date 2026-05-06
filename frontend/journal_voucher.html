@@ -686,19 +686,7 @@
         let currentDepreciationDetails = null;
         
         async function fetchVouchersData() {
-            let localVouchers = JSON.parse(localStorage.getItem('journal_vouchers')) || [];
-            try {
-                const remoteData = await apiClient.getJournalVouchers();
-                if (remoteData && remoteData.length > 0) {
-                    vouchers = remoteData;
-                    localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
-                } else {
-                    vouchers = localVouchers;
-                }
-            } catch (e) {
-                console.warn("API sync failed, using local data", e);
-                vouchers = localVouchers;
-            }
+            vouchers = await apiClient.getJournalVouchers();
             renderVoucherList();
         }
 
@@ -965,13 +953,13 @@
                 newVoucher.narration = (newVoucher.narration || "") + " (Copy)";
                 newVoucher.created_at = new Date().toISOString();
 
-                vouchers.push(newVoucher);
-                localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
-                if (typeof apiClient !== 'undefined' && apiClient.saveJournalVoucher) {
-                    apiClient.saveJournalVoucher(newVoucher).catch(e => console.warn(e));
-                }
-                renderVoucherList();
-                showSuccess("Voucher duplicated successfully!");
+                apiClient.saveJournalVoucher(newVoucher).then(res => {
+                     if(res.success) {
+                         vouchers.push(newVoucher);
+                         renderVoucherList();
+                         showSuccess("Voucher duplicated successfully!");
+                     }
+                });
             });
         }
 
@@ -1868,10 +1856,6 @@
                 addEntryRow('Cr', asset.asset_name, Math.abs(diff));
             }
             calculateTotals();
-
-            asset.current_wdv = newVal;
-            localStorage.setItem('fixed_assets', JSON.stringify(fixedAssets));
-
             closeRevaluationModal();
             closeFixedAssetRegisterModal();
             showSuccess("Revaluation Entry Prepared. Please Review and Save.");
@@ -2267,30 +2251,26 @@
                 created_at: new Date().toISOString()
             };
 
-            if (editingId) {
-                const idx = vouchers.findIndex(v => v.id === editingId);
-                if (idx > -1) vouchers[idx] = voucher;
+            const result = await apiClient.saveJournalVoucher(voucher);
+            if (result.success) {
+                if (editingId) {
+                    const idx = vouchers.findIndex(v => v.id === editingId);
+                    if (idx > -1) vouchers[idx] = voucher;
+                } else {
+                    vouchers.push(voucher);
+                }
+                closeModal();
+                renderVoucherList();
+                showSuccess("Voucher Saved Successfully!");
             } else {
-                vouchers.push(voucher);
+                showWarning("Error saving voucher: " + result.message);
             }
-            
-            localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
-            if (typeof apiClient !== 'undefined' && apiClient.saveJournalVoucher) {
-                apiClient.saveJournalVoucher(voucher).catch(e => console.warn(e));
-            }
-            
-            closeModal();
-            renderVoucherList();
-            showSuccess("Voucher Saved Successfully!");
         }
 
         async function deleteVoucher(id) {
             showConfirm("Delete Voucher", "Are you sure you want to delete this voucher?", async () => {
+                await apiClient.deleteJournalVoucher(id);
                 vouchers = vouchers.filter(v => v.id !== id);
-                localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
-                if (typeof apiClient !== 'undefined' && apiClient.deleteJournalVoucher) {
-                    apiClient.deleteJournalVoucher(id).catch(e => console.warn(e));
-                }
                 renderVoucherList();
                 showSuccess("Voucher deleted successfully!");
             });

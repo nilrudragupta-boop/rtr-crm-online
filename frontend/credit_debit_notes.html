@@ -604,19 +604,7 @@
         });
 
         async function fetchNotesData() {
-            let localNotes = JSON.parse(localStorage.getItem('credit_debit_notes')) || [];
-            try {
-                const remoteData = await apiClient.getCreditDebitNotes();
-                if (remoteData && remoteData.length > 0) {
-                    notes = remoteData;
-                    localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
-                } else {
-                    notes = localNotes;
-                }
-            } catch (e) {
-                console.warn("API sync failed, using local data", e);
-                notes = localNotes;
-            }
+            notes = await apiClient.getCreditDebitNotes();
             renderTable();
         }
 
@@ -886,7 +874,6 @@
                 document.getElementById('invTotal').innerText = parseFloat(selectedInvoice.invoice_total || selectedInvoice.total).toFixed(2);
                 document.getElementById('invDate').innerText = new Date(selectedInvoice.invoice_date || selectedInvoice.date).toLocaleDateString('en-GB');
                 generateNoteNo();
-                calculateTotals();
             }
         }
 
@@ -930,7 +917,7 @@
             if (!selectedInvoice) return alert("Please select an invoice.");
             const taxable = parseFloat(document.getElementById('taxableAmount').value) || 0;
             const nonTaxable = parseFloat(document.getElementById('nonTaxableAmount').value) || 0;
-            if (taxable === 0 && nonTaxable === 0) return alert("Enter valid amount (Taxable or Non-Taxable).");
+            if (taxable <= 0 && nonTaxable <= 0) return alert("Enter valid amount (Taxable or Non-Taxable).");
 
 
             // --- ADD THIS VALIDATION BLOCK ---
@@ -969,22 +956,22 @@
                 remarks: document.getElementById('remarksInput').value,
                 stock_effect: document.getElementById('stockEffect').checked,
                 non_taxable_amount: nonTaxable,
+                total_amount: finalTotal, // Override service total with final total including non-taxable
                 user: 'Admin', // Replace with actual user if available
                 customer_name: document.getElementById('partyInput').value, // Explicitly set party name
-                ...taxDetails,
-                total_amount: finalTotal // Override service total with final total including non-taxable
+                ...taxDetails
             };
 
             const newNote = window.creditDebitService.createNoteObject(type, selectedInvoice, noteData);
 
-            notes.push(newNote);
-            localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
-            if (typeof apiClient !== 'undefined' && apiClient.saveCreditDebitNote) {
-                apiClient.saveCreditDebitNote(newNote).catch(e => console.warn(e));
+            const result = await apiClient.saveCreditDebitNote(newNote);
+            if (result.success) {
+                alert("Note Saved Successfully!");
+                closeCreateModal();
+                await fetchNotesData();
+            } else {
+                alert("Error saving note: " + result.message);
             }
-            alert("Note Saved Successfully!");
-            closeCreateModal();
-            renderTable();
         }
 
         async function cancelNote(id) {
@@ -992,11 +979,8 @@
             const idx = notes.findIndex(n => n.id === id);
             if (idx > -1) {
                 notes[idx].status = 'CANCELLED';
-                localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
-                if (typeof apiClient !== 'undefined' && apiClient.saveCreditDebitNote) {
-                    apiClient.saveCreditDebitNote(notes[idx]).catch(e => console.warn(e));
-                }
-                renderTable();
+                await apiClient.saveCreditDebitNote(notes[idx]);
+                await fetchNotesData();
             }
         }
 
@@ -1019,9 +1003,9 @@
             const gstin = note.gstin || party.gst || party.gstin || '-';
 
             let companyName = "Company Name";
-            if (typeof window.BrandService !== 'undefined') {
-                const brand = window.BrandService.getBrand();
-                if (brand.name) companyName = brand.name;
+            if (window.getBrandSettings) {
+                const brand = window.getBrandSettings();
+                if (brand.companyName) companyName = brand.companyName;
             }
 
             let html = `

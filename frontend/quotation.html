@@ -560,22 +560,6 @@
             }
         }
 
-        async function fetchQuotationsData() {
-            if (typeof apiClient !== 'undefined' && apiClient.getQuotations) {
-                try {
-                    const remoteData = await apiClient.getQuotations();
-                    if (remoteData && remoteData.length > 0) {
-                        localStorage.setItem("quotations", JSON.stringify(remoteData));
-                        if (currentMode === 'list') {
-                            renderQuotationList();
-                        }
-                    }
-                } catch (e) {
-                    console.warn("Failed to fetch quotations from backend", e);
-                }
-            }
-        }
-
         document.addEventListener("DOMContentLoaded", () => {
             const savedBankToggle = localStorage.getItem('quoteShowBankDetails');
             if (savedBankToggle !== null && document.getElementById('showBankDetailsToggle')) {
@@ -609,7 +593,6 @@
                     companyGstin: APP_SETTINGS.COMPANY_GSTIN
                 });
             }
-            fetchQuotationsData();
             loadItems();
         });
 
@@ -804,7 +787,6 @@
             });
 
             const quotationData = {
-                id: refNo,
                 refNo, date, custName,
                 status: document.getElementById("quotationStatus").value,
                 custContact: document.getElementById("custContact").value,
@@ -821,13 +803,11 @@
                 askConfirm("Overwrite?", "Quotation with this Ref No already exists. Overwrite?", () => {
                     quotations[existingIndex] = quotationData;
                     localStorage.setItem("quotations", JSON.stringify(quotations));
-                    if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quotationData).catch(e => console.warn(e));
                     showInfo("Success", "Quotation saved successfully!");
                 });
             } else {
                 quotations.push(quotationData);
                 localStorage.setItem("quotations", JSON.stringify(quotations));
-                if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quotationData).catch(e => console.warn(e));
                 showInfo("Success", "Quotation saved successfully!");
             }
         }
@@ -1030,7 +1010,6 @@
                 askConfirm("Change Status", `Are you sure you want to change the status of ${refNo} from ${oldStatus} to ${newStatus}?`, () => {
                     quote.status = newStatus;
                     localStorage.setItem("quotations", JSON.stringify(quotations));
-                    if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quote).catch(e => console.warn(e));
 
                     let statusColor = '#6c757d';
                     if (newStatus === 'Accepted') statusColor = '#27ae60';
@@ -1103,9 +1082,6 @@
                 let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
                 quotations = quotations.filter(q => q.refNo !== refNo);
                 localStorage.setItem("quotations", JSON.stringify(quotations));
-                if (typeof apiClient !== 'undefined' && apiClient.deleteQuotation) {
-                    apiClient.deleteQuotation(refNo).catch(e => console.warn(e));
-                }
                 renderQuotationList();
                 showInfo("Success", `Quotation ${refNo} deleted.`);
             });
