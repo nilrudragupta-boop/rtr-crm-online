@@ -204,6 +204,14 @@ const apiClient = {
     saveJournalVoucher: (data) => apiClient._saveCollection('journal-vouchers', data),
     deleteJournalVoucher: (id) => apiClient._deleteCollection('journal-vouchers', id),
 
+    getFixedAssets: () => apiClient._getCollection('fixed-assets'),
+    saveFixedAsset: (data) => apiClient._saveCollection('fixed-assets', data),
+    deleteFixedAsset: (id) => apiClient._deleteCollection('fixed-assets', id),
+
+    getAssetCategories: () => apiClient._getCollection('asset-categories'),
+    saveAssetCategory: (data) => apiClient._saveCollection('asset-categories', data),
+    deleteAssetCategory: (id) => apiClient._deleteCollection('asset-categories', id),
+
     getExpenses: () => apiClient._getCollection('expenses'),
     saveExpense: (data) => apiClient._saveCollection('expenses', data),
     deleteExpense: (id) => apiClient._deleteCollection('expenses', id),

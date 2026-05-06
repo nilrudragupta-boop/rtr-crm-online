@@ -376,6 +376,32 @@
         </div>
     </div>
 
+    <!-- Manage Accounts Modal -->
+    <div id="manageAccountsModal" class="modal" style="z-index: 1100;">
+        <div class="modal-content" style="width: 500px;">
+            <span class="close-modal" onclick="closeManageAccountsModal()">&times;</span>
+            <h3>Manage Custom Accounts</h3>
+            <div class="form-row" style="align-items: flex-end;">
+                <div class="form-group">
+                    <label>Account Name</label>
+                    <input type="text" id="newAccountName" placeholder="e.g. Office Supplies">
+                </div>
+                <div class="form-group" style="flex: 0;">
+                    <button class="btn btn-success" onclick="addCustomAccount()">Add</button>
+                </div>
+            </div>
+            <table style="width:100%; margin-top:10px; border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f0f0f0;">
+                        <th style="padding:8px; border:1px solid #ddd;">Account Name</th>
+                        <th style="padding:8px; border:1px solid #ddd; text-align:center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="customAccountList"></tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Asset Master Modal -->
     <div id="assetMasterModal" class="modal">
         <div class="modal-content" style="width: 500px;">
@@ -702,10 +728,31 @@
             renderVoucherList();
         }
 
+        async function fetchFixedAssetsData() {
+            if (typeof apiClient !== 'undefined') {
+                try {
+                    if (apiClient.getFixedAssets) {
+                        const remoteAssets = await apiClient.getFixedAssets();
+                        if (remoteAssets && remoteAssets.length > 0) {
+                            fixedAssets = remoteAssets;
+                            localStorage.setItem('fixed_assets', JSON.stringify(fixedAssets));
+                        }
+                    }
+                    if (apiClient.getAssetCategories) {
+                        const remoteCats = await apiClient.getAssetCategories();
+                        if (remoteCats && remoteCats.length > 0) {
+                            localStorage.setItem('asset_categories', JSON.stringify(remoteCats));
+                        }
+                    }
+                } catch (e) { console.warn("Asset sync failed", e); }
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             loadAccounts();
             loadAssetCategoriesForFilter();
             fetchVouchersData();
+            fetchFixedAssetsData();
 
             const urlParams = new URLSearchParams(window.location.search);
             const drilldownAccount = urlParams.get('drilldown');
@@ -780,6 +827,10 @@
                 "Finished Goods Inventory", "Raw Materials Inventory", "Work-in-Progress", "Manufacturing Wages", "Manufacturing Overheads", "Wages Payable"
             ];
             defaults.forEach(d => accounts.push({ name: d, type: 'General' }));
+
+            // Custom Accounts
+            const customAccounts = JSON.parse(localStorage.getItem('custom_accounts')) || [];
+            customAccounts.forEach(a => accounts.push({ name: a, type: 'Custom' }));
 
             // 6. Asset Categories
             const assetCats = JSON.parse(localStorage.getItem('asset_categories')) || [];
@@ -1028,8 +1079,10 @@
                 return;
             }
 
-            categories.push({ name, rate });
+            const newCat = { id: 'cat_' + Date.now(), name, rate };
+            categories.push(newCat);
             localStorage.setItem('asset_categories', JSON.stringify(categories));
+            if (typeof apiClient !== 'undefined' && apiClient.saveAssetCategory) apiClient.saveAssetCategory(newCat).catch(console.warn);
 
             document.getElementById('assetCategoryName').value = '';
             document.getElementById('assetDepRate').value = '';
@@ -1042,8 +1095,10 @@
         function deleteAssetCategory(index) {
             showConfirm("Delete Category", "Are you sure you want to delete this category?", () => {
                 const categories = getAssetCategories();
+                const catToDelete = categories[index];
                 categories.splice(index, 1);
                 localStorage.setItem('asset_categories', JSON.stringify(categories));
+                if (catToDelete && catToDelete.id && typeof apiClient !== 'undefined' && apiClient.deleteAssetCategory) apiClient.deleteAssetCategory(catToDelete.id).catch(console.warn);
                 renderAssetCategories();
                 loadAssetCategoriesForFilter();
                 loadAccounts();
@@ -1268,6 +1323,7 @@
 
             fixedAssets.push(newAsset);
             localStorage.setItem('fixed_assets', JSON.stringify(fixedAssets));
+            if (typeof apiClient !== 'undefined' && apiClient.saveFixedAsset) apiClient.saveFixedAsset(newAsset).catch(console.warn);
 
             closeAddAssetModal();
             renderFixedAssetRegister();
@@ -1818,6 +1874,7 @@
             asset.status = 'Disposed';
             asset.current_wdv = 0;
             localStorage.setItem('fixed_assets', JSON.stringify(fixedAssets));
+            if (typeof apiClient !== 'undefined' && apiClient.saveFixedAsset) apiClient.saveFixedAsset(asset).catch(console.warn);
 
             closeDisposalModal();
             closeFixedAssetRegisterModal();
@@ -1871,6 +1928,7 @@
 
             asset.current_wdv = newVal;
             localStorage.setItem('fixed_assets', JSON.stringify(fixedAssets));
+            if (typeof apiClient !== 'undefined' && apiClient.saveFixedAsset) apiClient.saveFixedAsset(asset).catch(console.warn);
 
             closeRevaluationModal();
             closeFixedAssetRegisterModal();
@@ -1991,6 +2049,20 @@
                 };
                 list.appendChild(div);
             });
+
+            // Add Manage Custom Accounts option
+            const addDiv = document.createElement('div');
+            addDiv.className = 'autocomplete-item';
+            addDiv.style.color = '#2980b9';
+            addDiv.style.fontWeight = 'bold';
+            addDiv.innerHTML = '+ Manage Custom Accounts';
+            addDiv.onclick = function (e) {
+                e.stopPropagation();
+                list.style.display = 'none';
+                openManageAccountsModal();
+            };
+            list.appendChild(addDiv);
+
             list.style.display = 'block';
             input.currentFocus = -1;
         }
@@ -2044,6 +2116,70 @@
                 document.querySelectorAll('.autocomplete-list').forEach(l => l.style.display = 'none');
             }
         });
+
+        function openManageAccountsModal() {
+            renderCustomAccounts();
+            document.getElementById('manageAccountsModal').style.display = 'flex';
+        }
+
+        function closeManageAccountsModal() {
+            document.getElementById('manageAccountsModal').style.display = 'none';
+        }
+
+        function renderCustomAccounts() {
+            const list = document.getElementById('customAccountList');
+            list.innerHTML = '';
+            const customAccounts = JSON.parse(localStorage.getItem('custom_accounts')) || [];
+
+            if (customAccounts.length === 0) {
+                list.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:10px; color:#666;">No custom accounts defined.</td></tr>';
+                return;
+            }
+
+            customAccounts.forEach((acc, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:8px; border:1px solid #ddd;">${acc}</td>
+                    <td style="padding:8px; border:1px solid #ddd; text-align:center;">
+                        <button class="btn btn-danger" style="padding:2px 6px; font-size:12px;" onclick="deleteCustomAccount(${index})">Del</button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+        }
+
+        function addCustomAccount() {
+            const name = document.getElementById('newAccountName').value.trim();
+            if (!name) {
+                showWarning("Please enter Account Name.");
+                return;
+            }
+
+            const customAccounts = JSON.parse(localStorage.getItem('custom_accounts')) || [];
+            if (customAccounts.some(c => c.toLowerCase() === name.toLowerCase()) || accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) {
+                showWarning("Account already exists!");
+                return;
+            }
+
+            customAccounts.push(name);
+            localStorage.setItem('custom_accounts', JSON.stringify(customAccounts));
+
+            document.getElementById('newAccountName').value = '';
+            renderCustomAccounts();
+            loadAccounts();
+            showSuccess("Account added successfully!");
+        }
+
+        function deleteCustomAccount(index) {
+            showConfirm("Delete Account", "Are you sure you want to delete this custom account?", () => {
+                const customAccounts = JSON.parse(localStorage.getItem('custom_accounts')) || [];
+                customAccounts.splice(index, 1);
+                localStorage.setItem('custom_accounts', JSON.stringify(customAccounts));
+                renderCustomAccounts();
+                loadAccounts();
+                showSuccess("Account deleted successfully!");
+            });
+        }
 
         function removeRow(btn) {
             const row = btn.closest('tr');
@@ -2251,6 +2387,7 @@
                     fixedAssets[assetIndex].current_wdv = parseFloat(currentDepreciationDetails.netValue);
                     fixedAssets[assetIndex].last_depreciation_date = date;
                     localStorage.setItem('fixed_assets', JSON.stringify(fixedAssets));
+                    if (typeof apiClient !== 'undefined' && apiClient.saveFixedAsset) apiClient.saveFixedAsset(fixedAssets[assetIndex]).catch(console.warn);
                 }
             }
             // -------------------------------------------
