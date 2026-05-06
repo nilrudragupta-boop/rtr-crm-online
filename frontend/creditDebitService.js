@@ -148,6 +148,8 @@ class CreditDebitService {
      * Converts a number to words (Indian Rupee format)
      */
     convertNumberToWords(amount) {
+        const isNegative = amount < 0;
+        amount = Math.abs(parseFloat(amount) || 0);
         var a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
         var b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
@@ -168,7 +170,7 @@ class CreditDebitService {
         if (!words || words.trim() === '') words = "Zero ";
         words += "Rupees";
         if (parseInt(decPart) > 0) words += " and " + numToWords(parseInt(decPart)) + "Paise";
-        return words + " Only";
+        return (isNegative ? "Minus " : "") + words + " Only";
     }
 
     /**
@@ -223,12 +225,12 @@ class CreditDebitService {
         let addressLine2 = "";
         let contact = "";
 
-        if (window.getBrandSettings) {
-            const brand = window.getBrandSettings();
-            if (brand.companyName) companyName = brand.companyName;
+        if (typeof window.BrandService !== 'undefined') {
+            const brand = window.BrandService.getBrand();
+            if (brand.name) companyName = brand.name;
             if (brand.addressLine1) addressLine1 = brand.addressLine1;
             if (brand.addressLine2) addressLine2 = brand.addressLine2;
-            if (brand.contactNumber) contact = brand.contactNumber;
+            if (brand.phone) contact = brand.phone;
         }
 
         // Header

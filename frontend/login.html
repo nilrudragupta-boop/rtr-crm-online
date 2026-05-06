@@ -360,6 +360,27 @@
             animation: bulbWiggle 2s infinite ease-in-out;
             transform-origin: bottom center;
         }
+
+        @keyframes tipPulse {
+            0% { opacity: 0.7; color: #7f8c8d; }
+            50% { opacity: 1; color: #0313f3; text-shadow: 0 0 8px rgba(3, 19, 243, 0.2); }
+            100% { opacity: 0.7; color: #7f8c8d; }
+        }
+        .animated-tip {
+            animation: tipPulse 3s infinite ease-in-out;
+        }
+
+        @keyframes bulbWiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            50% { transform: rotate(15deg); }
+            75% { transform: rotate(-5deg); }
+        }
+        .bulb-wiggle {
+            display: inline-block;
+            animation: bulbWiggle 2s infinite ease-in-out;
+            transform-origin: bottom center;
+        }
     </style>
 </head>
 
@@ -394,7 +415,8 @@
                 <label for="rememberMe"
                     style="color: #2c3e50; font-size: 14px; cursor: pointer; user-select: none;">Remember Me</label>
             </div>
-            <button type="submit" id="loginBtn" style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
+            <button type="submit" id="loginBtn"
+                style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
                 Login</button>
             <button id="closeBtn" onclick="closeWindowWithWarning()" style="background:#ad2d2d;"> ❌ Close</button>
             <div style="margin-top: 15px; text-align: center; display: flex; justify-content: center; gap: 15px;">
@@ -515,7 +537,7 @@
                 </label>
                 <label
                     style="cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box;">
-                    <input type="radio" name="loginSoftware" value="firefox" id="loginBtnFirefox"
+                    <input type="radio" name="loginSoftware" value="edge" id="loginBtnEdge"
                         style="width: auto; margin: 0;">
                     Microsoft Edge
                 </label>
@@ -1250,7 +1272,7 @@
                 }
             }
 
-        if (EXPIRY_DATE && today > EXPIRY_DATE) {
+            if (EXPIRY_DATE && today > EXPIRY_DATE) {
                 window.location.href = 'expired.html';
                 return;
             }
@@ -1381,7 +1403,7 @@
                             if (lowerC.sellerstate || lowerC.state) appSettingsUpdates.sellerState = lowerC.sellerstate || lowerC.state;
                             if (lowerC.district) appSettingsUpdates.district = lowerC.district;
                             if (lowerC.currency) appSettingsUpdates.currency = lowerC.currency;
-                            
+
                             Object.keys(appSettingsUpdates).forEach(k => localStorage.setItem(k, appSettingsUpdates[k]));
                         }
 
@@ -1465,7 +1487,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             const duration = document.getElementById('renewDuration').value;
             const amount = document.getElementById('renewAmount').value;
-            const scriptUrl = localStorage.getItem('backupUrl') || GOOGLE_SCRIPT_URL;
+            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
 
             if (!adminId || !renewalCode || !duration || !amount) { openWarningModal("Please fill all fields."); return; }
 
@@ -1476,10 +1498,11 @@
                 if (window.electronAPI) {
                     response = await window.electronAPI.requestRenewal(adminId, renewalCode, duration, amount, scriptUrl, currentExpiry);
                 } else {
-                    response = await fetch('/api/request-renewal-otp', {
+                    const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                    response = await fetch(`${baseUrl}/request-renewal-otp`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry })
+                        body: JSON.stringify({ adminId, renewalCode, duration, amount, currentExpiry, scriptUrl })
                     }).then(res => res.json());
                 }
                 if (response.success) {
@@ -1508,7 +1531,8 @@
             if (window.electronAPI) {
                 response = await window.electronAPI.verifyRenewalOtp(otp);
             } else {
-                response = await fetch('/api/verify-renewal-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
+                const baseUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
+                response = await fetch(`${baseUrl}/verify-renewal-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ otp }) }).then(r => r.json());
             }
             if (response.success) {
                 const newExpiry = new Date(response.newExpiry);
@@ -1578,15 +1602,15 @@
             const isUltra = document.getElementById('loginBtnUltra').checked;
             const isDrive = document.getElementById('loginBtnDrive').checked;
             const isChrome = document.getElementById('loginBtnChrome').checked;
-            const isFirefox = document.getElementById('loginBtnFirefox').checked;
-            
+            const isEdge = document.getElementById('loginBtnEdge').checked;
+
             if (isUltra) {
                 window.open('https://www.ultraviewer.net/en/download.html', '_blank');
             } else if (isDrive) {
                 window.open('https://ipv4.google.com/intl/en_zm/drive/download/', '_blank');
             } else if (isChrome) {
                 window.open('https://www.google.com/chrome/', '_blank');
-            } else if (isFirefox) {
+            } else if (isEdge) {
                 window.open('https://www.microsoft.com/en-in/edge/download?form=MA13FJ', '_blank');
             } else {
                 showToast("Please select an option first!", "#dc3545");
@@ -1977,7 +2001,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             document.getElementById('paymentAmountDisplay').innerText = '₹ ' + amount;
             const upiId = "arindammemari-1@okicici";
-            const payeeName = brand - name;
+            const payeeName = "Arindam Ghosh";
             const note = `License Renewal for ${renewalCode} of ${duration} Days`;
             const qrData = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
             const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;

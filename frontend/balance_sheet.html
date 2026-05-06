@@ -534,9 +534,6 @@
                 }
             });
 
-            const retainedEarnings = retainedRevenue - retainedCOGS - retainedExpenses;
-            const netProfit = periodRevenue - periodCOGS - periodExpenses;
-
             // 2. Sundry Debtors (Receivables)
             // Sum of (Invoice Total - Paid) for invoices <= toDate
             // Note: This assumes 'total_paid' in invoice object is updated. 
@@ -549,7 +546,7 @@
                     const total = parseFloat(inv.invoice_total || inv.total || 0);
                     const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
                     // Ideally check payment dates, but for simple structure:
-                    sundryDebtors += Math.max(0, total - paid);
+                    sundryDebtors += (total - paid);
                 }
             });
             // Adjust for Credit/Debit Notes (Customers)
@@ -574,11 +571,18 @@
             let sundryCreditors = 0;
             purchases.forEach(p => {
                 if (p.date <= toDate) {
-                    const taxable = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
+                    const baseAmt = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
+                    const discVal = parseFloat(p.discount) || 0;
+                    const discType = p.discType || '%';
+                    const discAmt = discType === 'flat' ? discVal : baseAmt * (discVal / 100);
+                    const extraCharges = (parseFloat(p.freightCharges) || 0) + (parseFloat(p.packingCharges) || 0) + (parseFloat(p.loadingCharges) || 0);
+                    
+                    const taxable = baseAmt - discAmt + extraCharges;
                     const tax = taxable * ((parseFloat(p.gst) || 0) / 100);
-                    const total = taxable + tax;
-                    const paid = parseFloat(p.paid) || 0;
-                    sundryCreditors += Math.max(0, total - paid);
+                    const roundOff = parseFloat(p.roundOff) || 0;
+                    const total = taxable + tax + roundOff;
+                    const paid = parseFloat(p.paid) || parseFloat(p.total_paid) || 0;
+                    sundryCreditors += (total - paid);
                 }
             });
             // Adjust for Credit/Debit Notes (Suppliers)
@@ -592,7 +596,14 @@
                     }
                 }
             });
-            // Add Supplier Opening Balances (if any structure existed, currently assuming 0 or handled via dummy purchase)
+            // Add Supplier Opening Balances
+            suppliers.forEach(s => {
+                const opBal = parseFloat(s.openingBalance) || 0;
+                if (opBal > 0) {
+                    if (s.openingBalanceType === 'Dr') sundryCreditors -= opBal;
+                    else sundryCreditors += opBal; // Default Cr
+                }
+            });
 
             // 4. Closing Stock Value
             // (Total Purchased Qty - Total Sold Qty) * Avg Cost
@@ -763,7 +774,7 @@
                     inputTax += taxable * ((parseFloat(p.gst) || 0) / 100);
                 }
             });
-            const dutiesAndTaxes = outputTax - inputTax;
+            let dutiesAndTaxes = outputTax - inputTax;
 
             const fixedAssetsValue = fixedAssets.reduce((total, asset) => {
                 if (asset.status === 'Active' && new Date(asset.purchase_date) <= new Date(toDate)) {
@@ -772,10 +783,69 @@
                 return total;
             }, 0);
 
+            // 7. Process Journal Vouchers (JVs) for Balance Sheet Accounts
+            const journalVouchers = JSON.parse(localStorage.getItem("journal_vouchers")) || [];
+            const nonAccountingTypes = ['Memorandum', 'Purchase Order', 'Sales Order', 'Delivery Note', 'Receipt Note'];
+            
+            let jvCapital = 0;
+            let jvDrawings = 0;
+            let jvLoans = 0;
+            let jvTaxes = 0;
+            let jvCurrentLiabilities = 0;
+            let jvCurrentAssets = 0;
+
+            journalVouchers.forEach(jv => {
+                if (nonAccountingTypes.includes(jv.voucher_type)) return; // Exclude non-accounting
+                
+                const isCurrent = jv.date >= fromDate && jv.date <= toDate;
+                const isRetained = jv.date < fromDate;
+
+                if (jv.date > toDate) return;
+
+                jv.entries.forEach(entry => {
+                    const isDr = entry.type === 'Dr';
+                    const amt = parseFloat(entry.debit || entry.credit || 0);
+                    if (amt === 0) return;
+                    
+                    const acc = entry.account;
+
+                    if (acc === 'Cash') cashInHand += isDr ? amt : -amt;
+                    else if (bankAccounts.some(b => b.name === acc)) bankBalance += isDr ? amt : -amt;
+                    else if (customers.some(c => c.name === acc)) sundryDebtors += isDr ? amt : -amt;
+                    else if (suppliers.some(s => s.name === acc)) sundryCreditors += isDr ? -amt : amt; // Cr increases liability
+                    else if (acc === 'Capital Account' || acc === 'General Reserve' || acc === 'Opening Balance Equity' || acc === 'Revaluation Reserve' || acc === 'Profit & Loss') jvCapital += isDr ? -amt : amt; // Cr increases capital
+                    else if (acc === 'Drawings') jvDrawings += isDr ? amt : -amt; // Dr increases drawings
+                    else if (acc === 'Loans (Liability)' || acc.includes('Loan')) jvLoans += isDr ? -amt : amt; // Cr increases loan liability
+                    else if (acc === 'Duties & Taxes' || acc.includes('GST')) jvTaxes += isDr ? -amt : amt; // Cr increases payable tax
+                    else if (acc === 'Wages Payable') jvCurrentLiabilities += isDr ? -amt : amt; // Cr increases liability
+                    else if (acc === 'Finished Goods Inventory' || acc === 'Raw Materials Inventory' || acc === 'Work-in-Progress') jvCurrentAssets += isDr ? amt : -amt; // Dr increases asset
+                    else if (acc === 'Fixed Assets' || fixedAssets.some(f => f.asset_name === acc || f.category === acc)) {
+                        // FAR handles current_wdv separately. Ignore to prevent double counting.
+                    }
+                    else {
+                        // Any other account is treated as P&L (Income/Expense)
+                        if (isCurrent) {
+                            if (isDr) periodExpenses += amt;
+                            else periodRevenue += amt;
+                        } else if (isRetained) {
+                            if (isDr) retainedExpenses += amt;
+                            else retainedRevenue += amt;
+                        }
+                    }
+                });
+            });
+
+            dutiesAndTaxes += jvTaxes;
+            sundryCreditors += jvCurrentLiabilities;
+            closingStockValue += jvCurrentAssets;
+
+            const retainedEarnings = retainedRevenue - retainedCOGS - retainedExpenses;
+            const netProfit = periodRevenue - periodCOGS - periodExpenses;
+
             return {
                 liabilities: {
                     capital: {
-                        opening: 0, // Placeholder
+                        opening: jvCapital, // Captures JV Capital Injections
                         retainedEarnings: retainedEarnings,
                         retainedBreakdown: {
                             revenue: retainedRevenue,
@@ -783,9 +853,9 @@
                             expenses: retainedExpenses
                         },
                         netProfit: netProfit,
-                        drawings: 0
+                        drawings: jvDrawings // Captures JV Drawings
                     },
-                    loans: 0,
+                    loans: jvLoans, // Captures JV Loans
                     currentLiabilities: {
                         sundryCreditors: sundryCreditors,
                         dutiesTaxes: dutiesAndTaxes
@@ -1359,6 +1429,7 @@
             const customers = JSON.parse(localStorage.getItem("customers")) || [];
             const suppliers = JSON.parse(localStorage.getItem("suppliers")) || [];
             const creditNotes = JSON.parse(localStorage.getItem("credit_debit_notes")) || [];
+            const journalVouchers = JSON.parse(localStorage.getItem("journal_vouchers")) || [];
 
             const map = {}; // name -> amount
 
@@ -1380,9 +1451,7 @@
                         // Check if it's a customer note
                         if (customers.some(c => c.name === name)) {
                             const amt = parseFloat(n.total_amount) || 0;
-                            if (!map[name]) map[name] = 0;
-                            if (n.type === 'CREDIT') map[name] -= amt;
-                            else if (n.type === 'DEBIT') map[name] += amt;
+                            map[name] = (map[name] || 0) + (n.type === 'DEBIT' ? amt : -amt);
                         }
                     }
                 });
@@ -1391,9 +1460,7 @@
                     const opBal = parseFloat(c.openingBalance) || 0;
                     if (opBal > 0) {
                         const name = c.name.trim();
-                        if (!map[name]) map[name] = 0;
-                        if (c.openingBalanceType === 'Cr') map[name] -= opBal;
-                        else map[name] += opBal; // Default Dr
+                        map[name] = (map[name] || 0) + (c.openingBalanceType === 'Cr' ? -opBal : opBal);
                     }
                 });
             } else {
@@ -1401,10 +1468,19 @@
                 purchases.forEach(p => {
                     if (p.date <= asOfDate) {
                         const name = (p.supplierName || "Unknown").trim();
-                        const taxable = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
+                        
+                        const baseAmt = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
+                        const discVal = parseFloat(p.discount) || 0;
+                        const discType = p.discType || '%';
+                        const discAmt = discType === 'flat' ? discVal : baseAmt * (discVal / 100);
+                        const extraCharges = (parseFloat(p.freightCharges) || 0) + (parseFloat(p.packingCharges) || 0) + (parseFloat(p.loadingCharges) || 0);
+                        
+                        const taxable = baseAmt - discAmt + extraCharges;
                         const tax = taxable * ((parseFloat(p.gst) || 0) / 100);
-                        const total = taxable + tax;
-                        const paid = parseFloat(p.paid) || 0;
+                        const roundOff = parseFloat(p.roundOff) || 0;
+                        const total = taxable + tax + roundOff;
+                        
+                        const paid = parseFloat(p.paid) || parseFloat(p.total_paid) || 0;
                         map[name] = (map[name] || 0) + (total - paid);
                     }
                 });
@@ -1414,9 +1490,7 @@
                         const name = (n.customer_name || "").trim(); // Reused field
                         if (suppliers.some(s => s.name === name)) {
                             const amt = parseFloat(n.total_amount) || 0;
-                            if (!map[name]) map[name] = 0;
-                            if (n.type === 'DEBIT') map[name] -= amt; // Purchase Return
-                            else if (n.type === 'CREDIT') map[name] += amt;
+                            map[name] = (map[name] || 0) + (n.type === 'CREDIT' ? amt : -amt);
                         }
                     }
                 });
@@ -1425,12 +1499,29 @@
                     const opBal = parseFloat(s.openingBalance) || 0;
                     if (opBal > 0) {
                         const name = s.name.trim();
-                        if (!map[name]) map[name] = 0;
-                        if (s.openingBalanceType === 'Dr') map[name] -= opBal;
-                        else map[name] += opBal; // Default Cr
+                        map[name] = (map[name] || 0) + (s.openingBalanceType === 'Dr' ? -opBal : opBal);
                     }
                 });
             }
+
+            // Journal Vouchers
+            const nonAccountingTypes = ['Memorandum', 'Purchase Order', 'Sales Order', 'Delivery Note', 'Receipt Note'];
+            journalVouchers.forEach(jv => {
+                if (nonAccountingTypes.includes(jv.voucher_type)) return;
+                if (jv.date <= asOfDate) {
+                    jv.entries.forEach(entry => {
+                        const amt = parseFloat(entry.debit || entry.credit || 0);
+                        if (amt === 0) return;
+                        const acc = entry.account;
+                        
+                        if (type === 'debtors' && customers.some(c => c.name === acc)) {
+                            map[acc] = (map[acc] || 0) + (entry.type === 'Dr' ? amt : -amt);
+                        } else if (type === 'creditors' && suppliers.some(s => s.name === acc)) {
+                            map[acc] = (map[acc] || 0) + (entry.type === 'Cr' ? amt : -amt);
+                        }
+                    });
+                }
+            });
 
             // Convert to array and filter zero balances
             return Object.entries(map)

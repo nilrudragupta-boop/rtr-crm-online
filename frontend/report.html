@@ -4762,9 +4762,16 @@
         }
 
         document.getElementById("btnCancelDelete").addEventListener("click", closeDeleteModal);
-        document.getElementById("btnConfirmDelete").addEventListener("click", () => {
+        document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
             const idsToDelete = new Set(pendingDeleteIds);
+            
+            for (let id of pendingDeleteIds) {
+                if (typeof apiClient !== 'undefined' && apiClient.deleteInvoice) {
+                    await apiClient.deleteInvoice(id).catch(console.warn);
+                }
+            }
+
             invoices = invoices.filter(x => !idsToDelete.has(String(x.id || x.invoice_no)));
             localStorage.setItem("invoices", JSON.stringify(invoices));
             showToast(`✅ Deleted ${pendingDeleteIds.length} invoice(s).`, "#27ae60");
