@@ -444,6 +444,11 @@
             }
         }
 
+        /* Invert TradingView Ticker Colors in Dark Mode */
+        [data-theme="dark"] .tradingview-widget-container {
+            filter: invert(1) hue-rotate(180deg);
+        }
+
         /* Modal Styles */
         .modal {
             display: none;
@@ -533,10 +538,42 @@
             <button class="nav-btn" onclick="switchView('unit')">Unit Converter</button>
             <button class="nav-btn" style="background:#28aeec; color:white; border-color:#129ae9;"
                 onclick="window.open('Utilities.html', 'Utilities', 'width=400,height=350,resizable=yes,scrollbars=yes')">Utilities</button>
+            <button class="nav-btn" style="background:#10b981; color:white; border-color:#059669;"
+                onclick="loadMarket('https://s.tradingview.com/widgetembed/?symbol=NSE:NIFTY&interval=D&hidesidetoolbar=1&symboledit=1', this, 'https://www.google.com/finance/quote/NIFTY_50:INDEXNSE', '🟢')">NIFTY 50 Market</button>
+            <button class="nav-btn" style="background:#f59e0b; color:white; border-color:#d97706;"
+                onclick="loadMarket('https://s.tradingview.com/widgetembed/?symbol=BSE:SENSEX&interval=D&hidesidetoolbar=1&symboledit=1', this, 'https://www.google.com/finance/quote/SENSEX:INDEXBOM', '🟠')">SENSEX Market</button>
+            <button class="nav-btn" style="background:#8b5cf6; color:white; border-color:#7c3aed;"
+                onclick="loadMarket('https://s.tradingview.com/widgetembed/?symbol=FOREXCOM:SPXUSD&interval=D&hidesidetoolbar=1&symboledit=1', this, 'https://www.google.com/finance/quote/.INX:INDEXSP', '🌍')">S&P 500 (Global)</button>
         </div>
 
         <!-- Main Content Area -->
         <div class="main-content">
+
+            <!-- Live Market Ticker -->
+            <div class="tradingview-widget-container" style="margin-bottom: 20px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: var(--card-bg);">
+                <div class="tradingview-widget-container__widget"></div>
+                <script type="text/javascript" src="https://s.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+                {
+                    "symbols": [
+                        { "description": "NIFTY 50", "proName": "NSE:NIFTY" },
+                        { "description": "SENSEX", "proName": "BSE:SENSEX" },
+                        { "description": "RELIANCE", "proName": "BSE:RELIANCE" },
+                        { "description": "HDFC BANK", "proName": "BSE:HDFCBANK" },
+                        { "description": "TCS", "proName": "BSE:TCS" },
+                        { "description": "INFY", "proName": "BSE:INFY" },
+                        { "description": "ITC", "proName": "BSE:ITC" },
+                        { "description": "S&P 500", "proName": "FOREXCOM:SPXUSD" },
+                        { "description": "Apple", "proName": "NASDAQ:AAPL" },
+                        { "description": "Gold", "proName": "TVC:GOLD" }
+                    ],
+                    "showSymbolLogo": true,
+                    "isTransparent": true,
+                    "displayMode": "adaptive",
+                    "colorTheme": "light",
+                    "locale": "in"
+                }
+                </script>
+            </div>
 
             <!-- SCIENTIFIC CALCULATOR -->
             <div id="scientific" class="calc-view active">
@@ -770,6 +807,19 @@
                 </div>
                 <div class="result" id="unitResult">Result</div>
             </div>
+
+            <!-- MARKET VIEW -->
+            <div id="market-view" class="calc-view">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                    <h3 style="margin:0; border:none; padding:0;">Market Overview</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="googleFinanceBtn" style="width: auto; padding: 8px 16px; margin: 0; background: #3b82f6; border-color: #2563eb;" onclick="window.open('https://www.google.com/finance/quote/NIFTY_50:INDEXNSE', '_blank')" title="Open Google Finance in new tab">↗️ Google Finance</button>
+                        <button style="width: auto; padding: 8px 16px; margin: 0;" onclick="document.getElementById('marketFrame').src = document.getElementById('marketFrame').src">🔄 Refresh</button>
+                        <button style="width: auto; padding: 8px 16px; margin: 0; background: #6366f1; border-color: #4f46e5;" onclick="toggleFullScreen('marketFrame')">🔲 Full Screen</button>
+                    </div>
+                </div>
+                <iframe id="marketFrame" src="" width="100%" height="600" style="border:1px solid var(--border); border-radius: 8px; background: white;" allowfullscreen></iframe>
+            </div>
         </div>
     </div>
 
@@ -809,6 +859,46 @@
             html.setAttribute('data-theme', next);
             localStorage.setItem('theme', next);
             document.querySelector('.theme-toggle').innerHTML = next === 'dark' ? '☀️' : '🌙';
+        }
+
+        function loadMarket(url, btn, financeUrl, icon) {
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+
+            document.querySelectorAll('.calc-view').forEach(view => view.classList.remove('active'));
+            document.getElementById('market-view').classList.add('active');
+            
+            document.getElementById('marketFrame').src = url;
+            
+            const financeBtn = document.getElementById('googleFinanceBtn');
+            if (financeBtn && financeUrl) {
+                financeBtn.setAttribute('onclick', `window.open('${financeUrl}', '_blank')`);
+                if (icon) financeBtn.innerHTML = `${icon} Google Finance`;
+                if (btn && btn.innerText) {
+                    financeBtn.title = `Open ${btn.innerText} on Google Finance`;
+                }
+            }
+        }
+
+        function toggleFullScreen(elemId) {
+            const elem = document.getElementById(elemId);
+            if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) { /* Safari */
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { /* IE11 */
+                    elem.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) { /* Safari */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE11 */
+                    document.msExitFullscreen();
+                }
+            }
         }
 
         // Initialize Theme
