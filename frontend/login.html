@@ -421,6 +421,8 @@
                     style="font-size: 13px; color: #28a745; text-align: center; margin: 5px 0 10px 0; font-weight: bold;">
                 </p>
                 <button onclick="requestRenewalOtp()" style="background: #0313f3; width: 100%;">Request OTP</button>
+                <button onclick="openPaymentModal()" type="button"
+                    style="background: #9c27b0; width: 100%; margin-top: 10px;">📱 Make Payment</button>
             </div>
             <div id="renewStep2" style="display:none;">
                 <p style="color: #555; font-size: 13px;">OTP sent to Developer Email. <span id="otpTimer"
@@ -878,6 +880,16 @@
             }
 
             if (res) {
+                // --- CHECK SUSPENDED MODE ---
+                if (res.suspended) {
+                    alert(res.message || "Your account has been suspended.");
+                    document.body.innerHTML = `<div style="display:flex; height:100vh; align-items:center; justify-content:center; flex-direction:column; font-family:sans-serif; text-align:center; background:#fff;">
+                        <h1 style="color:#d35400; margin-top: 0; font-size: 32px;">🚫 Account Suspended</h1>
+                        <p style="font-size:18px; color: #333;">${res.message || "Your account has been suspended for Non-Payment of Subscription."}</p>
+                    </div>`;
+                    return; // Stop execution
+                }
+
                 // --- CHECK MAINTENANCE MODE ---
                 if (res.maintenance) {
                     const msgEl = document.getElementById('maintenanceMessage');
