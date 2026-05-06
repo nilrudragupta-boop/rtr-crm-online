@@ -534,9 +534,6 @@
                 }
             });
 
-            const retainedEarnings = retainedRevenue - retainedCOGS - retainedExpenses;
-            const netProfit = periodRevenue - periodCOGS - periodExpenses;
-
             // 2. Sundry Debtors (Receivables)
             // Sum of (Invoice Total - Paid) for invoices <= toDate
             // Note: This assumes 'total_paid' in invoice object is updated. 
@@ -763,7 +760,7 @@
                     inputTax += taxable * ((parseFloat(p.gst) || 0) / 100);
                 }
             });
-            const dutiesAndTaxes = outputTax - inputTax;
+            let dutiesAndTaxes = outputTax - inputTax;
 
             const fixedAssetsValue = fixedAssets.reduce((total, asset) => {
                 if (asset.status === 'Active' && new Date(asset.purchase_date) <= new Date(toDate)) {
@@ -780,9 +777,15 @@
             let jvDrawings = 0;
             let jvLoans = 0;
             let jvTaxes = 0;
+            let jvCurrentLiabilities = 0;
+            let jvCurrentAssets = 0;
 
             journalVouchers.forEach(jv => {
                 if (nonAccountingTypes.includes(jv.voucher_type)) return; // Exclude non-accounting
+                
+                const isCurrent = jv.date >= fromDate && jv.date <= toDate;
+                const isRetained = jv.date < fromDate;
+
                 if (jv.date > toDate) return;
 
                 jv.entries.forEach(entry => {
@@ -796,14 +799,34 @@
                     else if (bankAccounts.some(b => b.name === acc)) bankBalance += isDr ? amt : -amt;
                     else if (customers.some(c => c.name === acc)) sundryDebtors += isDr ? amt : -amt;
                     else if (suppliers.some(s => s.name === acc)) sundryCreditors += isDr ? -amt : amt; // Cr increases liability
-                    else if (acc === 'Capital Account') jvCapital += isDr ? -amt : amt; // Cr increases capital
+                    else if (acc === 'Capital Account' || acc === 'General Reserve' || acc === 'Opening Balance Equity' || acc === 'Revaluation Reserve' || acc === 'Profit & Loss') jvCapital += isDr ? -amt : amt; // Cr increases capital
                     else if (acc === 'Drawings') jvDrawings += isDr ? amt : -amt; // Dr increases drawings
                     else if (acc === 'Loans (Liability)' || acc.includes('Loan')) jvLoans += isDr ? -amt : amt; // Cr increases loan liability
                     else if (acc === 'Duties & Taxes' || acc.includes('GST')) jvTaxes += isDr ? -amt : amt; // Cr increases payable tax
+                    else if (acc === 'Wages Payable') jvCurrentLiabilities += isDr ? -amt : amt; // Cr increases liability
+                    else if (acc === 'Finished Goods Inventory' || acc === 'Raw Materials Inventory' || acc === 'Work-in-Progress') jvCurrentAssets += isDr ? amt : -amt; // Dr increases asset
+                    else if (acc === 'Fixed Assets' || fixedAssets.some(f => f.asset_name === acc || f.category === acc)) {
+                        // FAR handles current_wdv separately. Ignore to prevent double counting.
+                    }
+                    else {
+                        // Any other account is treated as P&L (Income/Expense)
+                        if (isCurrent) {
+                            if (isDr) periodExpenses += amt;
+                            else periodRevenue += amt;
+                        } else if (isRetained) {
+                            if (isDr) retainedExpenses += amt;
+                            else retainedRevenue += amt;
+                        }
+                    }
                 });
             });
 
             dutiesAndTaxes += jvTaxes;
+            sundryCreditors += jvCurrentLiabilities;
+            closingStockValue += jvCurrentAssets;
+
+            const retainedEarnings = retainedRevenue - retainedCOGS - retainedExpenses;
+            const netProfit = periodRevenue - periodCOGS - periodExpenses;
 
             return {
                 liabilities: {
