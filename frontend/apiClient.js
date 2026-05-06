@@ -36,40 +36,6 @@ const apiClient = {
         }
     },
 
-    // --- Settings ---
-    getSettings: async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/settings${apiClient._getAuthQuery()}`);
-            const result = await response.json();
-            return result.success ? result.data : null;
-        } catch (error) {
-            console.error('Error fetching settings:', error);
-            return null;
-        }
-    },
-
-    getAdminCreds: async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`);
-            const result = await response.json();
-            return result;
-        } catch (error) {
-            console.error('Error fetching admin creds:', error);
-            return null;
-        }
-    },
-
-    getLoginHistory: async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/login-history${apiClient._getAuthQuery()}`);
-            const result = await response.json();
-            return result.success ? result.data : [];
-        } catch (error) {
-            console.error('Error fetching login history:', error);
-            return [];
-        }
-    },
-
     // --- Customers ---
     getCustomers: async () => {
         try {
@@ -96,12 +62,6 @@ const apiClient = {
             return { success: false, message: error.message };
         }
     },
-    deleteCustomer: (id) => apiClient._deleteCollection('customers', id),
-
-    // --- Quotations ---
-    getQuotations: () => apiClient._getCollection('quotations'),
-    saveQuotation: (data) => apiClient._saveCollection('quotations', data),
-    deleteQuotation: (id) => apiClient._deleteCollection('quotations', id),
 
     // --- Invoices ---
     getInvoices: async () => {
@@ -210,24 +170,6 @@ const apiClient = {
 
     getEmployees: () => apiClient._getCollection('employees'),
     saveEmployee: (data) => apiClient._saveCollection('employees', data),
-    deleteEmployee: (id) => apiClient._deleteCollection('employees', id),
-
-    // --- Marketing Visits ---
-    getMarketingVisits: async (startDate, endDate) => {
-        let qs = apiClient._getAuthQuery();
-        if (startDate) qs += `&startDate=${encodeURIComponent(startDate)}`;
-        if (endDate) qs += `&endDate=${encodeURIComponent(endDate)}`;
-        try {
-            const response = await fetch(`${API_BASE_URL}/marketing-visits${qs}`);
-            const result = await response.json();
-            return result.success ? result.data : [];
-        } catch (error) {
-            console.error('Error fetching marketing-visits:', error);
-            return [];
-        }
-    },
-    saveMarketingVisit: (data) => apiClient._saveCollection('marketing-visits', data),
-    deleteMarketingVisit: (id) => apiClient._deleteCollection('marketing-visits', id),
 
     // --- Scraps & Production (for stock calculation) ---
     getScraps: () => apiClient._getCollection('scraps'),
@@ -290,31 +232,6 @@ const apiClient = {
             return await response.json();
         } catch (error) {
             console.error('Error saving shadow ledger:', error);
-            return { success: false, message: error.message };
-        }
-    },
-
-
-    // --- Maintenance ---
-    cleanupAnonymousRecords: async (firestoreDb) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/cleanup-anonymous${apiClient._getAuthQuery()}`, {
-                method: 'POST'
-            });
-            const result = await response.json();
-
-            if (result.success) {
-                if (firestoreDb && result.deletedCustomerIds && result.deletedCustomerIds.length > 0) {
-                    result.deletedCustomerIds.forEach(id => firestoreDb.collection('customers').doc(id).delete().catch(e => console.warn(e)));
-                }
-                if (firestoreDb && result.deletedSupplierIds && result.deletedSupplierIds.length > 0) {
-                    result.deletedSupplierIds.forEach(id => firestoreDb.collection('suppliers').doc(id).delete().catch(e => console.warn(e)));
-                }
-                console.log(result.message);
-            }
-            return result;
-        } catch (error) {
-            console.error('Error cleaning up anonymous records:', error);
             return { success: false, message: error.message };
         }
     },
