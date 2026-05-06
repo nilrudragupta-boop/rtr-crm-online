@@ -2500,15 +2500,32 @@
         };
 
         function renderInvoiceDetails(inv) {
-            const itemsHtml = (inv.items || []).map((item, i) => `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td>${item.item || ''} <br><small style="color:#666">${item.subDetails || ''}</small></td>
-                    <td class="text-right">${item.qty}</td>
-                    <td class="text-right">${parseFloat(item.price || 0).toFixed(2)}</td>
-                    <td class="text-right">${parseFloat(item.total || 0).toFixed(2)}</td>
-                </tr>
-            `).join('');
+            let totalTaxable = 0;
+            let totalGst = 0;
+            const itemsHtml = (inv.items || []).map((item, i) => {
+                const qty = parseFloat(item.qty) || 0;
+                const price = parseFloat(item.price) || 0;
+                const gst = parseFloat(item.gst) || 0;
+                const disc = parseFloat(item.disc) || 0;
+                const discType = item.discType || '%';
+                
+                const base = qty * price;
+                const discAmt = discType === 'flat' ? disc : base * (disc / 100);
+                const taxable = Math.max(0, base - discAmt);
+                totalTaxable += taxable;
+                totalGst += taxable * (gst / 100);
+                
+                return \`
+                    <tr>
+                        <td>\${i + 1}</td>
+                        <td>\${item.item || ''} <br><small style="color:#666">\${item.subDetails || ''}</small></td>
+                        <td class="text-right">\${item.qty}</td>
+                        <td class="text-right">\${parseFloat(item.price || 0).toFixed(2)}</td>
+                        <td class="text-right">\${gst}%</td>
+                        <td class="text-right">\${parseFloat(item.total || 0).toFixed(2)}</td>
+                    </tr>
+                \`;
+            }).join('');
 
             const total = parseFloat(inv.invoice_total || inv.total || 0);
             const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
@@ -2531,12 +2548,14 @@
                     </div>
                     <table class="table table-bordered" style="width:100%; margin-bottom:15px; border-collapse:collapse;">
                         <thead style="background:#f0f0f0;">
-                            <tr><th>#</th><th>Item</th><th class="text-right">Qty</th><th class="text-right">Price</th><th class="text-right">Total</th></tr>
+                            <tr><th>#</th><th>Item</th><th class="text-right">Qty</th><th class="text-right">Price</th><th class="text-right">GST</th><th class="text-right">Total</th></tr>
                         </thead>
                         <tbody>${itemsHtml}</tbody>
                     </table>
                     <div style="text-align:right;">
-                        <p style="margin:2px 0;"><strong>Total:</strong> ₹ ${total.toFixed(2)}</p>
+                        <p style="margin:2px 0; color:#555; font-size:13px;"><strong>Total Taxable:</strong> ₹ ${totalTaxable.toFixed(2)}</p>
+                        <p style="margin:2px 0; color:#555; font-size:13px;"><strong>Total GST:</strong> ₹ ${totalGst.toFixed(2)}</p>
+                        <p style="margin:2px 0; font-size:15px;"><strong>Grand Total:</strong> ₹ ${total.toFixed(2)}</p>
                         <p style="margin:2px 0; color:var(--success-color);"><strong>Paid:</strong> ₹ ${paid.toFixed(2)}</p>
                         <p style="margin:2px 0; color:var(--danger-color);"><strong>Due:</strong> ₹ ${due.toFixed(2)}</p>
                     </div>
