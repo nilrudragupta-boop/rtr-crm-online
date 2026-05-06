@@ -947,6 +947,7 @@
                 this.data.customers = JSON.parse(localStorage.getItem("customers")) || [];
                 this.data.suppliers = JSON.parse(localStorage.getItem("suppliers")) || [];
                 this.data.journalVouchers = JSON.parse(localStorage.getItem("journal_vouchers")) || [];
+                this.data.creditDebitNotes = JSON.parse(localStorage.getItem("credit_debit_notes")) || [];
             },
 
             getTransactions(type, name, fromDate, toDate) {
@@ -1011,10 +1012,14 @@
                     this.data.purchases.forEach(p => {
                         if ((p.supplierName || "").toLowerCase() === name.toLowerCase()) {
                             // Purchase (Credit)
-                            const qty = parseFloat(p.qty) || 0;
-                            const price = parseFloat(p.price) || 0;
-                            const gst = parseFloat(p.gst) || 0;
-                            const total = (qty * price) + ((qty * price * gst) / 100);
+                            const baseAmt = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
+                            const discVal = parseFloat(p.discount) || 0;
+                            const discType = p.discType || '%';
+                            const discAmt = discType === 'flat' ? discVal : baseAmt * (discVal / 100);
+                            const extraCharges = (parseFloat(p.freightCharges) || 0) + (parseFloat(p.packingCharges) || 0) + (parseFloat(p.loadingCharges) || 0);
+                            const taxable = baseAmt - discAmt + extraCharges;
+                            const taxAmt = taxable * ((parseFloat(p.gst) || 0) / 100);
+                            const total = taxable + taxAmt + (parseFloat(p.roundOff) || 0);
 
                             if (total > 0) {
                                 transactions.push({
@@ -1076,6 +1081,37 @@
                     }
                 });
 
+                // Pull entries from Credit/Debit Notes
+                this.data.creditDebitNotes.forEach(note => {
+                    if (note.status === 'CANCELLED') return;
+                    if ((note.customer_name || "").toLowerCase() === name.toLowerCase()) {
+                        const amt = parseFloat(note.total_amount) || 0;
+                        let dr = 0, cr = 0;
+                        if (type === 'Customer') {
+                            if (note.type === 'CREDIT') cr = amt;
+                            else if (note.type === 'DEBIT') dr = amt;
+                        } else if (type === 'Supplier') {
+                            if (note.type === 'DEBIT') dr = amt;
+                            else if (note.type === 'CREDIT') cr = amt;
+                        }
+
+                        if (dr > 0 || cr > 0) {
+                            transactions.push({
+                                date: note.note_date || note.date,
+                                desc: `${note.type === 'CREDIT' ? 'Credit' : 'Debit'} Note: ${note.note_no}`,
+                                type: 'Credit/Debit Note',
+                                debit: dr,
+                                credit: cr,
+                                ref: note.note_no,
+                                remarks: note.reason || note.remarks || '',
+                                id: note.id,
+                                createdBy: note.created_by,
+                                editedBy: note.edited_by
+                            });
+                        }
+                    }
+                });
+
                 // Sort by date
                 transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
                 return transactions;
@@ -1098,6 +1134,14 @@
                     const trans = this.getTransactions(type, p.name);
                     let debit = 0, credit = 0, balance = 0;
                     let overdue = 0;
+
+                    if (type === 'Customer') {
+                        const opAmt = parseFloat(p.openingBalance) || 0;
+                        balance += (p.openingBalanceType === 'Cr' ? -opAmt : opAmt);
+                    } else if (type === 'Supplier') {
+                        const opAmt = parseFloat(p.openingBalance) || 0;
+                        balance += (p.openingBalanceType === 'Dr' ? -opAmt : opAmt);
+                    }
 
                     trans.forEach(t => {
                         // For summary, we usually show current standing balance
@@ -1722,8 +1766,7 @@
                         <td>${new Date(t.date).toLocaleDateString('en-GB')}</td>
                         <td>${t.ref || '-'}</td>
                         <td>
-                            <div style="display:flex; justify-content:space-between; align-items:center;"><a href="#" onclick="ledgerApp.viewTransaction('${t.type}', '${t.id}'); return false;" style="color:var(--accent-color); text-decoration:none; font-weight:600;">${t.desc}</a>
-                            
+                            <div style="display:flex; justify-content:space-between; align-items:center;"><a href="#" onclick="ledgerApp.viewTransaction('${t.type}', '${t.id}'); return false;" style="color:var(--accent-color); text-decoration:none; font-weight:600;">${t.desc}</a></div>
                         </td>
                         <td><input type="text" class="form-control" value="${t.remarks || ''}" onchange="ledgerApp.confirmUpdateRemarks('${t.id}', '${t.type}', this.value, this)" style="font-size:13px; padding:4px; width:100%;"></td>
                         <td>${t.type}</td>
@@ -2452,7 +2495,7 @@
                 if (idx > -1) {
                     invoices[idx].remarks = newValue;
                     localStorage.setItem("invoices", JSON.stringify(invoices));
-                if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[idx]).catch(console.warn);
+                    if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[idx]).catch(console.warn);
                 }
             } else {
                 const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
@@ -2460,7 +2503,7 @@
                 if (idx > -1) {
                     purchases[idx].remarks = newValue;
                     localStorage.setItem("purchases", JSON.stringify(purchases));
-                if (typeof apiClient !== 'undefined' && apiClient.savePurchase) apiClient.savePurchase(purchases[idx]).catch(console.warn);
+                    if (typeof apiClient !== 'undefined' && apiClient.savePurchase) apiClient.savePurchase(purchases[idx]).catch(console.warn);
                 }
             }
 
@@ -2508,23 +2551,23 @@
                 const gst = parseFloat(item.gst) || 0;
                 const disc = parseFloat(item.disc) || 0;
                 const discType = item.discType || '%';
-                
+
                 const base = qty * price;
                 const discAmt = discType === 'flat' ? disc : base * (disc / 100);
                 const taxable = Math.max(0, base - discAmt);
                 totalTaxable += taxable;
                 totalGst += taxable * (gst / 100);
-                
-                return \`
+
+                return `
                     <tr>
-                        <td>\${i + 1}</td>
-                        <td>\${item.item || ''} <br><small style="color:#666">\${item.subDetails || ''}</small></td>
-                        <td class="text-right">\${item.qty}</td>
-                        <td class="text-right">\${parseFloat(item.price || 0).toFixed(2)}</td>
-                        <td class="text-right">\${gst}%</td>
-                        <td class="text-right">\${parseFloat(item.total || 0).toFixed(2)}</td>
+                        <td>${i + 1}</td>
+                        <td>${item.item || ''} <br><small style="color:#666">${item.subDetails || ''}</small></td>
+                        <td class="text-right">${item.qty}</td>
+                        <td class="text-right">${parseFloat(item.price || 0).toFixed(2)}</td>
+                        <td class="text-right">${gst}%</td>
+                        <td class="text-right">${parseFloat(item.total || 0).toFixed(2)}</td>
                     </tr>
-                \`;
+                `;
             }).join('');
 
             const total = parseFloat(inv.invoice_total || inv.total || 0);
@@ -2532,7 +2575,7 @@
             const due = total - paid;
 
             return `
-                <div style="font-size:14px;">
+                    <div style="font-size:14px;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:20px;">
                         <div>
                             <h4 style="margin:0 0 5px 0; color:var(--accent-color);">Invoice Info</h4>
@@ -2559,13 +2602,13 @@
                         <p style="margin:2px 0; color:var(--success-color);"><strong>Paid:</strong> ₹ ${paid.toFixed(2)}</p>
                         <p style="margin:2px 0; color:var(--danger-color);"><strong>Due:</strong> ₹ ${due.toFixed(2)}</p>
                     </div>
-                    ${inv.remarks ? `<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;"><strong>Remarks:</strong> ${inv.remarks}</div>` : ''}
-                    <div style="margin-top:10px; font-size:12px; color:#666; border-top:1px solid #eee; padding-top:5px;">
-                        ${inv.createdBy ? `Created by: ${inv.createdBy} on ${new Date(inv.createdDate).toLocaleString()}` : ''}
-                        ${inv.editedBy ? `<br>Last Edited by: ${inv.editedBy} on ${new Date(inv.editedDate).toLocaleString()}` : ''}
-                    </div>
+                    ${ inv.remarks ? `<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;"><strong>Remarks:</strong> ${inv.remarks}</div>` : '' }
+                <div style="margin-top:10px; font-size:12px; color:#666; border-top:1px solid #eee; padding-top:5px;">
+                    ${inv.createdBy ? `Created by: ${inv.createdBy} on ${new Date(inv.createdDate).toLocaleString()}` : ''}
+                    ${inv.editedBy ? `<br>Last Edited by: ${inv.editedBy} on ${new Date(inv.editedDate).toLocaleString()}` : ''}
                 </div>
-            `;
+                </div>
+                `;
         }
 
         function renderPurchaseDetails(p) {
@@ -2599,10 +2642,10 @@
                         <p style="margin:2px 0; color:var(--success-color);"><strong>Paid:</strong> ₹ ${paid.toFixed(2)}</p>
                         <p style="margin:2px 0; color:var(--danger-color);"><strong>Due:</strong> ₹ ${due.toFixed(2)}</p>
                     </div>
-                    ${p.paymentDate ? `<p style="text-align:right; font-size:12px; color:#666;">Payment Date: ${new Date(p.paymentDate).toLocaleDateString('en-GB')}</p>` : ''}
-                    ${p.remarks ? `<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;"><strong>Remarks:</strong> ${p.remarks}</div>` : ''}
+                    ${ p.paymentDate ? `<p style="text-align:right; font-size:12px; color:#666;">Payment Date: ${new Date(p.paymentDate).toLocaleDateString('en-GB')}</p>` : '' }
+                    ${ p.remarks ? `<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;"><strong>Remarks:</strong> ${p.remarks}</div>` : '' }
                 </div>
-            `;
+                `;
         }
 
         function renderJournalDetails(jv) {
@@ -2614,7 +2657,7 @@
                     <td class="text-right">${parseFloat(entry.debit || 0).toFixed(2)}</td>
                     <td class="text-right">${parseFloat(entry.credit || 0).toFixed(2)}</td>
                 </tr>
-            `).join('');
+                `).join('');
 
             return `
                 <div style="font-size:14px;">
@@ -2632,9 +2675,9 @@
                         </thead>
                         <tbody>${itemsHtml}</tbody>
                     </table>
-                    ${jv.narration ? `<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;"><strong>Narration:</strong> ${jv.narration}</div>` : ''}
+                    ${ jv.narration ? `<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;"><strong>Narration:</strong> ${jv.narration}</div>` : '' }
                 </div>
-            `;
+                `;
         }
 
         document.addEventListener("DOMContentLoaded", () => ledgerApp.init());
@@ -2685,7 +2728,7 @@
             doc.setFont("helvetica", "normal"); doc.setFontSize(10);
             if (addressLine1) { doc.text(addressLine1, 14, y); y += 5; }
             if (addressLine2) { doc.text(addressLine2, 14, y); y += 5; }
-            if (contactNumber) { doc.text(`Phone no.: ${contactNumber}`, 14, y); y += 6; }
+            if (contactNumber) { doc.text(`Phone no.: ${ contactNumber } `, 14, y); y += 6; }
 
             doc.setDrawColor(150, 150, 255); doc.setLineWidth(0.5); doc.line(14, y, 196, y); y += 10;
             doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(130, 140, 250);
@@ -2697,12 +2740,12 @@
             const splitAddress = doc.splitTextToSize(paymentData.customerAddress || "", 90);
             doc.text(splitAddress, 14, y + 12);
             doc.setFont("helvetica", "bold"); doc.text("Receipt Details", 196, y, { align: "right" });
-            doc.setFont("helvetica", "normal"); doc.text(`Receipt No.: ${paymentData.receiptNo || '-'}`, 196, y + 6, { align: "right" });
-            doc.text(`Date: ${paymentData.date || new Date().toLocaleDateString('en-GB')}`, 196, y + 12, { align: "right" });
+            doc.setFont("helvetica", "normal"); doc.text(`Receipt No.: ${ paymentData.receiptNo || '-' } `, 196, y + 6, { align: "right" });
+            doc.text(`Date: ${ paymentData.date || new Date().toLocaleDateString('en-GB') } `, 196, y + 12, { align: "right" });
             y += Math.max(25, splitAddress.length * 5 + 15);
 
             doc.setFont("helvetica", "bold"); doc.text("Description", 14, y); doc.text("Received", 140, y);
-            doc.text(`Rs. ${parseFloat(paymentData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, y, { align: "right" }); y += 8;
+            doc.text(`Rs.${ parseFloat(paymentData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } `, 196, y, { align: "right" }); y += 8;
 
             doc.setFont("helvetica", "normal");
             const descriptions = paymentData.descriptions || ["Payment Received"]; let descY = y;
@@ -2713,8 +2756,8 @@
             });
 
             doc.text("Payment Mode", 140, y); doc.text(paymentData.paymentMode || "Cash", 196, y, { align: "right" }); y += 8;
-            doc.text("Previous Balance", 140, y); doc.text(`Rs. ${parseFloat(paymentData.previousBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, y, { align: "right" }); y += 8;
-            doc.text("Current Balance", 140, y); doc.text(`Rs. ${parseFloat(paymentData.currentBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, y, { align: "right" }); y += 8;
+            doc.text("Previous Balance", 140, y); doc.text(`Rs.${ parseFloat(paymentData.previousBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } `, 196, y, { align: "right" }); y += 8;
+            doc.text("Current Balance", 140, y); doc.text(`Rs.${ parseFloat(paymentData.currentBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) } `, 196, y, { align: "right" }); y += 8;
 
             doc.setDrawColor(0); doc.setLineWidth(0.2); doc.line(135, y - 5, 196, y - 5); y = Math.max(y + 10, descY + 10);
 
@@ -2742,7 +2785,7 @@
             const splitWords = doc.splitTextToSize(words, 110); doc.text(splitWords, 14, y);
 
             let sigY = y + 30; if (sigY > 270) { doc.addPage(); sigY = 20; }
-            doc.text(`For: ${companyName}`, 196, sigY, { align: "right" });
+            doc.text(`For: ${ companyName } `, 196, sigY, { align: "right" });
 
             const signatureImage = localStorage.getItem("authorizedSignature");
             if (signatureImage) {
@@ -2758,7 +2801,7 @@
                     window.electronAPI.savePaymentReceipt(paymentData).catch(console.error);
                 } else {
                     const receipts = JSON.parse(localStorage.getItem('paymentReceipts')) || [];
-                    receipts.unshift({ id: `rect_${Date.now()}_${Math.random().toString(36).substring(2)}`, ...paymentData, generatedAt: new Date().toISOString() });
+                    receipts.unshift({ id: `rect_${ Date.now() }_${ Math.random().toString(36).substring(2) } `, ...paymentData, generatedAt: new Date().toISOString() });
                     if (receipts.length > 500) receipts.length = 500;
                     localStorage.setItem('paymentReceipts', JSON.stringify(receipts));
                 }
@@ -2767,7 +2810,7 @@
             if (isPreview) {
                 window.open(doc.output('bloburl'), '_blank');
             } else {
-                doc.save(`Payment_Receipt_${paymentData.receiptNo || 'New'}.pdf`);
+                doc.save(`Payment_Receipt_${ paymentData.receiptNo || 'New' }.pdf`);
             }
         }
     </script>
