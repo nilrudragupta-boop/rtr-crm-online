@@ -2551,6 +2551,7 @@
                             fetch(`${baseUrl}/custom-records${authQuery}`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
+                                keepalive: true,
                                 body: JSON.stringify(record)
                             }).catch(e => console.warn("Custom record sync warning:", e))
                         );
@@ -2680,7 +2681,7 @@
                 const syncStatusEl = document.getElementById('lastSyncStatus');
                 if (syncStatusEl) syncStatusEl.innerHTML = `<i class="fas fa-clock"></i> Last Synced: ${lastSync}`;
             }
-            setInterval(() => forceSyncData(true), 900000); // Auto-sync every 15 minutes
+            setInterval(() => forceSyncData(true), 300000); // Auto-sync every 5 minutes
             setInterval(checkPendingSync, 5000); // Check for unsynced local data every 5 seconds
             checkPendingSync();
 
@@ -2702,8 +2703,23 @@
             syncRemoteConfig();  // Sync remote user & company details
             updateSystemHealth();
 
-            window.addEventListener('online', updateSystemHealth);
+            window.addEventListener('online', () => {
+                updateSystemHealth();
+                forceSyncData(true); // Sync immediately when internet is restored
+            });
             window.addEventListener('offline', updateSystemHealth);
+
+            // Auto-sync when app is minimized or tab is switched
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') {
+                    forceSyncData(true);
+                }
+            });
+
+            // Attempt a final background sync before closing the window/tab
+            window.addEventListener('beforeunload', () => {
+                forceSyncData(true);
+            });
 
             // Clear search input automatically when clicking a sidebar item
             document.getElementById('sidebar').addEventListener('click', (e) => {

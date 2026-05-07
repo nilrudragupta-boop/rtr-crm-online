@@ -88,6 +88,7 @@ const apiClient = {
             const response = await fetch(`${API_BASE_URL}/customers`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
                 body: JSON.stringify(customerData)
             });
             return await response.json();
@@ -121,6 +122,7 @@ const apiClient = {
             const response = await fetch(`${API_BASE_URL}/invoices`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
                 body: JSON.stringify(invoiceData)
             });
             return await response.json();
@@ -162,6 +164,7 @@ const apiClient = {
             const response = await fetch(`${API_BASE_URL}/${collectionName}${apiClient._getAuthQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
                 body: JSON.stringify(data)
             });
             return await response.json();
@@ -172,7 +175,10 @@ const apiClient = {
     },
     _deleteCollection: async (collectionName, id) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/${collectionName}/${id}${apiClient._getAuthQuery()}`, { method: 'DELETE' });
+            const response = await fetch(`${API_BASE_URL}/${collectionName}/${id}${apiClient._getAuthQuery()}`, {
+                method: 'DELETE',
+                keepalive: true
+            });
             return await response.json();
         } catch (error) {
             console.error(`Error deleting from ${collectionName}:`, error);

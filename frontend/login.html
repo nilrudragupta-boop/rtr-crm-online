@@ -418,6 +418,8 @@
             <button type="submit" id="loginBtn"
                 style="background: linear-gradient(135deg, #0313f3 0%, #5b6cf9 100%);">🔓
                 Login</button>
+            <button type="button" onclick="signInAsDifferentUser()" 
+                style="background: transparent; border: 2px solid #0313f3; color: #0313f3; margin-top: 5px;">🔄 Switch Workspace / User</button>
             <button id="closeBtn" onclick="closeWindowWithWarning()" style="background:#ad2d2d;"> ❌ Close</button>
             <div style="margin-top: 15px; text-align: center; display: flex; justify-content: center; gap: 15px;">
                 <a href="javascript:void(0)" onclick="openForgotEmailModal()"
@@ -2078,6 +2080,24 @@
                 sessionStorage.clear();
                 showToast("App data cleared successfully!", "#28a745");
                 setTimeout(() => window.location.reload(), 1000);
+            }
+        }
+
+        function signInAsDifferentUser() {
+            if (confirm("This will sign you out of the current workspace and clear offline data. Are you sure you want to switch users?")) {
+                // Preserve critical API connection settings
+                const updateServer = localStorage.getItem('updateServerUrl');
+                const cloudBackup = localStorage.getItem('cloudBackupUrl');
+
+                // Wipe local cache to prevent data mixing between workspaces
+                localStorage.clear();
+                sessionStorage.clear();
+
+                if (updateServer) localStorage.setItem('updateServerUrl', updateServer);
+                if (cloudBackup) localStorage.setItem('cloudBackupUrl', cloudBackup);
+                
+                showToast("Workspace cleared. Please enter your new credentials.", "#17a2b8");
+                setTimeout(() => window.location.reload(), 1500);
             }
         }
     </script>
