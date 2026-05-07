@@ -2212,6 +2212,30 @@
         let currentOtpCallback = null;
         let secureOtpTimerInterval = null;
 
+        let autoSyncInterval;
+        let syncCountdownInterval;
+        let nextSyncTime = Date.now() + 300000;
+
+        function startAutoSync() {
+            if (autoSyncInterval) clearInterval(autoSyncInterval);
+            if (syncCountdownInterval) clearInterval(syncCountdownInterval);
+            
+            nextSyncTime = Date.now() + 300000;
+            autoSyncInterval = setInterval(() => {
+                forceSyncData(true);
+            }, 300000); // Auto-sync every 5 minutes
+
+            syncCountdownInterval = setInterval(() => {
+                const el = document.getElementById('syncCountdown');
+                if (el) {
+                    const timeLeft = Math.max(0, Math.floor((nextSyncTime - Date.now()) / 1000));
+                    const m = Math.floor(timeLeft / 60);
+                    const s = timeLeft % 60;
+                    el.innerText = `(in ${m}:${s.toString().padStart(2, '0')})`;
+                }
+            }, 1000);
+        }
+
         function promptForContactAndSyncDashboard(isRetry = false) {
             const msg = isRetry
                 ? "⚠️ Contact Number mismatch or not found on server.\n\nPlease carefully re-enter your Registered 10-Digit Mobile Number to verify your license and sync data (or click Cancel to ignore):"
@@ -2580,6 +2604,7 @@
                     document.getElementById('successMsg').innerText = "All data has been successfully synced to the Server!";
                     document.getElementById('successModal').style.display = 'flex';
                 }
+                startAutoSync(); // Reset interval and countdown when a manual sync happens
             } catch (err) {
                 console.error("Sync error:", err);
                 if (!silent) {
@@ -2608,7 +2633,9 @@
             if (!statusEl) return;
 
             if (currentHash !== lastHash) {
-                statusEl.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Pending Sync`;
+                if (!document.getElementById('syncCountdown')) {
+                    statusEl.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Pending Sync <span id="syncCountdown" style="font-size: 0.85em; font-weight: normal; margin-left: 5px;"></span>`;
+                }
                 statusEl.style.color = 'var(--warning-color)';
             } else {
                 statusEl.innerHTML = `<i class="fas fa-check-double"></i> Completely Synced`;
@@ -2682,7 +2709,7 @@
                 const syncStatusEl = document.getElementById('lastSyncStatus');
                 if (syncStatusEl) syncStatusEl.innerHTML = `<i class="fas fa-clock"></i> Last Synced: ${lastSync}`;
             }
-            setInterval(() => forceSyncData(true), 300000); // Auto-sync every 5 minutes
+            startAutoSync(); // Auto-sync every 5 minutes and update countdown
             setInterval(checkPendingSync, 5000); // Check for unsynced local data every 5 seconds
             checkPendingSync();
 
