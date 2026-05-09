@@ -1593,24 +1593,14 @@ Branch: </textarea>
             }
 
             async function generatePDF() {
-                const mergePdf = localStorage.getItem('mergeInvoicePdf') === 'true';
                 const copies = [
                     { label: "Customer Copy", suffix: "_customer" },
                     { label: "Office Copy", suffix: "_office" }
                 ];
-                const { jsPDF } = window.jspdf;
-                let doc = new jsPDF();
-                const invoice = getInvoiceDataFromDOM();
-
-                for (let i = 0; i < copies.length; i++) {
-                    const copy = copies[i];
-                    if (i > 0) {
-                        if (mergePdf) {
-                            doc.addPage();
-                        } else {
-                            doc = new jsPDF();
-                        }
-                    }
+                for (const copy of copies) {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    const invoice = getInvoiceDataFromDOM();
 
                     let companyName = document.querySelector('[data-brand="name"]').innerText || "Company Name";
                     let addressLine1 = "";
@@ -1822,24 +1812,14 @@ Branch: </textarea>
             }
 
             async function generateTallyInvoicePDF(isDirectPrint = false, isPreview = false) {
-                const mergePdf = localStorage.getItem('mergeInvoicePdf') === 'true';
                 const copies = [
                     { label: "Customer Copy", suffix: "_customer" },
                     { label: "Office Copy", suffix: "_office" }
                 ];
-                const { jsPDF } = window.jspdf;
-                let doc = new jsPDF();
-                const invoice = getInvoiceDataFromDOM();
-
-                for (let i = 0; i < copies.length; i++) {
-                    const copy = copies[i];
-                    if (i > 0) {
-                        if (mergePdf) {
-                            doc.addPage();
-                        } else {
-                            doc = new jsPDF();
-                        }
-                    }
+                for (const copy of copies) {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    const invoice = getInvoiceDataFromDOM();
 
                     let companyName = document.querySelector('[data-brand="name"]').innerText || "RISE Tech Revolution";
                     let addressLine1 = "";
@@ -2164,27 +2144,7 @@ Branch: </textarea>
                     doc.text(`For ${companyName}`, 190, sigY, { align: "right" });
                     doc.text("Authorized Signatory", 190, sigY + 15, { align: "right" });
 
-                     if (!mergePdf) {
-                        if (isDirectPrint) {
-                            doc.autoPrint();
-                            window.open(doc.output('bloburl'), '_blank');
-                        } else if (isPreview) {
-                            window.open(doc.output('bloburl'), '_blank');
-                        } else {
-                            doc.save(`Invoice_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
-                        }
-                    }
-                }
-                
-                if (mergePdf) {
-                    if (isDirectPrint) {
-                        doc.autoPrint();
-                        window.open(doc.output('bloburl'), '_blank');
-                    } else if (isPreview) {
-                        window.open(doc.output('bloburl'), '_blank');
-                    } else {
-                        doc.save(`Invoice_${invoice.invoice_no || 'new'}_Merged.pdf`);
-                    }
+                    doc.save(`1_Invoice_${invoice.invoice_no}.pdf`);
                 }
             };
         </script>

@@ -1049,6 +1049,9 @@
                     style="width: 50px; padding: 2px; font-size: 13px; font-weight: normal; border: 1px solid #ccc; border-radius: 4px;"
                     onchange="updateFreezePanesCount()"> cols
             </label>
+            <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
+                <input type="checkbox" id="mergeInvoicePdfToggle" onchange="toggleMergeInvoicePdf()"> Merge Invoice Copies (PDF)
+            </label>
         </div>
         <div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #eee;">
             <h4 style="margin:0 0 10px 0; font-size:14px; color:#555;">Action Buttons</h4>
@@ -1303,6 +1306,12 @@
         let numFreezeCols = parseInt(localStorage.getItem("reportFreezeCols")) || 3;
         let currentSortColumn = null;
         let currentSortDirection = 'asc';
+        let mergeInvoicePdf = localStorage.getItem("reportMergeInvoicePdf") === "true";
+
+        function toggleMergeInvoicePdf() {
+            mergeInvoicePdf = document.getElementById("mergeInvoicePdfToggle").checked;
+            localStorage.setItem("reportMergeInvoicePdf", mergeInvoicePdf);
+        }
 
         function handleSort(column) {
             if (currentSortColumn === column) {
@@ -2074,8 +2083,13 @@
                     const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
                     if (invoice) {
                         try {
-                            await generateTallyInvoicePDF(invoice, false, "Customer Copy", "_customer");
-                            await generateTallyInvoicePDF(invoice, false, "Office Copy", "_office");
+                            const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+                            if (mergePdf) {
+                                await generateTallyInvoicePDF(invoice, false, null, null);
+                            } else {
+                                await generateTallyInvoicePDF(invoice, false, "Customer Copy", "_customer");
+                                await generateTallyInvoicePDF(invoice, false, "Office Copy", "_office");
+                            }
                         } catch (err) { console.error(err); }
                     }
                 };
@@ -2089,8 +2103,13 @@
                     const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
                     if (invoice) {
                         try {
-                            await generateAndSavePDF(invoice, "Customer Copy", "_customer", false, false);
-                            await generateAndSavePDF(invoice, "Office Copy", "_office", false, false);
+                            const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+                            if (mergePdf) {
+                                await generateAndSavePDF(invoice, null, null, false, false);
+                            } else {
+                                await generateAndSavePDF(invoice, "Customer Copy", "_customer", false, false);
+                                await generateAndSavePDF(invoice, "Office Copy", "_office", false, false);
+                            }
                         } catch (err) { console.error(err); }
                     }
                 };
@@ -2544,8 +2563,20 @@
         }
 
         async function generateAndSavePDF(invoice, copyLabel, suffix, isPreview = false, isDirectPrint = false) {
+            const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+            
+            let copies = [];
+            if (copyLabel) {
+                copies.push({ label: copyLabel, suffix: suffix || "" });
+            } else {
+                copies = [
+                    { label: "Customer Copy", suffix: "_customer" },
+                    { label: "Office Copy", suffix: "_office" }
+                ];
+            }
+
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+            let doc = new jsPDF();
             const isSaleInvoice = (invoice.invoiceType === "SALE INVOICE");
 
             const itemsForSummary = invoice.items || [];
@@ -2559,14 +2590,25 @@
                 [3, 4, 5, 6, 7].forEach(i => invColVis[i] = false);
             }
 
-            // Add Copy Label (Top Right)
-            doc.setFontSize(10);
-            doc.setTextColor(0);
-            doc.setFont(undefined, 'bold');
-            doc.text(copyLabel, 195, 10, { align: "right" });
-            doc.setFont(undefined, 'normal');
+            for (let copyIdx = 0; copyIdx < copies.length; copyIdx++) {
+                const copy = copies[copyIdx];
+                if (copyIdx > 0) {
+                    if (mergePdf) {
+                        doc.addPage();
+                    } else {
+                        doc = new jsPDF();
+                    }
+                }
+                const copyStartPage = doc.internal.getNumberOfPages();
 
-            // Add Company Logo
+                // Add Copy Label (Top Right)
+                doc.setFontSize(10);
+                doc.setTextColor(0);
+                doc.setFont(undefined, 'bold');
+                doc.text(copy.label, 195, 10, { align: "right" });
+                doc.setFont(undefined, 'normal');
+
+                // Add Company Logo
             const logoImg = document.getElementById('invoiceLogo');
             if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
                 try {
@@ -3336,6 +3378,19 @@
                 doc.text(`Page ${i} of ${totalPages}`, 105, 292, { align: "center" });
             }
 
+            if (!mergePdf) {
+                if (isDirectPrint) {
+                    doc.autoPrint();
+                    window.open(doc.output('bloburl'), '_blank');
+                } else if (isPreview) {
+                    window.open(doc.output('bloburl'), '_blank');
+                } else {
+                    const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+                    doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                }
+            }
+        }
+        if (mergePdf) {
             if (isDirectPrint) {
                 doc.autoPrint();
                 window.open(doc.output('bloburl'), '_blank');
@@ -3343,13 +3398,28 @@
                 window.open(doc.output('bloburl'), '_blank');
             } else {
                 const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${suffix}.pdf`);
+                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}_Merged.pdf`);
             }
         }
+    }
 
-        async function generateTallyInvoicePDF(invoice, isDirectPrint = false, copyLabel = "Customer Copy", suffix = "_customer") {
+         async function generateTallyInvoicePDF(invoice, isDirectPrint = false, copyLabel = null, suffix = null) {
+            const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+            
+            let copies = [];
+            if (copyLabel) {
+                copies.push({ label: copyLabel, suffix: suffix || "" });
+            } else {
+                copies = [
+                    { label: "Customer Copy", suffix: "_customer" },
+                    { label: "Office Copy", suffix: "_office" }
+                ];
+            }
+
+
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+            let doc = new jsPDF();
+
 
             // Calculate totals for summary
             const itemsForSummary = invoice.items || [];
@@ -3362,6 +3432,16 @@
                 invColVis = new Array(18).fill(true);
                 [3, 4, 5, 6, 7].forEach(i => invColVis[i] = false);
             }
+
+            for (let copyIdx = 0; copyIdx < copies.length; copyIdx++) {
+                const copy = copies[copyIdx];
+                if (copyIdx > 0) {
+                    if (mergePdf) {
+                        doc.addPage();
+                    } else {
+                        doc = new jsPDF();
+                    }
+                }
 
 
             // Company Info
@@ -3438,7 +3518,7 @@
                 doc.text("TAX INVOICE", 105, 18, { align: "center" });
 
                 doc.setFontSize(10);
-                doc.text(copyLabel, startX + width, startY - 2, { align: "right" });
+            doc.text(copy.label, startX + width, startY - 2, { align: "right" });
 
                 doc.setLineWidth(0.1);
                 doc.setDrawColor(0);
@@ -3997,14 +4077,26 @@
                 doc.text(`Page ${i} of ${totalPages}`, 105, pageHeight - 5, { align: "center" });
             }
 
+            if (!mergePdf) {
+                if (isDirectPrint) {
+                    doc.autoPrint();
+                    window.open(doc.output('bloburl'), '_blank');
+                } else {
+                    const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+                    doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                }
+            }
+        }
+        if (mergePdf) {
             if (isDirectPrint) {
                 doc.autoPrint();
                 window.open(doc.output('bloburl'), '_blank');
             } else {
                 const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${suffix}.pdf`);
+                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}_Merged.pdf`);
             }
         }
+    }
 
         function confirmLoad() { askConfirm("Load", "Unsaved changes will be lost. Load?", () => loadQuotation()); }
         function confirmAddRow() { addRow(); } // No confirm needed for adding
@@ -5100,6 +5192,9 @@
 
             const freezePanesCount = document.getElementById("freezePanesCount");
             if (freezePanesCount) freezePanesCount.value = numFreezeCols;
+
+            const mergeInvoicePdfToggle = document.getElementById("mergeInvoicePdfToggle");
+            if (mergeInvoicePdfToggle) mergeInvoicePdfToggle.checked = mergeInvoicePdf;
 
             // Set Action Button Toggles
             Object.keys(actionBtnState).forEach(key => {
