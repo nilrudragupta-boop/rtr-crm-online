@@ -3599,13 +3599,23 @@
         }
 
         async function generateTallyInvoicePDF(invoice, isDirectPrint = false) {
+            const mergePdf = localStorage.getItem('mergeInvoicePdf') === 'true';
             const copies = [
                 { label: "Customer Copy", suffix: "_customer" },
                 { label: "Office Copy", suffix: "_office" }
             ];
-            for (const copy of copies) {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
+            const { jsPDF } = window.jspdf;
+            let doc = new jsPDF();
+
+            for (let i = 0; i < copies.length; i++) {
+                const copy = copies[i];
+                if (i > 0) {
+                    if (mergePdf) {
+                        doc.addPage();
+                    } else {
+                        doc = new jsPDF();
+                    }
+                }
 
                 // Load invoice table column visibility settings
                 let invColVis = JSON.parse(localStorage.getItem("invoiceColumnVisibility"));
@@ -3894,7 +3904,13 @@
                 doc.rect(startX, startY, width, sigY + 20 - startY);
 
                 const custNameForFile = (invoice.customer_name || invoice.customerName || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                if (!mergePdf) {
+                    doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                }
+            }
+            if (mergePdf) {
+                const custNameForFile = (invoice.customer_name || invoice.customerName || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}_Merged.pdf`);
             }
         }
 
