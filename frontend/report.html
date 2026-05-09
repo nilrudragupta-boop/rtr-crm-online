@@ -998,6 +998,28 @@
         </div>
     </div>
 
+    <!-- Print Copy Modal -->
+    <div id="printCopyModal" aria-hidden="true"
+        style="display:none; position:fixed; z-index:10005; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
+        <div
+            style="background:#fff; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding:20px; width:300px; border-radius:8px; text-align:center; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+            <h3 style="color:#2980b9; margin-top:0; padding-bottom: 10px; border-bottom: 1px solid #eee;">Select Copies
+                to Print</h3>
+            <div style="text-align: left; margin-bottom: 15px; padding-left: 20px;">
+                <label style="display: block; margin-bottom: 8px; cursor: pointer;"><input type="checkbox"
+                        id="printCustomerCopy" checked> Customer Copy</label>
+                <label style="display: block; margin-bottom: 8px; cursor: pointer;"><input type="checkbox"
+                        id="printOfficeCopy" checked> Office Copy</label>
+                <label style="display: block; margin-bottom: 8px; cursor: pointer;"><input type="checkbox"
+                        id="printTransportCopy"> Transporter Copy</label>
+            </div>
+            <div style="display:flex; justify-content:center; gap:10px;">
+                <button id="btnConfirmPrintCopy" class="secondary small" style="background:#27ae60;">Print</button>
+                <button id="btnCancelPrintCopy" class="danger small" style="background:#e74c3c;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="settingsModal" aria-hidden="true">
         <h3 style="margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">Table Settings</h3>
@@ -1050,7 +1072,8 @@
                     onchange="updateFreezePanesCount()"> cols
             </label>
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
-                <input type="checkbox" id="mergeInvoicePdfToggle" onchange="toggleMergeInvoicePdf()"> Merge Invoice Copies (PDF)
+                <input type="checkbox" id="mergeInvoicePdfToggle" onchange="toggleMergeInvoicePdf()"> Merge Invoice
+                Copies (PDF)
             </label>
         </div>
         <div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #eee;">
@@ -1235,6 +1258,47 @@
             }
         }
 
+        let pendingPrintAction = null;
+
+        function openPrintCopyModal(callback) {
+            pendingPrintAction = callback;
+            document.getElementById('printCopyModal').style.display = 'block';
+        }
+
+        function closePrintCopyModal() {
+            document.getElementById('printCopyModal').style.display = 'none';
+            pendingPrintAction = null;
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const btnConfirmCopy = document.getElementById('btnConfirmPrintCopy');
+            const btnCancelCopy = document.getElementById('btnCancelPrintCopy');
+            if (btnConfirmCopy) {
+                btnConfirmCopy.onclick = () => {
+                    if (pendingPrintAction) {
+                        const selectedCopies = [];
+                        if (document.getElementById('printCustomerCopy').checked) {
+                            selectedCopies.push({ label: "Customer Copy", suffix: "_customer" });
+                        }
+                        if (document.getElementById('printOfficeCopy').checked) {
+                            selectedCopies.push({ label: "Office Copy", suffix: "_office" });
+                        }
+                        if (document.getElementById('printTransportCopy').checked) {
+                            selectedCopies.push({ label: "Transporter Copy", suffix: "_transporter" });
+                        }
+
+                        if (selectedCopies.length === 0) {
+                            showToast("Please select at least one copy.", "#e67e22");
+                            return;
+                        }
+                        pendingPrintAction(selectedCopies);
+                    }
+                    closePrintCopyModal();
+                };
+            }
+            if (btnCancelCopy) btnCancelCopy.onclick = closePrintCopyModal;
+        });
+
         function makeDraggable(elmnt, headerId) {
             var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
             const header = document.getElementById(headerId);
@@ -1295,7 +1359,7 @@
         let showSubDetailsInPdf = localStorage.getItem("reportShowSubDetailsInPdf") === "true";
         let showItemCodeInPdf = localStorage.getItem("reportShowItemCodeInPdf") !== "false";
         let showBankDetailsInPdf = localStorage.getItem("reportShowBankDetailsInPdf") === "true";
-        let showTimestampInPdf = localStorage.getItem("reportShowTimestampInPdf") !== "false";
+        let showTimestampInPdf = localStorage.getItem("reportShowTimestampInPdf") === "true";
         let showPaidStampInPdf = localStorage.getItem("reportShowPaidStampInPdf") === "true";
         let showTermsInPdf = localStorage.getItem("reportShowTermsInPdf") !== "false";
         let isGreyButtons = localStorage.getItem("reportGreyButtons") === "true";
@@ -2082,15 +2146,20 @@
                     const id = tr.dataset.invoiceId;
                     const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
                     if (invoice) {
-                        try {
-                            const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
-                            if (mergePdf) {
+                        const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+                        if (mergePdf) {
+                            try {
                                 await generateTallyInvoicePDF(invoice, false, null, null);
-                            } else {
-                                await generateTallyInvoicePDF(invoice, false, "Customer Copy", "_customer");
-                                await generateTallyInvoicePDF(invoice, false, "Office Copy", "_office");
-                            }
-                        } catch (err) { console.error(err); }
+                            } catch (err) { console.error(err); }
+                        } else {
+                            openPrintCopyModal(async (selectedCopies) => {
+                                try {
+                                    for (const copy of selectedCopies) {
+                                        await generateTallyInvoicePDF(invoice, false, copy.label, copy.suffix);
+                                    }
+                                } catch (err) { console.error(err); }
+                            });
+                        }
                     }
                 };
             });
@@ -2102,15 +2171,20 @@
                     const id = tr.dataset.invoiceId;
                     const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
                     if (invoice) {
-                        try {
-                            const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
-                            if (mergePdf) {
+                        const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+                        if (mergePdf) {
+                            try {
                                 await generateAndSavePDF(invoice, null, null, false, false);
-                            } else {
-                                await generateAndSavePDF(invoice, "Customer Copy", "_customer", false, false);
-                                await generateAndSavePDF(invoice, "Office Copy", "_office", false, false);
-                            }
-                        } catch (err) { console.error(err); }
+                            } catch (err) { console.error(err); }
+                        } else {
+                            openPrintCopyModal(async (selectedCopies) => {
+                                try {
+                                    for (const copy of selectedCopies) {
+                                        await generateAndSavePDF(invoice, copy.label, copy.suffix, false, false);
+                                    }
+                                } catch (err) { console.error(err); }
+                            });
+                        }
                     }
                 };
             });
@@ -2489,7 +2563,7 @@
             =============================== */
             await generateAndSavePDF(invoice, "Customer Copy", "_customer");
             await generateAndSavePDF(invoice, "Office Copy", "_office");
-            await generateAndSavePDF(invoice, "Transport Copy", "_transporter");
+            await generateAndSavePDF(invoice, "Transporter Copy", "_transporter");
         }
 
 
@@ -2564,14 +2638,15 @@
 
         async function generateAndSavePDF(invoice, copyLabel, suffix, isPreview = false, isDirectPrint = false) {
             const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
-            
+
             let copies = [];
             if (copyLabel) {
                 copies.push({ label: copyLabel, suffix: suffix || "" });
             } else {
                 copies = [
                     { label: "Customer Copy", suffix: "_customer" },
-                    { label: "Office Copy", suffix: "_office" }
+                    { label: "Office Copy", suffix: "_office" },
+                    { label: "Transporter Copy", suffix: "_transporter" }
                 ];
             }
 
@@ -2609,776 +2684,797 @@
                 doc.setFont(undefined, 'normal');
 
                 // Add Company Logo
-            const logoImg = document.getElementById('invoiceLogo');
-            if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
-                try {
-                    doc.addImage(logoImg, 'PNG', 14, 5, 25, 25);
-                } catch (e) { console.warn("Error adding logo to PDF:", e); }
-            }
-
-            let companyName = "RISE Tech Revolution";
-            let addressLine1 = "Memari, New Bus Stand (near SBI)";
-            let addressLine2 = "Barddhaman (E), Pin: 713146";
-            let contactNumber = "Mo: 96141 73988";
-            let companyGstin = "";
-            let companyEmail = "";
-            let sellerDistrict = localStorage.getItem('district') || "";
-            let sellerState = localStorage.getItem('sellerState') || "";
-
-            if (typeof APP_SETTINGS !== 'undefined') {
-                companyName = APP_SETTINGS.COMPANY_NAME || companyName;
-                addressLine1 = APP_SETTINGS.ADDRESS_LINE_1 || addressLine1;
-                addressLine2 = APP_SETTINGS.ADDRESS_LINE_2 || addressLine2;
-                contactNumber = APP_SETTINGS.CONTACT_NUMBER ? `Mo: ${APP_SETTINGS.CONTACT_NUMBER}` : contactNumber;
-                companyGstin = APP_SETTINGS.COMPANY_GSTIN || companyGstin;
-                companyEmail = APP_SETTINGS.COMPANY_EMAIL || companyEmail;
-                sellerDistrict = sellerDistrict || APP_SETTINGS.DISTRICT || "";
-                sellerState = sellerState || APP_SETTINGS.SELLER_STATE || "";
-            }
-
-            if (window.electronAPI && window.electronAPI.getAppSettings) {
-                const res = await window.electronAPI.getAppSettings();
-                if (res.success) {
-                    companyName = res.companyName || companyName;
-                    addressLine1 = res.addressLine1 || addressLine1;
-                    addressLine2 = res.addressLine2 || addressLine2;
-                    contactNumber = res.contactNumber ? `Mo: ${res.contactNumber}` : contactNumber;
-                    companyGstin = res.companyGstin || companyGstin;
-                    companyEmail = res.companyEmail || companyEmail;
-                    sellerDistrict = res.district || sellerDistrict;
-                    sellerState = res.sellerState || sellerState;
+                const logoImg = document.getElementById('invoiceLogo');
+                if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
+                    try {
+                        doc.addImage(logoImg, 'PNG', 14, 5, 25, 25);
+                    } catch (e) { console.warn("Error adding logo to PDF:", e); }
                 }
-            } else if (window.BrandService) { // Fallback for non-electron env
-                const brand = window.BrandService.getBrand();
-                companyName = brand.name || companyName;
-                addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
-                addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
-                contactNumber = brand.phone ? `Mo: ${brand.phone}` : contactNumber;
-                companyGstin = brand.gst || companyGstin;
-                companyEmail = localStorage.getItem('companyEmail') || companyEmail;
-                sellerDistrict = localStorage.getItem('district') || sellerDistrict;
-                sellerState = localStorage.getItem('sellerState') || sellerState;
-            } else {
-                companyName = localStorage.getItem('companyName') || companyName;
-                addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
-                addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
-                contactNumber = localStorage.getItem('contactNumber') ? `Mo: ${localStorage.getItem('contactNumber')}` : contactNumber;
-                companyGstin = localStorage.getItem('companyGstin') || companyGstin;
-                companyEmail = localStorage.getItem('companyEmail') || companyEmail;
-                sellerDistrict = localStorage.getItem('district') || sellerDistrict;
-                sellerState = localStorage.getItem('sellerState') || sellerState;
-            }
 
-            // Header
-            doc.setFontSize(20);
-            doc.setTextColor(44, 62, 80);
-            doc.text(companyName, 105, 15, { align: "center" });
+                let companyName = "RISE Tech Revolution";
+                let addressLine1 = "Memari, New Bus Stand (near SBI)";
+                let addressLine2 = "Barddhaman (E), Pin: 713146";
+                let contactNumber = "Mo: 96141 73988";
+                let companyGstin = "";
+                let companyEmail = "";
+                let sellerDistrict = localStorage.getItem('district') || "";
+                let sellerState = localStorage.getItem('sellerState') || "";
 
-            doc.setFontSize(10);
-            doc.setTextColor(100);
+                if (typeof APP_SETTINGS !== 'undefined') {
+                    companyName = APP_SETTINGS.COMPANY_NAME || companyName;
+                    addressLine1 = APP_SETTINGS.ADDRESS_LINE_1 || addressLine1;
+                    addressLine2 = APP_SETTINGS.ADDRESS_LINE_2 || addressLine2;
+                    contactNumber = APP_SETTINGS.CONTACT_NUMBER ? `Mo: ${APP_SETTINGS.CONTACT_NUMBER}` : contactNumber;
+                    companyGstin = APP_SETTINGS.COMPANY_GSTIN || companyGstin;
+                    companyEmail = APP_SETTINGS.COMPANY_EMAIL || companyEmail;
+                    sellerDistrict = sellerDistrict || APP_SETTINGS.DISTRICT || "";
+                    sellerState = sellerState || APP_SETTINGS.SELLER_STATE || "";
+                }
 
-            let nextY = 22;
-            if (addressLine1) {
-                doc.text(addressLine1, 105, nextY, { align: "center" });
-                nextY += 5;
-            }
+                if (window.electronAPI && window.electronAPI.getAppSettings) {
+                    const res = await window.electronAPI.getAppSettings();
+                    if (res.success) {
+                        companyName = res.companyName || companyName;
+                        addressLine1 = res.addressLine1 || addressLine1;
+                        addressLine2 = res.addressLine2 || addressLine2;
+                        contactNumber = res.contactNumber ? `Mo: ${res.contactNumber}` : contactNumber;
+                        companyGstin = res.companyGstin || companyGstin;
+                        companyEmail = res.companyEmail || companyEmail;
+                        sellerDistrict = res.district || sellerDistrict;
+                        sellerState = res.sellerState || sellerState;
+                    }
+                } else if (window.BrandService) { // Fallback for non-electron env
+                    const brand = window.BrandService.getBrand();
+                    companyName = brand.name || companyName;
+                    addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                    addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                    contactNumber = brand.phone ? `Mo: ${brand.phone}` : contactNumber;
+                    companyGstin = brand.gst || companyGstin;
+                    companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                    sellerDistrict = localStorage.getItem('district') || sellerDistrict;
+                    sellerState = localStorage.getItem('sellerState') || sellerState;
+                } else {
+                    companyName = localStorage.getItem('companyName') || companyName;
+                    addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                    addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                    contactNumber = localStorage.getItem('contactNumber') ? `Mo: ${localStorage.getItem('contactNumber')}` : contactNumber;
+                    companyGstin = localStorage.getItem('companyGstin') || companyGstin;
+                    companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                    sellerDistrict = localStorage.getItem('district') || sellerDistrict;
+                    sellerState = localStorage.getItem('sellerState') || sellerState;
+                }
 
-            if (addressLine2) {
-                doc.text(addressLine2, 105, nextY, { align: "center" });
-                nextY += 5;
-            }
+                // Header
+                doc.setFontSize(20);
+                doc.setTextColor(44, 62, 80);
+                doc.text(companyName, 105, 15, { align: "center" });
 
-            let distStateParts = [];
-            if (sellerDistrict) distStateParts.push(`Dist: ${sellerDistrict}`);
-            if (sellerState) distStateParts.push(`State: ${sellerState}`);
-            let distState = distStateParts.join(", ");
-            if (distState) {
-                doc.text(distState, 105, nextY, { align: "center" });
-                nextY += 5;
-            }
+                doc.setFontSize(10);
+                doc.setTextColor(100);
 
-            let contactParts = [];
-            if (contactNumber) contactParts.push(contactNumber);
-            if (companyEmail) contactParts.push(`E-Mail: ${companyEmail}`);
+                let nextY = 22;
+                if (addressLine1) {
+                    doc.text(addressLine1, 105, nextY, { align: "center" });
+                    nextY += 5;
+                }
 
-            if (contactParts.length > 0) {
-                doc.text(contactParts.join(" | "), 105, nextY, { align: "center" });
-                nextY += 5;
-            }
-            if (companyGstin) {
-                doc.text(`GSTIN: ${companyGstin}`, 105, nextY, { align: "center" });
-                nextY += 4;
-            } else {
-                nextY += 4;
-            }
+                if (addressLine2) {
+                    doc.text(addressLine2, 105, nextY, { align: "center" });
+                    nextY += 5;
+                }
 
-            doc.setDrawColor(200);
-            doc.line(10, nextY, 200, nextY);
+                let distStateParts = [];
+                if (sellerDistrict) distStateParts.push(`Dist: ${sellerDistrict}`);
+                if (sellerState) distStateParts.push(`State: ${sellerState}`);
+                let distState = distStateParts.join(", ");
+                if (distState) {
+                    doc.text(distState, 105, nextY, { align: "center" });
+                    nextY += 5;
+                }
 
-            let offset = nextY - 36;
-            if (offset < 0) offset = 0;
+                let contactParts = [];
+                if (contactNumber) contactParts.push(contactNumber);
+                if (companyEmail) contactParts.push(`E-Mail: ${companyEmail}`);
 
-            // Invoice Details
-            doc.setFontSize(11);
-            doc.setTextColor(0);
-            doc.text(`Invoice No: ${invoice.invoice_no || invoice.invoiceNo || '-'}`, 14, 45 + offset);
-            doc.text(`Invoice Type: ${invoice.invoiceType || 'TAX INVOICE'}`, 14, 50 + offset);
-            const d = invoice.invoice_date || invoice.date;
+                if (contactParts.length > 0) {
+                    doc.text(contactParts.join(" | "), 105, nextY, { align: "center" });
+                    nextY += 5;
+                }
+                if (companyGstin) {
+                    doc.text(`GSTIN: ${companyGstin}`, 105, nextY, { align: "center" });
+                    nextY += 4;
+                } else {
+                    nextY += 4;
+                }
 
-            let dateStr = d ? formatDate(d) : '-';
-            if (showTimestampInPdf && (invoice.invoice_time || invoice.time)) {
-                const [h, m] = (invoice.invoice_time || invoice.time).split(':');
-                const tObj = new Date(); tObj.setHours(h); tObj.setMinutes(m);
-                const tStr = tObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                dateStr += " " + tStr;
-            }
-            doc.text(`Date: ${dateStr}`, 160, 45 + offset);
+                doc.setDrawColor(200);
+                doc.line(10, nextY, 200, nextY);
 
-            // Customer Details
-            // Bill To (Left)
-            doc.setFont(undefined, 'bold');
-            doc.text("Bill To:", 14, 55 + offset);
-            doc.setFont(undefined, 'normal');
+                let offset = nextY - 36;
+                if (offset < 0) offset = 0;
 
-            const custName = invoice.customer_name || getCustomerNameFrom(invoice) || "-";
-            doc.text(custName, 14, 62 + offset);
+                // Invoice Details
+                doc.setFontSize(11);
+                doc.setTextColor(0);
+                doc.text(`Invoice No: ${invoice.invoice_no || invoice.invoiceNo || '-'}`, 14, 45 + offset);
+                doc.text(`Invoice Type: ${invoice.invoiceType || 'TAX INVOICE'}`, 14, 50 + offset);
+                const d = invoice.invoice_date || invoice.date;
 
-            const address = invoice.address || getCustomerField(invoice, 'address') || "";
-            const contact = invoice.contact || getCustomerField(invoice, 'contact') || "";
-            const pin = invoice.pin || getCustomerField(invoice, 'pin') || "";
-            const district = invoice.district || getCustomerField(invoice, 'district') || "";
-            const state = invoice.state || getCustomerField(invoice, 'state') || "";
-            const gst = invoice.gst_no || invoice.gst || getCustomerField(invoice, 'gst') || "";
-            const stateCode = invoice.stateCode || getCustomerField(invoice, 'stateCode') || "";
+                let dateStr = d ? formatDate(d) : '-';
+                if (showTimestampInPdf) {
+                    let invTime = invoice.invoice_time || invoice.time;
+                    if (!invTime && invoice.createdAt) {
+                        const dt = new Date(invoice.createdAt);
+                        if (!isNaN(dt)) invTime = `${dt.getHours()}:${dt.getMinutes()}`;
+                    }
+                    if (invTime) {
+                        const [h, m] = invTime.split(':');
+                        const tObj = new Date(); tObj.setHours(h || 0); tObj.setMinutes(m || 0);
+                        const tStr = tObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        dateStr += " " + tStr;
+                    }
+                }
+                doc.text(`Date: ${dateStr}`, 160, 45 + offset);
 
-            let y = 67 + offset;
-            const maxColWidth = 90; // Reduced width to prevent overlap
-
-            if (address) {
-                const splitAddr = doc.splitTextToSize(address, maxColWidth);
-                doc.text(splitAddr, 14, y);
-                y += (splitAddr.length * 5);
-            }
-
-            // PIN & District
-            let line1 = [];
-            if (pin) line1.push(`PIN: ${pin}`);
-            if (district) line1.push(`Dist: ${district}`);
-            if (line1.length > 0) {
-                doc.text(line1.join(", "), 14, y);
-                y += 5;
-            }
-
-            // State & Code
-            let line2 = [];
-            if (state) line2.push(`State: ${state}`);
-            if (stateCode) line2.push(`Code: ${stateCode}`);
-            if (line2.length > 0) {
-                doc.text(line2.join(", "), 14, y);
-                y += 5;
-            }
-
-            // Contact & GST
-            let line3 = [];
-            if (contact) line3.push(`Mob: ${contact}`);
-            if (gst && !isSaleInvoice) line3.push(`GST: ${gst}`);
-            if (line3.length > 0) {
-                const splitLine3 = doc.splitTextToSize(line3.join(", "), maxColWidth);
-                doc.text(splitLine3, 14, y);
-                y += 5;
-            }
-
-            // Ship To (Right)
-            const printShipTo = (invoice.printShipTo !== undefined) ? invoice.printShipTo : true;
-
-            if (printShipTo) {
-                let shipY = 55 + offset;
+                // Customer Details
+                // Bill To (Left)
                 doc.setFont(undefined, 'bold');
-                doc.text("Ship To:", 110, shipY);
+                doc.text("Bill To:", 14, 55 + offset);
                 doc.setFont(undefined, 'normal');
-                shipY += 7;
 
-                const shipName = invoice.shipName || custName;
-                doc.text(shipName, 110, shipY);
-                shipY += 5;
+                const custName = invoice.customer_name || getCustomerNameFrom(invoice) || "-";
+                doc.text(custName, 14, 62 + offset);
 
-                const shipAddress = invoice.shipAddress || address;
-                if (shipAddress) {
-                    const splitShipAddr = doc.splitTextToSize(shipAddress, 90);
-                    doc.text(splitShipAddr, 110, shipY);
-                    shipY += (splitShipAddr.length * 5);
+                const address = invoice.address || getCustomerField(invoice, 'address') || "";
+                const contact = invoice.contact || getCustomerField(invoice, 'contact') || "";
+                const pin = invoice.pin || getCustomerField(invoice, 'pin') || "";
+                const district = invoice.district || getCustomerField(invoice, 'district') || "";
+                const state = invoice.state || getCustomerField(invoice, 'state') || "";
+                const gst = invoice.gst_no || invoice.gst || getCustomerField(invoice, 'gst') || "";
+                const stateCode = invoice.stateCode || getCustomerField(invoice, 'stateCode') || "";
+
+                let y = 67 + offset;
+                const maxColWidth = 90; // Reduced width to prevent overlap
+
+                if (address) {
+                    const splitAddr = doc.splitTextToSize(address, maxColWidth);
+                    doc.text(splitAddr, 14, y);
+                    y += (splitAddr.length * 5);
                 }
-
-                const sPin = invoice.shipPin || pin;
-                const sDist = invoice.shipDistrict || district;
-                const sState = invoice.shipState || state;
-                const sCode = invoice.shipStateCode || stateCode;
-                const sContact = invoice.shipContact || contact;
-                const sGst = invoice.shipGST || gst;
 
                 // PIN & District
-                let sLine1 = [];
-                if (sPin) sLine1.push(`PIN: ${sPin}`);
-                if (sDist) sLine1.push(`Dist: ${sDist}`);
-                if (sLine1.length > 0) {
-                    doc.text(sLine1.join(", "), 110, shipY);
-                    shipY += 5;
+                let line1 = [];
+                if (pin) line1.push(`PIN: ${pin}`);
+                if (district) line1.push(`Dist: ${district}`);
+                if (line1.length > 0) {
+                    doc.text(line1.join(", "), 14, y);
+                    y += 5;
                 }
 
                 // State & Code
-                let sLine2 = [];
-                if (sState) sLine2.push(`State: ${sState}`);
-                if (sCode) sLine2.push(`Code: ${sCode}`);
-                if (sLine2.length > 0) {
-                    doc.text(sLine2.join(", "), 110, shipY);
-                    shipY += 5;
+                let line2 = [];
+                if (state) line2.push(`State: ${state}`);
+                if (stateCode) line2.push(`Code: ${stateCode}`);
+                if (line2.length > 0) {
+                    doc.text(line2.join(", "), 14, y);
+                    y += 5;
                 }
 
                 // Contact & GST
-                let sLine3 = [];
-                if (sContact) sLine3.push(`Mob: ${sContact}`);
-                if (sGst && !isSaleInvoice) sLine3.push(`GST: ${sGst}`);
-                if (sLine3.length > 0) {
-                    const splitSLine3 = doc.splitTextToSize(sLine3.join(", "), 90);
-                    doc.text(splitSLine3, 110, shipY);
-                    shipY += (splitSLine3.length * 5);
+                let line3 = [];
+                if (contact) line3.push(`Mob: ${contact}`);
+                if (gst && !isSaleInvoice) line3.push(`GST: ${gst}`);
+                if (line3.length > 0) {
+                    const splitLine3 = doc.splitTextToSize(line3.join(", "), maxColWidth);
+                    doc.text(splitLine3, 14, y);
+                    y += 5;
                 }
 
-                // Ensure y is below both blocks
-                y = Math.max(y, shipY);
-            }
+                // Ship To (Right)
+                const printShipTo = (invoice.printShipTo !== undefined) ? invoice.printShipTo : true;
 
-            if (invoice.ewayBillNo) {
-                doc.text(`E-Way Bill: ${invoice.ewayBillNo}`, 14, y);
-                y += 5;
-            }
+                if (printShipTo) {
+                    let shipY = 55 + offset;
+                    doc.setFont(undefined, 'bold');
+                    doc.text("Ship To:", 110, shipY);
+                    doc.setFont(undefined, 'normal');
+                    shipY += 7;
 
-            if (invoice.deliveryChallanNo) {
-                doc.text(`Delivery Challan: ${invoice.deliveryChallanNo}`, 14, y);
-                y += 5;
-            }
+                    const shipName = invoice.shipName || custName;
+                    doc.text(shipName, 110, shipY);
+                    shipY += 5;
 
-            if (invoice.lrNo) {
-                let lrText = `LR No: ${invoice.lrNo}`;
-                if (invoice.lrDate) lrText += `  Dt: ${formatDate(invoice.lrDate)}`;
-                doc.text(lrText, 14, y);
-                y += 5;
-            }
+                    const shipAddress = invoice.shipAddress || address;
+                    if (shipAddress) {
+                        const splitShipAddr = doc.splitTextToSize(shipAddress, 90);
+                        doc.text(splitShipAddr, 110, shipY);
+                        shipY += (splitShipAddr.length * 5);
+                    }
 
-            if (invoice.buyersOrderNo) {
-                let orderText = `Buyers Order No: ${invoice.buyersOrderNo}`;
-                if (invoice.buyersOrderDate) orderText += `  Dt: ${formatDate(invoice.buyersOrderDate)}`;
-                doc.text(orderText, 14, y);
-                y += 5;
-            }
+                    const sPin = invoice.shipPin || pin;
+                    const sDist = invoice.shipDistrict || district;
+                    const sState = invoice.shipState || state;
+                    const sCode = invoice.shipStateCode || stateCode;
+                    const sContact = invoice.shipContact || contact;
+                    const sGst = invoice.shipGST || gst;
 
-            if (invoice.dispatchedThrough) {
-                doc.text(`Dispatched Through: ${invoice.dispatchedThrough}`, 14, y);
-                y += 5;
-            }
+                    // PIN & District
+                    let sLine1 = [];
+                    if (sPin) sLine1.push(`PIN: ${sPin}`);
+                    if (sDist) sLine1.push(`Dist: ${sDist}`);
+                    if (sLine1.length > 0) {
+                        doc.text(sLine1.join(", "), 110, shipY);
+                        shipY += 5;
+                    }
 
-            if (invoice.dispatchedDetails) {
-                doc.text(`Dispatched Details: ${invoice.dispatchedDetails}`, 14, y);
-                y += 5;
-            }
+                    // State & Code
+                    let sLine2 = [];
+                    if (sState) sLine2.push(`State: ${sState}`);
+                    if (sCode) sLine2.push(`Code: ${sCode}`);
+                    if (sLine2.length > 0) {
+                        doc.text(sLine2.join(", "), 110, shipY);
+                        shipY += 5;
+                    }
 
-            // Table
-            const items = invoice.items || [];
-            let calculatedTotal = 0;
-            let calculatedTotalDiscount = 0;
-            let totalCGST = 0;
-            let totalSGST = 0;
-            let totalIGST = 0;
-            let totalTaxable = 0;
-            const gstType = invoice.gstType || "Intra-State";
+                    // Contact & GST
+                    let sLine3 = [];
+                    if (sContact) sLine3.push(`Mob: ${sContact}`);
+                    if (sGst && !isSaleInvoice) sLine3.push(`GST: ${sGst}`);
+                    if (sLine3.length > 0) {
+                        const splitSLine3 = doc.splitTextToSize(sLine3.join(", "), 90);
+                        doc.text(splitSLine3, 110, shipY);
+                        shipY += (splitSLine3.length * 5);
+                    }
 
-            // Dynamic Headers
-            let headers = ['Sl', 'Item'];
-            if (invColVis[7]) headers.push('HSN/SAC');
-            if (invColVis[3]) headers.push('IMEI');
-            if (invColVis[4]) headers.push('Batch');
-            if (invColVis[5]) headers.push('Lot');
-            if (invColVis[6]) headers.push('Serial');
-            headers.push('Qty', 'UOM', 'Price');
-
-            const tableData = items.map((it, i) => {
-
-                const row = [i + 1];
-
-
-                // Item Name + Sub Details
-                let itemPdfDisplay = (it.item || "") + (showItemCodeInPdf && it.itemCode ? ` (${it.itemCode})` : "");
-                if (showSubDetailsInPdf && it.subDetails && it.subDetails.trim()) {
-                    itemPdfDisplay += "\n" + it.subDetails;
+                    // Ensure y is below both blocks
+                    y = Math.max(y, shipY);
                 }
 
+                if (invoice.ewayBillNo) {
+                    doc.text(`E-Way Bill: ${invoice.ewayBillNo}`, 14, y);
+                    y += 5;
+                }
 
-                row.push(itemPdfDisplay);
+                if (invoice.deliveryChallanNo) {
+                    doc.text(`Delivery Challan: ${invoice.deliveryChallanNo}`, 14, y);
+                    y += 5;
+                }
 
-                if (invColVis[7]) row.push(it.hsn || "");
-                if (invColVis[3]) row.push(it.imei || "");
-                if (invColVis[4]) row.push(it.batch || "");
-                if (invColVis[5]) row.push(it.lot || "");
-                if (invColVis[6]) row.push(it.serial || "");
+                if (invoice.lrNo) {
+                    let lrText = `LR No: ${invoice.lrNo}`;
+                    if (invoice.lrDate) lrText += `  Dt: ${formatDate(invoice.lrDate)}`;
+                    doc.text(lrText, 14, y);
+                    y += 5;
+                }
 
-                const qty = parseFloat(it.qty) || 0;
-                const price = parseFloat(it.price) || 0;
-                const gst = parseFloat(it.gst) || 0;
+                if (invoice.buyersOrderNo) {
+                    let orderText = `Buyers Order No: ${invoice.buyersOrderNo}`;
+                    if (invoice.buyersOrderDate) orderText += `  Dt: ${formatDate(invoice.buyersOrderDate)}`;
+                    doc.text(orderText, 14, y);
+                    y += 5;
+                }
 
-                row.push(qty);
-                row.push(it.uom || "");
-                row.push(price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                if (invoice.dispatchedThrough) {
+                    doc.text(`Dispatched Through: ${invoice.dispatchedThrough}`, 14, y);
+                    y += 5;
+                }
 
-                // Calcs
-                let rowTotal = 0;
-                let gstAmt = 0;
-                let discDisplay = "-";
+                if (invoice.dispatchedDetails) {
+                    doc.text(`Dispatched Details: ${invoice.dispatchedDetails}`, 14, y);
+                    y += 5;
+                }
 
-                const disc = parseFloat(it.disc) || 0;
-                const discType = it.discType || '%';
-                const base = qty * price;
-                let discVal = (discType === 'flat') ? disc : (base * disc / 100);
-                const taxable = Math.max(0, base - discVal);
+                // Table
+                const items = invoice.items || [];
+                let calculatedTotal = 0;
+                let calculatedTotalDiscount = 0;
+                let totalCGST = 0;
+                let totalSGST = 0;
+                let totalIGST = 0;
+                let totalTaxable = 0;
+                const gstType = invoice.gstType || "Intra-State";
 
-                calculatedTotalDiscount += discVal;
-                totalTaxable += taxable;
+                // Dynamic Headers
+                let headers = ['Sl', 'Item'];
+                if (invColVis[7]) headers.push('HSN/SAC');
+                if (invColVis[3]) headers.push('IMEI');
+                if (invColVis[4]) headers.push('Batch');
+                if (invColVis[5]) headers.push('Lot');
+                if (invColVis[6]) headers.push('Serial');
+                headers.push('Qty', 'UOM', 'Price');
 
-                gstAmt = taxable * (gst / 100);
-                rowTotal = taxable + gstAmt;
-                calculatedTotal += rowTotal;
+                const tableData = items.map((it, i) => {
 
+                    const row = [i + 1];
+
+
+                    // Item Name + Sub Details
+                    let itemPdfDisplay = (it.item || "") + (showItemCodeInPdf && it.itemCode ? ` (${it.itemCode})` : "");
+                    if (showSubDetailsInPdf && it.subDetails && it.subDetails.trim()) {
+                        itemPdfDisplay += "\n" + it.subDetails;
+                    }
+
+
+                    row.push(itemPdfDisplay);
+
+                    if (invColVis[7]) row.push(it.hsn || "");
+                    if (invColVis[3]) row.push(it.imei || "");
+                    if (invColVis[4]) row.push(it.batch || "");
+                    if (invColVis[5]) row.push(it.lot || "");
+                    if (invColVis[6]) row.push(it.serial || "");
+
+                    const qty = parseFloat(it.qty) || 0;
+                    const price = parseFloat(it.price) || 0;
+                    const gst = parseFloat(it.gst) || 0;
+
+                    row.push(qty);
+                    row.push(it.uom || "");
+                    row.push(price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+                    // Calcs
+                    let rowTotal = 0;
+                    let gstAmt = 0;
+                    let discDisplay = "-";
+
+                    const disc = parseFloat(it.disc) || 0;
+                    const discType = it.discType || '%';
+                    const base = qty * price;
+                    let discVal = (discType === 'flat') ? disc : (base * disc / 100);
+                    const taxable = Math.max(0, base - discVal);
+
+                    calculatedTotalDiscount += discVal;
+                    totalTaxable += taxable;
+
+                    gstAmt = taxable * (gst / 100);
+                    rowTotal = taxable + gstAmt;
+                    calculatedTotal += rowTotal;
+
+                    if (showDiscountInPdf) {
+                        discDisplay = disc > 0 ? `${disc}${discType === 'flat' ? '₹' : '%'}` : '-';
+                        row.push(discDisplay);
+                    }
+
+                    if (!isSaleInvoice) {
+                        if (gstType === "Intra-State") {
+                            const halfRate = gst / 2;
+                            const halfAmt = gstAmt / 2;
+                            totalCGST += halfAmt;
+                            totalSGST += halfAmt;
+                            row.push(halfRate ? halfRate + '%' : '-');
+                            row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                            row.push(halfRate ? halfRate + '%' : '-');
+                            row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        } else {
+                            totalIGST += gstAmt;
+                            row.push(gst ? gst + '%' : '-');
+                            row.push(gstAmt ? gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        }
+                    }
+
+                    row.push(rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+                    return row;
+                });
+
+                let freightBefore = parseFloat(invoice.freightBeforeGst) || 0;
+                let freightBeforeRate = parseFloat(invoice.freightBeforeGstRate) || 0;
+                let freightBeforeTax = freightBefore * (freightBeforeRate / 100);
+                totalTaxable += freightBefore;
+                if (!isSaleInvoice) {
+                    if (gstType === "Intra-State") {
+                        totalCGST += freightBeforeTax / 2;
+                        totalSGST += freightBeforeTax / 2;
+                    } else {
+                        totalIGST += freightBeforeTax;
+                    }
+                }
+
+                let overallDiscountValPdf = parseFloat(invoice.overallDiscountAmount || invoice.overallDiscount || 0);
+                if (overallDiscountValPdf > 0 && totalTaxable > 0) {
+                    const prop = overallDiscountValPdf / totalTaxable;
+                    totalCGST -= totalCGST * prop;
+                    totalSGST -= totalSGST * prop;
+                    totalIGST -= totalIGST * prop;
+                }
+
+                if (showDiscountInPdf) headers.push('Disc');
+                if (!isSaleInvoice) {
+                    if (gstType === "Intra-State") {
+                        headers.push('CGST%', 'CGST Amt', 'SGST%', 'SGST Amt');
+                    } else {
+                        headers.push('IGST%', 'IGST Amt');
+                    }
+                }
+                headers.push('Total');
+
+                // Column Styles
+                let optionalCount = 0;
+                if (invColVis[7]) optionalCount++;
+                if (invColVis[3]) optionalCount++;
+                if (invColVis[4]) optionalCount++;
+                if (invColVis[5]) optionalCount++;
+                if (invColVis[6]) optionalCount++;
+
+                const priceIdx = 2 + optionalCount + 2;
+                const styles = {
+                    0: { cellWidth: 10 },
+                    1: { cellWidth: 'auto' }
+                };
+                styles[2 + optionalCount] = { halign: 'center' }; // Qty
+                styles[2 + optionalCount + 1] = { halign: 'center' }; // UOM
+                styles[priceIdx] = { halign: 'right' }; // Price
+
+                let currentIdx = priceIdx + 1;
                 if (showDiscountInPdf) {
-                    discDisplay = disc > 0 ? `${disc}${discType === 'flat' ? '₹' : '%'}` : '-';
-                    row.push(discDisplay);
+                    styles[currentIdx] = { halign: 'center' }; // Disc
+                    currentIdx++;
                 }
 
                 if (!isSaleInvoice) {
                     if (gstType === "Intra-State") {
-                        const halfRate = gst / 2;
-                        const halfAmt = gstAmt / 2;
-                        totalCGST += halfAmt;
-                        totalSGST += halfAmt;
-                        row.push(halfRate ? halfRate + '%' : '-');
-                        row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
-                        row.push(halfRate ? halfRate + '%' : '-');
-                        row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        styles[currentIdx] = { halign: 'center' }; // CGST%
+                        styles[currentIdx + 1] = { halign: 'right' }; // Amt
+                        styles[currentIdx + 2] = { halign: 'center' }; // SGST%
+                        styles[currentIdx + 3] = { halign: 'right' }; // Amt
+                        currentIdx += 4;
                     } else {
-                        totalIGST += gstAmt;
-                        row.push(gst ? gst + '%' : '-');
-                        row.push(gstAmt ? gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        styles[currentIdx] = { halign: 'center' }; // IGST%
+                        styles[currentIdx + 1] = { halign: 'right' }; // Amt
+                        currentIdx += 2;
                     }
                 }
+                styles[currentIdx] = { halign: 'right' }; // Total
 
-                row.push(rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                doc.autoTable({
+                    startY: Math.max(y + 5, 85),
+                    head: [headers],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [255, 255, 255], textColor: 0 },
+                    styles: {
+                        fontSize: 9,
+                        cellPadding: 2,
+                        lineColor: 200,
+                        lineWidth: 0.2
+                    },
+                    bodyStyles: {
+                        minCellHeight: 6
+                    },
+                    rowPageBreak: 'avoid', // Keep rows together on page breaks
+                    columnStyles: styles,
+                    willDrawCell: (data) => {
+                        if (data.section === 'body' && data.column.index === 1) {
+                            const item = items[data.row.index];
+                            if (showSubDetailsInPdf && item && item.subDetails && item.subDetails.trim()) {
+                                const cell = data.cell;
 
-                return row;
-            });
+                                // Extract padding (handle both number and object formats)
+                                const pad = cell.padding || 3;
+                                const padLeft = (typeof pad === 'object') ? (pad.left || 3) : pad;
+                                const padTop = (typeof pad === 'object') ? (pad.top || 3) : pad;
+                                const padRight = (typeof pad === 'object') ? (pad.right || 3) : pad;
+                                const padBottom = (typeof pad === 'object') ? (pad.bottom || 3) : pad;
 
-            let freightBefore = parseFloat(invoice.freightBeforeGst) || 0;
-            let freightBeforeRate = parseFloat(invoice.freightBeforeGstRate) || 0;
-            let freightBeforeTax = freightBefore * (freightBeforeRate / 100);
-            totalTaxable += freightBefore;
-            if (!isSaleInvoice) {
-                if (gstType === "Intra-State") {
-                    totalCGST += freightBeforeTax / 2;
-                    totalSGST += freightBeforeTax / 2;
-                } else {
-                    totalIGST += freightBeforeTax;
-                }
-            }
+                                // Calculate text positioning
+                                const textX = cell.x + padLeft;
+                                const colWidth = cell.width - padLeft - padRight;
 
-            let overallDiscountValPdf = parseFloat(invoice.overallDiscountAmount || invoice.overallDiscount || 0);
-            if (overallDiscountValPdf > 0 && totalTaxable > 0) {
-                const prop = overallDiscountValPdf / totalTaxable;
-                totalCGST -= totalCGST * prop;
-                totalSGST -= totalSGST * prop;
-                totalIGST -= totalIGST * prop;
-            }
+                                // Professional invoice header style layout:
+                                // Main heading at top, sub-details below with tight spacing
+                                const mainHeadingY = cell.y + padTop;
+                                const mainHeadingFontSize = 10;
+                                const subDetailsFontSize = 7;
+                                const subDetailsGrey = [80, 80, 80]; // Slightly darker grey
 
-            if (showDiscountInPdf) headers.push('Disc');
-            if (!isSaleInvoice) {
-                if (gstType === "Intra-State") {
-                    headers.push('CGST%', 'CGST Amt', 'SGST%', 'SGST Amt');
-                } else {
-                    headers.push('IGST%', 'IGST Amt');
-                }
-            }
-            headers.push('Total');
+                                // Draw main heading (Item Name)
+                                doc.setFontSize(mainHeadingFontSize);
+                                doc.setFont(undefined, 'bold');
+                                doc.setTextColor(0, 0, 0);
 
-            // Column Styles
-            let optionalCount = 0;
-            if (invColVis[7]) optionalCount++;
-            if (invColVis[3]) optionalCount++;
-            if (invColVis[4]) optionalCount++;
-            if (invColVis[5]) optionalCount++;
-            if (invColVis[6]) optionalCount++;
+                                const itemText = (item.item || "") + (item.itemCode ? ` (${item.itemCode})` : "");
+                                const itemLines = doc.splitTextToSize(itemText, colWidth);
 
-            const priceIdx = 2 + optionalCount + 2;
-            const styles = {
-                0: { cellWidth: 10 },
-                1: { cellWidth: 'auto' }
-            };
-            styles[2 + optionalCount] = { halign: 'center' }; // Qty
-            styles[2 + optionalCount + 1] = { halign: 'center' }; // UOM
-            styles[priceIdx] = { halign: 'right' }; // Price
+                                doc.text(itemLines, textX, mainHeadingY, {
+                                    baseline: 'top',
+                                    align: 'left'
+                                });
 
-            let currentIdx = priceIdx + 1;
-            if (showDiscountInPdf) {
-                styles[currentIdx] = { halign: 'center' }; // Disc
-                currentIdx++;
-            }
+                                // Calculate height of the item text block to position sub-details correctly.
+                                // doc.getLineHeight() returns the height in document units (mm by default).
+                                const itemBlockHeight = itemLines.length * doc.getLineHeight();
 
-            if (!isSaleInvoice) {
-                if (gstType === "Intra-State") {
-                    styles[currentIdx] = { halign: 'center' }; // CGST%
-                    styles[currentIdx + 1] = { halign: 'right' }; // Amt
-                    styles[currentIdx + 2] = { halign: 'center' }; // SGST%
-                    styles[currentIdx + 3] = { halign: 'right' }; // Amt
-                    currentIdx += 4;
-                } else {
-                    styles[currentIdx] = { halign: 'center' }; // IGST%
-                    styles[currentIdx + 1] = { halign: 'right' }; // Amt
-                    currentIdx += 2;
-                }
-            }
-            styles[currentIdx] = { halign: 'right' }; // Total
+                                // Calculate Y position for sub-details with minimal vertical gap
+                                // A small negative offset pulls the sub-details up, closer to the heading.
+                                const subDetailsY = mainHeadingY + itemBlockHeight - 0.5;
 
-            doc.autoTable({
-                startY: Math.max(y + 5, 85),
-                head: [headers],
-                body: tableData,
-                theme: 'striped',
-                headStyles: { fillColor: [255, 255, 255], textColor: 0 },
-                styles: {
-                    fontSize: 9,
-                    cellPadding: 2,
-                    lineColor: 200,
-                    lineWidth: 0.2
-                },
-                bodyStyles: {
-                    minCellHeight: 6
-                },
-                rowPageBreak: 'avoid', // Keep rows together on page breaks
-                columnStyles: styles,
-                willDrawCell: (data) => {
-                    if (data.section === 'body' && data.column.index === 1) {
-                        const item = items[data.row.index];
-                        if (showSubDetailsInPdf && item && item.subDetails && item.subDetails.trim()) {
-                            const cell = data.cell;
+                                // Draw sub-details with reduced line spacing
+                                doc.setFontSize(subDetailsFontSize);
+                                doc.setFont(undefined, 'normal');
+                                doc.setTextColor(...subDetailsGrey);
 
-                            // Extract padding (handle both number and object formats)
-                            const pad = cell.padding || 3;
-                            const padLeft = (typeof pad === 'object') ? (pad.left || 3) : pad;
-                            const padTop = (typeof pad === 'object') ? (pad.top || 3) : pad;
-                            const padRight = (typeof pad === 'object') ? (pad.right || 3) : pad;
-                            const padBottom = (typeof pad === 'object') ? (pad.bottom || 3) : pad;
+                                const subText = item.subDetails;
+                                const subLines = doc.splitTextToSize(subText, colWidth);
+                                doc.text(subLines, textX, subDetailsY, {
+                                    baseline: 'top',
+                                    align: 'left',
+                                    lineHeightFactor: 0.85 // Use a specific line height factor for tight spacing
+                                });
 
-                            // Calculate text positioning
-                            const textX = cell.x + padLeft;
-                            const colWidth = cell.width - padLeft - padRight;
+                                // Restore original styles
+                                doc.setFontSize(10);
+                                doc.setFont(undefined, 'normal');
+                                doc.setTextColor(0, 0, 0);
 
-                            // Professional invoice header style layout:
-                            // Main heading at top, sub-details below with tight spacing
-                            const mainHeadingY = cell.y + padTop;
-                            const mainHeadingFontSize = 10;
-                            const subDetailsFontSize = 7;
-                            const subDetailsGrey = [80, 80, 80]; // Slightly darker grey
-
-                            // Draw main heading (Item Name)
-                            doc.setFontSize(mainHeadingFontSize);
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(0, 0, 0);
-
-                            const itemText = (item.item || "") + (item.itemCode ? ` (${item.itemCode})` : "");
-                            const itemLines = doc.splitTextToSize(itemText, colWidth);
-
-                            doc.text(itemLines, textX, mainHeadingY, {
-                                baseline: 'top',
-                                align: 'left'
-                            });
-
-                            // Calculate height of the item text block to position sub-details correctly.
-                            // doc.getLineHeight() returns the height in document units (mm by default).
-                            const itemBlockHeight = itemLines.length * doc.getLineHeight();
-
-                            // Calculate Y position for sub-details with minimal vertical gap
-                            // A small negative offset pulls the sub-details up, closer to the heading.
-                            const subDetailsY = mainHeadingY + itemBlockHeight - 0.5;
-
-                            // Draw sub-details with reduced line spacing
-                            doc.setFontSize(subDetailsFontSize);
-                            doc.setFont(undefined, 'normal');
-                            doc.setTextColor(...subDetailsGrey);
-
-                            const subText = item.subDetails;
-                            const subLines = doc.splitTextToSize(subText, colWidth);
-                            doc.text(subLines, textX, subDetailsY, {
-                                baseline: 'top',
-                                align: 'left',
-                                lineHeightFactor: 0.85 // Use a specific line height factor for tight spacing
-                            });
-
-                            // Restore original styles
-                            doc.setFontSize(10);
-                            doc.setFont(undefined, 'normal');
-                            doc.setTextColor(0, 0, 0);
-
-                            return false; // Prevent default cell drawing
+                                return false; // Prevent default cell drawing
+                            }
                         }
                     }
-                }
-            });
+                });
 
-            // Estimate footer height to prevent overlapping with Authorized Signatory at the bottom
-            let estFooterHeight = 45;
-            if (showBankDetailsInPdf) estFooterHeight += 45;
-            if (localStorage.getItem("invoiceTermsAndConditions")) estFooterHeight += 15;
+                // Estimate footer height to prevent overlapping with Authorized Signatory at the bottom
+                let estFooterHeight = 45;
+                if (showBankDetailsInPdf) estFooterHeight += 45;
+                if (localStorage.getItem("invoiceTermsAndConditions")) estFooterHeight += 15;
 
-            if (doc.lastAutoTable.finalY + estFooterHeight > 260) {
-                doc.addPage();
-                doc.lastAutoTable.finalY = 15; // Reset Y for the new page
-            }
-
-            // Totals
-            const finalY = doc.lastAutoTable.finalY + 10;
-            let currentY = finalY;
-
-            let total = calculatedTotal;
-            if (invoice.invoice_total !== undefined) {
-                total = parseFloat(invoice.invoice_total);
-            }
-            const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid) || 0;
-            const due = total - paid;
-
-            // Amount in Words
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'bold');
-            doc.text("Amount in Words:", 14, currentY);
-            doc.setFont(undefined, 'normal');
-            const amtWords = convertNumberToWords(total);
-            const splitWords = doc.splitTextToSize(amtWords, 110);
-            doc.text(splitWords, 14, currentY + 6);
-
-            // Terms and Conditions
-            let leftY = currentY + 8 + (splitWords.length * 5) + 5;
-
-            const terms = localStorage.getItem("invoiceTermsAndConditions");
-
-            // Bank Details
-            const bankDetailsText = getFormattedBankDetails();
-
-            // Terms and Conditions
-            if (showTermsInPdf && terms) {
-                doc.setFont(undefined, 'bold');
-                doc.setFontSize(10);
-                doc.text("Declaration:", 14, leftY);
-                doc.setFont(undefined, 'normal');
-                doc.setFontSize(9);
-                const splitTerms = doc.splitTextToSize(terms, 110);
-                doc.text(splitTerms, 14, leftY + 4);
-                leftY += 4 + (splitTerms.length * 4) + 4;
-            }
-
-            if (showBankDetailsInPdf && bankDetailsText) {
-
-                doc.setFont(undefined, 'bold');
-                doc.setFontSize(10);
-                doc.text("Bank Details:", 14, leftY);
-                doc.setFont(undefined, 'normal');
-                doc.setFontSize(9);
-                const splitBank = doc.splitTextToSize(bankDetailsText, 110);
-                doc.text(splitBank, 14, leftY + 5);
-
-                // Add QR Code if available
-                let qrCodeBase64 = localStorage.getItem("invoiceQrCode");
-
-                // Attempt to generate dynamic QR with amount
-                const parsedTotal = parseFloat(String(total).replace(/,/g, '')) || 0;
-                const dynamicQr = await generateDynamicQr(parsedTotal, invoice.invoice_no || invoice.invoiceNo, companyName);
-                if (dynamicQr) {
-                    qrCodeBase64 = dynamicQr;
+                if (doc.lastAutoTable.finalY + estFooterHeight > 260) {
+                    doc.addPage();
+                    doc.lastAutoTable.finalY = 15; // Reset Y for the new page
                 }
 
-                if (qrCodeBase64) {
-                    try {
-                        doc.setFont(undefined, 'bold');
-                        doc.text("Scan to Pay", 95, leftY);
-                        doc.setFont(undefined, 'normal');
-                        doc.addImage(qrCodeBase64, 'PNG', 95, leftY + 2, 30, 30);
-                    } catch (e) {
-                        console.warn("Error adding QR to PDF:", e);
+                // Totals
+                const finalY = doc.lastAutoTable.finalY + 10;
+                let currentY = finalY;
+
+                let total = calculatedTotal;
+                if (invoice.invoice_total !== undefined) {
+                    total = parseFloat(invoice.invoice_total);
+                }
+                const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid) || 0;
+                const due = total - paid;
+
+                // Amount in Words
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.text("Amount in Words:", 14, currentY);
+                doc.setFont(undefined, 'normal');
+                const amtWords = convertNumberToWords(total);
+                const splitWords = doc.splitTextToSize(amtWords, 110);
+                doc.text(splitWords, 14, currentY + 6);
+
+                // Terms and Conditions
+                let leftY = currentY + 8 + (splitWords.length * 5) + 5;
+
+                const terms = localStorage.getItem("invoiceTermsAndConditions");
+
+                // Bank Details
+                const bankDetailsText = getFormattedBankDetails();
+
+                // Terms and Conditions
+                if (showTermsInPdf && terms) {
+                    doc.setFont(undefined, 'bold');
+                    doc.setFontSize(10);
+                    doc.text("Declaration:", 14, leftY);
+                    doc.setFont(undefined, 'normal');
+                    doc.setFontSize(9);
+                    const splitTerms = doc.splitTextToSize(terms, 110);
+                    doc.text(splitTerms, 14, leftY + 4);
+                    leftY += 4 + (splitTerms.length * 4) + 4;
+                }
+
+                if (showBankDetailsInPdf && bankDetailsText) {
+
+                    doc.setFont(undefined, 'bold');
+                    doc.setFontSize(10);
+                    doc.text("Bank Details:", 14, leftY);
+                    doc.setFont(undefined, 'normal');
+                    doc.setFontSize(9);
+                    const splitBank = doc.splitTextToSize(bankDetailsText, 110);
+                    doc.text(splitBank, 14, leftY + 5);
+
+                    // Add QR Code if available
+                    let qrCodeBase64 = localStorage.getItem("invoiceQrCode");
+
+                    // Attempt to generate dynamic QR with amount
+                    const parsedTotal = parseFloat(String(total).replace(/,/g, '')) || 0;
+                    const dynamicQr = await generateDynamicQr(parsedTotal, invoice.invoice_no || invoice.invoiceNo, companyName);
+                    if (dynamicQr) {
+                        qrCodeBase64 = dynamicQr;
+                    }
+
+                    if (qrCodeBase64) {
+                        try {
+                            doc.setFont(undefined, 'bold');
+                            doc.text("Scan to Pay", 95, leftY);
+                            doc.setFont(undefined, 'normal');
+                            doc.addImage(qrCodeBase64, 'PNG', 95, leftY + 2, 30, 30);
+                        } catch (e) {
+                            console.warn("Error adding QR to PDF:", e);
+                        }
+                    }
+                    const bankBlockHeight = 5 + (splitBank.length * 5) + 5;
+                    const qrBlockHeight = qrCodeBase64 ? 35 : 0;
+                    leftY += Math.max(bankBlockHeight, qrBlockHeight);
+                }
+
+                doc.setFontSize(10);
+                let rightY = finalY;
+
+                doc.setFontSize(9);
+                // Taxable and GST breakdown
+                if (!isSaleInvoice && totalTaxable > 0) {
+                    if (freightBefore > 0) {
+                        doc.text(`Freight (${freightBeforeRate}% GST):`, 140, rightY);
+                        doc.text(freightBefore.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                        rightY += 4;
+                    }
+                    doc.text("Total Taxable Amount:", 140, rightY);
+                    doc.text(totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                    rightY += 4;
+
+                    if (gstType === "Intra-State") {
+                        doc.text("Add: CGST:", 140, rightY);
+                        doc.text(totalCGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                        rightY += 4;
+                        doc.text("Add: SGST:", 140, rightY);
+                        doc.text(totalSGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                        rightY += 4;
+                    } else {
+                        doc.text("Add: IGST:", 140, rightY);
+                        doc.text(totalIGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                        rightY += 4;
                     }
                 }
-                const bankBlockHeight = 5 + (splitBank.length * 5) + 5;
-                const qrBlockHeight = qrCodeBase64 ? 35 : 0;
-                leftY += Math.max(bankBlockHeight, qrBlockHeight);
-            }
 
-            doc.setFontSize(10);
-            let rightY = finalY;
-
-            doc.setFontSize(9);
-            // Taxable and GST breakdown
-            if (!isSaleInvoice && totalTaxable > 0) {
-                if (freightBefore > 0) {
-                    doc.text(`Freight (${freightBeforeRate}% GST):`, 140, rightY);
-                    doc.text(freightBefore.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                    rightY += 4;
-                }
-                doc.text("Total Taxable Amount:", 140, rightY);
-                doc.text(totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                rightY += 4;
-
-                if (gstType === "Intra-State") {
-                    doc.text("Add: CGST:", 140, rightY);
-                    doc.text(totalCGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                    rightY += 4;
-                    doc.text("Add: SGST:", 140, rightY);
-                    doc.text(totalSGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                    rightY += 4;
+                let overallDiscountVal = 0;
+                if (invoice.overallDiscountAmount !== undefined) {
+                    overallDiscountVal = parseFloat(invoice.overallDiscountAmount);
                 } else {
-                    doc.text("Add: IGST:", 140, rightY);
-                    doc.text(totalIGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                    overallDiscountVal = parseFloat(invoice.overallDiscount) || 0;
+                }
+
+                let totalDiscountAmt = calculatedTotalDiscount + overallDiscountVal;
+
+                if (totalDiscountAmt > 0) {
+                    doc.text("Total Discount:", 140, rightY);
+                    doc.text(totalDiscountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
                     rightY += 4;
                 }
-            }
 
-            let overallDiscountVal = 0;
-            if (invoice.overallDiscountAmount !== undefined) {
-                overallDiscountVal = parseFloat(invoice.overallDiscountAmount);
-            } else {
-                overallDiscountVal = parseFloat(invoice.overallDiscount) || 0;
-            }
+                const fC = parseFloat(invoice.freightCharges) || 0;
+                const pC = parseFloat(invoice.packingCharges) || 0;
+                const cC = parseFloat(invoice.customCharges) || 0;
+                const cN = invoice.customChargeName || 'Loading';
 
-            let totalDiscountAmt = calculatedTotalDiscount + overallDiscountVal;
+                if (fC > 0) {
+                    doc.text("Add: Freight:", 140, rightY);
+                    doc.text(fC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                    rightY += 4;
+                }
+                if (pC > 0) {
+                    doc.text("Add: Packing:", 140, rightY);
+                    doc.text(pC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                    rightY += 4;
+                }
+                if (cC > 0) {
+                    doc.text(`Add: ${cN}:`, 140, rightY);
+                    doc.text(cC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                    rightY += 4;
+                }
 
-            if (totalDiscountAmt > 0) {
-                doc.text("Total Discount:", 140, rightY);
-                doc.text(totalDiscountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                rightY += 4;
-            }
+                var previousDue = parseFloat(invoice.previousDue) || 0;
+                if (previousDue > 0) {
+                    doc.text("Previous Due:", 140, rightY);
+                    doc.text(previousDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                    rightY += 4;
+                }
 
-            const fC = parseFloat(invoice.freightCharges) || 0;
-            const pC = parseFloat(invoice.packingCharges) || 0;
-            const cC = parseFloat(invoice.customCharges) || 0;
-            const cN = invoice.customChargeName || 'Loading';
+                // Round Off
+                let roundOffVal = parseFloat(invoice.roundOffAmount || 0);
+                if (roundOffVal !== 0) {
+                    doc.text("Round Off:", 140, rightY);
+                    doc.text(roundOffVal.toFixed(2), 195, rightY, { align: "right" });
+                    rightY += 4;
+                }
 
-            if (fC > 0) {
-                doc.text("Add: Freight:", 140, rightY);
-                doc.text(fC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                rightY += 4;
-            }
-            if (pC > 0) {
-                doc.text("Add: Packing:", 140, rightY);
-                doc.text(pC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                rightY += 4;
-            }
-            if (cC > 0) {
-                doc.text(`Add: ${cN}:`, 140, rightY);
-                doc.text(cC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                rightY += 4;
-            }
-
-            var previousDue = parseFloat(invoice.previousDue) || 0;
-            if (previousDue > 0) {
-                doc.text("Previous Due:", 140, rightY);
-                doc.text(previousDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-                rightY += 4;
-            }
-
-            // Round Off
-            let roundOffVal = parseFloat(invoice.roundOffAmount || 0);
-            if (roundOffVal !== 0) {
-                doc.text("Round Off:", 140, rightY);
-                doc.text(roundOffVal.toFixed(2), 195, rightY, { align: "right" });
-                rightY += 4;
-            }
-
-            doc.setFont(undefined, 'bold');
-            doc.text("Total Amount:", 140, rightY);
-            doc.text(total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-            rightY += 4;
-
-            doc.setFont(undefined, 'normal');
-            doc.text("Paid Amount:", 140, rightY);
-            doc.text(paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-            rightY += 5;
-            doc.setFont(undefined, 'bold');
-            doc.text("Balance Due:", 140, rightY);
-            doc.text(due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
-
-            let sigY = Math.max(leftY, rightY) + 15;
-
-            // Add Page if we are too close to bottom
-            if (sigY > 270) {
-                doc.addPage();
-                sigY = 20;
-            }
-
-            // Add Total Items and Quantity Summary
-            doc.setFont(undefined, 'bold');
-            doc.setFontSize(10);
-            doc.text(`Total Items: ${totalItemsCount}`, 14, sigY);
-            doc.text(`Total Quantity: ${totalQtyCount.toLocaleString('en-IN')}`, 14, sigY + 5);
-
-            // Signature
-            doc.setFontSize(10);
-            doc.text(`For ${companyName}`, 195, sigY + 5, { align: "right" });
-
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.3);
-            doc.line(145, sigY + 12, 195, sigY + 12);
-
-            doc.setFont(undefined, 'normal');
-            doc.text("Authorized Signatory", 195, sigY + 16, { align: "right" });
-
-            if (copyLabel === "Office Copy") {
                 doc.setFont(undefined, 'bold');
-                doc.text("Receiver's Signature (Acknowledgement)", 14, sigY + 16);
+                doc.text("Total Amount:", 140, rightY);
+                doc.text(total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                rightY += 4;
+
                 doc.setFont(undefined, 'normal');
-            }
+                doc.text("Paid Amount:", 140, rightY);
+                doc.text(paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                rightY += 5;
+                doc.setFont(undefined, 'bold');
+                doc.text("Balance Due:", 140, rightY);
+                doc.text(due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
 
-            // Footer
-            doc.setFont(undefined, 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(100);
-            doc.text("Thank you for your business!", 105, sigY + 25, { align: "center" });
+                let sigY = Math.max(leftY, rightY) + 15;
 
-            // Paid Stamp
-            if (showPaidStampInPdf && due <= 1) {
-                try {
-                    doc.saveGraphicsState();
-                    doc.setGState(new window.jspdf.GState({ opacity: 0.25 }));
-                    doc.setFontSize(70);
-                    doc.setTextColor(0, 150, 0); // Green
-                    doc.text("PAID", 105, 160, { align: "center", angle: 45 });
-                    doc.restoreGraphicsState();
-                } catch (e) {
-                    // Fallback if GState not supported
-                    doc.setFontSize(70);
-                    doc.setTextColor(200, 255, 200);
-                    doc.text("PAID", 105, 160, { align: "center", angle: 45 });
+                // Add Page if we are too close to bottom
+                if (sigY > 270) {
+                    doc.addPage();
+                    sigY = 20;
+                }
+
+                // Add Total Items and Quantity Summary
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                doc.text(`Total Items: ${totalItemsCount}`, 14, sigY);
+                doc.text(`Total Quantity: ${totalQtyCount.toLocaleString('en-IN')}`, 14, sigY + 5);
+
+                // Signature
+                doc.setFontSize(10);
+                doc.text(`For ${companyName}`, 195, sigY + 5, { align: "right" });
+
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.3);
+                doc.line(145, sigY + 12, 195, sigY + 12);
+
+                doc.setFont(undefined, 'normal');
+                doc.text("Authorized Signatory", 195, sigY + 16, { align: "right" });
+
+                if (copy.label === "Office Copy") {
+                    doc.setFont(undefined, 'bold');
+                    doc.text("Receiver's Signature (Acknowledgement)", 14, sigY + 16);
+                    doc.setFont(undefined, 'normal');
+                }
+
+                // Footer
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(100);
+                doc.text("Thank you for your business!", 105, sigY + 25, { align: "center" });
+
+                // Paid Stamp
+                if (showPaidStampInPdf && due <= 1) {
+                    try {
+                        doc.saveGraphicsState();
+                        doc.setGState(new window.jspdf.GState({ opacity: 0.25 }));
+                        doc.setFontSize(70);
+                        doc.setTextColor(0, 150, 0); // Green
+                        doc.text("PAID", 105, 160, { align: "center", angle: 45 });
+                        doc.restoreGraphicsState();
+                    } catch (e) {
+                        // Fallback if GState not supported
+                        doc.setFontSize(70);
+                        doc.setTextColor(200, 255, 200);
+                        doc.text("PAID", 105, 160, { align: "center", angle: 45 });
+                    }
+                }
+
+                // Add full page border and page count to all pages
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = copyStartPage; i <= totalPages; i++) {
+                    doc.setPage(i);
+
+                    // Full Page Border
+                    doc.setLineWidth(0.1);
+                    doc.setDrawColor(0);
+                    doc.rect(10, 5, 190, 282); // From Y=5 to Y=287
+
+                    // Page Count
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(9);
+                    doc.setTextColor(0);
+                    const pageNumInCopy = i - copyStartPage + 1;
+                    const totalPagesInCopy = totalPages - copyStartPage + 1;
+                    doc.text(`Page ${pageNumInCopy} of ${totalPagesInCopy}`, 105, 292, { align: "center" });
+                }
+
+                if (!mergePdf) {
+                    if (isDirectPrint) {
+                        doc.autoPrint();
+                        window.open(doc.output('bloburl'), '_blank');
+                    } else if (isPreview) {
+                        window.open(doc.output('bloburl'), '_blank');
+                    } else {
+                        const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+                        doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                    }
                 }
             }
-
-            // Add full page border and page count to all pages
-            const totalPages = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= totalPages; i++) {
-                doc.setPage(i);
-
-                // Full Page Border
-                doc.setLineWidth(0.1);
-                doc.setDrawColor(0);
-                doc.rect(10, 5, 190, 282); // From Y=5 to Y=287
-
-                // Page Count
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(9);
-                doc.setTextColor(0);
-                doc.text(`Page ${i} of ${totalPages}`, 105, 292, { align: "center" });
-            }
-
-            if (!mergePdf) {
+            if (mergePdf) {
                 if (isDirectPrint) {
                     doc.autoPrint();
                     window.open(doc.output('bloburl'), '_blank');
@@ -3386,40 +3482,27 @@
                     window.open(doc.output('bloburl'), '_blank');
                 } else {
                     const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-                    doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                    doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}_Merged.pdf`);
                 }
             }
         }
-        if (mergePdf) {
-            if (isDirectPrint) {
-                doc.autoPrint();
-                window.open(doc.output('bloburl'), '_blank');
-            } else if (isPreview) {
-                window.open(doc.output('bloburl'), '_blank');
-            } else {
-                const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}_Merged.pdf`);
-            }
-        }
-    }
 
-         async function generateTallyInvoicePDF(invoice, isDirectPrint = false, copyLabel = null, suffix = null) {
+        async function generateTallyInvoicePDF(invoice, isDirectPrint = false, copyLabel = null, suffix = null) {
             const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
-            
+
             let copies = [];
             if (copyLabel) {
                 copies.push({ label: copyLabel, suffix: suffix || "" });
             } else {
                 copies = [
                     { label: "Customer Copy", suffix: "_customer" },
-                    { label: "Office Copy", suffix: "_office" }
+                    { label: "Office Copy", suffix: "_office" },
+                    { label: "Transporter Copy", suffix: "_transporter" }
                 ];
             }
 
-
             const { jsPDF } = window.jspdf;
             let doc = new jsPDF();
-
 
             // Calculate totals for summary
             const itemsForSummary = invoice.items || [];
@@ -3443,660 +3526,671 @@
                     }
                 }
 
-
-            // Company Info
-            let companyName = "RISE Tech Revolution"; // Default
-            let addressLine1 = "";
-            let addressLine2 = "";
-            let companyGstin = "";
-            let companyEmail = "";
-            let contactNumber = "";
-            let district = localStorage.getItem('district') || "";
-            let state = localStorage.getItem('sellerState') || "";
+                const copyStartPage = doc.internal.getNumberOfPages();
 
 
-            if (typeof APP_SETTINGS !== 'undefined') {
-                companyName = APP_SETTINGS.COMPANY_NAME || companyName;
-                addressLine1 = APP_SETTINGS.ADDRESS_LINE_1 || addressLine1;
-                addressLine2 = APP_SETTINGS.ADDRESS_LINE_2 || addressLine2;
-                companyGstin = APP_SETTINGS.COMPANY_GSTIN || companyGstin;
-                companyEmail = APP_SETTINGS.COMPANY_EMAIL || companyEmail;
-                contactNumber = APP_SETTINGS.CONTACT_NUMBER || contactNumber;
-                district = district || APP_SETTINGS.DISTRICT || "";
-                state = state || APP_SETTINGS.SELLER_STATE || "";
-            }
-
-            if (window.electronAPI && window.electronAPI.getAppSettings) {
-                const res = await window.electronAPI.getAppSettings();
-                if (res.success) {
-                    companyName = res.companyName || companyName;
-                    addressLine1 = res.addressLine1 || addressLine1;
-                    addressLine2 = res.addressLine2 || addressLine2;
-                    companyGstin = res.companyGstin || companyGstin;
-                    companyEmail = res.companyEmail || companyEmail;
-                    contactNumber = res.contactNumber || contactNumber;
-                    district = res.district || district;
-                    state = res.sellerState || state;
-                }
-            } else if (window.BrandService) { // Fallback for non-electron env
-                const brand = window.BrandService.getBrand();
-                companyName = brand.name || companyName;
-                addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
-                addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
-                companyGstin = brand.gst || companyGstin;
-                companyEmail = localStorage.getItem('companyEmail') || companyEmail;
-                contactNumber = brand.phone || contactNumber;
-                district = localStorage.getItem('district') || district;
-                state = localStorage.getItem('sellerState') || state;
-            }
-
-            // Layout Constants
-            const startX = 10;
-            const startY = 10;
-            const width = 190;
-            const pageHeight = 297;
+                // Company Info
+                let companyName = "RISE Tech Revolution"; // Default
+                let addressLine1 = "";
+                let addressLine2 = "";
+                let companyGstin = "";
+                let companyEmail = "";
+                let contactNumber = "";
+                let district = localStorage.getItem('district') || "";
+                let state = localStorage.getItem('sellerState') || "";
 
 
-            const buyerY = startY + 45;
-            const buyerH = 35; // Compact height
-
-            const tableY = buyerY + buyerH;
-
-            const drawHeader = (data) => {
-                // Add Company Logo if available
-                const logoImg = document.getElementById('invoiceLogo');
-                if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
-                    try {
-                        doc.addImage(logoImg, 'PNG', 14, 5, 25, 25);
-                    } catch (e) { console.warn("Error adding logo to PDF:", e); }
+                if (typeof APP_SETTINGS !== 'undefined') {
+                    companyName = APP_SETTINGS.COMPANY_NAME || companyName;
+                    addressLine1 = APP_SETTINGS.ADDRESS_LINE_1 || addressLine1;
+                    addressLine2 = APP_SETTINGS.ADDRESS_LINE_2 || addressLine2;
+                    companyGstin = APP_SETTINGS.COMPANY_GSTIN || companyGstin;
+                    companyEmail = APP_SETTINGS.COMPANY_EMAIL || companyEmail;
+                    contactNumber = APP_SETTINGS.CONTACT_NUMBER || contactNumber;
+                    district = district || APP_SETTINGS.DISTRICT || "";
+                    state = state || APP_SETTINGS.SELLER_STATE || "";
                 }
 
-                // --- Header Section ---
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(0);
-                doc.text("TAX INVOICE", 105, 18, { align: "center" });
-
-                doc.setFontSize(10);
-            doc.text(copy.label, startX + width, startY - 2, { align: "right" });
-
-                doc.setLineWidth(0.1);
-                doc.setDrawColor(0);
-                doc.rect(startX, startY + 10, width, 35); // Header Box
-
-                // Left: Company Details
-                doc.setFontSize(12);
-                doc.text(companyName, startX + 2, startY + 16);
-
-                doc.setFontSize(9);
-                doc.setFont("helvetica", "normal");
-
-                let compY = startY + 19;
-                if (addressLine1) {
-                    doc.text(addressLine1, startX + 2, compY);
-                    compY += 4;
+                if (window.electronAPI && window.electronAPI.getAppSettings) {
+                    const res = await window.electronAPI.getAppSettings();
+                    if (res.success) {
+                        companyName = res.companyName || companyName;
+                        addressLine1 = res.addressLine1 || addressLine1;
+                        addressLine2 = res.addressLine2 || addressLine2;
+                        companyGstin = res.companyGstin || companyGstin;
+                        companyEmail = res.companyEmail || companyEmail;
+                        contactNumber = res.contactNumber || contactNumber;
+                        district = res.district || district;
+                        state = res.sellerState || state;
+                    }
+                } else if (window.BrandService) { // Fallback for non-electron env
+                    const brand = window.BrandService.getBrand();
+                    companyName = brand.name || companyName;
+                    addressLine1 = localStorage.getItem('addressLine1') || addressLine1;
+                    addressLine2 = localStorage.getItem('addressLine2') || addressLine2;
+                    companyGstin = brand.gst || companyGstin;
+                    companyEmail = localStorage.getItem('companyEmail') || companyEmail;
+                    contactNumber = brand.phone || contactNumber;
+                    district = localStorage.getItem('district') || district;
+                    state = localStorage.getItem('sellerState') || state;
                 }
 
-                let addr2 = addressLine2;
-                let distStateParts = [];
-                if (district) distStateParts.push(`Dist: ${district}`);
-                if (state) distStateParts.push(`State: ${state}`);
-                let distState = distStateParts.join(", ");
-                if (addr2 && distState) addr2 += ", " + distState;
-                else if (!addr2 && distState) addr2 = distState;
+                // Layout Constants
+                const startX = 10;
+                const startY = 10;
+                const width = 190;
+                const pageHeight = 297;
 
-                if (addr2) {
-                    doc.text(addr2, startX + 2, compY);
-                    compY += 5;
+
+                const buyerY = startY + 45;
+                const buyerH = 35; // Compact height
+
+                const tableY = buyerY + buyerH;
+
+                const drawHeader = (data) => {
+                    // Add Company Logo if available
+                    const logoImg = document.getElementById('invoiceLogo');
+                    if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
+                        try {
+                            doc.addImage(logoImg, 'PNG', 14, 5, 25, 25);
+                        } catch (e) { console.warn("Error adding logo to PDF:", e); }
+                    }
+
+                    // --- Header Section ---
+                    doc.setFontSize(14);
+                    doc.setFont("helvetica", "bold");
+                    doc.setTextColor(0);
+                    doc.text("TAX INVOICE", 105, 18, { align: "center" });
+
+                    doc.setFontSize(10);
+                    doc.text(copy.label, startX + width, startY - 2, { align: "right" });
+
+                    doc.setLineWidth(0.1);
+                    doc.setDrawColor(0);
+                    doc.rect(startX, startY + 10, width, 35); // Header Box
+
+                    // Left: Company Details
+                    doc.setFontSize(12);
+                    doc.text(companyName, startX + 2, startY + 16);
+
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+
+                    let compY = startY + 19;
+                    if (addressLine1) {
+                        doc.text(addressLine1, startX + 2, compY);
+                        compY += 4;
+                    }
+
+                    let addr2 = addressLine2;
+                    let distStateParts = [];
+                    if (district) distStateParts.push(`Dist: ${district}`);
+                    if (state) distStateParts.push(`State: ${state}`);
+                    let distState = distStateParts.join(", ");
+                    if (addr2 && distState) addr2 += ", " + distState;
+                    else if (!addr2 && distState) addr2 = distState;
+
+                    if (addr2) {
+                        doc.text(addr2, startX + 2, compY);
+                        compY += 5;
+                    }
+                    if (companyGstin) {
+                        doc.text(`GSTIN/UIN: ${companyGstin}`, startX + 2, compY);
+                        compY += 4;
+                    }
+
+                    let contactStr = [];
+                    if (contactNumber) contactStr.push(contactNumber);
+                    if (companyEmail) contactStr.push(`E-Mail: ${companyEmail}`);
+                    if (contactStr.length > 0) {
+                        doc.text(contactStr.join(" | "), startX + 2, compY);
+                    }
+
+                    // Right: Invoice Details (Split by vertical line)
+                    doc.line(startX + 95, startY + 10, startX + 95, startY + 45);
+
+                    // Right Sub-grid
+                    doc.line(startX + 95, startY + 22, startX + 190, startY + 22);
+                    doc.line(startX + 95, startY + 34, startX + 190, startY + 34);
+
+                    // Row 1
+                    doc.text("Invoice No.", startX + 97, startY + 14);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(invoice.invoice_no || invoice.invoiceNo || "", startX + 97, startY + 19);
+                    doc.setFont("helvetica", "normal");
+
+                    doc.text("Dated", startX + 145, startY + 14);
+                    doc.setFont("helvetica", "bold");
+                    const d = invoice.invoice_date || invoice.date;
+
+                    let dateStr = d ? new Date(d).toLocaleDateString('en-GB') : "";
+                    if (showTimestampInPdf) {
+                        let invTime = invoice.invoice_time || invoice.time;
+                        if (!invTime && invoice.createdAt) {
+                            const dt = new Date(invoice.createdAt);
+                            if (!isNaN(dt)) invTime = `${dt.getHours()}:${dt.getMinutes()}`;
+                        }
+                        if (invTime) {
+                            const [h, m] = invTime.split(':');
+                            const tObj = new Date(); tObj.setHours(h || 0); tObj.setMinutes(m || 0);
+                            const tStr = tObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            dateStr += " " + tStr;
+                        }
+                    }
+                    doc.text(dateStr, startX + 145, startY + 19);
+                    doc.setFont("helvetica", "normal");
+
+                    // Row 2
+                    doc.text("Delivery Note", startX + 97, startY + 26);
+                    doc.text(invoice.deliveryChallanNo || "", startX + 97, startY + 31);
+
+                    doc.text("Mode/Terms of Payment", startX + 145, startY + 26);
+
+                    // Row 3
+                    doc.text("Buyer's Order No.", startX + 97, startY + 38);
+                    doc.text(invoice.buyersOrderNo || "", startX + 97, startY + 43);
+
+                    doc.text("Dated", startX + 145, startY + 38);
+                    doc.text(invoice.buyersOrderDate ? new Date(invoice.buyersOrderDate).toLocaleDateString('en-GB') : "", startX + 145, startY + 43);
+
+                    // --- Buyer & Consignee Section ---
+                    doc.rect(startX, buyerY, width, buyerH);
+                    doc.line(startX + 95, buyerY, startX + 95, buyerY + buyerH); // Vertical Split
+
+                    // Consignee (Ship To) - Left
+                    doc.text("Consignee (Ship to)", startX + 2, buyerY + 5);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(invoice.shipName || invoice.customer_name || getCustomerNameFrom(invoice) || "", startX + 2, buyerY + 10);
+                    doc.setFont("helvetica", "normal");
+                    let sAddr = (invoice.shipAddress || invoice.address || getCustomerField(invoice, 'address') || "");
+                    let sLoc = [];
+                    const sDist = invoice.shipDistrict || invoice.district || getCustomerField(invoice, 'district');
+                    if (sDist) sLoc.push(sDist);
+                    const sState = invoice.shipState || invoice.state || getCustomerField(invoice, 'state');
+                    if (sState) sLoc.push(sState);
+                    const sPin = invoice.shipPin || invoice.pin || getCustomerField(invoice, 'pin');
+                    if (sPin) sLoc.push("PIN: " + sPin);
+                    if (sLoc.length > 0) sAddr += "\n" + sLoc.join(", ");
+                    const sContact = invoice.shipContact || invoice.contact || getCustomerField(invoice, 'contact');
+                    if (sContact) sAddr += `\nPh: ${sContact}`;
+
+                    const shipAddr = doc.splitTextToSize(sAddr, 90);
+                    doc.text(shipAddr, startX + 2, buyerY + 15);
+                    const sGst = invoice.shipGST || invoice.gst_no || getCustomerField(invoice, 'gst');
+                    if (sGst) doc.text(`GSTIN/UIN: ${sGst}`, startX + 2, buyerY + buyerH - 3);
+
+                    // Buyer (Bill To) - Right
+                    doc.text("Buyer (Bill to)", startX + 97, buyerY + 5);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(invoice.customer_name || getCustomerNameFrom(invoice) || "", startX + 97, buyerY + 10);
+                    doc.setFont("helvetica", "normal");
+                    let bAddr = (invoice.address || getCustomerField(invoice, 'address') || "");
+                    let bLoc = [];
+                    const bDist = invoice.district || getCustomerField(invoice, 'district');
+                    if (bDist) bLoc.push(bDist);
+                    const bState = invoice.state || getCustomerField(invoice, 'state');
+                    if (bState) bLoc.push(bState);
+                    const bPin = invoice.pin || getCustomerField(invoice, 'pin');
+                    if (bPin) bLoc.push("PIN: " + bPin);
+                    if (bLoc.length > 0) bAddr += "\n" + bLoc.join(", ");
+                    const bContact = invoice.contact || getCustomerField(invoice, 'contact');
+                    if (bContact) bAddr += `\nPh: ${bContact}`;
+
+                    const billAddr = doc.splitTextToSize(bAddr, 90);
+                    doc.text(billAddr, startX + 97, buyerY + 15);
+                    const bGst = invoice.gst_no || getCustomerField(invoice, 'gst');
+                    if (bGst) doc.text(`GSTIN/UIN: ${bGst}`, startX + 97, buyerY + buyerH - 3);
+                };
+
+                // --- Item Table ---
+
+                const items = invoice.items || [];
+
+                const isSaleInvoice = (invoice.invoiceType === "SALE INVOICE");
+                const rawGstType = invoice.gstType || "Intra-State";
+                const gstType = rawGstType === 'Intra' ? 'Intra-State' : (rawGstType === 'Inter' ? 'Inter-State' : rawGstType);
+
+                let headers = ['Sl', 'Description of Goods'];
+                if (invColVis[7]) headers.push('HSN/SAC');
+                if (invColVis[3]) headers.push('IMEI');
+                if (invColVis[4]) headers.push('Batch');
+                if (invColVis[5]) headers.push('Lot');
+                if (invColVis[6]) headers.push('Serial');
+                headers.push('Qty', 'UOM', 'Rate');
+                if (showDiscountInPdf) headers.push('Disc');
+
+                if (!isSaleInvoice) {
+                    if (gstType === "Intra-State") {
+                        headers.push('CGST%', 'CGST Amt', 'SGST%', 'SGST Amt');
+                    } else {
+                        headers.push('IGST%', 'IGST Amt');
+                    }
                 }
-                if (companyGstin) {
-                    doc.text(`GSTIN/UIN: ${companyGstin}`, startX + 2, compY);
-                    compY += 4;
+                headers.push('Total');
+
+                let calculatedTotal = 0;
+                let calculatedTotalDiscount = 0;
+                let totalCGST = 0;
+                let totalSGST = 0;
+                let totalIGST = 0;
+                let totalTaxable = 0;
+
+                const tableData = items.map((item, i) => {
+                    const row = [i + 1, (item.item || "") + (showItemCodeInPdf && item.itemCode ? ` (${item.itemCode})` : "") + (item.subDetails ? "\n" + item.subDetails : "")];
+                    if (invColVis[7]) row.push(item.hsn || "");
+                    if (invColVis[3]) row.push(item.imei || "");
+                    if (invColVis[4]) row.push(item.batch || "");
+                    if (invColVis[5]) row.push(item.lot || "");
+                    if (invColVis[6]) row.push(item.serial || "");
+
+                    const qty = parseFloat(item.qty) || 0;
+                    const price = parseFloat(item.price) || 0;
+                    const gst = parseFloat(item.gst) || 0;
+
+                    row.push(qty);
+                    row.push(item.uom || "");
+                    row.push(parseFloat(item.price).toFixed(2));
+
+                    let rowTotal = 0;
+                    let gstAmt = 0;
+                    let discDisplay = "-";
+
+                    const disc = parseFloat(item.disc) || 0;
+                    const discType = item.discType || '%';
+                    const base = qty * price;
+                    let discVal = (discType === 'flat') ? disc : (base * disc / 100);
+                    const taxable = Math.max(0, base - discVal);
+                    calculatedTotalDiscount += discVal;
+                    totalTaxable += taxable;
+
+                    gstAmt = taxable * (gst / 100);
+                    rowTotal = taxable + gstAmt;
+                    calculatedTotal += rowTotal;
+
+                    if (showDiscountInPdf) {
+                        discDisplay = disc > 0 ? `${disc}${discType === 'flat' ? '₹' : '%'}` : '-';
+                        row.push(discDisplay);
+                    }
+
+                    if (!isSaleInvoice) {
+                        if (gstType === "Intra-State") {
+                            const halfRate = gst / 2;
+                            const halfAmt = gstAmt / 2;
+                            totalCGST += halfAmt;
+                            totalSGST += halfAmt;
+                            row.push(halfRate ? halfRate + '%' : '-');
+                            row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                            row.push(halfRate ? halfRate + '%' : '-');
+                            row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        } else {
+                            totalIGST += gstAmt;
+                            row.push(gst ? gst + '%' : '-');
+                            row.push(gstAmt ? gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        }
+                    }
+
+                    row.push(rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    return row;
+                });
+
+                let freightBefore = parseFloat(invoice.freightBeforeGst) || 0;
+                let freightBeforeRate = parseFloat(invoice.freightBeforeGstRate) || 0;
+                let freightBeforeTax = freightBefore * (freightBeforeRate / 100);
+                totalTaxable += freightBefore;
+                if (!isSaleInvoice) {
+                    if (gstType === "Intra-State") {
+                        totalCGST += freightBeforeTax / 2;
+                        totalSGST += freightBeforeTax / 2;
+                    } else {
+                        totalIGST += freightBeforeTax;
+                    }
                 }
 
-                let contactStr = [];
-                if (contactNumber) contactStr.push(contactNumber);
-                if (companyEmail) contactStr.push(`E-Mail: ${companyEmail}`);
-                if (contactStr.length > 0) {
-                    doc.text(contactStr.join(" | "), startX + 2, compY);
-                }
+                // Calculate indices for styles
+                let optionalCount = 0;
+                if (invColVis[7]) optionalCount++;
+                if (invColVis[3]) optionalCount++;
+                if (invColVis[4]) optionalCount++;
+                if (invColVis[5]) optionalCount++;
+                if (invColVis[6]) optionalCount++;
 
-                // Right: Invoice Details (Split by vertical line)
-                doc.line(startX + 95, startY + 10, startX + 95, startY + 45);
+                const priceIdx = 2 + optionalCount + 2;
+                const styles = {
+                    0: { halign: 'center', cellWidth: 8 },
+                    1: { cellWidth: 'auto' }
+                };
+                styles[2 + optionalCount] = { halign: 'center' }; // Qty
+                styles[2 + optionalCount + 1] = { halign: 'center' }; // UOM
+                styles[priceIdx] = { halign: 'right' }; // Price
 
-                // Right Sub-grid
-                doc.line(startX + 95, startY + 22, startX + 190, startY + 22);
-                doc.line(startX + 95, startY + 34, startX + 190, startY + 34);
-
-                // Row 1
-                doc.text("Invoice No.", startX + 97, startY + 14);
-                doc.setFont("helvetica", "bold");
-                doc.text(invoice.invoice_no || invoice.invoiceNo || "", startX + 97, startY + 19);
-                doc.setFont("helvetica", "normal");
-
-                doc.text("Dated", startX + 145, startY + 14);
-                doc.setFont("helvetica", "bold");
-                const d = invoice.invoice_date || invoice.date;
-
-                let dateStr = d ? new Date(d).toLocaleDateString('en-GB') : "";
-                if (showTimestampInPdf && (invoice.invoice_time || invoice.time)) {
-                    const [h, m] = (invoice.invoice_time || invoice.time).split(':');
-                    const tObj = new Date(); tObj.setHours(h); tObj.setMinutes(m);
-                    const tStr = tObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    dateStr += " " + tStr;
-                }
-                doc.text(dateStr, startX + 145, startY + 19);
-                doc.setFont("helvetica", "normal");
-
-                // Row 2
-                doc.text("Delivery Note", startX + 97, startY + 26);
-                doc.text(invoice.deliveryChallanNo || "", startX + 97, startY + 31);
-
-                doc.text("Mode/Terms of Payment", startX + 145, startY + 26);
-
-                // Row 3
-                doc.text("Buyer's Order No.", startX + 97, startY + 38);
-                doc.text(invoice.buyersOrderNo || "", startX + 97, startY + 43);
-
-                doc.text("Dated", startX + 145, startY + 38);
-                doc.text(invoice.buyersOrderDate ? new Date(invoice.buyersOrderDate).toLocaleDateString('en-GB') : "", startX + 145, startY + 43);
-
-                // --- Buyer & Consignee Section ---
-                doc.rect(startX, buyerY, width, buyerH);
-                doc.line(startX + 95, buyerY, startX + 95, buyerY + buyerH); // Vertical Split
-
-                // Consignee (Ship To) - Left
-                doc.text("Consignee (Ship to)", startX + 2, buyerY + 5);
-                doc.setFont("helvetica", "bold");
-                doc.text(invoice.shipName || invoice.customer_name || getCustomerNameFrom(invoice) || "", startX + 2, buyerY + 10);
-                doc.setFont("helvetica", "normal");
-                let sAddr = (invoice.shipAddress || invoice.address || getCustomerField(invoice, 'address') || "");
-                let sLoc = [];
-                const sDist = invoice.shipDistrict || invoice.district || getCustomerField(invoice, 'district');
-                if (sDist) sLoc.push(sDist);
-                const sState = invoice.shipState || invoice.state || getCustomerField(invoice, 'state');
-                if (sState) sLoc.push(sState);
-                const sPin = invoice.shipPin || invoice.pin || getCustomerField(invoice, 'pin');
-                if (sPin) sLoc.push("PIN: " + sPin);
-                if (sLoc.length > 0) sAddr += "\n" + sLoc.join(", ");
-                const sContact = invoice.shipContact || invoice.contact || getCustomerField(invoice, 'contact');
-                if (sContact) sAddr += `\nPh: ${sContact}`;
-
-                const shipAddr = doc.splitTextToSize(sAddr, 90);
-                doc.text(shipAddr, startX + 2, buyerY + 15);
-                const sGst = invoice.shipGST || invoice.gst_no || getCustomerField(invoice, 'gst');
-                if (sGst) doc.text(`GSTIN/UIN: ${sGst}`, startX + 2, buyerY + buyerH - 3);
-
-                // Buyer (Bill To) - Right
-                doc.text("Buyer (Bill to)", startX + 97, buyerY + 5);
-                doc.setFont("helvetica", "bold");
-                doc.text(invoice.customer_name || getCustomerNameFrom(invoice) || "", startX + 97, buyerY + 10);
-                doc.setFont("helvetica", "normal");
-                let bAddr = (invoice.address || getCustomerField(invoice, 'address') || "");
-                let bLoc = [];
-                const bDist = invoice.district || getCustomerField(invoice, 'district');
-                if (bDist) bLoc.push(bDist);
-                const bState = invoice.state || getCustomerField(invoice, 'state');
-                if (bState) bLoc.push(bState);
-                const bPin = invoice.pin || getCustomerField(invoice, 'pin');
-                if (bPin) bLoc.push("PIN: " + bPin);
-                if (bLoc.length > 0) bAddr += "\n" + bLoc.join(", ");
-                const bContact = invoice.contact || getCustomerField(invoice, 'contact');
-                if (bContact) bAddr += `\nPh: ${bContact}`;
-
-                const billAddr = doc.splitTextToSize(bAddr, 90);
-                doc.text(billAddr, startX + 97, buyerY + 15);
-                const bGst = invoice.gst_no || getCustomerField(invoice, 'gst');
-                if (bGst) doc.text(`GSTIN/UIN: ${bGst}`, startX + 97, buyerY + buyerH - 3);
-            };
-
-            // --- Item Table ---
-
-            const items = invoice.items || [];
-
-            const isSaleInvoice = (invoice.invoiceType === "SALE INVOICE");
-            const rawGstType = invoice.gstType || "Intra-State";
-            const gstType = rawGstType === 'Intra' ? 'Intra-State' : (rawGstType === 'Inter' ? 'Inter-State' : rawGstType);
-
-            let headers = ['Sl', 'Description of Goods'];
-            if (invColVis[7]) headers.push('HSN/SAC');
-            if (invColVis[3]) headers.push('IMEI');
-            if (invColVis[4]) headers.push('Batch');
-            if (invColVis[5]) headers.push('Lot');
-            if (invColVis[6]) headers.push('Serial');
-            headers.push('Qty', 'UOM', 'Rate');
-            if (showDiscountInPdf) headers.push('Disc');
-
-            if (!isSaleInvoice) {
-                if (gstType === "Intra-State") {
-                    headers.push('CGST%', 'CGST Amt', 'SGST%', 'SGST Amt');
-                } else {
-                    headers.push('IGST%', 'IGST Amt');
-                }
-            }
-            headers.push('Total');
-
-            let calculatedTotal = 0;
-            let calculatedTotalDiscount = 0;
-            let totalCGST = 0;
-            let totalSGST = 0;
-            let totalIGST = 0;
-            let totalTaxable = 0;
-
-            const tableData = items.map((item, i) => {
-                const row = [i + 1, (item.item || "") + (showItemCodeInPdf && item.itemCode ? ` (${item.itemCode})` : "") + (item.subDetails ? "\n" + item.subDetails : "")];
-                if (invColVis[7]) row.push(item.hsn || "");
-                if (invColVis[3]) row.push(item.imei || "");
-                if (invColVis[4]) row.push(item.batch || "");
-                if (invColVis[5]) row.push(item.lot || "");
-                if (invColVis[6]) row.push(item.serial || "");
-
-                const qty = parseFloat(item.qty) || 0;
-                const price = parseFloat(item.price) || 0;
-                const gst = parseFloat(item.gst) || 0;
-
-                row.push(qty);
-                row.push(item.uom || "");
-                row.push(parseFloat(item.price).toFixed(2));
-
-                let rowTotal = 0;
-                let gstAmt = 0;
-                let discDisplay = "-";
-
-                const disc = parseFloat(item.disc) || 0;
-                const discType = item.discType || '%';
-                const base = qty * price;
-                let discVal = (discType === 'flat') ? disc : (base * disc / 100);
-                const taxable = Math.max(0, base - discVal);
-                calculatedTotalDiscount += discVal;
-                totalTaxable += taxable;
-
-                gstAmt = taxable * (gst / 100);
-                rowTotal = taxable + gstAmt;
-                calculatedTotal += rowTotal;
-
+                let currentIdx = priceIdx + 1;
                 if (showDiscountInPdf) {
-                    discDisplay = disc > 0 ? `${disc}${discType === 'flat' ? '₹' : '%'}` : '-';
-                    row.push(discDisplay);
+                    styles[currentIdx] = { halign: 'center' }; // Disc
+                    currentIdx++;
                 }
 
                 if (!isSaleInvoice) {
                     if (gstType === "Intra-State") {
-                        const halfRate = gst / 2;
-                        const halfAmt = gstAmt / 2;
-                        totalCGST += halfAmt;
-                        totalSGST += halfAmt;
-                        row.push(halfRate ? halfRate + '%' : '-');
-                        row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
-                        row.push(halfRate ? halfRate + '%' : '-');
-                        row.push(halfAmt ? halfAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        styles[currentIdx] = { halign: 'center' }; // CGST%
+                        styles[currentIdx + 1] = { halign: 'right' }; // Amt
+                        styles[currentIdx + 2] = { halign: 'center' }; // SGST%
+                        styles[currentIdx + 3] = { halign: 'right' }; // Amt
+                        currentIdx += 4;
                     } else {
-                        totalIGST += gstAmt;
-                        row.push(gst ? gst + '%' : '-');
-                        row.push(gstAmt ? gstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-');
+                        styles[currentIdx] = { halign: 'center' }; // IGST%
+                        styles[currentIdx + 1] = { halign: 'right' }; // Amt
+                        currentIdx += 2;
                     }
                 }
-
-                row.push(rowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                return row;
-            });
-
-            let freightBefore = parseFloat(invoice.freightBeforeGst) || 0;
-            let freightBeforeRate = parseFloat(invoice.freightBeforeGstRate) || 0;
-            let freightBeforeTax = freightBefore * (freightBeforeRate / 100);
-            totalTaxable += freightBefore;
-            if (!isSaleInvoice) {
-                if (gstType === "Intra-State") {
-                    totalCGST += freightBeforeTax / 2;
-                    totalSGST += freightBeforeTax / 2;
-                } else {
-                    totalIGST += freightBeforeTax;
-                }
-            }
-
-            // Calculate indices for styles
-            let optionalCount = 0;
-            if (invColVis[7]) optionalCount++;
-            if (invColVis[3]) optionalCount++;
-            if (invColVis[4]) optionalCount++;
-            if (invColVis[5]) optionalCount++;
-            if (invColVis[6]) optionalCount++;
-
-            const priceIdx = 2 + optionalCount + 2;
-            const styles = {
-                0: { halign: 'center', cellWidth: 8 },
-                1: { cellWidth: 'auto' }
-            };
-            styles[2 + optionalCount] = { halign: 'center' }; // Qty
-            styles[2 + optionalCount + 1] = { halign: 'center' }; // UOM
-            styles[priceIdx] = { halign: 'right' }; // Price
-
-            let currentIdx = priceIdx + 1;
-            if (showDiscountInPdf) {
-                styles[currentIdx] = { halign: 'center' }; // Disc
-                currentIdx++;
-            }
-
-            if (!isSaleInvoice) {
-                if (gstType === "Intra-State") {
-                    styles[currentIdx] = { halign: 'center' }; // CGST%
-                    styles[currentIdx + 1] = { halign: 'right' }; // Amt
-                    styles[currentIdx + 2] = { halign: 'center' }; // SGST%
-                    styles[currentIdx + 3] = { halign: 'right' }; // Amt
-                    currentIdx += 4;
-                } else {
-                    styles[currentIdx] = { halign: 'center' }; // IGST%
-                    styles[currentIdx + 1] = { halign: 'right' }; // Amt
-                    currentIdx += 2;
-                }
-            }
-            styles[currentIdx] = { halign: 'right' }; // Total
+                styles[currentIdx] = { halign: 'right' }; // Total
 
 
-            doc.autoTable({
-                startY: tableY,
-                head: [headers],
-                body: tableData,
-                theme: 'grid',
-                styles: { fontSize: 8, cellPadding: 2, lineColor: 0, lineWidth: 0.1 },
-                headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', halign: 'center' },
-                didDrawPage: drawHeader,
-                columnStyles: styles,
-                margin: { top: tableY, left: startX, right: 10 },
-                tableWidth: width
-            });
+                doc.autoTable({
+                    startY: tableY,
+                    head: [headers],
+                    body: tableData,
+                    theme: 'grid',
+                    styles: { fontSize: 8, cellPadding: 2, lineColor: 0, lineWidth: 0.1 },
+                    headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', halign: 'center' },
+                    didDrawPage: drawHeader,
+                    columnStyles: styles,
+                    margin: { top: tableY, left: startX, right: 10 },
+                    tableWidth: width
+                });
 
-            // --- Footer ---
-            let finalY = doc.lastAutoTable.finalY;
+                // --- Footer ---
+                let finalY = doc.lastAutoTable.finalY;
 
-            // Estimate bank and terms height
-            let estimatedExtraHeight = 0;
-            const bankText = getFormattedBankDetails();
-            let qrCodeBase64 = localStorage.getItem("invoiceQrCode");
-            let qrBlockHeight = (showBankDetailsInPdf && qrCodeBase64) ? 35 : 0;
-            let bankBlockHeight = 0;
-            if (showBankDetailsInPdf && bankText) {
-                const splitBank = doc.splitTextToSize(bankText, 60);
-                bankBlockHeight = 5 + (splitBank.length * 5) + 5;
-            }
-            const termsText = localStorage.getItem("invoiceTermsAndConditions");
-            let termsBlockHeight = 0;
-            if (showTermsInPdf && termsText) {
-                const splitTerms = doc.splitTextToSize(termsText, 85);
-                termsBlockHeight = 5 + (splitTerms.length * 5) + 5;
-            }
-            estimatedExtraHeight = Math.max(bankBlockHeight, qrBlockHeight, termsBlockHeight);
-
-
-
-            // Determine required footer height dynamically
-            let reqFooterLines = 1; // Total
-            if (!isSaleInvoice && totalTaxable > 0) {
-                if (freightBefore > 0) reqFooterLines++;
-                reqFooterLines += 1; // Taxable
-                reqFooterLines += (gstType === "Intra-State") ? 2 : 1; // CGST+SGST / IGST
-            }
-            if (invoice.roundOffAmount && parseFloat(invoice.roundOffAmount) !== 0) reqFooterLines++;
-            let overallDiscountVal = parseFloat(invoice.overallDiscountAmount || invoice.overallDiscount || 0);
-            if (overallDiscountVal > 0) reqFooterLines++;
-
-            const tempFC = parseFloat(invoice.freightCharges) || 0;
-            const tempPC = parseFloat(invoice.packingCharges) || 0;
-            const tempCC = parseFloat(invoice.customCharges) || 0;
-            if (tempFC > 0) reqFooterLines++;
-            if (tempPC > 0) reqFooterLines++;
-            if (tempCC > 0) reqFooterLines++;
-
-            const previousDue = parseFloat(invoice.previousDue) || 0;
-            if (previousDue > 0) reqFooterLines++;
-
-            const baseFooterHeight = Math.max(30, reqFooterLines * 5 + 15);
-            const footerHeight = baseFooterHeight + estimatedExtraHeight + 35; // 35 for signature + padding
-
-            let lineStartY = doc.lastAutoTable.finalY;
-
-            // Tally Style: Push footer to the bottom of the page and ensure space
-            if (finalY + footerHeight > pageHeight - 10) {
-                doc.addPage();
-                drawHeader();
-                finalY = tableY;
-                lineStartY = tableY;
-            }
-            const footerStartY = pageHeight - footerHeight - 5;
-            if (finalY < footerStartY) {
-                // Draw left and right borders for the empty space to maintain the box
-                doc.setLineWidth(0.1);
-                doc.setDrawColor(0);
-                doc.line(startX, lineStartY, startX, footerStartY);
-                doc.line(startX + width, lineStartY, startX + width, footerStartY);
-                finalY = footerStartY;
-            }
-
-            doc.line(startX, finalY, startX + width, finalY); // Top line of footer
-
-            let currentRightY = finalY + 4;
-
-
-            doc.setFontSize(9);
-            // Sub Total / Taxable Value
-            if (!isSaleInvoice && totalTaxable > 0) {
-                doc.setFont("helvetica", "normal");
-                if (freightBefore > 0) {
-                    doc.text(`Freight (${freightBeforeRate}% GST)`, startX + 125, currentRightY);
-                    doc.text(freightBefore.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                    currentRightY += 4;
-                }
-                doc.text("Total Taxable Amount", startX + 125, currentRightY);
-                doc.text(totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                currentRightY += 4;
-
-                if (gstType === "Intra-State") {
-                    doc.text("Add: CGST", startX + 125, currentRightY);
-                    doc.text(totalCGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                    currentRightY += 4;
-                    doc.text("Add: SGST", startX + 125, currentRightY);
-                    doc.text(totalSGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                    currentRightY += 4;
-                } else {
-                    doc.text("Add: IGST", startX + 125, currentRightY);
-                    doc.text(totalIGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                    currentRightY += 4;
-                }
-            }
-
-            // Total Discount (if applicable)
-            overallDiscountVal = parseFloat(invoice.overallDiscountAmount || invoice.overallDiscount || 0);
-            let totalDiscountAmt = calculatedTotalDiscount + overallDiscountVal;
-            if (totalDiscountAmt > 0) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Total Discount", startX + 125, currentRightY);
-                doc.text(totalDiscountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                currentRightY += 4;
-            }
-
-            const fC = parseFloat(invoice.freightCharges) || 0;
-            const pC = parseFloat(invoice.packingCharges) || 0;
-            const cC = parseFloat(invoice.customCharges) || 0;
-            const cN = invoice.customChargeName || 'Loading';
-
-            if (fC > 0) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Add: Freight", startX + 125, currentRightY);
-                doc.text(fC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                currentRightY += 4;
-            }
-            if (pC > 0) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Add: Packing", startX + 125, currentRightY);
-                doc.text(pC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                currentRightY += 4;
-            }
-            if (cC > 0) {
-                doc.setFont("helvetica", "normal");
-                doc.text(`Add: ${cN}`, startX + 125, currentRightY);
-                doc.text(cC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                currentRightY += 4;
-            }
-
-            // Round Off
-            if (previousDue > 0) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Previous Due", startX + 125, currentRightY);
-                doc.text(previousDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-                currentRightY += 4;
-            }
-
-
-            if (invoice.roundOffAmount && parseFloat(invoice.roundOffAmount) !== 0) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Round Off", startX + 125, currentRightY);
-                doc.text(parseFloat(invoice.roundOffAmount).toFixed(2), 195, currentRightY, { align: "right" });
-                currentRightY += 4;
-            }
-
-            // Total
-            doc.setFont("helvetica", "bold");
-            doc.text("Total", startX + 125, currentRightY);
-            const totalVal = parseFloat(String(invoice.invoice_total || invoice.total || 0).replace(/,/g, '')) || 0;
-            doc.text(totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-
-            doc.line(startX, currentRightY + 2, startX + width, currentRightY + 2); // Bottom line of total
-
-            const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid || 0);
-            const due = totalVal - paid;
-
-            currentRightY += 6;
-            doc.setFont("helvetica", "normal");
-            doc.text("Paid Amount", startX + 125, currentRightY);
-            doc.text(paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-
-            currentRightY += 6;
-            doc.setFont("helvetica", "bold");
-            doc.text("Balance Due", startX + 125, currentRightY);
-            doc.text(due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
-
-            doc.line(startX, currentRightY + 2, startX + width, currentRightY + 2); // Bottom line of Due section
-
-            // Amount in Words
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(9);
-            doc.text("Amount Chargeable (in words):", startX + 2, finalY + 12);
-            doc.setFont("helvetica", "bold");
-            const amtWords = convertNumberToWords(totalVal);
-            const splitWords = doc.splitTextToSize(amtWords, 110);
-            doc.text(splitWords, startX + 2, finalY + 17);
-
-            let leftY = finalY + 17 + (splitWords.length * 5) + 5;
-
-            let blockStartY = Math.max(leftY, currentRightY) + 5;
-            let maxBlockHeight = 0;
-
-            // Bank Details
-            if (showBankDetailsInPdf && bankText) {
-                doc.setFont("helvetica", "normal");
-                doc.text("Bank Details:", startX + 2, blockStartY);
-                doc.setFont("helvetica", "bold");
-                const splitBank = doc.splitTextToSize(bankText, 60);
-                doc.text(splitBank, startX + 2, blockStartY + 5);
-
-                // Add QR Code if available
+                // Estimate bank and terms height
+                let estimatedExtraHeight = 0;
+                const bankText = getFormattedBankDetails();
                 let qrCodeBase64 = localStorage.getItem("invoiceQrCode");
-                const dynamicQr = await generateDynamicQr(totalVal, invoice.invoice_no || invoice.invoiceNo, companyName);
-                if (dynamicQr) {
-                    qrCodeBase64 = dynamicQr;
+                let qrBlockHeight = (showBankDetailsInPdf && qrCodeBase64) ? 35 : 0;
+                let bankBlockHeight = 0;
+                if (showBankDetailsInPdf && bankText) {
+                    const splitBank = doc.splitTextToSize(bankText, 60);
+                    bankBlockHeight = 5 + (splitBank.length * 5) + 5;
+                }
+                const termsText = localStorage.getItem("invoiceTermsAndConditions");
+                let termsBlockHeight = 0;
+                if (showTermsInPdf && termsText) {
+                    const splitTerms = doc.splitTextToSize(termsText, 85);
+                    termsBlockHeight = 5 + (splitTerms.length * 5) + 5;
+                }
+                estimatedExtraHeight = Math.max(bankBlockHeight, qrBlockHeight, termsBlockHeight);
+
+
+
+                // Determine required footer height dynamically
+                let reqFooterLines = 1; // Total
+                if (!isSaleInvoice && totalTaxable > 0) {
+                    if (freightBefore > 0) reqFooterLines++;
+                    reqFooterLines += 1; // Taxable
+                    reqFooterLines += (gstType === "Intra-State") ? 2 : 1; // CGST+SGST / IGST
+                }
+                if (invoice.roundOffAmount && parseFloat(invoice.roundOffAmount) !== 0) reqFooterLines++;
+                let overallDiscountVal = parseFloat(invoice.overallDiscountAmount || invoice.overallDiscount || 0);
+                if (overallDiscountVal > 0) reqFooterLines++;
+
+                const tempFC = parseFloat(invoice.freightCharges) || 0;
+                const tempPC = parseFloat(invoice.packingCharges) || 0;
+                const tempCC = parseFloat(invoice.customCharges) || 0;
+                if (tempFC > 0) reqFooterLines++;
+                if (tempPC > 0) reqFooterLines++;
+                if (tempCC > 0) reqFooterLines++;
+
+                const previousDue = parseFloat(invoice.previousDue) || 0;
+                if (previousDue > 0) reqFooterLines++;
+
+                const baseFooterHeight = Math.max(30, reqFooterLines * 5 + 15);
+                const footerHeight = baseFooterHeight + estimatedExtraHeight + 35; // 35 for signature + padding
+
+                let lineStartY = doc.lastAutoTable.finalY;
+
+                // Tally Style: Push footer to the bottom of the page and ensure space
+                if (finalY + footerHeight > pageHeight - 10) {
+                    doc.addPage();
+                    drawHeader();
+                    finalY = tableY;
+                    lineStartY = tableY;
+                }
+                const footerStartY = pageHeight - footerHeight - 5;
+                if (finalY < footerStartY) {
+                    // Draw left and right borders for the empty space to maintain the box
+                    doc.setLineWidth(0.1);
+                    doc.setDrawColor(0);
+                    doc.line(startX, lineStartY, startX, footerStartY);
+                    doc.line(startX + width, lineStartY, startX + width, footerStartY);
+                    finalY = footerStartY;
                 }
 
-                let qrBlockHeight = 0;
-                if (qrCodeBase64) {
-                    try {
-                        doc.setFont("helvetica", "bold");
-                        doc.text("Scan to Pay", startX + 65, blockStartY);
-                        doc.setFont("helvetica", "normal");
-                        doc.addImage(qrCodeBase64, 'PNG', startX + 65, blockStartY + 2, 25, 25);
-                        qrBlockHeight = 35;
-                    } catch (e) {
-                        console.warn("Error adding QR to PDF:", e);
+                doc.line(startX, finalY, startX + width, finalY); // Top line of footer
+
+                let currentRightY = finalY + 4;
+
+
+                doc.setFontSize(9);
+                // Sub Total / Taxable Value
+                if (!isSaleInvoice && totalTaxable > 0) {
+                    doc.setFont("helvetica", "normal");
+                    if (freightBefore > 0) {
+                        doc.text(`Freight (${freightBeforeRate}% GST)`, startX + 125, currentRightY);
+                        doc.text(freightBefore.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                        currentRightY += 4;
+                    }
+                    doc.text("Total Taxable Amount", startX + 125, currentRightY);
+                    doc.text(totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                    currentRightY += 4;
+
+                    if (gstType === "Intra-State") {
+                        doc.text("Add: CGST", startX + 125, currentRightY);
+                        doc.text(totalCGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                        currentRightY += 4;
+                        doc.text("Add: SGST", startX + 125, currentRightY);
+                        doc.text(totalSGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                        currentRightY += 4;
+                    } else {
+                        doc.text("Add: IGST", startX + 125, currentRightY);
+                        doc.text(totalIGST.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                        currentRightY += 4;
                     }
                 }
-                const bankBlockHeight = 5 + (splitBank.length * 5) + 5;
-                maxBlockHeight = Math.max(maxBlockHeight, bankBlockHeight, qrBlockHeight);
-            }
 
-            // Terms and Conditions
-            let termsTextBlock = localStorage.getItem("invoiceTermsAndConditions");
-            if (showTermsInPdf && termsTextBlock) {
-                doc.setFont("helvetica", "normal");
+                // Total Discount (if applicable)
+                overallDiscountVal = parseFloat(invoice.overallDiscountAmount || invoice.overallDiscount || 0);
+                let totalDiscountAmt = calculatedTotalDiscount + overallDiscountVal;
+                if (totalDiscountAmt > 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Total Discount", startX + 125, currentRightY);
+                    doc.text(totalDiscountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                    currentRightY += 4;
+                }
+
+                const fC = parseFloat(invoice.freightCharges) || 0;
+                const pC = parseFloat(invoice.packingCharges) || 0;
+                const cC = parseFloat(invoice.customCharges) || 0;
+                const cN = invoice.customChargeName || 'Loading';
+
+                if (fC > 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Add: Freight", startX + 125, currentRightY);
+                    doc.text(fC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                    currentRightY += 4;
+                }
+                if (pC > 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Add: Packing", startX + 125, currentRightY);
+                    doc.text(pC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                    currentRightY += 4;
+                }
+                if (cC > 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text(`Add: ${cN}`, startX + 125, currentRightY);
+                    doc.text(cC.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                    currentRightY += 4;
+                }
+
+                // Round Off
+                if (previousDue > 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Previous Due", startX + 125, currentRightY);
+                    doc.text(previousDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                    currentRightY += 4;
+                }
+
+
+                if (invoice.roundOffAmount && parseFloat(invoice.roundOffAmount) !== 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Round Off", startX + 125, currentRightY);
+                    doc.text(parseFloat(invoice.roundOffAmount).toFixed(2), 195, currentRightY, { align: "right" });
+                    currentRightY += 4;
+                }
+
+                // Total
                 doc.setFont("helvetica", "bold");
-                doc.text("Declaration:", startX + 95, blockStartY);
+                doc.text("Total", startX + 125, currentRightY);
+                const totalVal = parseFloat(String(invoice.invoice_total || invoice.total || 0).replace(/,/g, '')) || 0;
+                doc.text(totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+
+                doc.line(startX, currentRightY + 2, startX + width, currentRightY + 2); // Bottom line of total
+
+                const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid || 0);
+                const due = totalVal - paid;
+
+                currentRightY += 6;
                 doc.setFont("helvetica", "normal");
-                const splitTerms = doc.splitTextToSize(termsTextBlock, 85);
-                doc.text(splitTerms, startX + 95, blockStartY + 4);
-                const termsBlockHeight = 4 + (splitTerms.length * 4) + 4;
-                maxBlockHeight = Math.max(maxBlockHeight, termsBlockHeight);
-            }
+                doc.text("Paid Amount", startX + 125, currentRightY);
+                doc.text(paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
 
-            // Signature
-            let sigY = blockStartY + maxBlockHeight + 10;
-            if (sigY > 270) {
-                doc.addPage();
-                sigY = 30;
-            }
-
-            // Add Total Items and Quantity Summary
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "bold");
-            doc.text(`Total Items: ${totalItemsCount}`, startX + 2, sigY - 4);
-            doc.text(`Total Quantity: ${totalQtyCount.toLocaleString('en-IN')}`, startX + 2, sigY + 1);
-
-
-            doc.text(`For ${companyName}`, 195, sigY, { align: "right" });
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.3);
-            doc.line(145, sigY + 8, 195, sigY + 8);
-            doc.setFont("helvetica", "normal");
-            doc.text("Authorized Signatory", 195, sigY + 12, { align: "right" });
-
-            if (copyLabel === "Office Copy") {
+                currentRightY += 6;
                 doc.setFont("helvetica", "bold");
-                doc.text("Receiver's Signature (Acknowledgement)", startX + 2, sigY + 12, { align: "left" });
-            }
+                doc.text("Balance Due", startX + 125, currentRightY);
+                doc.text(due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
 
-            // Add full page border and page count to all pages
-            const totalPages = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= totalPages; i++) {
-                doc.setPage(i);
+                doc.line(startX, currentRightY + 2, startX + width, currentRightY + 2); // Bottom line of Due section
 
-                // Full Page Border
-                doc.setLineWidth(0.1);
-                doc.setDrawColor(0);
-                doc.rect(startX, startY, width, pageHeight - 20); // 10 to 287
-
-                // Page Count
+                // Amount in Words
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(9);
-                doc.text(`Page ${i} of ${totalPages}`, 105, pageHeight - 5, { align: "center" });
-            }
+                doc.text("Amount Chargeable (in words):", startX + 2, finalY + 12);
+                doc.setFont("helvetica", "bold");
+                const amtWords = convertNumberToWords(totalVal);
+                const splitWords = doc.splitTextToSize(amtWords, 110);
+                doc.text(splitWords, startX + 2, finalY + 17);
 
-            if (!mergePdf) {
+                let leftY = finalY + 17 + (splitWords.length * 5) + 5;
+
+                let blockStartY = Math.max(leftY, currentRightY) + 5;
+                let maxBlockHeight = 0;
+
+                // Bank Details
+                if (showBankDetailsInPdf && bankText) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Bank Details:", startX + 2, blockStartY);
+                    doc.setFont("helvetica", "bold");
+                    const splitBank = doc.splitTextToSize(bankText, 60);
+                    doc.text(splitBank, startX + 2, blockStartY + 5);
+
+                    // Add QR Code if available
+                    let qrCodeBase64 = localStorage.getItem("invoiceQrCode");
+                    const dynamicQr = await generateDynamicQr(totalVal, invoice.invoice_no || invoice.invoiceNo, companyName);
+                    if (dynamicQr) {
+                        qrCodeBase64 = dynamicQr;
+                    }
+
+                    let qrBlockHeight = 0;
+                    if (qrCodeBase64) {
+                        try {
+                            doc.setFont("helvetica", "bold");
+                            doc.text("Scan to Pay", startX + 65, blockStartY);
+                            doc.setFont("helvetica", "normal");
+                            doc.addImage(qrCodeBase64, 'PNG', startX + 65, blockStartY + 2, 25, 25);
+                            qrBlockHeight = 35;
+                        } catch (e) {
+                            console.warn("Error adding QR to PDF:", e);
+                        }
+                    }
+                    const bankBlockHeight = 5 + (splitBank.length * 5) + 5;
+                    maxBlockHeight = Math.max(maxBlockHeight, bankBlockHeight, qrBlockHeight);
+                }
+
+                // Terms and Conditions
+                let termsTextBlock = localStorage.getItem("invoiceTermsAndConditions");
+                if (showTermsInPdf && termsTextBlock) {
+                    doc.setFont("helvetica", "normal");
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Declaration:", startX + 95, blockStartY);
+                    doc.setFont("helvetica", "normal");
+                    const splitTerms = doc.splitTextToSize(termsTextBlock, 85);
+                    doc.text(splitTerms, startX + 95, blockStartY + 4);
+                    const termsBlockHeight = 4 + (splitTerms.length * 4) + 4;
+                    maxBlockHeight = Math.max(maxBlockHeight, termsBlockHeight);
+                }
+
+                // Signature
+                let sigY = blockStartY + maxBlockHeight + 10;
+                if (sigY > 270) {
+                    doc.addPage();
+                    sigY = 30;
+                }
+
+                // Add Total Items and Quantity Summary
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "bold");
+                doc.text(`Total Items: ${totalItemsCount}`, startX + 2, sigY - 4);
+                doc.text(`Total Quantity: ${totalQtyCount.toLocaleString('en-IN')}`, startX + 2, sigY + 1);
+
+
+                doc.text(`For ${companyName}`, 195, sigY, { align: "right" });
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.3);
+                doc.line(145, sigY + 8, 195, sigY + 8);
+                doc.setFont("helvetica", "normal");
+                doc.text("Authorized Signatory", 195, sigY + 12, { align: "right" });
+
+                if (copy.label === "Office Copy") {
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Receiver's Signature (Acknowledgement)", startX + 2, sigY + 12, { align: "left" });
+                }
+
+                // Add full page border and page count to all pages
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = copyStartPage; i <= totalPages; i++) {
+                    doc.setPage(i);
+
+                    // Full Page Border
+                    doc.setLineWidth(0.1);
+                    doc.setDrawColor(0);
+                    doc.rect(startX, startY, width, pageHeight - 20); // 10 to 287
+
+                    // Page Count
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(9);
+                    const pageNumInCopy = i - copyStartPage + 1;
+                    const totalPagesInCopy = totalPages - copyStartPage + 1;
+                    doc.text(`Page ${pageNumInCopy} of ${totalPagesInCopy}`, 105, pageHeight - 5, { align: "center" });
+                }
+
+                if (!mergePdf) {
+                    if (isDirectPrint) {
+                        doc.autoPrint();
+                        window.open(doc.output('bloburl'), '_blank');
+                    } else {
+                        const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+                        doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                    }
+                }
+            }
+            if (mergePdf) {
                 if (isDirectPrint) {
                     doc.autoPrint();
                     window.open(doc.output('bloburl'), '_blank');
                 } else {
                     const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-                    doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}${copy.suffix}.pdf`);
+                    doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}_Merged.pdf`);
                 }
             }
         }
-        if (mergePdf) {
-            if (isDirectPrint) {
-                doc.autoPrint();
-                window.open(doc.output('bloburl'), '_blank');
-            } else {
-                const custNameForFile = (invoice.customer_name || getCustomerNameFrom(invoice) || 'Customer').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-                doc.save(`${custNameForFile}_${invoice.invoice_no || 'new'}_Merged.pdf`);
-            }
-        }
-    }
 
         function confirmLoad() { askConfirm("Load", "Unsaved changes will be lost. Load?", () => loadQuotation()); }
         function confirmAddRow() { addRow(); } // No confirm needed for adding
@@ -4857,7 +4951,7 @@
         document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
             const idsToDelete = new Set(pendingDeleteIds);
-            
+
             for (let id of pendingDeleteIds) {
                 if (typeof apiClient !== 'undefined' && apiClient.deleteInvoice) {
                     await apiClient.deleteInvoice(id).catch(console.warn);
