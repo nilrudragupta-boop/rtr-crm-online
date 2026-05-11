@@ -3413,9 +3413,32 @@
                 const fetchedPurchases = await apiClient.getPurchases();
                 const fetchedItems = await apiClient.getItems();
 
-                invoices = (fetchedInvoices && fetchedInvoices.length > 0) ? fetchedInvoices : JSON.parse(localStorage.getItem("invoices")) || [];
-                purchases = (fetchedPurchases && fetchedPurchases.length > 0) ? fetchedPurchases : JSON.parse(localStorage.getItem("purchases")) || [];
-                items = (fetchedItems && fetchedItems.length > 0) ? fetchedItems : JSON.parse(localStorage.getItem("items")) || [];
+                if (fetchedInvoices && Array.isArray(fetchedInvoices)) {
+                    const local = JSON.parse(localStorage.getItem('invoices')) || [];
+                    const map = new Map();
+                    local.forEach(i => map.set(i.id || i.invoice_no || i.invoiceNo, i));
+                    fetchedInvoices.forEach(i => map.set(i.id || i.invoice_no || i.invoiceNo, i));
+                    invoices = Array.from(map.values());
+                    localStorage.setItem('invoices', JSON.stringify(invoices));
+                } else { invoices = JSON.parse(localStorage.getItem("invoices")) || []; }
+
+                if (fetchedPurchases && Array.isArray(fetchedPurchases)) {
+                    const local = JSON.parse(localStorage.getItem('purchases')) || [];
+                    const map = new Map();
+                    local.forEach(i => map.set(i.id || i.purchaseNo, i));
+                    fetchedPurchases.forEach(i => map.set(i.id || i.purchaseNo, i));
+                    purchases = Array.from(map.values());
+                    localStorage.setItem('purchases', JSON.stringify(purchases));
+                } else { purchases = JSON.parse(localStorage.getItem("purchases")) || []; }
+
+                if (fetchedItems && Array.isArray(fetchedItems)) {
+                    const local = JSON.parse(localStorage.getItem('items')) || [];
+                    const map = new Map();
+                    local.forEach(i => map.set(i.id || i.itemCode, i));
+                    fetchedItems.forEach(i => map.set(i.id || i.itemCode, i));
+                    items = Array.from(map.values());
+                    localStorage.setItem('items', JSON.stringify(items));
+                } else { items = JSON.parse(localStorage.getItem("items")) || []; }
             } catch (e) {
                 console.error("API Fetch Error:", e);
                 invoices = JSON.parse(localStorage.getItem("invoices")) || [];

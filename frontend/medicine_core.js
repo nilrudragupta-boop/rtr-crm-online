@@ -7,40 +7,36 @@ const MedicineCore = {
     masterSort: { field: null, direction: 'asc' },
 
     init: async function () {
-        // Load medicines from backend API
-        if (typeof apiClient !== 'undefined' && apiClient.getMedicines) {
-            try {
-                const remoteMeds = await apiClient.getMedicines();
-                if (remoteMeds && remoteMeds.length > 0) {
-                    this.medicines = remoteMeds;
-                    localStorage.setItem('medicines', JSON.stringify(this.medicines));
-                } else {
-                    this.medicines = JSON.parse(localStorage.getItem('medicines')) || [];
+        // Robust sync logic to fetch and merge all necessary data for the remote device
+        if (typeof apiClient !== 'undefined') {
+            const collectionsToSync = [
+                { get: 'getMedicines', key: 'medicines', assignTo: 'medicines' },
+                { get: 'getMedPayments', key: 'med_payments' },
+                { get: 'getMedPurchaseInvoices', key: 'med_purchase_invoices' },
+                { get: 'getPurchases', key: 'purchases' },
+                { get: 'getInvoices', key: 'invoices' }
+            ];
+
+            for (const col of collectionsToSync) {
+                if (apiClient[col.get]) {
+                    try {
+                        const remoteData = await apiClient[col.get]();
+                        if (remoteData && Array.isArray(remoteData)) {
+                            const localData = JSON.parse(localStorage.getItem(col.key)) || [];
+                            const map = new Map();
+                            localData.forEach(item => { const k = item.id || item.invoice_no || item.purchaseNo || JSON.stringify(item); map.set(k, item); });
+                            remoteData.forEach(item => { const k = item.id || item.invoice_no || item.purchaseNo || JSON.stringify(item); map.set(k, item); });
+                            const merged = Array.from(map.values());
+                            localStorage.setItem(col.key, JSON.stringify(merged));
+                            if (col.assignTo) this[col.assignTo] = merged;
+                        }
+                    } catch (e) { console.warn(`Failed to sync ${col.key}:`, e); }
                 }
-            } catch (error) {
-                console.warn("Failed to fetch medicines from backend:", error);
-                this.medicines = JSON.parse(localStorage.getItem('medicines')) || [];
             }
-        } else {
+        }
+
+        if (!this.medicines || this.medicines.length === 0) {
             this.medicines = JSON.parse(localStorage.getItem('medicines')) || [];
-        }
-
-        if (typeof apiClient !== 'undefined' && apiClient.getMedPayments) {
-            try {
-                const remotePayments = await apiClient.getMedPayments();
-                if (remotePayments && remotePayments.length > 0) {
-                    localStorage.setItem('med_payments', JSON.stringify(remotePayments));
-                }
-            } catch (error) { console.warn("Failed to fetch med payments:", error); }
-        }
-
-        if (typeof apiClient !== 'undefined' && apiClient.getMedPurchaseInvoices) {
-            try {
-                const remotePurInv = await apiClient.getMedPurchaseInvoices();
-                if (remotePurInv && remotePurInv.length > 0) {
-                    localStorage.setItem('med_purchase_invoices', JSON.stringify(remotePurInv));
-                }
-            } catch (error) { console.warn("Failed to fetch med purchase invoices:", error); }
         }
 
         this.heldBills = JSON.parse(localStorage.getItem('med_held_bills')) || [];
@@ -2028,7 +2024,11 @@ const MedicineCore = {
                 <td>${itemsCount}</td>
                 <td>₹${invTotal.toFixed(2)}</td>
                 <td>
-                    <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="MedicineCore.deletePurchaseInvoice('${inv.id}', '${inv.invoice_no}')"><i class="fas fa-trash"></i></button>
+                    <select class="form-control" style="width: auto; padding: 4px 8px; cursor: pointer; display: inline-block;" onchange="if(this.value === 'edit') MedicineCore.editPurchaseInvoice('${inv.id}'); else if(this.value === 'delete') MedicineCore.deletePurchaseInvoice('${inv.id}', '${inv.invoice_no}'); this.value='';">
+                        <option value="">Action</option>
+                        <option value="edit">Edit</option>
+                        <option value="delete">Delete</option>
+                    </select>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -2095,6 +2095,54 @@ const MedicineCore = {
         if(printBtn) printBtn.style.display = 'none';
 
         if (typeof openModal === 'function') openModal('modal-view-invoice');
+    },
+
+    editPurchaseInvoice: async function (id) {
+        if (this.purCart && this.purCart.length > 0) {
+            if (!confirm("Your current purchase cart has items. Editing this invoice will clear the current cart. Continue?")) return;
+        } else {
+            if (!confirm("Are you sure you want to edit this purchase invoice? It will be moved back to the Purchase Entry cart, stock will be reversed, and the original invoice will be deleted.")) return;
+        }
+
+        let purInvoices = JSON.parse(localStorage.getItem('med_purchase_invoices')) || [];
+        const inv = purInvoices.find(i => i.id === id);
+        if (!inv) return alert("Purchase invoice not found!");
+
+        this.purCart = [...(inv.items || [])];
+        document.getElementById('pur-supplier').value = inv.supplier_name || '';
+        document.getElementById('pur-invoice').value = inv.invoice_no || '';
+        document.getElementById('pur-date').value = inv.date || new Date().toISOString().split('T')[0];
+
+        const invoiceNo = inv.invoice_no;
+
+        purInvoices = purInvoices.filter(i => i.id !== id);
+        localStorage.setItem('med_purchase_invoices', JSON.stringify(purInvoices));
+
+        if (typeof apiClient !== 'undefined' && apiClient.deleteMedPurchaseInvoice) {
+            try { await apiClient.deleteMedPurchaseInvoice(id); } catch (e) { console.warn("Backend sync failed", e); }
+        }
+
+        let purchases = JSON.parse(localStorage.getItem('purchases')) || [];
+        let toDeleteIds = [];
+        purchases = purchases.filter(p => {
+            if ((p.category === 'Medicine' || p.remarks === 'Medicine Purchase') && p.supplierInv === invoiceNo) {
+                toDeleteIds.push(p.id);
+                return false;
+            }
+            return true;
+        });
+        localStorage.setItem('purchases', JSON.stringify(purchases));
+
+        if (typeof apiClient !== 'undefined' && apiClient.deletePurchase) {
+            for (let pid of toDeleteIds) {
+                try { await apiClient.deletePurchase(pid); } catch (e) {}
+            }
+        }
+
+        if (typeof switchView === 'function') switchView('purchase');
+        this.renderPurCart();
+        this.renderStock();
+        this.renderDashboard();
     },
 
     deletePurchaseInvoice: async function (id, invoiceNo) {

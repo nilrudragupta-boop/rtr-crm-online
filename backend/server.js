@@ -346,7 +346,8 @@ app.delete('/api/suppliers/:id', async (req, res) => {
 // --- Medicine Routes ---
 app.get('/api/medicines', async (req, res) => {
     try {
-        const medicines = await Medicine.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const medicines = await Medicine.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: medicines });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -364,7 +365,8 @@ app.delete('/api/medicines/:id', async (req, res) => {
 // --- Medicine Payments Routes ---
 app.get('/api/med-payments', async (req, res) => {
     try {
-        const payments = await MedPayment.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const payments = await MedPayment.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: payments });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
@@ -378,7 +380,8 @@ app.post('/api/med-payments', async (req, res) => {
 // --- Medicine Purchase Invoices Routes ---
 app.get('/api/med-purchase-invoices', async (req, res) => {
     try {
-        const invoices = await MedPurchaseInvoice.find().sort({ createdAt: -1 });
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const invoices = await MedPurchaseInvoice.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: invoices });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
