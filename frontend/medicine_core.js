@@ -898,6 +898,7 @@ const MedicineCore = {
         if (med) {
             document.getElementById('pur-mrp').value = med.mrp || '';
             document.getElementById('pur-gst').value = med.gst || '0';
+            if (document.getElementById('pur-uom')) document.getElementById('pur-uom').value = med.unit || '';
 
             // Auto-populate last purchase rate
             const purchases = JSON.parse(localStorage.getItem('purchases')) || [];
@@ -916,6 +917,7 @@ const MedicineCore = {
             document.getElementById('pur-rate').value = '';
             document.getElementById('pur-gst').value = '';
             document.getElementById('pur-total').value = '';
+            if (document.getElementById('pur-uom')) document.getElementById('pur-uom').value = '';
         }
     },
 
@@ -981,6 +983,7 @@ const MedicineCore = {
         const batch = document.getElementById('pur-batch').value.trim();
         const expiry = document.getElementById('pur-expiry').value;
         const qty = parseFloat(document.getElementById('pur-qty').value) || 0;
+        const uom = document.getElementById('pur-uom') ? document.getElementById('pur-uom').value : '';
         const free = parseFloat(document.getElementById('pur-free').value) || 0;
         const rate = parseFloat(document.getElementById('pur-rate').value) || 0;
         const mrp = parseFloat(document.getElementById('pur-mrp').value) || 0;
@@ -998,7 +1001,7 @@ const MedicineCore = {
             medId: med.id,
             medName: med.name,
             category: med.category || 'Medicine',
-            uom: med.unit || 'Nos',
+            uom: uom || med.unit || 'Nos',
             gst: gst || med.gst || 0,
             batch: batch,
             expiry: expiry,
@@ -1012,6 +1015,7 @@ const MedicineCore = {
         document.getElementById('pur-batch').value = '';
         document.getElementById('pur-expiry').value = '';
         document.getElementById('pur-qty').value = '';
+        if (document.getElementById('pur-uom')) document.getElementById('pur-uom').value = '';
         document.getElementById('pur-free').value = '0';
         document.getElementById('pur-rate').value = '';
         document.getElementById('pur-gst').value = '';
@@ -1041,7 +1045,7 @@ const MedicineCore = {
                 <td>${item.medName}</td>
                 <td>${item.batch}</td>
                 <td>${item.expiry}</td>
-                <td>${item.qty} (+${item.free})</td>
+                <td>${item.qty} (+${item.free}) ${item.uom}</td>
                 <td>₹${item.rate.toFixed(2)}</td>
                 <td>₹${item.mrp.toFixed(2)}</td>
                 <td>₹${item.total.toFixed(2)}</td>
@@ -1333,8 +1337,10 @@ const MedicineCore = {
         const med = this.medicines.find(m => m.id === medId);
         if (med) {
             document.getElementById('sale-gst').value = med.gst || '0';
+            if (document.getElementById('sale-uom')) document.getElementById('sale-uom').value = med.unit || '';
         } else {
             document.getElementById('sale-gst').value = '';
+            if (document.getElementById('sale-uom')) document.getElementById('sale-uom').value = '';
         }
         this.calculateSaleItemTotal();
     },
@@ -1356,6 +1362,7 @@ const MedicineCore = {
         const batchOpt = batchSelect.options[batchSelect.selectedIndex];
         const price = parseFloat(document.getElementById('sale-price').value) || 0;
         const qty = parseFloat(document.getElementById('sale-qty').value) || 0;
+        const uom = document.getElementById('sale-uom') ? document.getElementById('sale-uom').value : '';
         const disc = parseFloat(document.getElementById('sale-disc').value) || 0;
         const discType = document.getElementById('sale-disc-type') ? document.getElementById('sale-disc-type').value : '%';
         const gst = parseFloat(document.getElementById('sale-gst').value) || 0;
@@ -1422,6 +1429,7 @@ const MedicineCore = {
         this.cart.push({
             medId: med.id,
             medName: med.name,
+            uom: uom || med.unit || 'Nos',
             batch: batch,
             expiry: expiry,
             mrp: price,
@@ -1441,6 +1449,7 @@ const MedicineCore = {
         document.getElementById('sale-batch-select').innerHTML = '<option value="">Select Batch</option>';
         document.getElementById('sale-price').value = '';
         document.getElementById('sale-qty').value = '1';
+        if (document.getElementById('sale-uom')) document.getElementById('sale-uom').value = '';
         document.getElementById('sale-disc').value = '0';
         if (document.getElementById('sale-disc-type')) document.getElementById('sale-disc-type').value = '%';
         if (document.getElementById('sale-gst')) document.getElementById('sale-gst').value = '';
@@ -1493,7 +1502,7 @@ const MedicineCore = {
                 <td>${item.medName}</td>
                 <td>${item.batch || '-'}</td>
                 <td>${item.expiry || '-'}</td>
-                <td>${item.qty}</td>
+                <td>${item.qty} ${item.uom || ''}</td>
                 <td>${item.gst}%</td>
                 <td>₹${item.mrp.toFixed(2)} <small style="color:var(--danger)">${item.discText}</small></td>
                 <td>₹${item.total.toFixed(2)}</td>
@@ -1547,6 +1556,7 @@ const MedicineCore = {
             document.getElementById('sale-batch-select').value = item.batch || '';
             document.getElementById('sale-price').value = item.mrp;
             document.getElementById('sale-qty').value = item.qty;
+            if (document.getElementById('sale-uom')) document.getElementById('sale-uom').value = item.uom || '';
             document.getElementById('sale-disc').value = item.disc;
             if (document.getElementById('sale-disc-type')) document.getElementById('sale-disc-type').value = item.discType || '%';
             if (document.getElementById('sale-gst')) document.getElementById('sale-gst').value = item.gst || '0';
@@ -1697,16 +1707,42 @@ const MedicineCore = {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
-        doc.setFontSize(16);
-        doc.text("Tax Invoice (Pharmacy)", 105, 15, { align: "center" });
+        let companyName = localStorage.getItem('companyName') || "Pharmacy Name";
+        let addressLine1 = localStorage.getItem('addressLine1') || "";
+        let addressLine2 = localStorage.getItem('addressLine2') || "";
+        let contact = localStorage.getItem('contactNumber') || "";
+        let gstin = localStorage.getItem('companyGstin') || "";
+
+        doc.setFontSize(18);
+        doc.setTextColor(44, 62, 80);
+        doc.text(companyName, 105, 15, { align: "center" });
 
         doc.setFontSize(10);
-        doc.text(`Invoice No: ${inv.invoice_no}`, 15, 30);
-        doc.text(`Date: ${inv.date}`, 150, 30);
-        doc.text(`Patient: ${inv.customer_name}`, 15, 40);
-        doc.text(`Doctor: ${inv.doctor_name || '-'}`, 15, 45);
+        doc.setTextColor(100);
+        if (addressLine1) doc.text(addressLine1, 105, 22, { align: "center" });
+        if (addressLine2) doc.text(addressLine2, 105, 27, { align: "center" });
+        
+        let contactStr = [];
+        if (contact) contactStr.push(`Mo: ${contact}`);
+        if (gstin) contactStr.push(`GSTIN: ${gstin}`);
+        if (contactStr.length > 0) doc.text(contactStr.join("  |  "), 105, 32, { align: "center" });
 
-        const head = [['Medicine', 'Batch', 'Expiry', 'Qty', 'MRP', 'Disc', 'CGST%', 'SGST%', 'Rate', 'Total']];
+        doc.setDrawColor(200);
+        doc.line(10, 36, 200, 36);
+
+        doc.setFontSize(14);
+        doc.setTextColor(0);
+        doc.setFont("helvetica", "bold");
+        doc.text("Tax Invoice (Pharmacy)", 105, 45, { align: "center" });
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Invoice No: ${inv.invoice_no}`, 15, 55);
+        doc.text(`Date: ${inv.date}`, 150, 55);
+        doc.text(`Patient: ${inv.customer_name}`, 15, 62);
+        doc.text(`Doctor: ${inv.doctor_name || '-'}`, 15, 67);
+
+        const head = [['Medicine', 'Batch', 'Expiry', 'Qty', 'Unit', 'MRP', 'Disc', 'CGST%', 'SGST%', 'Rate', 'Total']];
         const body = inv.items.map(item => {
             const gst = parseFloat(item.gst) || 0;
             const halfGst = (gst / 2).toFixed(1);
@@ -1715,6 +1751,7 @@ const MedicineCore = {
                 item.batch || '-',
                 item.expiry || '-',
                 item.qty,
+                item.uom || '-',
                 item.mrp.toFixed(2),
                 item.discText || '-',
                 `${halfGst}%`,
@@ -1725,7 +1762,7 @@ const MedicineCore = {
         });
 
         doc.autoTable({
-            startY: 55,
+            startY: 75,
             head: head,
             body: body,
             styles: { fontSize: 8, cellPadding: 2 },
