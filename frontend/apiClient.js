@@ -48,6 +48,21 @@ const apiClient = {
         }
     },
 
+    saveSettings: async (settingsData) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/settings${apiClient._getAuthQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
+                body: JSON.stringify(settingsData)
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            return { success: false, message: error.message };
+        }
+    },
+
     getAdminCreds: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`);
@@ -225,6 +240,11 @@ const apiClient = {
     getEmployees: () => apiClient._getCollection('employees'),
     saveEmployee: (data) => apiClient._saveCollection('employees', data),
     deleteEmployee: (id) => apiClient._deleteCollection('employees', id),
+
+    // --- Medicines ---
+    getMedicines: () => apiClient._getCollection('medicines'),
+    saveMedicine: (data) => apiClient._saveCollection('medicines', data),
+    deleteMedicine: (id) => apiClient._deleteCollection('medicines', id),
 
     // --- Marketing Visits ---
     getMarketingVisits: async (startDate, endDate) => {

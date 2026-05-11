@@ -379,6 +379,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_profit_loss', label: 'Profit & Loss', feature: 'invoice' },
     { id: 'perm_balance_sheet', label: 'Balance Sheet', feature: 'invoice' },
     { id: 'perm_expense_manager', label: 'Expense Manager', feature: 'invoice' },
+    { id: 'perm_medicine_depts', label: 'Medicine Depts' },
     { id: 'perm_supplier_manager', label: 'Supplier Manager', feature: 'inventory' },
     { id: 'perm_reminder', label: 'Reminder' },
     { id: 'perm_summary_chart', label: 'Summary & Chart' },

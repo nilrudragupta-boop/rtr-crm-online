@@ -1,0 +1,1802 @@
+<!-- c:\Users\User\Desktop\Final - 22.1.1-Backup-DashABC\dashboard_medicine.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine Department: - RiseTech Revolution</title>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script src="config.js"></script>
+    <script src="settings.js"></script>
+    <script src="brandLoader.js"></script>
+    <style>
+        :root {
+            --primary: #0313f3;
+            --secondary: #c44be9;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --heading: #1e293b;
+            --text: #475569;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --sidebar-width: 260px;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nav-item {
+            padding: 12px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.8);
+            white-space: nowrap;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .header {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 25px;
+            color: white;
+        }
+
+        /* Cards & Containers */
+        .glass-panel {
+            background: var(--card-bg);
+            border-radius: 18px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            margin-bottom: 20px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h2,
+        h3 {
+            margin-top: 0;
+            color: var(--heading);
+        }
+
+        /* Dashboard Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid var(--primary);
+        }
+
+        .stat-card.alert {
+            border-left-color: var(--danger);
+        }
+
+        .stat-card.warning {
+            border-left-color: var(--warning);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--heading);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        /* Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--text);
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--heading);
+            background: #f8fafc;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: white;
+        }
+
+        .bg-green {
+            background: var(--success);
+        }
+
+        .bg-red {
+            background: var(--danger);
+        }
+
+        .bg-orange {
+            background: var(--warning);
+        }
+
+        /* Views Control */
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 600px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Main Content -->
+    <div class="main-content">
+
+        <!-- Header -->
+        <div class="header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 style="color: white; margin:0;"> <i class="fas fa-heartbeat"></i> Medicine Department: - <span
+                            data-brand="name"></span></h2>
+                    <small>Version 1.0</small>
+                </div>
+                <div>
+                    <button class="btn btn-primary" style="background: white; color: var(--primary);"
+                        onclick="location.reload()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                    <button class="btn btn-danger" style="margin-left: 10px;" onclick="window.close()">
+                        <i class="fas fa-sign-out-alt"></i> Exit
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="top-nav" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px;">
+                <div class="nav-item active" onclick="switchView('dashboard')">
+                    <i class="fas fa-th-large"></i> Dashboard
+                </div>
+                <div class="nav-item" onclick="switchView('master')">
+                    <i class="fas fa-pills"></i> Medicine Master
+                </div>
+                <div class="nav-item" onclick="switchView('purchase')">
+                    <i class="fas fa-truck-loading"></i> Purchase Entry
+                </div>
+                <div class="nav-item" onclick="switchView('sales')">
+                    <i class="fas fa-cash-register"></i> Sales / POS
+                </div>
+                <div class="nav-item" onclick="switchView('stock')">
+                    <i class="fas fa-boxes"></i> Stock & Expiry
+                </div>
+                <div class="nav-item" onclick="switchView('ledger')">
+                    <i class="fas fa-book"></i> Customer Ledger
+                </div>
+                <div class="nav-item" onclick="switchView('reports')">
+                    <i class="fas fa-chart-line"></i> Reports
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: DASHBOARD -->
+        <div id="view-dashboard" class="view-section active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="dash-total-meds">0</div>
+                    <div class="stat-label">Total Medicines</div>
+                </div>
+                <div class="stat-card alert" style="cursor: pointer;" onclick="showExpiredBatches()"
+                    title="Click to view expired batches">
+                    <div class="stat-value" id="dash-expired">0</div>
+                    <div class="stat-label">Expired Batches</div>
+                </div>
+                <div class="stat-card alert" style="cursor: pointer;" onclick="showOutOfStock()"
+                    title="Click to view out of stock medicines">
+                    <div class="stat-value" id="dash-out-of-stock">0</div>
+                    <div class="stat-label">Out of Stock</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-value" id="dash-expiring-soon">0</div>
+                    <div class="stat-label">Expiring in 90 Days</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="dash-today-sales">₹ 0.00</div>
+                    <div class="stat-label">Today's Sales</div>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <h3><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> Expiry Alerts (Next 90
+                    Days)</h3>
+                <table id="expiry-alert-table">
+                    <thead>
+                        <tr>
+                            <th>Medicine</th>
+                            <th>Batch</th>
+                            <th>Expiry Date</th>
+                            <th>Days Left</th>
+                            <th>Stock</th>
+                        </tr>
+                    </thead>
+                    <tbody><!-- Populated by JS --></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW: MEDICINE MASTER -->
+        <div id="view-master" class="view-section">
+            <div class="glass-panel">
+                <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                    <h3>Medicine Master</h3>
+                    <button class="btn btn-primary" onclick="openModal('modal-add-medicine')">+ Add Medicine</button>
+                </div>
+                <input type="text" class="form-control" id="search-master"
+                    placeholder="Search by Name, Generic Name, or Manufacturer..." onkeyup="renderMasterTable()">
+                <div
+                    style="margin-top: 10px; margin-bottom: 10px; font-size: 13px; color: #666; display: flex; gap: 15px; align-items: center;">
+                    <strong>Color Legend:</strong>
+                    <span><i class="fas fa-square"
+                            style="color: #ffe6e6; border: 1px solid #ccc; margin-right: 4px;"></i> Out of Stock
+                        (Row)</span>
+                    <span><i class="fas fa-square"
+                            style="color: #fff3cd; border: 1px solid #ccc; margin-right: 4px;"></i> Low Stock
+                        (Row)</span>
+                    <span><i class="fas fa-square"
+                            style="color: #f8d7da; border: 1px solid #ccc; margin-right: 4px;"></i> Missing Info
+                        (Cell)</span>
+                </div>
+                <table id="master-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th onclick="sortMasterByName()" style="cursor: pointer;"
+                                title="Click to sort by Medicine Name">Name <i class="fas fa-sort"
+                                    id="sort-icon-master-name" style="margin-left: 5px;"></i></th>
+                            <th>Generic</th>
+                            <th>Manufacturer</th>
+                            <th>Category</th>
+                            <th>Unit Type</th>
+                            <th>HSN</th>
+                            <th>Rack/Loc</th>
+                            <th>MRP</th>
+                            <th>Alert Qty</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW: PURCHASE -->
+        <div id="view-purchase" class="view-section">
+            <div class="glass-panel">
+                <h3>New Purchase Entry</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Supplier Name</label>
+                        <div style="display:flex; gap:5px;">
+                            <select id="pur-supplier" class="form-control">
+                                <option value="">Select Supplier</option>
+                            </select>
+                            <button type="button" class="btn btn-primary" onclick="openSupplierModal()"
+                                style="padding: 0 10px;" title="Manage Suppliers">⚙️</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Invoice No</label>
+                        <input type="text" id="pur-invoice" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="pur-date" class="form-control">
+                    </div>
+                </div>
+                <hr>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Select Medicine</label>
+                        <select id="pur-med-select" class="form-control"
+                            onchange="fillMedicineDetails(this.value)"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Batch No</label>
+                        <input type="text" id="pur-batch" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Date</label>
+                        <input type="date" id="pur-expiry" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" id="pur-qty" class="form-control" placeholder="Qty"
+                            onkeyup="calculatePurTotal()" onchange="calculatePurTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label>Free Qty</label>
+                        <input type="number" id="pur-free" class="form-control" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Purchase Rate</label>
+                        <input type="number" id="pur-rate" class="form-control" onkeyup="calculatePurTotal()"
+                            onchange="calculatePurTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label>GST %</label>
+                        <input type="number" id="pur-gst" class="form-control" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>MRP</label>
+                        <input type="number" id="pur-mrp" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Total Value</label>
+                        <input type="number" id="pur-total" class="form-control" readonly>
+                    </div>
+                </div>
+                <div style="margin-top:15px; text-align:right;">
+                    <button class="btn btn-primary" onclick="addToPurchaseCart()">+ Add to List</button>
+                </div>
+
+                <table id="pur-cart-table" style="margin-top:20px;">
+                    <thead>
+                        <tr>
+                            <th>Medicine</th>
+                            <th>Batch</th>
+                            <th>Expiry</th>
+                            <th>Qty (+Free)</th>
+                            <th>Rate</th>
+                            <th>MRP</th>
+                            <th>Total</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+
+                <div
+                    style="margin-top:15px; text-align:right; display:flex; justify-content:flex-end; align-items:center; gap:15px;">
+                    <span style="font-size:18px; font-weight:bold;">Total: ₹ <span
+                            id="pur-grand-total">0.00</span></span>
+                    <button class="btn btn-success" onclick="savePurchaseInvoice()">Save Complete Purchase</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: SALES -->
+        <div id="view-sales" class="view-section">
+            <div class="glass-panel">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Sales Invoice / POS</h3>
+                    <div>
+                        <span style="font-weight:bold; font-size:18px;">Total: ₹ <span
+                                id="sale-grand-total">0.00</span></span>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Invoice No</label>
+                        <input type="text" id="sale-invoice-no" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Patient / Customer Name</label>
+                        <input type="text" id="sale-customer" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Doctor Name</label>
+                        <input type="text" id="sale-doctor" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="sale-date" class="form-control">
+                    </div>
+                </div>
+
+                <div style="background:#f1f5f9; padding:15px; border-radius:10px; margin:15px 0;">
+                    <div class="form-grid"
+                        style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); align-items: flex-end;">
+                        <div class="form-group">
+                            <label>Medicine</label>
+                            <select id="sale-med-select" class="form-control"
+                                onchange="loadBatchesForSale(this.value)"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Batch (Stock)</label>
+                            <select id="sale-batch-select" class="form-control"
+                                onchange="updateSalePrice(this.value)"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Price</label>
+                            <input type="number" id="sale-price" class="form-control" onkeyup="calculateSaleItemTotal()"
+                                onchange="calculateSaleItemTotal()">
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" id="sale-qty" class="form-control" value="1"
+                                onkeyup="calculateSaleItemTotal()" onchange="calculateSaleItemTotal()">
+                        </div>
+                        <div class="form-group">
+                            <label>GST %</label>
+                            <input type="number" id="sale-gst" class="form-control" readonly>
+                        </div>
+                        <div class="form-group" style="min-width: 140px;">
+                            <label>Discount</label>
+                            <div style="display:flex; gap:5px;">
+                                <input type="number" id="sale-disc" class="form-control" value="0"
+                                    onkeyup="calculateSaleItemTotal()" onchange="calculateSaleItemTotal()">
+                                <select id="sale-disc-type" class="form-control" style="width:70px; padding:0 5px;"
+                                    onchange="calculateSaleItemTotal()">
+                                    <option value="%">%</option>
+                                    <option value="Rs">₹</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Item Total</label>
+                            <input type="number" id="sale-item-total" class="form-control" readonly
+                                style="font-weight:bold;">
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:flex-end;">
+                            <button class="btn btn-primary" onclick="addToCart()">Add</button>
+                        </div>
+                    </div>
+                </div>
+
+                <table id="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Medicine</th>
+                            <th>Batch</th>
+                            <th>Expiry</th>
+                            <th>Qty</th>
+                            <th>GST %</th>
+                            <th>MRP</th>
+                            <th>Total</th>
+                            <th>Margin</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+
+                <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-top:15px;">
+                    <div class="form-grid"
+                        style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); align-items: center;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Gross (Pre-Tax)</label>
+                            <input type="text" id="sale-gross-amount" class="form-control" value="0.00" readonly
+                                style="font-weight:bold;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Total GST</label>
+                            <input type="text" id="sale-total-gst" class="form-control" value="0.00" readonly
+                                style="font-weight:bold;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label style="display:flex; align-items:center; gap:5px;">Round Off <input type="checkbox"
+                                    id="sale-round-off-check" checked
+                                    onchange="if(window.MedicineCore) MedicineCore.renderCart()"></label>
+                            <input type="text" id="sale-round-off" class="form-control" value="0.00" readonly
+                                style="font-weight:bold;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Grand Total</label>
+                            <input type="number" id="sale-grand-total-field" class="form-control" value="0.00" readonly
+                                style="color:var(--primary); font-weight:bold; font-size:16px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Pay Mode</label>
+                            <select id="sale-payment-mode" class="form-control" onchange="calculateReturnAmount()">
+                                <option>Cash</option>
+                                <option>UPI</option>
+                                <option>Card</option>
+                                <option>Credit</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Paid Amt</label>
+                            <input type="number" id="sale-paid-amount" class="form-control" value="0"
+                                onkeyup="calculateReturnAmount()" onchange="calculateReturnAmount()">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Return Amt</label>
+                            <input type="number" id="sale-return-amount" class="form-control" value="0.00" readonly
+                                style="color:var(--danger); font-weight:bold; font-size:16px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:20px; text-align:right;">
+                    <button class="btn btn-warning" style="background:var(--warning); color:white; margin-right:10px;"
+                        onclick="holdBill()"><i class="fas fa-pause"></i> Hold Bill</button>
+                    <button class="btn btn-primary" style="margin-right:10px;" onclick="openHeldBills()"><i
+                            class="fas fa-history"></i> Recall Bill</button>
+                    <button class="btn btn-success" onclick="finalizeSale()">Generate Invoice & Print</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: STOCK -->
+        <div id="view-stock" class="view-section">
+            <div class="glass-panel">
+                <h3>Current Stock Report (Batch Wise)</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" class="form-control" id="search-stock" placeholder="Search Stock..."
+                        onkeyup="renderStockTable()" style="flex: 2;">
+                    <select id="filter-stock-status" class="form-control" onchange="renderStockTable()"
+                        style="flex: 1;">
+                        <option value="">All Statuses</option>
+                        <option value="In Stock">In Stock</option>
+                        <option value="Low Stock">Low Stock</option>
+                        <option value="Out of Stock">Out of Stock</option>
+                        <option value="Expiring Soon">Expiring Soon</option>
+                        <option value="Expired">Expired</option>
+                    </select>
+                </div>
+                <table id="stock-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortStockByName()" style="cursor: pointer;"
+                                title="Click to sort by Medicine Name">Medicine <i class="fas fa-sort"
+                                    id="sort-icon-name" style="margin-left: 5px;"></i></th>
+                            <th>Manufacturer</th>
+                            <th>Batch</th>
+                            <th>Supplier Name</th>
+                            <th onclick="sortStockByExpiry()" style="cursor: pointer;"
+                                title="Click to sort by Expiry Date">Expiry <i class="fas fa-sort" id="sort-icon-expiry"
+                                    style="margin-left: 5px;"></i></th>
+                            <th>Qty Available</th>
+                            <th>Pur. Rate</th>
+                            <th>MRP</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW: LEDGER -->
+        <div id="view-ledger" class="view-section">
+            <div class="glass-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3>Customer Ledger</h3>
+                    <button class="btn btn-success" onclick="openModal('modal-payment')">+ Record Receipt</button>
+                </div>
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <input type="text" id="ledger-customer-search" class="form-control"
+                        placeholder="Search Customer Name or Invoice No..." style="flex:1;" onkeyup="renderLedger()">
+                </div>
+                <div
+                    style="background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:15px; text-align:right; font-size:18px; font-weight:bold;">
+                    Outstanding Balance: <span id="ledger-balance" style="color:var(--primary);">₹ 0.00</span>
+                </div>
+                <table id="ledger-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Description</th>
+                            <th>Type</th>
+                            <th>Debit (Bill)</th>
+                            <th>Credit (Paid)</th>
+                            <th>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VIEW: REPORTS -->
+        <div id="view-reports" class="view-section">
+            <div class="glass-panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0;">Sales Reports</h3>
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <input type="date" id="report-from-date" class="form-control" style="width: auto;"
+                            onchange="renderReportsTable()" title="From Date">
+                        <span style="color:var(--text); font-weight:bold;">to</span>
+                        <input type="date" id="report-to-date" class="form-control" style="width: auto;"
+                            onchange="renderReportsTable()" title="To Date">
+                        <input type="text" id="search-reports" class="form-control" style="width: auto;"
+                            placeholder="Search by Inv No or Patient..." onkeyup="renderReportsTable()">
+                        <button class="btn btn-primary"
+                            onclick="window.open('profit_loss_med.html', '_blank', 'width=1000,height=700')"><i
+                                class="fas fa-balance-scale"></i> Profit & Loss Report</button>
+                    </div>
+                </div>
+                <table id="report-sales-table">
+                    <thead>
+                        <tr>
+                            <th>Inv No</th>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Items</th>
+                            <th>Total Amount</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" style="text-align:right; font-weight:bold;">Grand Total:</td>
+                            <td colspan="2" style="font-weight:bold; color:var(--primary);" id="report-grand-total">₹0.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL: ADD MEDICINE -->
+    <div id="modal-add-medicine" class="modal">
+        <div class="modal-content">
+            <h3>Add New Medicine</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Medicine Name *</label>
+                    <input type="text" id="new-med-name" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Generic Name</label>
+                    <input type="text" id="new-med-generic" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="new-med-cat" class="form-control">
+                            <option value="">Select Category</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openCategoryModal()"
+                            style="padding: 0 10px;" title="Manage Categories">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>HSN Code</label>
+                    <input type="text" id="new-med-hsn" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Manufacturer</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="new-med-supplier" class="form-control">
+                            <option value="">Select Manufacturer</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openManufacturerModal()"
+                            style="padding: 0 10px;" title="Manage Manufacturers">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>GST %</label>
+                    <select id="new-med-gst" class="form-control">
+                        <option value="0">0%</option>
+                        <option value="5">5%</option>
+                        <option value="12" selected>12%</option>
+                        <option value="18">18%</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Unit Type</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="new-med-unit" class="form-control">
+                            <option value="">Select Unit Type</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openUnitModal()" style="padding: 0 10px;"
+                            title="Manage Unit Types">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Min Stock Alert</label>
+                    <input type="number" id="new-med-alert" class="form-control" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Rack Location</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="new-med-loc" class="form-control">
+                            <option value="">Select Rack</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openRackModal()" style="padding: 0 10px;"
+                            title="Manage Racks">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Schedule Type</label>
+                    <select id="new-med-schedule" class="form-control">
+                        <option>OTC</option>
+                        <option>Schedule H</option>
+                        <option>Schedule H1</option>
+                        <option>Schedule X</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-add-medicine')">Cancel</button>
+                <button class="btn btn-success" onclick="saveMedicine()">Save Medicine</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT MEDICINE -->
+    <div id="modal-edit-medicine" class="modal">
+        <div class="modal-content">
+            <h3>Edit Medicine</h3>
+            <input type="hidden" id="edit-med-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Medicine Name *</label>
+                    <input type="text" id="edit-med-name" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Generic Name</label>
+                    <input type="text" id="edit-med-generic" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="edit-med-cat" class="form-control">
+                            <option value="">Select Category</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openCategoryModal()"
+                            style="padding: 0 10px;" title="Manage Categories">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>HSN Code</label>
+                    <input type="text" id="edit-med-hsn" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Manufacturer</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="edit-med-supplier" class="form-control">
+                            <option value="">Select Manufacturer</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openManufacturerModal()"
+                            style="padding: 0 10px;" title="Manage Manufacturers">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>GST %</label>
+                    <select id="edit-med-gst" class="form-control">
+                        <option value="0">0%</option>
+                        <option value="5">5%</option>
+                        <option value="12">12%</option>
+                        <option value="18">18%</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Unit Type</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="edit-med-unit" class="form-control">
+                            <option value="">Select Unit Type</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openUnitModal()" style="padding: 0 10px;"
+                            title="Manage Unit Types">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Min Stock Alert</label>
+                    <input type="number" id="edit-med-alert" class="form-control" value="10">
+                </div>
+                <div class="form-group">
+                    <label>Rack Location</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="edit-med-loc" class="form-control">
+                            <option value="">Select Rack</option>
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="openRackModal()" style="padding: 0 10px;"
+                            title="Manage Racks">⚙️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Schedule Type</label>
+                    <select id="edit-med-schedule" class="form-control">
+                        <option>OTC</option>
+                        <option>Schedule H</option>
+                        <option>Schedule H1</option>
+                        <option>Schedule X</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-edit-medicine')">Cancel</button>
+                <button class="btn btn-success" onclick="updateMedicine()">Update Medicine</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PAYMENT -->
+    <div id="modal-payment" class="modal">
+        <div class="modal-content">
+            <h3>Record Customer Payment</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Customer Name</label>
+                    <input type="text" id="pay-customer" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="pay-date" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" id="pay-amount" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Mode</label>
+                    <select id="pay-mode" class="form-control">
+                        <option>Cash</option>
+                        <option>UPI</option>
+                        <option>Bank</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Remarks</label>
+                    <input type="text" id="pay-remarks" class="form-control">
+                </div>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-payment')">Cancel</button>
+                <button class="btn btn-success" onclick="savePayment()">Save Payment</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HELD BILLS -->
+    <div id="modal-held-bills" class="modal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3>Held Bills</h3>
+                <button class="btn btn-danger" onclick="closeModal('modal-held-bills')">Close</button>
+            </div>
+            <table id="held-bills-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODAL: MANAGE MANUFACTURERS -->
+    <div id="modal-manage-manufacturer" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">Manage Manufacturers</h3>
+                <span style="cursor:pointer; font-size:24px;"
+                    onclick="closeModal('modal-manage-manufacturer')">&times;</span>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom:15px;">
+                <input type="hidden" id="edit-manufacturer-index">
+                <input type="text" id="new-manufacturer-name" class="form-control" placeholder="Manufacturer Name">
+                <button class="btn btn-success" id="btn-save-manufacturer" onclick="saveManufacturer()">Add</button>
+            </div>
+            <div id="manufacturer-list"
+                style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
+                <!-- List injected by JS -->
+            </div>
+            <div style="margin-top:15px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-manage-manufacturer')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MANAGE CATEGORIES -->
+    <div id="modal-manage-category" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">Manage Categories</h3>
+                <span style="cursor:pointer; font-size:24px;"
+                    onclick="closeModal('modal-manage-category')">&times;</span>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom:15px;">
+                <input type="hidden" id="edit-category-index">
+                <input type="text" id="new-category-name" class="form-control" placeholder="Category Name">
+                <button class="btn btn-success" id="btn-save-category" onclick="saveCategory()">Add</button>
+            </div>
+            <div id="category-list"
+                style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
+                <!-- List injected by JS -->
+            </div>
+            <div style="margin-top:15px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-manage-category')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MANAGE UNIT TYPES -->
+    <div id="modal-manage-unit" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">Manage Unit Types</h3>
+                <span style="cursor:pointer; font-size:24px;" onclick="closeModal('modal-manage-unit')">&times;</span>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom:15px;">
+                <input type="hidden" id="edit-unit-index">
+                <input type="text" id="new-unit-name" class="form-control" placeholder="Unit Type Name">
+                <button class="btn btn-success" id="btn-save-unit" onclick="saveUnit()">Add</button>
+            </div>
+            <div id="unit-list"
+                style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
+                <!-- List injected by JS -->
+            </div>
+            <div style="margin-top:15px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-manage-unit')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MANAGE RACKS -->
+    <div id="modal-manage-rack" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">Manage Racks</h3>
+                <span style="cursor:pointer; font-size:24px;" onclick="closeModal('modal-manage-rack')">&times;</span>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom:15px;">
+                <input type="hidden" id="edit-rack-index">
+                <input type="text" id="new-rack-name" class="form-control" placeholder="Rack Name (e.g. A1, B2)">
+                <button class="btn btn-success" id="btn-save-rack" onclick="saveRack()">Add</button>
+            </div>
+            <div id="rack-list"
+                style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
+                <!-- List injected by JS -->
+            </div>
+            <div style="margin-top:15px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-manage-rack')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: MANAGE PURCHASE SUPPLIERS -->
+    <div id="modal-manage-supplier" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">Manage Purchase Suppliers</h3>
+                <span style="cursor:pointer; font-size:24px;"
+                    onclick="closeModal('modal-manage-supplier')">&times;</span>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom:15px;">
+                <input type="hidden" id="edit-supplier-index">
+                <input type="text" id="new-supplier-name" class="form-control" placeholder="Supplier Name">
+                <button class="btn btn-success" id="btn-save-supplier" onclick="saveMedSupplier()">Add</button>
+            </div>
+            <div id="supplier-list"
+                style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px;">
+                <!-- List injected by JS -->
+            </div>
+            <div style="margin-top:15px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-manage-supplier')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT STOCK (BATCH) -->
+    <div id="modal-edit-stock" class="modal">
+        <div class="modal-content">
+            <h3>Edit Stock (Batch Details)</h3>
+            <input type="hidden" id="edit-stock-med-id">
+            <input type="hidden" id="edit-stock-old-batch">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Medicine Name</label>
+                    <input type="text" id="edit-stock-med-name" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Batch No</label>
+                    <input type="text" id="edit-stock-batch" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Expiry Date</label>
+                    <input type="date" id="edit-stock-expiry" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Supplier Name</label>
+                    <select id="edit-stock-supplier" class="form-control">
+                        <option value="">Select Supplier</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>MRP</label>
+                    <input type="number" id="edit-stock-mrp" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Available Qty</label>
+                    <input type="number" id="edit-stock-qty" class="form-control">
+                    <small style="color:#666;">Change this to adjust stock levels.</small>
+                </div>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn btn-danger" onclick="closeModal('modal-edit-stock')">Cancel</button>
+                <button class="btn btn-success" onclick="updateStock()">Update Stock</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="medicine_core.js"></script>
+
+    <script>
+        // Simple View Switcher
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            document.getElementById('view-' + viewId).classList.add('active');
+
+            if (window.event && event.currentTarget && event.currentTarget.classList && event.currentTarget.classList.contains('nav-item')) {
+                event.currentTarget.classList.add('active');
+            } else {
+                const nav = document.querySelector(`.nav-item[onclick*="'${viewId}'"]`);
+                if (nav) nav.classList.add('active');
+            }
+
+            // Refresh data on view switch
+            if (viewId === 'dashboard') MedicineCore.renderDashboard();
+            if (viewId === 'master') MedicineCore.renderMaster();
+            if (viewId === 'stock') MedicineCore.renderStock();
+            if (viewId === 'reports') MedicineCore.renderReports();
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // --- Global Wrappers for MedicineCore ---
+        function renderMasterTable() { if (window.MedicineCore && MedicineCore.renderMaster) MedicineCore.renderMaster(); }
+        function addToPurchaseCart() { if (window.MedicineCore && MedicineCore.addToPurchaseCart) MedicineCore.addToPurchaseCart(); }
+        function removePurCartItem(index) { if (window.MedicineCore && MedicineCore.removePurCartItem) MedicineCore.removePurCartItem(index); }
+        function savePurchaseInvoice() { if (window.MedicineCore && MedicineCore.savePurchaseInvoice) MedicineCore.savePurchaseInvoice(); }
+        function loadBatchesForSale(val) { if (window.MedicineCore && MedicineCore.loadBatchesForSale) MedicineCore.loadBatchesForSale(val); }
+        function updateSalePrice(val) { if (window.MedicineCore && MedicineCore.updateSalePrice) MedicineCore.updateSalePrice(val); }
+        function addToCart() { if (window.MedicineCore && MedicineCore.addToCart) MedicineCore.addToCart(); }
+        function holdBill() { if (window.MedicineCore && MedicineCore.holdBill) MedicineCore.holdBill(); }
+        function openHeldBills() { if (window.MedicineCore && MedicineCore.openHeldBills) MedicineCore.openHeldBills(); }
+        function finalizeSale() { if (window.MedicineCore && MedicineCore.finalizeSale) MedicineCore.finalizeSale(); }
+        function renderStockTable() { if (window.MedicineCore && MedicineCore.renderStock) MedicineCore.renderStock(); }
+        function editStock(id, batch) { if (window.MedicineCore && MedicineCore.editStock) MedicineCore.editStock(id, batch); }
+        function deleteStock(id, batch) { if (window.MedicineCore && MedicineCore.deleteStock) MedicineCore.deleteStock(id, batch); }
+        function updateStock() { if (window.MedicineCore && MedicineCore.updateStock) MedicineCore.updateStock(); }
+        function renderLedger() { if (window.MedicineCore && MedicineCore.renderLedger) MedicineCore.renderLedger(); }
+        function sortStockByExpiry() { if (window.MedicineCore && MedicineCore.sortStockByExpiry) MedicineCore.sortStockByExpiry(); }
+        function sortStockByName() { if (window.MedicineCore && MedicineCore.sortStockByName) MedicineCore.sortStockByName(); }
+        function sortMasterByName() { if (window.MedicineCore && MedicineCore.sortMasterByName) MedicineCore.sortMasterByName(); }
+        function showOutOfStock() { if (window.MedicineCore && MedicineCore.showOutOfStock) MedicineCore.showOutOfStock(); }
+        function showExpiredBatches() { if (window.MedicineCore && MedicineCore.showExpiredBatches) MedicineCore.showExpiredBatches(); }
+        function saveMedicine() { if (window.MedicineCore && MedicineCore.saveMedicine) MedicineCore.saveMedicine(); }
+        function editMedicine(id) { if (window.MedicineCore && MedicineCore.editMedicine) MedicineCore.editMedicine(id); }
+        function updateMedicine() { if (window.MedicineCore && MedicineCore.updateMedicine) MedicineCore.updateMedicine(); }
+        function savePayment() { if (window.MedicineCore && MedicineCore.savePayment) MedicineCore.savePayment(); }
+        function fillMedicineDetails(val) { if (window.MedicineCore && MedicineCore.fillMedicineDetails) MedicineCore.fillMedicineDetails(val); }
+        function calculatePurTotal() { if (window.MedicineCore && MedicineCore.calculatePurTotal) MedicineCore.calculatePurTotal(); }
+        function renderReportsTable() { if (window.MedicineCore && MedicineCore.renderReports) MedicineCore.renderReports(); }
+        function calculateReturnAmount() { if (window.MedicineCore && MedicineCore.calculateReturnAmount) MedicineCore.calculateReturnAmount(); }
+        function calculateSaleItemTotal() { if (window.MedicineCore && MedicineCore.calculateSaleItemTotal) MedicineCore.calculateSaleItemTotal(); }
+
+        async function loadBackendSettings() {
+            if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
+                try {
+                    const settings = await apiClient.getSettings();
+                    if (settings) {
+                        if (settings.med_manufacturers) { medManufacturers = settings.med_manufacturers; localStorage.setItem("med_manufacturers", JSON.stringify(medManufacturers)); }
+                        if (settings.med_categories) { medCategories = settings.med_categories; localStorage.setItem("med_categories", JSON.stringify(medCategories)); }
+                        if (settings.med_units) { medUnits = settings.med_units; localStorage.setItem("med_units", JSON.stringify(medUnits)); }
+                        if (settings.med_racks) { medRacks = settings.med_racks; localStorage.setItem("med_racks", JSON.stringify(medRacks)); }
+                        if (settings.med_suppliers) { medSuppliers = settings.med_suppliers; localStorage.setItem("med_suppliers", JSON.stringify(medSuppliers)); }
+                    }
+                } catch (e) {
+                    console.warn("Failed to fetch backend settings for medicine dept", e);
+                }
+            }
+        }
+
+        // Initialize
+        window.onload = async function () {
+            try {
+                if (window.MedicineCore) MedicineCore.init();
+            } catch (e) {
+                console.error("MedicineCore init error:", e);
+            }
+            document.getElementById('sale-date').valueAsDate = new Date();
+            document.getElementById('pur-date').valueAsDate = new Date();
+            document.getElementById('pay-date').valueAsDate = new Date();
+            await loadBackendSettings();
+            loadManufacturers();
+            loadCategories();
+            loadUnits();
+            loadRacks();
+            loadMedSuppliers();
+        };
+
+        // --- Manufacturer Management Logic ---
+        let medManufacturers = [];
+        try { medManufacturers = JSON.parse(localStorage.getItem("med_manufacturers")) || []; } catch (e) { }
+
+        function loadManufacturers() {
+            ['new-med-supplier', 'edit-med-supplier'].forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">Select Manufacturer</option>';
+                medManufacturers.sort().forEach(m => {
+                    const opt = document.createElement("option");
+                    opt.value = m;
+                    opt.textContent = m;
+                    select.appendChild(opt);
+                });
+                if (currentVal && medManufacturers.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            });
+        }
+
+        function openManufacturerModal() {
+            document.getElementById('new-manufacturer-name').value = '';
+            document.getElementById('edit-manufacturer-index').value = '';
+            document.getElementById('btn-save-manufacturer').innerText = 'Add';
+            renderManufacturerList();
+            openModal('modal-manage-manufacturer');
+        }
+
+        function renderManufacturerList() {
+            const list = document.getElementById('manufacturer-list');
+            list.innerHTML = '';
+            if (medManufacturers.length === 0) {
+                list.innerHTML = '<div style="padding:10px; text-align:center; color:#666;">No manufacturers found.</div>';
+                return;
+            }
+            medManufacturers.forEach((m, index) => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #eee;';
+                div.innerHTML = `
+                    <span>${m}</span>
+                    <div>
+                        <button onclick="editManufacturer(${index})" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteManufacturer(${index})" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function saveManufacturer() {
+            const name = document.getElementById('new-manufacturer-name').value.trim();
+            if (!name) return alert("Please enter a manufacturer name.");
+
+            const editIndex = document.getElementById('edit-manufacturer-index').value;
+            let oldName = null;
+
+            if (editIndex !== '') {
+                oldName = medManufacturers[parseInt(editIndex)];
+                if (medManufacturers.some((m, i) => m.toLowerCase() === name.toLowerCase() && i !== parseInt(editIndex))) {
+                    return alert("Manufacturer already exists!");
+                }
+                medManufacturers[parseInt(editIndex)] = name;
+            } else {
+                if (medManufacturers.some(m => m.toLowerCase() === name.toLowerCase())) {
+                    return alert("Manufacturer already exists!");
+                }
+                medManufacturers.push(name);
+            }
+
+            localStorage.setItem("med_manufacturers", JSON.stringify(medManufacturers));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_manufacturers: medManufacturers }).catch(console.warn);
+
+            if (oldName && oldName !== name) {
+                if (window.MedicineCore && MedicineCore.medicines) {
+                    let updated = false;
+                    MedicineCore.medicines.forEach(m => {
+                        if (m.manufacturer === oldName) {
+                            m.manufacturer = name;
+                            updated = true;
+                        }
+                    });
+                    if (updated) {
+                        localStorage.setItem('medicines', JSON.stringify(MedicineCore.medicines));
+                        if (MedicineCore.renderMaster) MedicineCore.renderMaster();
+                        if (MedicineCore.renderStock) MedicineCore.renderStock();
+                    }
+                }
+            }
+
+            document.getElementById('new-manufacturer-name').value = '';
+            document.getElementById('edit-manufacturer-index').value = '';
+            document.getElementById('btn-save-manufacturer').innerText = 'Add';
+            renderManufacturerList();
+            loadManufacturers();
+        }
+
+        function editManufacturer(index) {
+            document.getElementById('new-manufacturer-name').value = medManufacturers[index];
+            document.getElementById('edit-manufacturer-index').value = index;
+            document.getElementById('btn-save-manufacturer').innerText = 'Update';
+        }
+
+        function deleteManufacturer(index) {
+            if (!confirm("Are you sure you want to delete this manufacturer?")) return;
+            medManufacturers.splice(index, 1);
+            localStorage.setItem("med_manufacturers", JSON.stringify(medManufacturers));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_manufacturers: medManufacturers }).catch(console.warn);
+            renderManufacturerList();
+            loadManufacturers();
+        }
+
+        // --- Category Management Logic ---
+        const DEFAULT_CATEGORIES = ['Tablet', 'Capsule', 'Syrup', 'Injection', 'Cream', 'Drops', 'Surgical'];
+        let medCategories = [...DEFAULT_CATEGORIES];
+        try {
+            const parsedCat = JSON.parse(localStorage.getItem("med_categories"));
+            if (parsedCat && Array.isArray(parsedCat)) medCategories = parsedCat;
+        } catch (e) { }
+
+        function loadCategories() {
+            ['new-med-cat', 'edit-med-cat'].forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">Select Category</option>';
+                medCategories.sort().forEach(c => {
+                    const opt = document.createElement("option");
+                    opt.value = c;
+                    opt.textContent = c;
+                    select.appendChild(opt);
+                });
+                if (currentVal && medCategories.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            });
+        }
+
+        function openCategoryModal() {
+            document.getElementById('new-category-name').value = '';
+            document.getElementById('edit-category-index').value = '';
+            document.getElementById('btn-save-category').innerText = 'Add';
+            renderCategoryList();
+            openModal('modal-manage-category');
+        }
+
+        function renderCategoryList() {
+            const list = document.getElementById('category-list');
+            list.innerHTML = '';
+            if (medCategories.length === 0) {
+                list.innerHTML = '<div style="padding:10px; text-align:center; color:#666;">No categories found.</div>';
+                return;
+            }
+            medCategories.forEach((c, index) => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #eee;';
+                div.innerHTML = `
+                    <span>${c}</span>
+                    <div>
+                        <button onclick="editCategory(${index})" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteCategory(${index})" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function saveCategory() {
+            const name = document.getElementById('new-category-name').value.trim();
+            if (!name) return alert("Please enter a category name.");
+
+            const editIndex = document.getElementById('edit-category-index').value;
+
+            if (editIndex !== '') {
+                if (medCategories.some((c, i) => c.toLowerCase() === name.toLowerCase() && i !== parseInt(editIndex))) {
+                    return alert("Category already exists!");
+                }
+                medCategories[parseInt(editIndex)] = name;
+            } else {
+                if (medCategories.some(c => c.toLowerCase() === name.toLowerCase())) {
+                    return alert("Category already exists!");
+                }
+                medCategories.push(name);
+            }
+
+            localStorage.setItem("med_categories", JSON.stringify(medCategories));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_categories: medCategories }).catch(console.warn);
+            document.getElementById('new-category-name').value = '';
+            document.getElementById('edit-category-index').value = '';
+            document.getElementById('btn-save-category').innerText = 'Add';
+            renderCategoryList();
+            loadCategories();
+        }
+
+        function editCategory(index) {
+            document.getElementById('new-category-name').value = medCategories[index];
+            document.getElementById('edit-category-index').value = index;
+            document.getElementById('btn-save-category').innerText = 'Update';
+        }
+
+        function deleteCategory(index) {
+            if (!confirm("Are you sure you want to delete this category?")) return;
+            medCategories.splice(index, 1);
+            localStorage.setItem("med_categories", JSON.stringify(medCategories));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_categories: medCategories }).catch(console.warn);
+            renderCategoryList();
+            loadCategories();
+        }
+
+        // --- Unit Type Management Logic ---
+        const DEFAULT_UNITS = ['Strip', 'Bottle', 'Tube', 'Vial', 'Box'];
+        let medUnits = [...DEFAULT_UNITS];
+        try {
+            const parsedUnits = JSON.parse(localStorage.getItem("med_units"));
+            if (parsedUnits && Array.isArray(parsedUnits)) medUnits = parsedUnits;
+        } catch (e) { }
+
+        function loadUnits() {
+            ['new-med-unit', 'edit-med-unit'].forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">Select Unit Type</option>';
+                let globalUoms = [];
+                try { globalUoms = JSON.parse(localStorage.getItem('custom_uoms')) || []; } catch (e) { }
+                const combined = [...new Set([...medUnits, ...globalUoms])];
+
+                combined.sort().forEach(u => {
+                    const opt = document.createElement("option");
+                    opt.value = u;
+                    opt.textContent = u;
+                    select.appendChild(opt);
+                });
+                if (currentVal && combined.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            });
+        }
+
+        function openUnitModal() {
+            document.getElementById('new-unit-name').value = '';
+            document.getElementById('edit-unit-index').value = '';
+            document.getElementById('btn-save-unit').innerText = 'Add';
+            renderUnitList();
+            openModal('modal-manage-unit');
+        }
+
+        function renderUnitList() {
+            const list = document.getElementById('unit-list');
+            list.innerHTML = '';
+            if (medUnits.length === 0) {
+                list.innerHTML = '<div style="padding:10px; text-align:center; color:#666;">No unit types found.</div>';
+                return;
+            }
+            medUnits.forEach((u, index) => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #eee;';
+                div.innerHTML = `
+                    <span>${u}</span>
+                    <div>
+                        <button onclick="editUnit(${index})" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteUnit(${index})" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function saveUnit() {
+            const name = document.getElementById('new-unit-name').value.trim();
+            if (!name) return alert("Please enter a unit type name.");
+
+            const editIndex = document.getElementById('edit-unit-index').value;
+            let oldName = null;
+
+            if (editIndex !== '') {
+                oldName = medUnits[parseInt(editIndex)];
+                if (medUnits.some((u, i) => u.toLowerCase() === name.toLowerCase() && i !== parseInt(editIndex))) {
+                    return alert("Unit Type already exists!");
+                }
+                medUnits[parseInt(editIndex)] = name;
+            } else {
+                if (medUnits.some(u => u.toLowerCase() === name.toLowerCase())) {
+                    return alert("Unit Type already exists!");
+                }
+                medUnits.push(name);
+            }
+
+            localStorage.setItem("med_units", JSON.stringify(medUnits));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_units: medUnits }).catch(console.warn);
+
+            // Synchronize with global application UOMs
+            let customUoms = [];
+            try { customUoms = JSON.parse(localStorage.getItem('custom_uoms')) || []; } catch (e) { }
+            if (oldName) {
+                const idx = customUoms.findIndex(u => u.toLowerCase() === oldName.toLowerCase());
+                if (idx > -1) {
+                    customUoms[idx] = name;
+                } else if (!customUoms.some(u => u.toLowerCase() === name.toLowerCase())) {
+                    customUoms.push(name);
+                }
+            } else {
+                if (!customUoms.some(u => u.toLowerCase() === name.toLowerCase())) {
+                    customUoms.push(name);
+                }
+            }
+            localStorage.setItem('custom_uoms', JSON.stringify(customUoms));
+
+            document.getElementById('new-unit-name').value = '';
+            document.getElementById('edit-unit-index').value = '';
+            document.getElementById('btn-save-unit').innerText = 'Add';
+            renderUnitList();
+            loadUnits();
+        }
+
+        function editUnit(index) {
+            document.getElementById('new-unit-name').value = medUnits[index];
+            document.getElementById('edit-unit-index').value = index;
+            document.getElementById('btn-save-unit').innerText = 'Update';
+        }
+
+        function deleteUnit(index) {
+            if (!confirm("Are you sure you want to delete this unit type?")) return;
+            const deletedUnit = medUnits[index];
+            medUnits.splice(index, 1);
+            localStorage.setItem("med_units", JSON.stringify(medUnits));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_units: medUnits }).catch(console.warn);
+
+            // Synchronize delete with global UOMs
+            let customUoms = [];
+            try { customUoms = JSON.parse(localStorage.getItem('custom_uoms')) || []; } catch (e) { }
+            customUoms = customUoms.filter(u => u.toLowerCase() !== deletedUnit.toLowerCase());
+            localStorage.setItem('custom_uoms', JSON.stringify(customUoms));
+
+            renderUnitList();
+            loadUnits();
+        }
+
+        // --- Rack Management Logic ---
+        let medRacks = [];
+        try { medRacks = JSON.parse(localStorage.getItem("med_racks")) || []; } catch (e) { }
+
+        function loadRacks() {
+            ['new-med-loc', 'edit-med-loc'].forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">Select Rack</option>';
+                medRacks.sort().forEach(r => {
+                    const opt = document.createElement("option");
+                    opt.value = r;
+                    opt.textContent = r;
+                    select.appendChild(opt);
+                });
+                if (currentVal && medRacks.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            });
+        }
+
+        function openRackModal() {
+            document.getElementById('new-rack-name').value = '';
+            document.getElementById('edit-rack-index').value = '';
+            document.getElementById('btn-save-rack').innerText = 'Add';
+            renderRackList();
+            openModal('modal-manage-rack');
+        }
+
+        function renderRackList() {
+            const list = document.getElementById('rack-list');
+            list.innerHTML = '';
+            if (medRacks.length === 0) {
+                list.innerHTML = '<div style="padding:10px; text-align:center; color:#666;">No racks found.</div>';
+                return;
+            }
+            medRacks.forEach((r, index) => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #eee;';
+                div.innerHTML = `
+                    <span>${r}</span>
+                    <div>
+                        <button onclick="editRack(${index})" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteRack(${index})" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function saveRack() {
+            const name = document.getElementById('new-rack-name').value.trim();
+            if (!name) return alert("Please enter a rack name.");
+
+            const editIndex = document.getElementById('edit-rack-index').value;
+
+            if (editIndex !== '') {
+                if (medRacks.some((r, i) => r.toLowerCase() === name.toLowerCase() && i !== parseInt(editIndex))) {
+                    return alert("Rack already exists!");
+                }
+                medRacks[parseInt(editIndex)] = name;
+            } else {
+                if (medRacks.some(r => r.toLowerCase() === name.toLowerCase())) {
+                    return alert("Rack already exists!");
+                }
+                medRacks.push(name);
+            }
+
+            localStorage.setItem("med_racks", JSON.stringify(medRacks));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_racks: medRacks }).catch(console.warn);
+            document.getElementById('new-rack-name').value = '';
+            document.getElementById('edit-rack-index').value = '';
+            document.getElementById('btn-save-rack').innerText = 'Add';
+            renderRackList();
+            loadRacks();
+        }
+
+        function editRack(index) {
+            document.getElementById('new-rack-name').value = medRacks[index];
+            document.getElementById('edit-rack-index').value = index;
+            document.getElementById('btn-save-rack').innerText = 'Update';
+        }
+
+        function deleteRack(index) {
+            if (!confirm("Are you sure you want to delete this rack?")) return;
+            medRacks.splice(index, 1);
+            localStorage.setItem("med_racks", JSON.stringify(medRacks));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_racks: medRacks }).catch(console.warn);
+            renderRackList();
+            loadRacks();
+        }
+
+        // --- Purchase Supplier Management Logic ---
+        let medSuppliers = [];
+        try { medSuppliers = JSON.parse(localStorage.getItem("med_suppliers")) || []; } catch (e) { }
+
+        function loadMedSuppliers() {
+            ['pur-supplier', 'edit-stock-supplier'].forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">Select Supplier</option>';
+                medSuppliers.sort().forEach(s => {
+                    const opt = document.createElement("option");
+                    opt.value = s;
+                    opt.textContent = s;
+                    select.appendChild(opt);
+                });
+                if (currentVal && medSuppliers.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            });
+        }
+
+        function openSupplierModal() {
+            document.getElementById('new-supplier-name').value = '';
+            document.getElementById('edit-supplier-index').value = '';
+            document.getElementById('btn-save-supplier').innerText = 'Add';
+            renderSupplierList();
+            openModal('modal-manage-supplier');
+        }
+
+        function renderSupplierList() {
+            const list = document.getElementById('supplier-list');
+            list.innerHTML = '';
+            if (medSuppliers.length === 0) {
+                list.innerHTML = '<div style="padding:10px; text-align:center; color:#666;">No suppliers found.</div>';
+                return;
+            }
+            medSuppliers.forEach((s, index) => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #eee;';
+                div.innerHTML = `
+                    <span>${s}</span>
+                    <div>
+                        <button onclick="editMedSupplier(${index})" style="background:#f59e0b; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Edit"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteMedSupplier(${index})" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Delete"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function saveMedSupplier() {
+            const name = document.getElementById('new-supplier-name').value.trim();
+            if (!name) return alert("Please enter a supplier name.");
+            const editIndex = document.getElementById('edit-supplier-index').value;
+            let oldName = null;
+            if (editIndex !== '') {
+                oldName = medSuppliers[parseInt(editIndex)];
+                if (medSuppliers.some((s, i) => s.toLowerCase() === name.toLowerCase() && i !== parseInt(editIndex))) return alert("Supplier already exists!");
+                medSuppliers[parseInt(editIndex)] = name;
+            } else {
+                if (medSuppliers.some(s => s.toLowerCase() === name.toLowerCase())) return alert("Supplier already exists!");
+                medSuppliers.push(name);
+            }
+            localStorage.setItem("med_suppliers", JSON.stringify(medSuppliers));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_suppliers: medSuppliers }).catch(console.warn);
+
+            if (oldName && oldName !== name) {
+                let purchases = JSON.parse(localStorage.getItem('purchases')) || [];
+                let updated = false;
+                purchases.forEach(p => {
+                    if (p.supplierName === oldName) { p.supplierName = name; updated = true; }
+                    if (p.supplier === oldName) { p.supplier = name; updated = true; }
+                });
+                if (updated) {
+                    localStorage.setItem('purchases', JSON.stringify(purchases));
+                    if (window.MedicineCore && MedicineCore.renderStock) MedicineCore.renderStock();
+                }
+            }
+
+            document.getElementById('new-supplier-name').value = '';
+            document.getElementById('edit-supplier-index').value = '';
+            document.getElementById('btn-save-supplier').innerText = 'Add';
+            renderSupplierList();
+            loadMedSuppliers();
+        }
+
+        function editMedSupplier(index) {
+            document.getElementById('new-supplier-name').value = medSuppliers[index];
+            document.getElementById('edit-supplier-index').value = index;
+            document.getElementById('btn-save-supplier').innerText = 'Update';
+        }
+
+        function deleteMedSupplier(index) {
+            if (!confirm("Are you sure you want to delete this supplier?")) return;
+            medSuppliers.splice(index, 1);
+            localStorage.setItem("med_suppliers", JSON.stringify(medSuppliers));
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) apiClient.saveSettings({ med_suppliers: medSuppliers }).catch(console.warn);
+            renderSupplierList();
+            loadMedSuppliers();
+        }
+    </script>
+</body>
+
+</html>
