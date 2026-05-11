@@ -31,6 +31,7 @@ const MedicineCore = {
         this.populateSelects();
         this.renderStock();
         this.renderPurCart();
+        if (document.getElementById('sales-report-container')) this.renderReports();
 
         const saleInvInput = document.getElementById('sale-invoice-no');
         if (saleInvInput && !saleInvInput.value) saleInvInput.value = this.generateNextSaleInvoiceNo();
@@ -845,7 +846,14 @@ const MedicineCore = {
         document.getElementById('view-inv-no').innerText = inv.invoice_no;
         document.getElementById('view-inv-date').innerText = inv.date;
         document.getElementById('view-inv-customer').innerText = inv.customer_name || 'Walk-in';
+        
+        const lblCustomer = document.getElementById('label-view-inv-customer');
+        if(lblCustomer) lblCustomer.innerText = "Patient:";
+        const wrpDoctor = document.getElementById('wrapper-view-inv-doctor');
+        if(wrpDoctor) wrpDoctor.style.display = 'block';
         document.getElementById('view-inv-doctor').innerText = inv.doctor_name || '-';
+        const wrpPaymode = document.getElementById('wrapper-view-inv-paymode');
+        if(wrpPaymode) wrpPaymode.style.display = 'block';
         document.getElementById('view-inv-paymode').innerText = inv.payment_mode || 'Cash';
 
         const tbody = document.getElementById('view-inv-items');
@@ -876,6 +884,7 @@ const MedicineCore = {
         document.getElementById('view-inv-total').innerText = (parseFloat(inv.invoice_total || inv.total) || 0).toFixed(2);
 
         const printBtn = document.getElementById('btn-print-view-inv');
+        if(printBtn) printBtn.style.display = 'inline-block';
         printBtn.onclick = () => this.printPosInvoice(inv);
 
         if (typeof openModal === 'function') openModal('modal-view-invoice');
@@ -1121,6 +1130,21 @@ const MedicineCore = {
 
         let purchases = JSON.parse(localStorage.getItem('purchases')) || [];
         const timestamp = new Date().toISOString();
+        
+        const grandTotal = this.purCart.reduce((sum, item) => sum + item.total, 0);
+        const consolidatedInvoice = {
+            id: 'PUR-INV-' + Date.now() + Math.random().toString(36).substr(2, 5),
+            invoice_no: invoice,
+            date: purDate,
+            supplier_name: supplier,
+            items: [...this.purCart],
+            total_amount: grandTotal,
+            created_at: timestamp
+        };
+
+        let medPurchaseInvoices = JSON.parse(localStorage.getItem('med_purchase_invoices')) || [];
+        medPurchaseInvoices.push(consolidatedInvoice);
+        localStorage.setItem('med_purchase_invoices', JSON.stringify(medPurchaseInvoices));
 
         for (let item of this.purCart) {
             const purchaseRecord = {
@@ -1167,6 +1191,7 @@ const MedicineCore = {
         this.renderDashboard();
         this.renderStock();
         this.renderMaster(); // Refresh Medicine Master to update stock highlight colors
+        if (this.renderPurchaseReports) this.renderPurchaseReports();
         alert("Purchase Invoice saved and stock updated successfully!");
     },
 
@@ -1319,6 +1344,7 @@ const MedicineCore = {
 
         this.renderStock();
         this.renderDashboard();
+        if (this.renderPurchaseReports) this.renderPurchaseReports();
         alert("Stock batch deleted successfully!");
     },
 
@@ -1883,6 +1909,178 @@ const MedicineCore = {
         this.heldBills.splice(index, 1);
         localStorage.setItem('med_held_bills', JSON.stringify(this.heldBills));
         this.openHeldBills();
+    },
+
+    toggleReportView: function (view) {
+        const salesContainer = document.getElementById('sales-report-container');
+        const purContainer = document.getElementById('purchase-report-container');
+        const btnSales = document.getElementById('btn-tab-sales-report');
+        const btnPur = document.getElementById('btn-tab-purchase-report');
+        
+        if (view === 'sales') {
+            if(salesContainer) salesContainer.style.display = 'block';
+            if(purContainer) purContainer.style.display = 'none';
+            if(btnSales) { btnSales.className = 'btn btn-primary'; btnSales.style.background = ''; }
+            if(btnPur) { btnPur.className = 'btn btn-secondary'; btnPur.style.background = '#64748b'; btnPur.style.color = 'white'; }
+            this.renderReports();
+        } else {
+            if(salesContainer) salesContainer.style.display = 'none';
+            if(purContainer) purContainer.style.display = 'block';
+            if(btnSales) { btnSales.className = 'btn btn-secondary'; btnSales.style.background = '#64748b'; btnSales.style.color = 'white'; }
+            if(btnPur) { btnPur.className = 'btn btn-primary'; btnPur.style.background = ''; }
+            this.renderPurchaseReports();
+        }
+    },
+
+    renderPurchaseReports: function () {
+        const tbody = document.querySelector('#report-purchase-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        const search = (document.getElementById('search-pur-reports')?.value || '').toLowerCase();
+        const fromDateStr = document.getElementById('pur-report-from-date')?.value;
+        const toDateStr = document.getElementById('pur-report-to-date')?.value;
+
+        let purInvoices = JSON.parse(localStorage.getItem('med_purchase_invoices')) || [];
+
+        if (fromDateStr) {
+            const fd = new Date(fromDateStr).getTime();
+            purInvoices = purInvoices.filter(inv => new Date(inv.date || inv.created_at).getTime() >= fd);
+        }
+
+        if (toDateStr) {
+            const td = new Date(toDateStr);
+            td.setHours(23, 59, 59, 999);
+            purInvoices = purInvoices.filter(inv => new Date(inv.date || inv.created_at).getTime() <= td.getTime());
+        }
+
+        purInvoices.sort((a, b) => new Date(b.created_at || b.date) - new Date(a.created_at || a.date));
+
+        if (search) {
+            purInvoices = purInvoices.filter(inv =>
+                (inv.invoice_no || '').toLowerCase().includes(search) ||
+                (inv.supplier_name || '').toLowerCase().includes(search)
+            );
+        }
+
+        if (purInvoices.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#666;">No purchase invoices found.</td></tr>`;
+            const totalEl = document.getElementById('pur-report-grand-total');
+            if (totalEl) totalEl.innerText = `₹0.00`;
+            return;
+        }
+
+        let reportTotal = 0;
+
+        purInvoices.forEach(inv => {
+            const tr = document.createElement('tr');
+            const itemsCount = inv.items ? inv.items.length : 0;
+            const invTotal = parseFloat(inv.total_amount || 0);
+            reportTotal += invTotal;
+
+            tr.innerHTML = `
+                <td><a href="#" onclick="MedicineCore.viewPurchaseInvoice('${inv.id}'); return false;" style="color:var(--primary); font-weight:bold; text-decoration:none;" title="View Invoice">${inv.invoice_no}</a></td>
+                <td>${inv.date}</td>
+                <td>${inv.supplier_name || '-'}</td>
+                <td>${itemsCount}</td>
+                <td>₹${invTotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="MedicineCore.deletePurchaseInvoice('${inv.id}', '${inv.invoice_no}')"><i class="fas fa-trash"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const totalEl = document.getElementById('pur-report-grand-total');
+        if (totalEl) totalEl.innerText = `₹${reportTotal.toFixed(2)}`;
+    },
+
+    viewPurchaseInvoice: function (id) {
+        const purInvoices = JSON.parse(localStorage.getItem('med_purchase_invoices')) || [];
+        const inv = purInvoices.find(i => i.id === id);
+        if (!inv) return alert("Purchase Invoice not found!");
+
+        document.getElementById('view-inv-no').innerText = inv.invoice_no;
+        document.getElementById('view-inv-date').innerText = inv.date;
+        
+        const lblCustomer = document.getElementById('label-view-inv-customer');
+        if(lblCustomer) lblCustomer.innerText = "Supplier:";
+        document.getElementById('view-inv-customer').innerText = inv.supplier_name || '-';
+        
+        const wrpDoctor = document.getElementById('wrapper-view-inv-doctor');
+        if(wrpDoctor) wrpDoctor.style.display = 'none';
+        const wrpPaymode = document.getElementById('wrapper-view-inv-paymode');
+        if(wrpPaymode) wrpPaymode.style.display = 'none';
+
+        const tbody = document.getElementById('view-inv-items');
+        tbody.innerHTML = '';
+        
+        let gross = 0;
+        let gstTotal = 0;
+
+        if (inv.items && inv.items.length > 0) {
+            inv.items.forEach(item => {
+                const tr = document.createElement('tr');
+                const gstAmt = item.total - (item.qty * item.rate);
+                gross += (item.qty * item.rate);
+                gstTotal += gstAmt;
+                
+                tr.innerHTML = `
+                    <td style="padding:8px;">${item.medName || '-'}</td>
+                    <td style="padding:8px;">${item.batch || '-'}</td>
+                    <td style="padding:8px;">${item.expiry || '-'}</td>
+                    <td style="padding:8px; text-align:right;">${item.qty} ${item.uom || ''} (+${item.free || 0} Free)</td>
+                    <td style="padding:8px; text-align:right;">₹${parseFloat(item.mrp || 0).toFixed(2)}</td>
+                    <td style="padding:8px; text-align:right;">-</td>
+                    <td style="padding:8px; text-align:right;">₹${parseFloat(item.rate || 0).toFixed(2)}</td>
+                    <td style="padding:8px; text-align:right;">${item.gst}%</td>
+                    <td style="padding:8px; text-align:right;">₹${parseFloat(item.total || 0).toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:8px;">No items found.</td></tr>';
+        }
+
+        document.getElementById('view-inv-gross').innerText = gross.toFixed(2);
+        document.getElementById('view-inv-roundoff').innerText = '0.00';
+        document.getElementById('view-inv-total').innerText = (parseFloat(inv.total_amount) || 0).toFixed(2);
+
+        const printBtn = document.getElementById('btn-print-view-inv');
+        if(printBtn) printBtn.style.display = 'none';
+
+        if (typeof openModal === 'function') openModal('modal-view-invoice');
+    },
+
+    deletePurchaseInvoice: async function (id, invoiceNo) {
+        if (!confirm("Are you sure you want to delete this purchase invoice? This will also remove the corresponding stock items.")) return;
+
+        let purInvoices = JSON.parse(localStorage.getItem('med_purchase_invoices')) || [];
+        purInvoices = purInvoices.filter(i => i.id !== id);
+        localStorage.setItem('med_purchase_invoices', JSON.stringify(purInvoices));
+
+        let purchases = JSON.parse(localStorage.getItem('purchases')) || [];
+        
+        let toDeleteIds = [];
+        purchases = purchases.filter(p => {
+            if ((p.category === 'Medicine' || p.remarks === 'Medicine Purchase') && p.supplierInv === invoiceNo) {
+                toDeleteIds.push(p.id);
+                return false;
+            }
+            return true;
+        });
+        localStorage.setItem('purchases', JSON.stringify(purchases));
+
+        if (typeof apiClient !== 'undefined' && apiClient.deletePurchase) {
+            for (let pid of toDeleteIds) {
+                try { await apiClient.deletePurchase(pid); } catch (e) {}
+            }
+        }
+
+        this.renderPurchaseReports();
+        this.renderStock();
+        this.renderDashboard();
+        alert("Purchase invoice deleted successfully!");
     }
 };
 

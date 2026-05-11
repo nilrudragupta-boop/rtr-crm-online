@@ -754,40 +754,79 @@
         <!-- VIEW: REPORTS -->
         <div id="view-reports" class="view-section">
             <div class="glass-panel">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0;">Sales Reports</h3>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <input type="date" id="report-from-date" class="form-control" style="width: auto;"
-                            onchange="renderReportsTable()" title="From Date">
-                        <span style="color:var(--text); font-weight:bold;">to</span>
-                        <input type="date" id="report-to-date" class="form-control" style="width: auto;"
-                            onchange="renderReportsTable()" title="To Date">
-                        <input type="text" id="search-reports" class="form-control" style="width: auto;"
-                            placeholder="Search by Inv No or Patient..." onkeyup="renderReportsTable()">
-                        <button class="btn btn-primary"
-                            onclick="window.open('profit_loss_med.html', '_blank', 'width=1000,height=700')"><i
-                                class="fas fa-balance-scale"></i> Profit & Loss Report</button>
-                    </div>
+                <!-- Tabs for Sales vs Purchase Reports -->
+                <div style="display:flex; gap: 10px; margin-bottom: 15px;">
+                    <button class="btn btn-primary" id="btn-tab-sales-report" onclick="if(window.MedicineCore) MedicineCore.toggleReportView('sales')">Sales Reports</button>
+                    <button class="btn btn-secondary" id="btn-tab-purchase-report" style="background:#64748b; color:white;" onclick="if(window.MedicineCore) MedicineCore.toggleReportView('purchase')">Purchase Reports</button>
                 </div>
-                <table id="report-sales-table">
-                    <thead>
-                        <tr>
-                            <th>Inv No</th>
-                            <th>Date</th>
-                            <th>Customer</th>
-                            <th>Items</th>
-                            <th>Total Amount</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="4" style="text-align:right; font-weight:bold;">Grand Total:</td>
-                            <td colspan="2" style="font-weight:bold; color:var(--primary);" id="report-grand-total">₹0.00</td>
-                        </tr>
-                    </tfoot>
-                </table>
+
+                <div id="sales-report-container">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0;">Sales Reports</h3>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="date" id="report-from-date" class="form-control" style="width: auto;"
+                                onchange="renderReportsTable()" title="From Date">
+                            <span style="color:var(--text); font-weight:bold;">to</span>
+                            <input type="date" id="report-to-date" class="form-control" style="width: auto;"
+                                onchange="renderReportsTable()" title="To Date">
+                            <input type="text" id="search-reports" class="form-control" style="width: auto;"
+                                placeholder="Search by Inv No or Patient..." onkeyup="renderReportsTable()">
+                            <button class="btn btn-primary"
+                                onclick="window.open('profit_loss_med.html', '_blank', 'width=1000,height=700')"><i
+                                    class="fas fa-balance-scale"></i> Profit & Loss Report</button>
+                        </div>
+                    </div>
+                    <table id="report-sales-table">
+                        <thead>
+                            <tr>
+                                <th>Inv No</th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Items</th>
+                                <th>Total Amount</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="4" style="text-align:right; font-weight:bold;">Grand Total:</td>
+                                <td colspan="2" style="font-weight:bold; color:var(--primary);" id="report-grand-total">₹0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div id="purchase-report-container" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0;">Purchase Reports</h3>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="date" id="pur-report-from-date" class="form-control" style="width: auto;" onchange="if(window.MedicineCore) MedicineCore.renderPurchaseReports()" title="From Date">
+                            <span style="color:var(--text); font-weight:bold;">to</span>
+                            <input type="date" id="pur-report-to-date" class="form-control" style="width: auto;" onchange="if(window.MedicineCore) MedicineCore.renderPurchaseReports()" title="To Date">
+                            <input type="text" id="search-pur-reports" class="form-control" style="width: auto;" placeholder="Search by Inv No or Supplier..." onkeyup="if(window.MedicineCore) MedicineCore.renderPurchaseReports()">
+                        </div>
+                    </div>
+                    <table id="report-purchase-table">
+                        <thead>
+                            <tr>
+                                <th>Inv No</th>
+                                <th>Date</th>
+                                <th>Supplier</th>
+                                <th>Items</th>
+                                <th>Total Amount</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="4" style="text-align:right; font-weight:bold;">Grand Total:</td>
+                                <td colspan="2" style="font-weight:bold; color:var(--primary);" id="pur-report-grand-total">₹0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -1191,9 +1230,9 @@
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; background: #f8fafc; padding: 15px; border-radius: 8px;">
                 <div><strong>Date:</strong> <span id="view-inv-date"></span></div>
-                <div><strong>Patient:</strong> <span id="view-inv-customer"></span></div>
-                <div><strong>Doctor:</strong> <span id="view-inv-doctor"></span></div>
-                <div><strong>Payment Mode:</strong> <span id="view-inv-paymode"></span></div>
+                <div><strong id="label-view-inv-customer">Patient:</strong> <span id="view-inv-customer"></span></div>
+                <div id="wrapper-view-inv-doctor"><strong>Doctor:</strong> <span id="view-inv-doctor"></span></div>
+                <div id="wrapper-view-inv-paymode"><strong>Payment Mode:</strong> <span id="view-inv-paymode"></span></div>
             </div>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; margin-bottom:15px;" border="1">
