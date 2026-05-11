@@ -806,7 +806,7 @@ const MedicineCore = {
             reportTotal += invTotal;
 
             tr.innerHTML = `
-                <td>${inv.invoice_no}</td>
+                <td><a href="#" onclick="viewInvoice('${inv.id}'); return false;" style="color:var(--primary); font-weight:bold; text-decoration:none;" title="View Invoice">${inv.invoice_no}</a></td>
                 <td>${inv.date}</td>
                 <td>${inv.customer_name || 'Walk-in'}</td>
                 <td>${itemsCount}</td>
@@ -835,6 +835,50 @@ const MedicineCore = {
         } else {
             alert("Invoice not found!");
         }
+    },
+
+    viewInvoice: function (id) {
+        const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+        const inv = invoices.find(i => i.id === id);
+        if (!inv) return alert("Invoice not found!");
+
+        document.getElementById('view-inv-no').innerText = inv.invoice_no;
+        document.getElementById('view-inv-date').innerText = inv.date;
+        document.getElementById('view-inv-customer').innerText = inv.customer_name || 'Walk-in';
+        document.getElementById('view-inv-doctor').innerText = inv.doctor_name || '-';
+        document.getElementById('view-inv-paymode').innerText = inv.payment_mode || 'Cash';
+
+        const tbody = document.getElementById('view-inv-items');
+        tbody.innerHTML = '';
+        
+        if (inv.items && inv.items.length > 0) {
+            inv.items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:8px;">${item.itemName || item.medName}</td>
+                    <td style="padding:8px;">${item.batch || '-'}</td>
+                    <td style="padding:8px;">${item.expiry || '-'}</td>
+                    <td style="padding:8px; text-align:right;">${item.qty} ${item.uom || ''}</td>
+                    <td style="padding:8px; text-align:right;">₹${parseFloat(item.mrp || 0).toFixed(2)}</td>
+                    <td style="padding:8px; text-align:right;">${item.discText || '-'}</td>
+                    <td style="padding:8px; text-align:right;">₹${parseFloat(item.rate || 0).toFixed(2)}</td>
+                    <td style="padding:8px; text-align:right;">${item.gst}%</td>
+                    <td style="padding:8px; text-align:right;">₹${parseFloat(item.total || 0).toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:8px;">No items found.</td></tr>';
+        }
+
+        document.getElementById('view-inv-gross').innerText = (parseFloat(inv.gross_total) || 0).toFixed(2);
+        document.getElementById('view-inv-roundoff').innerText = (parseFloat(inv.round_off) || 0).toFixed(2);
+        document.getElementById('view-inv-total').innerText = (parseFloat(inv.invoice_total || inv.total) || 0).toFixed(2);
+
+        const printBtn = document.getElementById('btn-print-view-inv');
+        printBtn.onclick = () => this.printPosInvoice(inv);
+
+        if (typeof openModal === 'function') openModal('modal-view-invoice');
     },
 
     deleteInvoice: async function (id) {
@@ -1798,6 +1842,21 @@ const MedicineCore = {
         doc.setFont("helvetica", "bold");
         doc.text(`Grand Total: Rs. ${grandTotal.toFixed(2)}`, 140, finalY);
         doc.setFont("helvetica", "normal");
+
+        // Add Terms & Conditions
+        finalY += 15;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("Terms & Conditions:", 15, finalY);
+        doc.setFont("helvetica", "normal");
+        
+        let terms = "1. Goods once sold will not be taken back.\n2. All disputes subject to local jurisdiction.";
+        if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.PRINT_OPTIONS && APP_SETTINGS.PRINT_OPTIONS.terms) {
+            terms = APP_SETTINGS.PRINT_OPTIONS.terms;
+        }
+        const splitTerms = doc.splitTextToSize(terms, 120);
+        doc.text(splitTerms, 15, finalY + 5);
+
         doc.save(`${inv.invoice_no}.pdf`);
     },
 
