@@ -25,6 +25,24 @@ const MedicineCore = {
             this.medicines = JSON.parse(localStorage.getItem('medicines')) || [];
         }
 
+        if (typeof apiClient !== 'undefined' && apiClient.getMedPayments) {
+            try {
+                const remotePayments = await apiClient.getMedPayments();
+                if (remotePayments && remotePayments.length > 0) {
+                    localStorage.setItem('med_payments', JSON.stringify(remotePayments));
+                }
+            } catch (error) { console.warn("Failed to fetch med payments:", error); }
+        }
+
+        if (typeof apiClient !== 'undefined' && apiClient.getMedPurchaseInvoices) {
+            try {
+                const remotePurInv = await apiClient.getMedPurchaseInvoices();
+                if (remotePurInv && remotePurInv.length > 0) {
+                    localStorage.setItem('med_purchase_invoices', JSON.stringify(remotePurInv));
+                }
+            } catch (error) { console.warn("Failed to fetch med purchase invoices:", error); }
+        }
+
         this.heldBills = JSON.parse(localStorage.getItem('med_held_bills')) || [];
 
         this.renderDashboard();
@@ -739,6 +757,10 @@ const MedicineCore = {
         payments.push(paymentRecord);
         localStorage.setItem('med_payments', JSON.stringify(payments));
 
+        if (typeof apiClient !== 'undefined' && apiClient.saveMedPayment) {
+            try { await apiClient.saveMedPayment(paymentRecord); } catch (e) { console.warn("Backend sync failed", e); }
+        }
+
         if (typeof closeModal === 'function') closeModal('modal-payment');
 
         document.getElementById('pay-customer').value = '';
@@ -849,6 +871,10 @@ const MedicineCore = {
         
         const lblCustomer = document.getElementById('label-view-inv-customer');
         if(lblCustomer) lblCustomer.innerText = "Patient:";
+        const wrpContact = document.getElementById('wrapper-view-inv-contact');
+        if(wrpContact) wrpContact.style.display = 'block';
+        const contactEl = document.getElementById('view-inv-contact');
+        if(contactEl) contactEl.innerText = inv.customer_contact || '-';
         const wrpDoctor = document.getElementById('wrapper-view-inv-doctor');
         if(wrpDoctor) wrpDoctor.style.display = 'block';
         document.getElementById('view-inv-doctor').innerText = inv.doctor_name || '-';
@@ -921,6 +947,8 @@ const MedicineCore = {
 
         this.cart = [...(inv.items || [])];
         document.getElementById('sale-customer').value = inv.customer_name === 'Walk-in' ? '' : (inv.customer_name || '');
+        const contactInput = document.getElementById('sale-contact');
+        if (contactInput) contactInput.value = inv.customer_contact || '';
         document.getElementById('sale-doctor').value = inv.doctor_name || '';
         document.getElementById('sale-date').value = inv.date || new Date().toISOString().split('T')[0];
 
@@ -1145,6 +1173,10 @@ const MedicineCore = {
         let medPurchaseInvoices = JSON.parse(localStorage.getItem('med_purchase_invoices')) || [];
         medPurchaseInvoices.push(consolidatedInvoice);
         localStorage.setItem('med_purchase_invoices', JSON.stringify(medPurchaseInvoices));
+
+        if (typeof apiClient !== 'undefined' && apiClient.saveMedPurchaseInvoice) {
+            try { await apiClient.saveMedPurchaseInvoice(consolidatedInvoice); } catch (e) { console.warn("Backend sync failed", e); }
+        }
 
         for (let item of this.purCart) {
             const purchaseRecord = {
@@ -1639,6 +1671,7 @@ const MedicineCore = {
         if (this.cart.length === 0) return alert("Cart is empty. Nothing to hold.");
 
         const customer = document.getElementById('sale-customer').value.trim();
+        const contact = document.getElementById('sale-contact')?.value.trim() || '';
         const doctor = document.getElementById('sale-doctor').value.trim();
         const total = document.getElementById('sale-grand-total').innerText;
 
@@ -1646,6 +1679,7 @@ const MedicineCore = {
             id: Date.now(),
             time: new Date().toLocaleTimeString(),
             customer: customer || 'Walk-in',
+            contact: contact,
             doctor: doctor,
             items: [...this.cart],
             total: parseFloat(total) || 0
@@ -1655,6 +1689,7 @@ const MedicineCore = {
 
         this.cart = [];
         document.getElementById('sale-customer').value = '';
+        if (document.getElementById('sale-contact')) document.getElementById('sale-contact').value = '';
         document.getElementById('sale-doctor').value = '';
         this.renderCart();
         alert("Bill held successfully!");
@@ -1710,6 +1745,7 @@ const MedicineCore = {
         if (this.cart.length === 0) return alert("Cart is empty!");
 
         const customer = document.getElementById('sale-customer').value.trim() || 'Walk-in';
+        const contact = document.getElementById('sale-contact')?.value.trim() || '';
         const doctor = document.getElementById('sale-doctor').value.trim();
         const date = document.getElementById('sale-date').value || new Date().toISOString().split('T')[0];
         const payMode = document.getElementById('sale-payment-mode').value;
@@ -1735,6 +1771,7 @@ const MedicineCore = {
             invoice_date: date,
             date: date,
             customer_name: customer,
+            customer_contact: contact,
             doctor_name: doctor,
             items: this.cart.map(item => ({
                 ...item,
@@ -1763,6 +1800,7 @@ const MedicineCore = {
 
         this.cart = [];
         document.getElementById('sale-customer').value = '';
+        if (document.getElementById('sale-contact')) document.getElementById('sale-contact').value = '';
         document.getElementById('sale-doctor').value = '';
         document.getElementById('sale-invoice-no').value = this.generateNextSaleInvoiceNo();
         this.renderCart();
@@ -1810,6 +1848,9 @@ const MedicineCore = {
         doc.text(`Invoice No: ${inv.invoice_no}`, 15, 55);
         doc.text(`Date: ${inv.date}`, 150, 55);
         doc.text(`Patient: ${inv.customer_name}`, 15, 62);
+        if (inv.customer_contact) {
+            doc.text(`Contact: ${inv.customer_contact}`, 150, 62);
+        }
         doc.text(`Doctor: ${inv.doctor_name || '-'}`, 15, 67);
 
         const head = [['Medicine', 'Batch', 'Expiry', 'Qty', 'Unit', 'MRP', 'Disc', 'CGST%', 'SGST%', 'Rate', 'Total']];
@@ -1899,6 +1940,8 @@ const MedicineCore = {
         }
         this.cart = bill.items;
         document.getElementById('sale-customer').value = bill.customer !== 'Walk-in' ? bill.customer : '';
+        const contactInput = document.getElementById('sale-contact');
+        if (contactInput) contactInput.value = bill.contact || '';
         document.getElementById('sale-doctor').value = bill.doctor || '';
         this.deleteHeldBill(index);
         this.renderCart();
@@ -2007,6 +2050,8 @@ const MedicineCore = {
         if(lblCustomer) lblCustomer.innerText = "Supplier:";
         document.getElementById('view-inv-customer').innerText = inv.supplier_name || '-';
         
+        const wrpContact = document.getElementById('wrapper-view-inv-contact');
+        if(wrpContact) wrpContact.style.display = 'none';
         const wrpDoctor = document.getElementById('wrapper-view-inv-doctor');
         if(wrpDoctor) wrpDoctor.style.display = 'none';
         const wrpPaymode = document.getElementById('wrapper-view-inv-paymode');
@@ -2058,6 +2103,10 @@ const MedicineCore = {
         let purInvoices = JSON.parse(localStorage.getItem('med_purchase_invoices')) || [];
         purInvoices = purInvoices.filter(i => i.id !== id);
         localStorage.setItem('med_purchase_invoices', JSON.stringify(purInvoices));
+
+        if (typeof apiClient !== 'undefined' && apiClient.deleteMedPurchaseInvoice) {
+            try { await apiClient.deleteMedPurchaseInvoice(id); } catch (e) { console.warn("Backend sync failed", e); }
+        }
 
         let purchases = JSON.parse(localStorage.getItem('purchases')) || [];
         

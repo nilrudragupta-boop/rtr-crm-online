@@ -246,6 +246,15 @@ const apiClient = {
     saveMedicine: (data) => apiClient._saveCollection('medicines', data),
     deleteMedicine: (id) => apiClient._deleteCollection('medicines', id),
 
+    // --- Medicine Payments ---
+    getMedPayments: () => apiClient._getCollection('med-payments'),
+    saveMedPayment: (data) => apiClient._saveCollection('med-payments', data),
+
+    // --- Medicine Purchase Invoices ---
+    getMedPurchaseInvoices: () => apiClient._getCollection('med-purchase-invoices'),
+    saveMedPurchaseInvoice: (data) => apiClient._saveCollection('med-purchase-invoices', data),
+    deleteMedPurchaseInvoice: (id) => apiClient._deleteCollection('med-purchase-invoices', id),
+
     // --- Marketing Visits ---
     getMarketingVisits: async (startDate, endDate) => {
         let qs = apiClient._getAuthQuery();

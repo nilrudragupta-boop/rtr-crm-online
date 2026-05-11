@@ -90,6 +90,16 @@ const quotationSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Quotation = mongoose.model('Quotation', quotationSchema);
 
+// --- Medicine Models ---
+const medicineSchema = new mongoose.Schema({ id: { type: String, required: true, unique: true } }, { strict: false, timestamps: true });
+const Medicine = mongoose.model('Medicine', medicineSchema);
+
+const medPaymentSchema = new mongoose.Schema({ id: { type: String, required: true, unique: true } }, { strict: false, timestamps: true });
+const MedPayment = mongoose.model('MedPayment', medPaymentSchema);
+
+const medPurchaseInvoiceSchema = new mongoose.Schema({ id: { type: String, required: true, unique: true } }, { strict: false, timestamps: true });
+const MedPurchaseInvoice = mongoose.model('MedPurchaseInvoice', medPurchaseInvoiceSchema);
+
 // --- API Routes ---
 app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });
@@ -331,6 +341,56 @@ app.delete('/api/suppliers/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+// --- Medicine Routes ---
+app.get('/api/medicines', async (req, res) => {
+    try {
+        const medicines = await Medicine.find().sort({ createdAt: -1 });
+        res.json({ success: true, data: medicines });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+app.post('/api/medicines', async (req, res) => {
+    try {
+        const updated = await Medicine.findOneAndUpdate({ id: req.body.id }, req.body, { new: true, upsert: true });
+        res.json({ success: true, data: updated });
+    } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+});
+app.delete('/api/medicines/:id', async (req, res) => {
+    try { await Medicine.findOneAndDelete({ id: req.params.id }); res.json({ success: true }); }
+    catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// --- Medicine Payments Routes ---
+app.get('/api/med-payments', async (req, res) => {
+    try {
+        const payments = await MedPayment.find().sort({ createdAt: -1 });
+        res.json({ success: true, data: payments });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+app.post('/api/med-payments', async (req, res) => {
+    try {
+        const updated = await MedPayment.findOneAndUpdate({ id: req.body.id }, req.body, { new: true, upsert: true });
+        res.json({ success: true, data: updated });
+    } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+});
+
+// --- Medicine Purchase Invoices Routes ---
+app.get('/api/med-purchase-invoices', async (req, res) => {
+    try {
+        const invoices = await MedPurchaseInvoice.find().sort({ createdAt: -1 });
+        res.json({ success: true, data: invoices });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+app.post('/api/med-purchase-invoices', async (req, res) => {
+    try {
+        const updated = await MedPurchaseInvoice.findOneAndUpdate({ id: req.body.id }, req.body, { new: true, upsert: true });
+        res.json({ success: true, data: updated });
+    } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+});
+app.delete('/api/med-purchase-invoices/:id', async (req, res) => {
+    try { await MedPurchaseInvoice.findOneAndDelete({ id: req.params.id }); res.json({ success: true }); }
+    catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // --- Database Maintenance Routes ---
@@ -888,6 +948,9 @@ app.post('/api/restore', async (req, res) => {
         await restoreCollection(BankTransaction, backupData['bank-transactions']);
         await restoreCollection(JournalVoucher, backupData['journal-vouchers'], 'voucher_no');
         await restoreCollection(CustomField, backupData['CUSTOM_FIELDS'], '_id');
+        await restoreCollection(Medicine, backupData['medicines']);
+        await restoreCollection(MedPayment, backupData['med_payments']);
+        await restoreCollection(MedPurchaseInvoice, backupData['med_purchase_invoices']);
 
         for (const key of Object.keys(backupData)) {
             if (key.startsWith('CUSTOM_RECORDS_')) await restoreCollection(CustomRecord, backupData[key], '_id');
