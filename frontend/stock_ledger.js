@@ -73,6 +73,8 @@ async function generateLedger() {
     const itemId = document.getElementById('sl-item').value;
     const fromDateStr = document.getElementById('sl-from-date').value;
     const toDateStr = document.getElementById('sl-to-date').value;
+    const refSearch = (document.getElementById('sl-ref-search') ? document.getElementById('sl-ref-search').value.toLowerCase().trim() : '');
+    const typeFilter = document.getElementById('sl-type-filter') ? document.getElementById('sl-type-filter').value : '';
 
     if (!itemId) return alert("Please select an item first.");
 
@@ -105,11 +107,18 @@ async function generateLedger() {
             if (pDateMs < fromDate) {
                 openingBalance += qty;
             } else if (pDateMs >= fromDate && pDateMs <= toDateMs) {
+                let refText = p.supplierInv || '-';
+                if (p.category === 'Quick Entry' || p.remarks === 'Quick Stock Journal') {
+                    refText = p.remarks && p.remarks !== 'Quick Stock Journal' ? p.remarks : p.supplierInv;
+                } else if (p.remarks && p.remarks !== 'Medicine Purchase') {
+                    refText = p.supplierInv ? `${p.supplierInv} - ${p.remarks}` : p.remarks;
+                }
+
                 ledgerEntries.push({
                     date: p.date || p.createdAt.split('T')[0],
                     timestamp: pDateMs,
                     type: p.category === 'Quick Entry' ? 'Quick Stock IN' : 'Purchase / Entry',
-                    ref: p.supplierInv || p.remarks || '-',
+                    ref: refText,
                     in: qty,
                     out: 0
                 });
@@ -128,11 +137,18 @@ async function generateLedger() {
                     if (invDateMs < fromDate) {
                         openingBalance -= qty;
                     } else if (invDateMs >= fromDate && invDateMs <= toDateMs) {
+                        let refText = inv.invoice_no || '-';
+                        if (inv.invoiceType === 'Quick Exit' || inv.remarks === 'Quick Stock Journal') {
+                            refText = inv.remarks && inv.remarks !== 'Quick Stock Journal' ? inv.remarks : inv.invoice_no;
+                        } else if (inv.remarks) {
+                            refText = inv.invoice_no ? `${inv.invoice_no} - ${inv.remarks}` : inv.remarks;
+                        }
+
                         ledgerEntries.push({
                             date: inv.date || inv.invoice_date || inv.created_at.split('T')[0],
                             timestamp: invDateMs,
                             type: inv.invoiceType === 'Quick Exit' ? 'Quick Stock OUT' : 'Invoice / Exit',
-                            ref: inv.invoice_no || inv.remarks || '-',
+                            ref: refText,
                             in: 0,
                             out: qty
                         });
@@ -145,11 +161,32 @@ async function generateLedger() {
     // Sort entries chronologically
     ledgerEntries.sort((a, b) => a.timestamp - b.timestamp);
 
-    // Calculate Running Balance and Render
-    renderLedgerTable(ledgerEntries, openingBalance);
+    // Calculate Running Balance
+    let currentBalance = openingBalance;
+    ledgerEntries.forEach(entry => {
+        currentBalance += entry.in;
+        currentBalance -= entry.out;
+        entry.runningBalance = currentBalance;
+    });
+
+    // Apply search filter if any
+    let displayEntries = ledgerEntries;
+    if (refSearch) {
+        displayEntries = displayEntries.filter(e => 
+            (e.ref && e.ref.toLowerCase().includes(refSearch)) || 
+            (e.type && e.type.toLowerCase().includes(refSearch))
+        );
+    }
+    if (typeFilter === 'IN') {
+        displayEntries = displayEntries.filter(e => e.in > 0);
+    } else if (typeFilter === 'OUT') {
+        displayEntries = displayEntries.filter(e => e.out > 0);
+    }
+
+    renderLedgerTable(displayEntries, openingBalance, refSearch !== '' || typeFilter !== '');
 }
 
-function renderLedgerTable(entries, openingBalance) {
+function renderLedgerTable(entries, openingBalance, isFiltered) {
     const tbody = document.querySelector('#ledger-table tbody');
     tbody.innerHTML = '';
 
@@ -158,28 +195,28 @@ function renderLedgerTable(entries, openingBalance) {
         return;
     }
 
-    let runningBalance = openingBalance;
-
     // Render Opening Balance Row
-    const trOp = document.createElement('tr');
-    trOp.classList.add('table-secondary');
-    trOp.innerHTML = `
-        <td colspan="3" class="text-end fw-bold">Opening Balance:</td>
-        <td>-</td>
-        <td>-</td>
-        <td class="fw-bold">${runningBalance.toFixed(2)}</td>
-    `;
-    tbody.appendChild(trOp);
+    if (!isFiltered) {
+        const trOp = document.createElement('tr');
+        trOp.classList.add('table-secondary');
+        trOp.innerHTML = `
+            <td colspan="3" class="text-end fw-bold">Opening Balance:</td>
+            <td>-</td>
+            <td>-</td>
+            <td class="fw-bold">${openingBalance.toFixed(2)}</td>
+        `;
+        tbody.appendChild(trOp);
+    }
 
     let totalIn = 0;
     let totalOut = 0;
+    let finalBalance = openingBalance;
 
     // Render Transaction Rows
     entries.forEach(entry => {
-        runningBalance += entry.in;
-        runningBalance -= entry.out;
         totalIn += entry.in;
         totalOut += entry.out;
+        finalBalance = entry.runningBalance !== undefined ? entry.runningBalance : finalBalance;
 
         const inHtml = entry.in > 0 ? `<span class="text-success fw-bold">+${entry.in.toFixed(2)}</span>` : '-';
         const outHtml = entry.out > 0 ? `<span class="text-danger fw-bold">-${entry.out.toFixed(2)}</span>` : '-';
@@ -191,7 +228,7 @@ function renderLedgerTable(entries, openingBalance) {
             <td>${entry.ref}</td>
             <td>${inHtml}</td>
             <td>${outHtml}</td>
-            <td class="fw-bold">${runningBalance.toFixed(2)}</td>
+            <td class="fw-bold">${entry.runningBalance.toFixed(2)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -199,11 +236,20 @@ function renderLedgerTable(entries, openingBalance) {
     // Render Closing Balance / Totals Row
     const trCl = document.createElement('tr');
     trCl.classList.add('table-dark');
-    trCl.innerHTML = `
-        <td colspan="3" class="text-end fw-bold">Totals / Closing Balance:</td>
-        <td class="text-success fw-bold">${totalIn.toFixed(2)}</td>
-        <td class="text-danger fw-bold">${totalOut.toFixed(2)}</td>
-        <td class="fw-bold fs-5">${runningBalance.toFixed(2)}</td>
-    `;
+    if (isFiltered) {
+        trCl.innerHTML = `
+            <td colspan="3" class="text-end fw-bold">Filtered Totals:</td>
+            <td class="text-success fw-bold">${totalIn.toFixed(2)}</td>
+            <td class="text-danger fw-bold">${totalOut.toFixed(2)}</td>
+            <td class="fw-bold fs-5">-</td>
+        `;
+    } else {
+        trCl.innerHTML = `
+            <td colspan="3" class="text-end fw-bold">Totals / Closing Balance:</td>
+            <td class="text-success fw-bold">${totalIn.toFixed(2)}</td>
+            <td class="text-danger fw-bold">${totalOut.toFixed(2)}</td>
+            <td class="fw-bold fs-5">${finalBalance.toFixed(2)}</td>
+        `;
+    }
     tbody.appendChild(trCl);
 }
