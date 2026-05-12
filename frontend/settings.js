@@ -374,6 +374,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_production_entry', label: 'Production Entries', feature: 'inventory' },
     { id: 'perm_order_sheet', label: 'Order Sheet', feature: 'inventory' },
     { id: 'perm_stock_report', label: 'Stock Report', feature: 'inventory' },
+    { id: 'perm_stock_journal', label: 'Stock Entry & Exit', feature: 'inventory' },
+    { id: 'perm_stock_ledger', label: 'Stock Ledger', feature: 'inventory' },
     { id: 'perm_production_report', label: 'Production Report', feature: 'inventory' },
     { id: 'perm_production_stock_report', label: 'Production Stock Report', feature: 'inventory' },
     { id: 'perm_profit_loss', label: 'Profit & Loss', feature: 'invoice' },
