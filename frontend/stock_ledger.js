@@ -8,7 +8,41 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sl-from-date').value = lastMonth.toISOString().split('T')[0];
 
     loadItems();
+
+    document.getElementById('sl-item-search').addEventListener('input', function() {
+        const val = this.value;
+        const options = document.getElementById('sl-item-list').options;
+        document.getElementById('sl-item').value = '';
+        for(let i = 0; i < options.length; i++) {
+            if(options[i].value === val) {
+                document.getElementById('sl-item').value = options[i].dataset.id;
+                break;
+            }
+        }
+        document.getElementById('sl-item').dispatchEvent(new Event('change'));
+    });
+
+    document.getElementById('sl-item').addEventListener('change', function() {
+        const selectedId = this.value;
+        const detailsRow = document.getElementById('itemDetailsRow');
+        if(!selectedId) {
+            detailsRow.style.display = 'none';
+            return;
+        }
+        const item = allItems.find(i => i.id === selectedId);
+        if(item) {
+            document.getElementById('lbl-itemCode').textContent = item.itemCode || '-';
+            document.getElementById('lbl-indexNo').textContent = item.indexNo || '-';
+            document.getElementById('lbl-category').textContent = item.category || '-';
+            document.getElementById('lbl-uom').textContent = item.uom || '-';
+            detailsRow.style.display = 'flex';
+        } else {
+            detailsRow.style.display = 'none';
+        }
+    });
 });
+
+let allItems = [];
 
 async function loadItems() {
     try {
@@ -22,11 +56,12 @@ async function loadItems() {
             items = JSON.parse(localStorage.getItem('items')) || [];
         }
 
-        const itemSelect = document.getElementById('sl-item');
-        items.forEach(item => {
+        allItems = items;
+        const itemSelect = document.getElementById('sl-item-list');
+        allItems.forEach(item => {
             const opt = document.createElement('option');
-            opt.value = item.id;
-            opt.textContent = `${item.name} ${item.code ? '(' + item.code + ')' : ''}`;
+            opt.value = `${item.name} ${item.itemCode ? '[' + item.itemCode + ']' : ''}`;
+            opt.dataset.id = item.id;
             itemSelect.appendChild(opt);
         });
     } catch (error) {
