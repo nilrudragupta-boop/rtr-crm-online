@@ -451,6 +451,10 @@
                     headerDiv.style.display = 'none';
                 }
             }
+
+            if (navigator.onLine) {
+                syncOfflineCustomRecords();
+            }
         };
 
         // --- Custom Objects Logic ---
@@ -1118,6 +1122,50 @@
             html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
             if (controls) controls.innerHTML = html;
         }
+
+        // --- Auto-Sync Engine ---
+        async function syncOfflineCustomRecords() {
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            if (!navigator.onLine || typeof apiClient === 'undefined' || !apiClient.saveCustomRecord) return;
+            
+            let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            let pages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
+            
+            for (const p of pages) {
+                const pageId = p.pageId;
+                const allData = JSON.parse(localStorage.getItem('data_' + pageId)) || [];
+                const userData = allData.filter(r => r.createdBy === currentUser);
+                const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+                let updated = false;
+                
+                for (let i = 0; i < userData.length; i++) {
+                    const record = userData[i];
+                    try {
+                        let apiPayload = { ...record };
+                        if (!apiPayload._id && apiPayload.id) apiPayload._id = apiPayload.id;
+                        
+                        const res = await apiClient.saveCustomRecord(apiPayload);
+                        if (res && res.data && res.data._id && !record._id) {
+                            userData[i].id = res.data._id;
+                            userData[i]._id = res.data._id;
+                            updated = true;
+                        }
+                    } catch (e) {
+                        console.warn("Auto-sync failed for record:", record.id, e);
+                    }
+                }
+                
+                if (updated) {
+                    localStorage.setItem('data_' + pageId, JSON.stringify([...otherUsersData, ...userData]));
+                }
+            }
+        }
+
+        window.addEventListener('online', () => {
+            syncOfflineCustomRecords().then(() => {
+                if (currentActivePageId) handleSearch(); // Refresh active view
+            });
+        });
     </script>
 
 </body>
