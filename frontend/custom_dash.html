@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Custom Objects | RISE Tech Revolution</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <style>
         :root {
             --slds-blue: #0176d3;
@@ -73,6 +74,11 @@
             text-decoration: none;
             font-size: 0.9rem;
             border-bottom: 3px solid transparent;
+            cursor: grab;
+        }
+
+        .navbar a:active {
+            cursor: grabbing;
         }
 
         .navbar a.active {
@@ -291,6 +297,7 @@
 
         function loadCustomTabs() {
             const nav = document.getElementById('mainNavbar');
+            nav.innerHTML = '';
             customPages.forEach(p => {
                 const a = document.createElement('a');
                 a.href = "#";
@@ -298,6 +305,17 @@
                 a.onclick = function (e) { e.preventDefault(); switchTab(p.pageId, this, p.label); };
                 nav.appendChild(a);
             });
+
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(nav, {
+                    animation: 150,
+                    onEnd: function (evt) {
+                        const movedItem = customPages.splice(evt.oldIndex, 1)[0];
+                        customPages.splice(evt.newIndex, 0, movedItem);
+                        localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
+                    }
+                });
+            }
         }
 
         function switchTab(pageId, tabElement, pageLabel = '') {
