@@ -747,7 +747,7 @@
             if (data.length === 0) return alert("No data to export.");
 
             const exportData = data.map(row => {
-                const obj = {};
+                const obj = { 'Record ID': row.id || row._id };
                 currentCustomFields.forEach(f => {
                     let val = row[f.fieldName];
                     if (val !== undefined && val !== null && val !== '') {
@@ -802,45 +802,71 @@
 
                 let savedData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
                 let added = 0;
+                let updated = 0;
 
                 for (const row of jsonData) {
-                    const newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
-                    const newRow = { id: newId, _id: newId, moduleName: currentActivePageId };
-                    const apiPayload = { _id: newId, moduleName: currentActivePageId };
+                    const recordId = row['Record ID'] || row['id'] || row['_id'];
+                    let isUpdate = false;
+                    let existingRecord = {};
+                    
+                    if (recordId) {
+                        const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
+                        if (existingIdx > -1) {
+                            isUpdate = true;
+                            existingRecord = savedData[existingIdx];
+                        }
+                    }
+                    
+                    const newId = isUpdate ? existingRecord.id : ('cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5));
+                    
+                    let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId };
+                    let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId };
 
                     currentCustomFields.forEach(f => {
-                        let val = row[f.fieldLabel] !== undefined ? row[f.fieldLabel] : '';
+                        let val = row[f.fieldLabel];
                         
-                        if (val instanceof Date) {
-                            const offset = val.getTimezoneOffset() * 60000;
-                            const localDate = new Date(val.getTime() - offset);
-                            
-                            if (f.fieldType === 'date') {
-                                val = localDate.toISOString().split('T')[0];
-                            } else if (f.fieldType === 'datetime') {
-                                val = localDate.toISOString().slice(0, 16);
+                        if (val !== undefined) {
+                            if (val instanceof Date) {
+                                const offset = val.getTimezoneOffset() * 60000;
+                                const localDate = new Date(val.getTime() - offset);
+                                
+                                if (f.fieldType === 'date') {
+                                    val = localDate.toISOString().split('T')[0];
+                                } else if (f.fieldType === 'datetime') {
+                                    val = localDate.toISOString().slice(0, 16);
+                                }
                             }
+                            newRow[f.fieldName] = val;
+                            apiPayload[f.fieldName] = val;
+                        } else if (!isUpdate) {
+                            newRow[f.fieldName] = '';
+                            apiPayload[f.fieldName] = '';
                         }
-                        newRow[f.fieldName] = val;
-                        apiPayload[f.fieldName] = val;
                     });
                     
                     if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
                         try {
                             const res = await apiClient.saveCustomRecord(apiPayload);
-                            if (res && res.data && res.data._id) {
+                            if (res && res.data && res.data._id && !isUpdate) {
                                 newRow.id = res.data._id;
                                 newRow._id = res.data._id;
                             }
                         } catch(err) { console.warn("API sync failed", err); }
                     }
-                    savedData.push(newRow);
-                    added++;
+                    
+                    if (isUpdate) {
+                        const idx = savedData.findIndex(r => r.id === newRow.id || r._id === newRow._id);
+                        savedData[idx] = newRow;
+                        updated++;
+                    } else {
+                        savedData.push(newRow);
+                        added++;
+                    }
                 }
 
                 localStorage.setItem('data_' + currentActivePageId, JSON.stringify(savedData));
                 renderCustomTable();
-                alert(`Imported ${added} records successfully.`);
+                alert(`Import successful: ${added} added, ${updated} updated.`);
                 input.value = '';
             };
             reader.readAsArrayBuffer(file);
