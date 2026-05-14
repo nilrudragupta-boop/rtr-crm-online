@@ -217,6 +217,57 @@
             display: flex;
             align-items: center;
         }
+
+        /* --- Pagination --- */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 4px;
+            border: 1px solid var(--slds-border);
+            box-shadow: var(--slds-card-shadow);
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid var(--slds-border);
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #444;
+        }
+
+        .pagination button.active {
+            background: var(--slds-blue);
+            color: #fff;
+            border-color: var(--slds-blue);
+        }
+
+        .pagination button:disabled {
+            background: #f8f9fa;
+            cursor: not-allowed;
+            color: #999;
+        }
+        
+        .pagination span {
+            padding: 0 5px;
+            color: #666;
+        }
+        
+        .sort-icon {
+            font-size: 11px;
+            color: #888;
+            margin-left: 4px;
+        }
     </style>
 </head>
 
@@ -252,6 +303,21 @@
                 <thead id="customTableHead"></thead>
                 <tbody id="customTableBody"></tbody>
             </table>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div class="pagination-container" id="paginationWrapper" style="display:none;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="totalRecordsDisplay" style="font-weight: bold; color: var(--slds-blue);"></span>
+                <select id="rowsPerPageSelect" onchange="changeRowsPerPage()" style="padding: 6px; border: 1px solid var(--slds-border); border-radius: 4px; font-size: 13px;">
+                    <option value="50" selected>50 rows</option>
+                    <option value="100">100 rows</option>
+                    <option value="200">200 rows</option>
+                    <option value="500">500 rows</option>
+                </select>
+            </div>
+            <div id="paginationInfo" style="color: #666; font-size: 13px;"></div>
+            <div class="pagination" id="paginationControls"></div>
         </div>
     </section>
 
@@ -312,6 +378,7 @@
 
     <script>
         function handleSearch() {
+            currentPage = 1;
             renderCustomTable();
         }
 
@@ -354,6 +421,12 @@
         let currentCustomFields = [];
         let columnVisibility = {};
 
+        let currentPage = 1;
+        let rowsPerPage = 50;
+        let currentSortColumn = null;
+        let currentSortDirection = 'asc';
+        let currentFilteredData = [];
+
         function loadCustomTabs() {
             const nav = document.getElementById('mainNavbar');
             nav.innerHTML = '';
@@ -388,6 +461,10 @@
             searchInput.placeholder = `Search ${pageLabel}...`;
             currentCustomFields = customFields.filter(f => f.moduleName === pageId).sort((a, b) => (a.order || 0) - (b.order || 0));
             columnVisibility = JSON.parse(localStorage.getItem('customDashColVis_' + pageId)) || {};
+            currentPage = 1;
+            currentSortColumn = null;
+            currentSortDirection = 'asc';
+            document.getElementById('paginationWrapper').style.display = 'flex';
             renderCustomTable();
         }
 
@@ -400,7 +477,10 @@
             if (currentCustomFields.length === 0) {
                 thead.innerHTML = '';
                 tbody.innerHTML = '<tr><td style="text-align:center; padding: 30px;">No fields defined yet. Go to Object Manager to add fields.</td></tr>';
+                document.getElementById('paginationWrapper').style.display = 'none';
                 return;
+            } else {
+                document.getElementById('paginationWrapper').style.display = 'flex';
             }
 
             const visibleFields = currentCustomFields.filter(f => {
@@ -409,24 +489,57 @@
             });
 
             let thHTML = '<tr><th>S.No</th>';
-            visibleFields.forEach(f => thHTML += `<th>${f.fieldLabel}</th>`);
+            visibleFields.forEach(f => {
+                const icon = currentSortColumn === f.fieldName ? (currentSortDirection === 'asc' ? '▲' : '▼') : '';
+                thHTML += `<th style="cursor:pointer;" onclick="handleSort('${f.fieldName}')">${f.fieldLabel} <span class="sort-icon">${icon}</span></th>`;
+            });
             thHTML += '<th>Actions</th></tr>';
             thead.innerHTML = thHTML;
 
             tbody.innerHTML = '';
-            const filteredData = data.filter(row => {
+            currentFilteredData = data.filter(row => {
                 return Object.values(row).some(v => String(v).toLowerCase().includes(searchTerm));
             });
 
-            filteredData.forEach((row, i) => {
-                let tr = `<tr><td>${i + 1}</td>`;
-                visibleFields.forEach(f => tr += `<td>${row[f.fieldName] || '-'}</td>`);
-                tr += `<td>
-                    <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
-                    <button onclick="deleteCustomRecord('${row.id}')" style="color:#c62828; border:none; background:none; padding:0; cursor:pointer;">Delete</button>
-                </td></tr>`;
-                tbody.innerHTML += tr;
-            });
+            if (currentSortColumn) {
+                currentFilteredData.sort((a, b) => {
+                    let valA = String(a[currentSortColumn] || "").toLowerCase();
+                    let valB = String(b[currentSortColumn] || "").toLowerCase();
+                    
+                    const numA = parseFloat(valA);
+                    const numB = parseFloat(valB);
+                    if(!isNaN(numA) && !isNaN(numB)) {
+                        return currentSortDirection === 'asc' ? numA - numB : numB - numA;
+                    }
+                    
+                    return currentSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                });
+            }
+
+            const totalItems = currentFilteredData.length;
+            const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+            const paginatedData = currentFilteredData.slice(startIndex, endIndex);
+
+            if (paginatedData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${visibleFields.length + 2}" style="text-align:center; padding: 30px;">No records found.</td></tr>`;
+            } else {
+                paginatedData.forEach((row, i) => {
+                    let tr = `<tr><td>${startIndex + i + 1}</td>`;
+                    visibleFields.forEach(f => tr += `<td>${row[f.fieldName] || '-'}</td>`);
+                    tr += `<td>
+                        <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
+                        <button onclick="deleteCustomRecord('${row.id}')" style="color:#c62828; border:none; background:none; padding:0; cursor:pointer;">Delete</button>
+                    </td></tr>`;
+                    tbody.innerHTML += tr;
+                });
+            }
+            
+            renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
         }
 
         function openCustomRecordModal(recordData = null) {
@@ -683,6 +796,55 @@
             win.document.write(html);
             win.document.close();
             win.focus();
+        }
+
+        // --- Sorting and Pagination Engine ---
+        function handleSort(column) {
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+            }
+            renderCustomTable();
+        }
+
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rowsPerPageSelect').value);
+            currentPage = 1;
+            renderCustomTable();
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            renderCustomTable();
+        }
+
+        function renderPagination(totalItems, start, end, totalPages) {
+            const info = document.getElementById("paginationInfo");
+            const controls = document.getElementById("paginationControls");
+            const totalDisplay = document.getElementById("totalRecordsDisplay");
+
+            if (totalDisplay) totalDisplay.innerText = `Total Records: ${totalItems}`;
+
+            if (totalItems === 0) {
+                if (info) info.innerText = "No records found";
+                if (controls) controls.innerHTML = "";
+                return;
+            }
+
+            if (info) info.innerText = `Showing ${start} to ${end} of ${totalItems} entries`;
+            let html = `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const activeStyle = i === currentPage ? 'class="active"' : '';
+                    html += `<button ${activeStyle} onclick="changePage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span>...</span>`;
+                }
+            }
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+            if (controls) controls.innerHTML = html;
         }
     </script>
 
