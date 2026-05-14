@@ -1076,9 +1076,9 @@
                             <label class="cfm-check-label">
                                 <input type="checkbox" id="cfActive" checked> Active
                             </label>
-                                        <label class="cfm-check-label">
-                                            <input type="checkbox" id="cfShowInGrid" checked> Show in Table
-                                        </label>
+                            <label class="cfm-check-label">
+                                <input type="checkbox" id="cfShowInGrid" checked> Show in Table
+                            </label>
                             <label class="cfm-check-label" id="cfShowTotalWrapper" style="display:none">
                                 <input type="checkbox" id="cfShowTotal"> Show Grand Total
                             </label>
@@ -1476,7 +1476,9 @@
         // ── Fetch & render ──
         async function fetchCustomFields() {
             try {
-                const fields = (typeof apiClient !== 'undefined' && apiClient.getCustomFields) ? await apiClient.getCustomFields() : null;
+                const res = (typeof apiClient !== 'undefined' && apiClient.getCustomFields) ? await apiClient.getCustomFields() : null;
+                const fields = Array.isArray(res) ? res : (res?.data || null);
+
                 if (fields) {
                     customFieldsCache = fields;
                     localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFieldsCache));
@@ -1494,7 +1496,8 @@
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
-                    const settings = await apiClient.getSettings();
+                    const res = await apiClient.getSettings();
+                    const settings = res?.data || res || {};
                     if (settings && settings.crmCustomPages) {
                         localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
                     }
@@ -1507,12 +1510,15 @@
             if (!filter) return;
             const cur = filter.value;
             filter.innerHTML = '<option value="">All Modules</option>';
-            
-            const customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+
+            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
             const customPageIds = customPages.map(p => p.pageId);
-            
+            const myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+
             const allModules = [...new Set([
-                ...customFieldsCache.map(f => f.moduleName),
+                ...myFields.map(f => f.moduleName),
                 ...customPageIds
             ])].filter(Boolean).sort();
 
@@ -1528,13 +1534,16 @@
         function populateCfModuleDatalist() {
             const dl = document.getElementById('cfModuleList');
             if (!dl) return;
-            const customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
+            const myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
             const all = [...new Set([
                 'Customer', 'Invoice', 'Item', 'Supplier',
                 ...customPages.map(p => p.pageId),
-                ...customFieldsCache.map(f => f.moduleName)
+                ...myFields.map(f => f.moduleName)
             ].filter(Boolean))].sort();
-            
+
             dl.innerHTML = all.map(m => {
                 const pageDef = customPages.find(p => p.pageId === m);
                 const display = pageDef ? `${pageDef.label} (${m})` : m;
@@ -1543,7 +1552,7 @@
 
             const secDl = document.getElementById('cfSectionList');
             if (secDl) {
-                const secs = [...new Set(customFieldsCache.map(f => f.section))].filter(Boolean);
+                const secs = [...new Set(myFields.map(f => f.section))].filter(Boolean);
                 secDl.innerHTML = secs.map(s => `<option value="${s}">`).join('');
             }
         }
@@ -1553,9 +1562,12 @@
             if (!tbody) return;
             const search = (document.getElementById('cfSearch')?.value || '').trim().toLowerCase();
             const modFil = document.getElementById('cfModuleFilter')?.value || '';
-            const customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
 
-            let fields = customFieldsCache;
+            let myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+            let fields = myFields;
             if (modFil) fields = fields.filter(f => f.moduleName === modFil);
             if (search) fields = fields.filter(f =>
                 (f.fieldLabel || '').toLowerCase().includes(search) ||
@@ -1565,10 +1577,10 @@
             fields.sort((a, b) => (a.order || 0) - (b.order || 0));
 
             // Update stats
-            document.getElementById('cfmStatTotal').textContent = customFieldsCache.length;
+            document.getElementById('cfmStatTotal').textContent = myFields.length;
             document.getElementById('cfmStatShowing').textContent = fields.length;
             document.getElementById('cfmStatModules').textContent =
-                new Set(customFieldsCache.map(f => f.moduleName)).size;
+                new Set(myFields.map(f => f.moduleName)).size;
 
             tbody.innerHTML = '';
             if (!fields.length) {
@@ -1675,7 +1687,7 @@
                 fieldType: type,
                 isRequired: document.getElementById('cfRequired').checked,
                 isActive: document.getElementById('cfActive').checked,
-                        showInGrid: document.getElementById('cfShowInGrid') ? document.getElementById('cfShowInGrid').checked : true,
+                showInGrid: document.getElementById('cfShowInGrid') ? document.getElementById('cfShowInGrid').checked : true,
                 showGrandTotal: document.getElementById('cfShowTotal') ? document.getElementById('cfShowTotal').checked : false,
                 visibilityCondition: document.getElementById('cfCondition').value.trim(),
                 calculationFormula: document.getElementById('cfFormula').value.trim(),
@@ -1683,6 +1695,7 @@
                 suffix: document.getElementById('cfSuffix').value.trim(),
                 order: parseInt(document.getElementById('cfOrder').value) || 0,
                 gridWidth: document.getElementById('cfGridWidth').value,
+                createdBy: localStorage.getItem('currentUser') || 'System'
             };
 
             if (id) payload._id = id;
@@ -1753,9 +1766,9 @@
             document.getElementById('cfName').value = f.fieldName;
             document.getElementById('cfRequired').checked = f.isRequired;
             document.getElementById('cfActive').checked = f.isActive;
-                    if (document.getElementById('cfShowInGrid')) {
-                        document.getElementById('cfShowInGrid').checked = f.showInGrid !== false;
-                    }
+            if (document.getElementById('cfShowInGrid')) {
+                document.getElementById('cfShowInGrid').checked = f.showInGrid !== false;
+            }
             if (document.getElementById('cfShowTotal')) {
                 document.getElementById('cfShowTotal').checked = f.showGrandTotal || false;
             }
@@ -1817,9 +1830,10 @@
         // ── Delete entire module ──
         async function deleteEntireModule() {
             const mod = document.getElementById('cfModuleFilter')?.value;
+            const currentUser = localStorage.getItem('currentUser') || 'System';
             if (!mod) { cfmToast('Select a specific module first.', 'error'); return; }
             if (!confirm(`Delete ALL fields in module "${mod}"? This cannot be undone.`)) return;
-            const toDelete = customFieldsCache.filter(f => f.moduleName === mod);
+            const toDelete = customFieldsCache.filter(f => f.moduleName === mod && (!f.createdBy || f.createdBy === currentUser));
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.deleteCustomField) {
                     for (const f of toDelete) {
@@ -1851,7 +1865,7 @@
             if (el('cfGridWidth')) el('cfGridWidth').value = 'col-md-3';
             if (el('cfRequired')) el('cfRequired').checked = false;
             if (el('cfActive')) el('cfActive').checked = true;
-                if (el('cfShowInGrid')) el('cfShowInGrid').checked = true;
+            if (el('cfShowInGrid')) el('cfShowInGrid').checked = true;
             if (el('cfShowTotal')) el('cfShowTotal').checked = false;
             if (el('cfCurrencyDecimals')) el('cfCurrencyDecimals').value = '2';
             if (el('cfPhoneFormat')) el('cfPhoneFormat').value = 'IN';
@@ -1893,11 +1907,14 @@
             if (draggedFieldItem !== this) {
                 const fromId = draggedFieldItem.dataset.fieldId;
                 const toId = this.dataset.fieldId;
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    let myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
                 const fi = customFieldsCache.findIndex(f => f._id === fromId);
                 const ti = customFieldsCache.findIndex(f => f._id === toId);
                 const [item] = customFieldsCache.splice(fi, 1);
                 customFieldsCache.splice(ti, 0, item);
-                customFieldsCache.forEach((f, i) => f.order = i);
+                    let newMyFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+                    newMyFields.forEach((f, i) => f.order = i);
                 renderCustomFieldsTable();
                 saveFieldOrder();
             }
@@ -1905,7 +1922,8 @@
         }
 
         async function saveFieldOrder() {
-            const payload = customFieldsCache.map((f, i) => ({ _id: f._id, order: i }));
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const payload = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser).map((f) => ({ _id: f._id, order: f.order }));
             try {
                 const res = await fetch(`${API_BASE_URL}/custom-fields/reorder`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1987,7 +2005,8 @@
         async function syncCustomPagesToBackend(pages) {
             if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
                 try {
-                    const settings = await apiClient.getSettings() || {};
+                    const res = await apiClient.getSettings();
+                    const settings = res?.data || res || {};
                     settings.crmCustomPages = pages;
                     await apiClient.saveSettings(settings);
                 } catch (e) {
@@ -1999,12 +2018,13 @@
             const label = document.getElementById('pageLabel').value.trim();
             const pageId = document.getElementById('pageId').value.trim();
             const icon = document.getElementById('pageIcon').value;
+            const currentUser = localStorage.getItem('currentUser') || 'System';
             if (!label || !pageId) return cfmToast('Page Label is required', 'error');
-            let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
-            if (customPages.some(p => p.pageId === pageId)) return cfmToast('A page with this API name already exists.', 'error');
-            customPages.push({ pageId, label, icon });
-            localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
-            await syncCustomPagesToBackend(customPages);
+            let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            if (allPages.some(p => p.pageId === pageId)) return cfmToast('A page with this API name already exists.', 'error');
+            allPages.push({ pageId, label, icon, createdBy: currentUser });
+            localStorage.setItem('crmCustomPages', JSON.stringify(allPages));
+            await syncCustomPagesToBackend(allPages);
             cfmToast('Custom page created! It will now appear as a Target Module.', 'success');
             closePageModal();
             populateCfModuleDatalist();
@@ -2020,12 +2040,14 @@
         function renderCustomPageList() {
             const list = document.getElementById('customPageList');
             list.innerHTML = '';
-            let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            let customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
             if (customPages.length === 0) {
                 list.innerHTML = '<li style="text-align:center; color:#94a3b8; padding: 10px;">No custom pages found.</li>';
                 return;
             }
-            customPages.forEach((p, index) => {
+            customPages.forEach((p) => {
                 const li = document.createElement('li');
                 li.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #e2e8f0; background: #fff;';
                 li.innerHTML = `
@@ -2035,8 +2057,9 @@
                         <div><strong style="color:#1e293b; font-size:14px;">${p.label}</strong><div style="font-size:11px; color:#64748b; font-family:monospace;">${p.pageId}</div></div>
                     </div>
                     <div style="display:flex; gap:6px;">
-                        <button onclick="editCustomPage(${index})" class="cfm-btn-save" style="padding:4px 8px; width:auto; font-size:11px; background:#3b82f6;" title="Edit Label"><i class="fas fa-pen"></i></button>
-                        <button onclick="deleteCustomPage(${index})" class="cfm-btn-save" style="padding:4px 8px; width:auto; font-size:11px; background:#ef4444;" title="Delete Page"><i class="fas fa-trash"></i></button>
+                        <button onclick="previewCustomPage('${p.pageId}')" class="cfm-btn-save" style="padding:4px 8px; width:auto; font-size:11px; background:#10b981;" title="Preview Page"><i class="fas fa-eye"></i></button>
+                        <button onclick="editCustomPage('${p.pageId}')" class="cfm-btn-save" style="padding:4px 8px; width:auto; font-size:11px; background:#3b82f6;" title="Edit Label"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteCustomPage('${p.pageId}')" class="cfm-btn-save" style="padding:4px 8px; width:auto; font-size:11px; background:#ef4444;" title="Delete Page"><i class="fas fa-trash"></i></button>
                     </div>`;
                 list.appendChild(li);
             });
@@ -2046,35 +2069,43 @@
                 handle: '.cfm-grip',
                 animation: 150,
                 onEnd: async function (evt) {
-                    let pages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
-                    const movedItem = pages.splice(evt.oldIndex, 1)[0];
-                    pages.splice(evt.newIndex, 0, movedItem);
-                    localStorage.setItem('crmCustomPages', JSON.stringify(pages));
-                    await syncCustomPagesToBackend(pages);
+                    let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    let otherUsersPages = allPages.filter(p => p.createdBy && p.createdBy !== currentUser);
+                    let myPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
+                    const movedItem = myPages.splice(evt.oldIndex, 1)[0];
+                    myPages.splice(evt.newIndex, 0, movedItem);
+                    const updatedAllPages = [...otherUsersPages, ...myPages];
+                    localStorage.setItem('crmCustomPages', JSON.stringify(updatedAllPages));
+                    await syncCustomPagesToBackend(updatedAllPages);
                     renderCustomPageList(); // Refresh indices
                     populateCfModuleDatalist();
                 }
             });
         }
-        async function editCustomPage(index) {
-            let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
-            const newLabel = prompt("Enter new label for custom page:", customPages[index].label);
-            if (newLabel && newLabel.trim() !== "" && newLabel !== customPages[index].label) {
-                customPages[index].label = newLabel.trim();
-                localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
-                await syncCustomPagesToBackend(customPages);
+        async function editCustomPage(pageId) {
+            let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const index = allPages.findIndex(p => p.pageId === pageId);
+            if(index === -1) return;
+            const newLabel = prompt("Enter new label for custom page:", allPages[index].label);
+            if (newLabel && newLabel.trim() !== "" && newLabel !== allPages[index].label) {
+                allPages[index].label = newLabel.trim();
+                localStorage.setItem('crmCustomPages', JSON.stringify(allPages));
+                await syncCustomPagesToBackend(allPages);
                 cfmToast('Custom page label updated.', 'success');
                 renderCustomPageList();
                 populateCfModuleDatalist();
                 populateCfModuleFilter();
             }
         }
-        async function deleteCustomPage(index) {
-            let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
-            if (confirm(`Are you sure you want to delete the custom page "${customPages[index].label}"? Existing records mapped to this page will become inaccessible.`)) {
-                customPages.splice(index, 1);
-                localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
-                await syncCustomPagesToBackend(customPages);
+        async function deleteCustomPage(pageId) {
+            let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const index = allPages.findIndex(p => p.pageId === pageId);
+            if(index === -1) return;
+            if (confirm(`Are you sure you want to delete the custom page "${allPages[index].label}"? Existing records mapped to this page will become inaccessible.`)) {
+                allPages.splice(index, 1);
+                localStorage.setItem('crmCustomPages', JSON.stringify(allPages));
+                await syncCustomPagesToBackend(allPages);
                 cfmToast('Custom page deleted.', 'success');
                 renderCustomPageList();
                 populateCfModuleDatalist();
@@ -2082,11 +2113,15 @@
             }
         }
 
+        function previewCustomPage(pageId) {
+            window.open('custom_dash.html?pageId=' + encodeURIComponent(pageId), '_blank');
+        }
+
         function updateIconPreview() {
-    const select = document.getElementById("pageIcon");
-    const preview = document.getElementById("iconPreview");
-    preview.innerHTML = `<i class="${select.value}"></i>`;
-}
+            const select = document.getElementById("pageIcon");
+            const preview = document.getElementById("iconPreview");
+            preview.innerHTML = `<i class="${select.value}"></i>`;
+        }
     </script>
 </body>
 

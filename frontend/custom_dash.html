@@ -394,7 +394,8 @@
             try {
                 if (typeof apiClient !== 'undefined') {
                     if (apiClient.getCustomFields) {
-                        const fields = await apiClient.getCustomFields();
+                        const res = await apiClient.getCustomFields();
+                        const fields = Array.isArray(res) ? res : (res?.data || null);
                         if (fields) {
                             customFields = fields;
                             localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
@@ -404,7 +405,8 @@
                     }
                     
                     if (apiClient.getSettings) {
-                        const settings = await apiClient.getSettings();
+                        const res = await apiClient.getSettings();
+                        const settings = res?.data || res || {};
                         if (settings && settings.crmCustomPages) {
                             localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
                         }
@@ -417,6 +419,8 @@
             }
 
             customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            customPages = customPages.filter(p => !p.createdBy || p.createdBy === currentUser);
 
             loadCustomTabs();
             if (customPages.length > 0) {
@@ -485,7 +489,8 @@
 
                         if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
                             try {
-                                const settings = await apiClient.getSettings() || {};
+                                const res = await apiClient.getSettings();
+                                const settings = res?.data || res || {};
                                 settings.crmCustomPages = customPages;
                                 await apiClient.saveSettings(settings);
                             } catch(e) {}
@@ -504,7 +509,8 @@
             document.getElementById('customObjectContent').style.display = 'block';
             document.getElementById('customObjectTitle').innerText = pageLabel;
             searchInput.placeholder = `Search ${pageLabel}...`;
-            currentCustomFields = customFields.filter(f => f.moduleName === pageId).sort((a, b) => (a.order || 0) - (b.order || 0));
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            currentCustomFields = customFields.filter(f => f.moduleName === pageId && (!f.createdBy || f.createdBy === currentUser)).sort((a, b) => (a.order || 0) - (b.order || 0));
             columnVisibility = JSON.parse(localStorage.getItem('customDashColVis_' + pageId)) || {};
             currentPage = 1;
             currentSortColumn = null;
@@ -515,14 +521,16 @@
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
                     const res = await apiClient.getCustomRecords(pageId);
-                    const records = Array.isArray(res) ? res : (res?.data || []);
+                    let records = Array.isArray(res) ? res : (res?.data || []);
+                    records = records.filter(r => r.createdBy === currentUser);
                     
                     let localData = JSON.parse(localStorage.getItem('data_' + pageId));
                     if (!Array.isArray(localData)) localData = [];
+                    let localUserData = localData.filter(r => r.createdBy === currentUser);
                     
                     const fetchedMap = new Map(records.map(r => [r._id || r.id, r]));
                     
-                    localData.forEach(localRecord => {
+                    localUserData.forEach(localRecord => {
                         if (localRecord && (localRecord._id || localRecord.id)) {
                             const recId = localRecord._id || localRecord.id;
                             if (!fetchedMap.has(recId)) {
@@ -540,7 +548,8 @@
                     });
 
                     const mappedRecords = records.map(r => ({ ...r, id: r._id || r.id }));
-                    localStorage.setItem('data_' + pageId, JSON.stringify(mappedRecords));
+                    const otherUsersData = localData.filter(r => r.createdBy !== currentUser);
+                    localStorage.setItem('data_' + pageId, JSON.stringify([...otherUsersData, ...mappedRecords]));
                 }
             } catch (e) {
                 console.warn("Failed to fetch custom records from API", e);
@@ -550,7 +559,9 @@
         }
 
         function renderCustomTable() {
-            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const data = allData.filter(r => r.createdBy === currentUser);
             const thead = document.getElementById('customTableHead');
             const tbody = document.getElementById('customTableBody');
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -692,6 +703,10 @@
             let apiPayload = { _id: newId, moduleName: currentActivePageId, createdBy: currentUser, updatedAt: new Date().toISOString() };
             let hasError = false;
 
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let data = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+
             if (editCustomRecordId) {
                 const existing = data.find(r => r.id === editCustomRecordId || r._id === editCustomRecordId);
                 if (existing) {
@@ -731,21 +746,24 @@
                 data.push(newRow);
             }
 
-            localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
             closeCustomRecordModal();
             renderCustomTable();
         }
 
         async function deleteCustomRecord(id, skipConfirm = false) {
             if (!skipConfirm && !confirm("Delete this record?")) return;
-            let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            let data = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
             data = data.filter(r => r.id !== id && r._id !== id);
             
             if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
                 await apiClient.deleteCustomRecord(id).catch(err => console.warn("API delete failed", err));
             }
 
-            localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
             if (!skipConfirm) renderCustomTable();
         }
 
@@ -783,7 +801,9 @@
 
         function exportData() {
             if (!currentActivePageId) return alert("No active page.");
-            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const data = allData.filter(r => r.createdBy === currentUser);
             if (data.length === 0) return alert("No data to export.");
 
             const exportData = data.map(row => {
@@ -840,7 +860,10 @@
                     return;
                 }
 
-                let savedData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+                let currentUser = localStorage.getItem('currentUser') || 'System';
+                let allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+                let savedData = allData.filter(r => r.createdBy === currentUser);
+                const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
                 let added = 0;
                 let updated = 0;
 
@@ -875,7 +898,6 @@
                         newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
                     }
                     
-                    let currentUser = localStorage.getItem('currentUser') || 'System';
                     let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
                     let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
                     
@@ -931,7 +953,7 @@
                     }
                 }
 
-                localStorage.setItem('data_' + currentActivePageId, JSON.stringify(savedData));
+                localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...savedData]));
                 renderCustomTable();
                 alert(`Import successful: ${added} added, ${updated} updated.`);
                 input.value = '';
