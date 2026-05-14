@@ -289,6 +289,7 @@
         <div class="page-header">
             <h2 id="customObjectTitle">Custom Object</h2>
             <div style="display: flex; gap: 10px;">
+                <button id="bulkDeleteBtn" onclick="deleteSelectedRecords()" style="background: #e74c3c; color: white; border: none; display: none;">🗑️ Delete Selected</button>
                 <button onclick="openTableSettingsModal()"><i class="fas fa-cog"></i> ⚙️ Settings</button>
                 <button onclick="openFieldOrderModal()"><i class="fas fa-sort"></i> ↕️ Field Order</button>
                 <button onclick="printTableReport()"><i class="fas fa-print"></i> 🖨️ Print Report</button>
@@ -488,7 +489,7 @@
                 return f.showInGrid !== false;
             });
 
-            let thHTML = '<tr><th>S.No</th>';
+            let thHTML = '<tr><th style="width: 40px;"><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAllRecords(this)"></th><th>S.No</th>';
             visibleFields.forEach(f => {
                 const icon = currentSortColumn === f.fieldName ? (currentSortDirection === 'asc' ? '▲' : '▼') : '';
                 thHTML += `<th style="cursor:pointer;" onclick="handleSort('${f.fieldName}')">${f.fieldLabel} <span class="sort-icon">${icon}</span></th>`;
@@ -526,10 +527,10 @@
             const paginatedData = currentFilteredData.slice(startIndex, endIndex);
 
             if (paginatedData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${visibleFields.length + 2}" style="text-align:center; padding: 30px;">No records found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${visibleFields.length + 3}" style="text-align:center; padding: 30px;">No records found.</td></tr>`;
             } else {
                 paginatedData.forEach((row, i) => {
-                    let tr = `<tr><td>${startIndex + i + 1}</td>`;
+                    let tr = `<tr><td><input type="checkbox" class="record-checkbox" value="${row.id}" onclick="updateBulkDeleteBtn()"></td><td>${startIndex + i + 1}</td>`;
                     visibleFields.forEach(f => tr += `<td>${row[f.fieldName] || '-'}</td>`);
                     tr += `<td>
                         <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
@@ -540,6 +541,7 @@
             }
             
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+            updateBulkDeleteBtn();
         }
 
         function openCustomRecordModal(recordData = null) {
@@ -621,6 +623,36 @@
 
             localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
             renderCustomTable();
+        }
+
+        function toggleSelectAllRecords(source) {
+            const checkboxes = document.querySelectorAll('.record-checkbox');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+            const btn = document.getElementById('bulkDeleteBtn');
+            if (btn) {
+                btn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                btn.innerHTML = `🗑️ Delete Selected (${checkedCount})`;
+            }
+            const selectAllCb = document.getElementById('selectAllCheckbox');
+            if (selectAllCb) {
+                const totalCheckboxes = document.querySelectorAll('.record-checkbox').length;
+                selectAllCb.checked = totalCheckboxes > 0 && checkedCount === totalCheckboxes;
+            }
+        }
+
+        async function deleteSelectedRecords() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return;
+            if (!confirm(`Are you sure you want to delete ${checkboxes.length} selected record(s)?`)) return;
+            
+            const idsToDelete = Array.from(checkboxes).map(cb => cb.value);
+            for (const id of idsToDelete) deleteCustomRecord(id);
+            // deleteCustomRecord already updates localStorage and re-renders table per ID
         }
 
         function exportData() {
