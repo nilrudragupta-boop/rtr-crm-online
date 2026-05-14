@@ -2885,23 +2885,49 @@ function createResponse(obj) {
                     if (!filter) return;
                     const cur = filter.value;
                     filter.innerHTML = '<option value="">All Modules</option>';
-                    [...new Set(customFieldsCache.map(f => f.moduleName))].filter(Boolean).sort()
-                        .forEach(m => filter.innerHTML += `<option value="${m}">${m}</option>`);
+
+            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const customPages = allPages.filter(p => p.createdBy === currentUser);
+            const customPageIds = customPages.map(p => p.pageId);
+            const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+
+            const allModules = [...new Set([
+                ...myFields.map(f => f.moduleName),
+                ...customPageIds
+            ])].filter(Boolean).sort();
+
+            allModules.forEach(m => {
+                const pageDef = customPages.find(p => p.pageId === m);
+                const display = pageDef ? `${pageDef.label} (${m})` : m;
+                filter.innerHTML += `<option value="${m}">${display}</option>`;
+            });
+
                     if (cur) filter.value = cur;
                 }
 
                 function populateCfModuleDatalist() {
                     const dl = document.getElementById('cfModuleList');
                     if (!dl) return;
+            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const customPages = allPages.filter(p => p.createdBy === currentUser);
+            const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
                     const all = [...new Set([
                         'Customer', 'Invoice', 'Item', 'Supplier',
-                        ...customFieldsCache.map(f => f.moduleName)
+                ...customPages.map(p => p.pageId),
+                ...myFields.map(f => f.moduleName)
                     ].filter(Boolean))].sort();
-                    dl.innerHTML = all.map(m => `<option value="${m}">`).join('');
+
+            dl.innerHTML = all.map(m => {
+                const pageDef = customPages.find(p => p.pageId === m);
+                const display = pageDef ? `${pageDef.label} (${m})` : m;
+                return `<option value="${m}">${display}</option>`;
+            }).join('');
 
                     const secDl = document.getElementById('cfSectionList');
                     if (secDl) {
-                        const secs = [...new Set(customFieldsCache.map(f => f.section))].filter(Boolean);
+                const secs = [...new Set(myFields.map(f => f.section))].filter(Boolean);
                         secDl.innerHTML = secs.map(s => `<option value="${s}">`).join('');
                     }
                 }
@@ -2911,8 +2937,12 @@ function createResponse(obj) {
                     if (!tbody) return;
                     const search = (document.getElementById('cfSearch')?.value || '').trim().toLowerCase();
                     const modFil = document.getElementById('cfModuleFilter')?.value || '';
+            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const customPages = allPages.filter(p => p.createdBy === currentUser);
 
-                    let fields = customFieldsCache;
+            let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+            let fields = myFields;
                     if (modFil) fields = fields.filter(f => f.moduleName === modFil);
                     if (search) fields = fields.filter(f =>
                         (f.fieldLabel || '').toLowerCase().includes(search) ||
@@ -2922,10 +2952,10 @@ function createResponse(obj) {
                     fields.sort((a, b) => (a.order || 0) - (b.order || 0));
 
                     // Update stats
-                    document.getElementById('cfmStatTotal').textContent = customFieldsCache.length;
+            document.getElementById('cfmStatTotal').textContent = myFields.length;
                     document.getElementById('cfmStatShowing').textContent = fields.length;
                     document.getElementById('cfmStatModules').textContent =
-                        new Set(customFieldsCache.map(f => f.moduleName)).size;
+                new Set(myFields.map(f => f.moduleName)).size;
 
                     tbody.innerHTML = '';
                     if (!fields.length) {
@@ -2945,12 +2975,15 @@ function createResponse(obj) {
                         const badgeClass = TYPE_BADGE_CLASS[field.fieldType] || 'tb-text';
                         const gridLabel = { 'col-md-3': '25%', 'col-md-4': '33%', 'col-md-6': '50%', 'col-md-12': '100%' }[field.gridWidth] || field.gridWidth || '25%';
 
+                        const pageDef = customPages.find(p => p.pageId === field.moduleName);
+                        const modDisplay = pageDef ? `${pageDef.label} <span style="color:#94a3b8; font-weight:normal; font-size:11px">(${field.moduleName})</span>` : field.moduleName;
+
                         tr.innerHTML = `
                             <td style="text-align:center">
                                 ${!search ? `<i class="fas fa-grip-vertical cfm-grip"></i>` : ''}
                             </td>
                             <td>
-                                <div style="font-weight:700;color:#1e293b;font-size:12.5px">${field.moduleName}</div>
+                                <div style="font-weight:700;color:#1e293b;font-size:12.5px">${modDisplay}</div>
                                 <div style="font-size:11px;color:${field.section ? '#7c3aed' : '#94a3b8'};margin-top:2px">
                                     ${field.section
                                 ? `<i class="fas fa-folder-open" style="font-size:9px"></i> ${field.section}`
@@ -3044,6 +3077,7 @@ function createResponse(obj) {
                         suffix: document.getElementById('cfSuffix').value.trim(),
                         order: parseInt(document.getElementById('cfOrder').value) || 0,
                         gridWidth: document.getElementById('cfGridWidth').value,
+                createdBy: localStorage.getItem('currentUser') || 'System'
                     };
 
                     if (id) payload._id = id;
@@ -3182,9 +3216,10 @@ function createResponse(obj) {
                 // ── Delete entire module ──
                 async function deleteEntireModule() {
                     const mod = document.getElementById('cfModuleFilter')?.value;
+            const currentUser = localStorage.getItem('currentUser') || 'System';
                     if (!mod) { cfmToast('Select a specific module first.', 'error'); return; }
                     if (!confirm(`Delete ALL fields in module "${mod}"? This cannot be undone.`)) return;
-                    const toDelete = customFieldsCache.filter(f => f.moduleName === mod);
+            const toDelete = customFieldsCache.filter(f => f.moduleName === mod && f.createdBy === currentUser);
                     try {
                         for (const f of toDelete) {
                             await apiClient.deleteCustomField(f._id);
@@ -3254,11 +3289,14 @@ function createResponse(obj) {
                     if (draggedFieldItem !== this) {
                         const fromId = draggedFieldItem.dataset.fieldId;
                         const toId = this.dataset.fieldId;
+                const currentUser = localStorage.getItem('currentUser') || 'System';
+                let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
                         const fi = customFieldsCache.findIndex(f => f._id === fromId);
                         const ti = customFieldsCache.findIndex(f => f._id === toId);
                         const [item] = customFieldsCache.splice(fi, 1);
                         customFieldsCache.splice(ti, 0, item);
-                        customFieldsCache.forEach((f, i) => f.order = i);
+                let newMyFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                newMyFields.forEach((f, i) => f.order = i);
                         renderCustomFieldsTable();
                         saveFieldOrder();
                     }
@@ -3266,7 +3304,8 @@ function createResponse(obj) {
                 }
 
                 async function saveFieldOrder() {
-                    const payload = customFieldsCache.map((f, i) => ({ _id: f._id, order: i }));
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const payload = customFieldsCache.filter(f => f.createdBy === currentUser).map((f) => ({ _id: f._id, order: f.order }));
                     try {
                         const res = await fetch(`${API_BASE_URL}/custom-fields/reorder`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },

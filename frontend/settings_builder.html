@@ -1513,9 +1513,9 @@
 
             const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             const currentUser = localStorage.getItem('currentUser') || 'System';
-            const customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
+            const customPages = allPages.filter(p => p.createdBy === currentUser);
             const customPageIds = customPages.map(p => p.pageId);
-            const myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+            const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
 
             const allModules = [...new Set([
                 ...myFields.map(f => f.moduleName),
@@ -1536,8 +1536,8 @@
             if (!dl) return;
             const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             const currentUser = localStorage.getItem('currentUser') || 'System';
-            const customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
-            const myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+            const customPages = allPages.filter(p => p.createdBy === currentUser);
+            const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
             const all = [...new Set([
                 'Customer', 'Invoice', 'Item', 'Supplier',
                 ...customPages.map(p => p.pageId),
@@ -1564,9 +1564,9 @@
             const modFil = document.getElementById('cfModuleFilter')?.value || '';
             const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             const currentUser = localStorage.getItem('currentUser') || 'System';
-            const customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
+            const customPages = allPages.filter(p => p.createdBy === currentUser);
 
-            let myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+            let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
             let fields = myFields;
             if (modFil) fields = fields.filter(f => f.moduleName === modFil);
             if (search) fields = fields.filter(f =>
@@ -1833,7 +1833,7 @@
             const currentUser = localStorage.getItem('currentUser') || 'System';
             if (!mod) { cfmToast('Select a specific module first.', 'error'); return; }
             if (!confirm(`Delete ALL fields in module "${mod}"? This cannot be undone.`)) return;
-            const toDelete = customFieldsCache.filter(f => f.moduleName === mod && (!f.createdBy || f.createdBy === currentUser));
+            const toDelete = customFieldsCache.filter(f => f.moduleName === mod && f.createdBy === currentUser);
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.deleteCustomField) {
                     for (const f of toDelete) {
@@ -1908,12 +1908,12 @@
                 const fromId = draggedFieldItem.dataset.fieldId;
                 const toId = this.dataset.fieldId;
                     const currentUser = localStorage.getItem('currentUser') || 'System';
-                    let myFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+                    let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
                 const fi = customFieldsCache.findIndex(f => f._id === fromId);
                 const ti = customFieldsCache.findIndex(f => f._id === toId);
                 const [item] = customFieldsCache.splice(fi, 1);
                 customFieldsCache.splice(ti, 0, item);
-                    let newMyFields = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser);
+                    let newMyFields = customFieldsCache.filter(f => f.createdBy === currentUser);
                     newMyFields.forEach((f, i) => f.order = i);
                 renderCustomFieldsTable();
                 saveFieldOrder();
@@ -1923,7 +1923,7 @@
 
         async function saveFieldOrder() {
             const currentUser = localStorage.getItem('currentUser') || 'System';
-            const payload = customFieldsCache.filter(f => !f.createdBy || f.createdBy === currentUser).map((f) => ({ _id: f._id, order: f.order }));
+            const payload = customFieldsCache.filter(f => f.createdBy === currentUser).map((f) => ({ _id: f._id, order: f.order }));
             try {
                 const res = await fetch(`${API_BASE_URL}/custom-fields/reorder`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2042,7 +2042,7 @@
             list.innerHTML = '';
             let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             const currentUser = localStorage.getItem('currentUser') || 'System';
-            let customPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
+            let customPages = allPages.filter(p => p.createdBy === currentUser);
             if (customPages.length === 0) {
                 list.innerHTML = '<li style="text-align:center; color:#94a3b8; padding: 10px;">No custom pages found.</li>';
                 return;
@@ -2071,8 +2071,8 @@
                 onEnd: async function (evt) {
                     let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
                     const currentUser = localStorage.getItem('currentUser') || 'System';
-                    let otherUsersPages = allPages.filter(p => p.createdBy && p.createdBy !== currentUser);
-                    let myPages = allPages.filter(p => !p.createdBy || p.createdBy === currentUser);
+                    let otherUsersPages = allPages.filter(p => p.createdBy !== currentUser);
+                    let myPages = allPages.filter(p => p.createdBy === currentUser);
                     const movedItem = myPages.splice(evt.oldIndex, 1)[0];
                     myPages.splice(evt.newIndex, 0, movedItem);
                     const updatedAllPages = [...otherUsersPages, ...myPages];
