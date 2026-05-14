@@ -271,6 +271,18 @@
             color: #888;
             margin-left: 4px;
         }
+
+        /* --- Action Dropdown & Column Resizing --- */
+        .action-dropdown { position: relative; display: inline-block; }
+        .action-btn-main { background-color: #607d8b; color: white; padding: 6px 12px; font-size: 13px; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        .action-dropdown-content { display: none; position: fixed; background-color: #fff; min-width: 120px; box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2); z-index: 9999; border: 1px solid var(--slds-border); border-radius: 4px; padding: 4px 0; text-align: left; }
+        .action-dropdown-content button { color: #333 !important; background: none !important; padding: 8px 16px !important; text-decoration: none !important; display: block !important; width: 100% !important; text-align: left !important; border: none !important; border-radius: 0 !important; margin: 0 !important; box-shadow: none !important; font-weight: normal !important; font-size: 13px !important; }
+        .action-dropdown-content button:hover { background-color: #f1f1f1 !important; color: #000 !important; }
+        .action-dropdown.active .action-dropdown-content { display: block; }
+        
+        #customTable th { position: relative; }
+        .resizer { position: absolute; top: 0; right: 0; width: 5px; height: 100%; cursor: col-resize; user-select: none; touch-action: none; z-index: 10; }
+        .resizer:hover, .resizing { background-color: var(--slds-blue); opacity: 0.5; }
     </style>
 </head>
 
@@ -601,7 +613,7 @@
                 const icon = currentSortColumn === f.fieldName ? (currentSortDirection === 'asc' ? '▲' : '▼') : '';
                 thHTML += `<th style="cursor:pointer;" onclick="handleSort('${f.fieldName}')">${f.fieldLabel} <span class="sort-icon">${icon}</span></th>`;
             });
-            thHTML += '<th>Actions</th></tr>';
+            thHTML += '<th style="text-align: center; width: 100px;">Actions</th></tr>';
             thead.innerHTML = thHTML;
 
             tbody.innerHTML = '';
@@ -663,9 +675,14 @@
                         }
                         tr += `<td>${val}</td>`;
                     });
-                    tr += `<td>
-                        <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
-                        <button onclick="deleteCustomRecord('${row.id}')" style="color:#c62828; border:none; background:none; padding:0; cursor:pointer;">Delete</button>
+                    tr += `<td style="text-align: center;">
+                        <div class="action-dropdown" id="actionDropdown-${row.id}">
+                            <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
+                            <div class="action-dropdown-content">
+                                <button onclick="editCustomRecord('${row.id}')">✏️ Edit</button>
+                                <button onclick="deleteCustomRecord('${row.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
+                            </div>
+                        </div>
                     </td></tr>`;
                     tbody.innerHTML += tr;
                 });
@@ -673,6 +690,11 @@
 
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
             updateBulkDeleteBtn();
+            
+            requestAnimationFrame(() => {
+                loadColumnWidths();
+                enableColumnResizing();
+            });
         }
 
         function openCustomRecordModal(recordData = null) {
@@ -1177,6 +1199,61 @@
                 if (currentActivePageId) handleSearch(); // Refresh active view
             });
         });
+
+        // --- Action Dropdown Logic ---
+        function toggleActionMenu(btn) {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => {
+                if (d !== btn.parentElement) d.classList.remove('active');
+            });
+            const dropdown = btn.parentElement;
+            dropdown.classList.toggle('active');
+            if (dropdown.classList.contains('active')) {
+                const content = dropdown.querySelector('.action-dropdown-content');
+                content.style.display = 'block'; 
+                const rect = btn.getBoundingClientRect();
+                let top = rect.bottom;
+                let left = rect.right - content.offsetWidth;
+                if (top + content.offsetHeight > window.innerHeight) { top = rect.top - content.offsetHeight; }
+                content.style.top = top + 'px';
+                content.style.left = left + 'px';
+                content.style.display = ''; 
+            }
+        }
+        document.addEventListener('click', function (e) { if (!e.target.matches('.action-btn-main')) { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); } });
+        window.addEventListener('scroll', function () { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); }, true);
+
+        // --- Column Resizing Logic ---
+        function enableColumnResizing() {
+            const table = document.getElementById('customTable');
+            const headers = table.querySelectorAll('th');
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+                resizer.addEventListener('click', function (e) { e.stopPropagation(); });
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault(); e.stopPropagation();
+                    startX = e.pageX; startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) { th.style.width = newWidth + 'px'; th.style.minWidth = newWidth + 'px'; }
+                }
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+        function saveColumnWidths() { const widths = []; document.querySelectorAll('#customTable th').forEach(th => { widths.push(th.style.width); }); localStorage.setItem('customDashColWidths_' + currentActivePageId, JSON.stringify(widths)); }
+        function loadColumnWidths() { const savedWidths = JSON.parse(localStorage.getItem('customDashColWidths_' + currentActivePageId)); if (savedWidths && Array.isArray(savedWidths)) { document.querySelectorAll('#customTable th').forEach((th, index) => { if (savedWidths[index]) { th.style.width = savedWidths[index]; th.style.minWidth = savedWidths[index]; } }); } }
     </script>
 
 </body>
