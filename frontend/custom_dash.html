@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Custom Objects | RISE Tech Revolution</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="apiClient.js"></script>
     <style>
         :root {
             --slds-blue: #0176d3;
@@ -205,6 +207,16 @@
             background: #f8f9fa;
             border-radius: 0 0 8px 8px;
         }
+
+        #fieldOrderList li {
+            padding: 10px;
+            border: 1px solid var(--slds-border);
+            margin-bottom: 5px;
+            border-radius: 4px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+        }
     </style>
 </head>
 
@@ -225,7 +237,15 @@
     <section class="content" id="customObjectContent">
         <div class="page-header">
             <h2 id="customObjectTitle">Custom Object</h2>
-            <button class="primary" onclick="openCustomRecordModal()">+ New Record</button>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="openTableSettingsModal()"><i class="fas fa-cog"></i> ⚙️ Settings</button>
+                <button onclick="openFieldOrderModal()"><i class="fas fa-sort"></i> ↕️ Field Order</button>
+                <button onclick="printTableReport()"><i class="fas fa-print"></i> 🖨️ Print Report</button>
+                <button onclick="exportData()" style="background: #27ae60; color: white; border: none;">Export Excel</button>
+                <button onclick="document.getElementById('importDataInput').click()" style="background: #17a2b8; color: white; border: none;">Import Data</button>
+                <input type="file" id="importDataInput" style="display: none;" accept=".xlsx, .xls, .csv" onchange="importData(this)">
+                <button class="primary" onclick="openCustomRecordModal()">+ New Record</button>
+            </div>
         </div>
         <div class="table-card" style="overflow-x: auto;">
             <table id="customTable">
@@ -248,6 +268,44 @@
             <div class="modal-footer">
                 <button onclick="closeCustomRecordModal()">Cancel</button>
                 <button class="primary" onclick="saveCustomRecord()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Settings Modal -->
+    <div id="tableSettingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Table Settings</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="document.getElementById('tableSettingsModal').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                    <button onclick="toggleAllColumns(true)">Select All</button>
+                    <button onclick="toggleAllColumns(false)">Deselect All</button>
+                </div>
+                <div id="columnToggles" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="document.getElementById('tableSettingsModal').style.display='none'">Close</button>
+                <button class="primary" onclick="saveColumnSettings()">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Field Order Modal -->
+    <div id="fieldOrderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Field Order</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="document.getElementById('fieldOrderModal').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <ul id="fieldOrderList" style="list-style: none; padding: 0; margin: 0;"></ul>
+            </div>
+            <div class="modal-footer">
+                <button onclick="document.getElementById('fieldOrderModal').style.display='none'">Close</button>
+                <button class="primary" onclick="saveFieldOrder()">Save Order</button>
             </div>
         </div>
     </div>
@@ -294,6 +352,7 @@
         let currentActivePageId = null;
         let editCustomRecordId = null;
         let currentCustomFields = [];
+        let columnVisibility = {};
 
         function loadCustomTabs() {
             const nav = document.getElementById('mainNavbar');
@@ -328,6 +387,7 @@
             document.getElementById('customObjectTitle').innerText = pageLabel;
             searchInput.placeholder = `Search ${pageLabel}...`;
             currentCustomFields = customFields.filter(f => f.moduleName === pageId).sort((a, b) => (a.order || 0) - (b.order || 0));
+            columnVisibility = JSON.parse(localStorage.getItem('customDashColVis_' + pageId)) || {};
             renderCustomTable();
         }
 
@@ -343,8 +403,13 @@
                 return;
             }
 
+            const visibleFields = currentCustomFields.filter(f => {
+                if (columnVisibility[f.fieldName] !== undefined) return columnVisibility[f.fieldName];
+                return f.showInGrid !== false;
+            });
+
             let thHTML = '<tr><th>S.No</th>';
-            currentCustomFields.forEach(f => thHTML += `<th>${f.fieldLabel}</th>`);
+            visibleFields.forEach(f => thHTML += `<th>${f.fieldLabel}</th>`);
             thHTML += '<th>Actions</th></tr>';
             thead.innerHTML = thHTML;
 
@@ -355,7 +420,7 @@
 
             filteredData.forEach((row, i) => {
                 let tr = `<tr><td>${i + 1}</td>`;
-                currentCustomFields.forEach(f => tr += `<td>${row[f.fieldName] || '-'}</td>`);
+                visibleFields.forEach(f => tr += `<td>${row[f.fieldName] || '-'}</td>`);
                 tr += `<td>
                     <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
                     <button onclick="deleteCustomRecord('${row.id}')" style="color:#c62828; border:none; background:none; padding:0; cursor:pointer;">Delete</button>
@@ -402,13 +467,16 @@
 
         function saveCustomRecord() {
             let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
-            let newRow = { id: editCustomRecordId || Date.now().toString() };
+            let newId = editCustomRecordId || Date.now().toString();
+            let newRow = { id: newId };
+            let apiPayload = { _id: newId, moduleName: currentActivePageId };
             let hasError = false;
 
             currentCustomFields.forEach(f => {
                 const val = document.getElementById(f.fieldName).value;
                 if (f.isRequired && !val) hasError = true;
                 newRow[f.fieldName] = val;
+                apiPayload[f.fieldName] = val;
             });
 
             if (hasError) return alert("Please fill all required fields");
@@ -420,6 +488,10 @@
                 data.push(newRow);
             }
 
+            if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                apiClient.saveCustomRecord(apiPayload).catch(err => console.warn("API sync failed", err));
+            }
+
             localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
             closeCustomRecordModal();
             renderCustomTable();
@@ -429,8 +501,188 @@
             if (!confirm("Delete this record?")) return;
             let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
             data = data.filter(r => r.id !== id);
+            
+            if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
+                apiClient.deleteCustomRecord(id).catch(err => console.warn("API delete failed", err));
+            }
+
             localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
             renderCustomTable();
+        }
+
+        function exportData() {
+            if (!currentActivePageId) return alert("No active page.");
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            if (data.length === 0) return alert("No data to export.");
+
+            const exportData = data.map(row => {
+                const obj = {};
+                currentCustomFields.forEach(f => {
+                    obj[f.fieldLabel] = row[f.fieldName] || '';
+                });
+                return obj;
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, currentActivePageId);
+            XLSX.writeFile(wb, `${currentActivePageId}_export.xlsx`);
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+                if (jsonData.length === 0) {
+                    alert("The file is empty or formatted incorrectly.");
+                    input.value = '';
+                    return;
+                }
+
+                let savedData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+                let added = 0;
+
+                for (const row of jsonData) {
+                    const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                    const newRow = { id: newId };
+                    const apiPayload = { _id: newId, moduleName: currentActivePageId };
+
+                    currentCustomFields.forEach(f => {
+                        const val = row[f.fieldLabel] !== undefined ? row[f.fieldLabel] : '';
+                        newRow[f.fieldName] = val;
+                        apiPayload[f.fieldName] = val;
+                    });
+                    savedData.push(newRow);
+                    added++;
+                    
+                    if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                        await apiClient.saveCustomRecord(apiPayload).catch(err => console.warn("API sync failed", err));
+                    }
+                }
+
+                localStorage.setItem('data_' + currentActivePageId, JSON.stringify(savedData));
+                renderCustomTable();
+                alert(`Imported ${added} records successfully.`);
+                input.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- Settings / Columns Logic ---
+        function openTableSettingsModal() {
+            if (!currentActivePageId) return alert("No active page.");
+            const container = document.getElementById('columnToggles');
+            container.innerHTML = '';
+            currentCustomFields.forEach(f => {
+                let isChecked = columnVisibility[f.fieldName];
+                if (isChecked === undefined) isChecked = f.showInGrid !== false;
+                
+                const label = document.createElement('label');
+                label.style.display = 'flex';
+                label.style.alignItems = 'center';
+                label.style.gap = '8px';
+                label.style.cursor = 'pointer';
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = 'col_' + f.fieldName;
+                cb.checked = isChecked;
+                
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(f.fieldLabel));
+                container.appendChild(label);
+            });
+            document.getElementById('tableSettingsModal').style.display = 'block';
+        }
+
+        function toggleAllColumns(state) {
+            currentCustomFields.forEach(f => {
+                const cb = document.getElementById('col_' + f.fieldName);
+                if (cb) cb.checked = state;
+            });
+        }
+
+        function saveColumnSettings() {
+            currentCustomFields.forEach(f => {
+                const cb = document.getElementById('col_' + f.fieldName);
+                if (cb) columnVisibility[f.fieldName] = cb.checked;
+            });
+            localStorage.setItem('customDashColVis_' + currentActivePageId, JSON.stringify(columnVisibility));
+            document.getElementById('tableSettingsModal').style.display = 'none';
+            renderCustomTable();
+        }
+
+        // --- Field Order Logic ---
+        function openFieldOrderModal() {
+            if (!currentActivePageId) return alert("No active page.");
+            const list = document.getElementById('fieldOrderList');
+            list.innerHTML = '';
+            currentCustomFields.forEach(f => {
+                const li = document.createElement('li');
+                li.dataset.fieldId = f._id || f.fieldName;
+                li.innerHTML = `<span style="color:#999; cursor:grab; margin-right:10px;">☰</span> <span>${f.fieldLabel}</span> <code style="font-size:11px;color:#666;margin-left:auto;">${f.fieldName}</code>`;
+                list.appendChild(li);
+            });
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(list, { animation: 150 });
+            }
+            document.getElementById('fieldOrderModal').style.display = 'block';
+        }
+
+        async function saveFieldOrder() {
+            const listItems = document.querySelectorAll('#fieldOrderList li');
+            const newOrderIds = Array.from(listItems).map(li => li.dataset.fieldId);
+            
+            currentCustomFields.sort((a, b) => newOrderIds.indexOf(a._id || a.fieldName) - newOrderIds.indexOf(b._id || b.fieldName));
+            currentCustomFields.forEach((f, i) => f.order = i);
+            
+            currentCustomFields.forEach(cf => {
+                const idx = customFields.findIndex(f => (f._id || f.fieldName) === (cf._id || cf.fieldName));
+                if (idx > -1) customFields[idx].order = cf.order;
+            });
+            localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
+            
+            if (typeof apiClient !== 'undefined' && apiClient.reorderCustomFields) {
+                const payload = currentCustomFields.map(f => ({ _id: f._id, order: f.order }));
+                apiClient.reorderCustomFields(payload).catch(console.warn);
+            }
+            
+            document.getElementById('fieldOrderModal').style.display = 'none';
+            renderCustomTable();
+        }
+
+        // --- Print Report Logic ---
+        function printTableReport() {
+            if (!currentActivePageId) return alert("No active page.");
+            const tableHTML = document.getElementById('customTable').outerHTML;
+            const title = document.getElementById('customObjectTitle').innerText;
+
+            let html = `<!DOCTYPE html><html><head><title>Print Report - ${title}</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f8fafc; font-weight: 600; }
+                @media print { .no-print { display: none !important; } th:last-child, td:last-child { display: none !important; } }
+            </style></head><body>
+            <h2 style="text-align:center;">${title} Report</h2>
+            ${tableHTML}
+            <div style="text-align:center; margin-top:30px;" class="no-print">
+                <button onclick="window.print()" style="padding:10px 20px; font-size:16px; background:#0176d3; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
+            </div></body></html>`;
+
+            const win = window.open('', '', 'width=900,height=700');
+            win.document.write(html);
+            win.document.close();
+            win.focus();
         }
     </script>
 
