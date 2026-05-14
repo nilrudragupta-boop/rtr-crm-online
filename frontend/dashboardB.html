@@ -2945,13 +2945,20 @@
 
             // Inject Dynamic Custom Pages
             function loadDynamicCustomPages() {
+                const cfData = JSON.parse(localStorage.getItem('CUSTOM_FIELDS') || '[]');
+                const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier', 'Purchase', 'Scrap', 'Production', 'Expense', 'Employee', 'Bank', 'Journal'];
+                
                 const customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+                const customPageIds = customPages.map(p => p.pageId);
+
+                const customModules = [...new Set(cfData.map(f => f.moduleName).filter(m => m && !standardModules.includes(m) && !customPageIds.includes(m)))];
+
                 const wrapper = document.getElementById('dynamicPagesWrapper');
                 if (wrapper) {
-                    wrapper.innerHTML = customPages.map(p => `
-                    <button class="nav-item" onclick="openWindow('custom_module.html?module=${encodeURIComponent(p.pageId)}', 1200, 800)" title="${p.label}">
-                        <i class="${p.icon || 'fas fa-folder-open'}" style="color: #f39c12;"></i>
-                        <span class="nav-text">${p.label}</span>
+                    wrapper.innerHTML = customModules.map(m => `
+                    <button class="nav-item" onclick="openWindow('custom_module.html?module=${encodeURIComponent(m)}', 1200, 800)" title="${m}">
+                        <i class="fas fa-folder-open" style="color: #f39c12;"></i>
+                        <span class="nav-text">${m}</span>
                     </button>
                 `).join('');
                 }
