@@ -808,16 +808,32 @@
                     const recordId = row['Record ID'] || row['id'] || row['_id'];
                     let isUpdate = false;
                     let existingRecord = {};
+                    let newId = null;
                     
                     if (recordId) {
                         const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
                         if (existingIdx > -1) {
                             isUpdate = true;
                             existingRecord = savedData[existingIdx];
+                            newId = existingRecord.id || existingRecord._id;
+                        }
+                    } else if (currentCustomFields.length > 0) {
+                        // Fallback: Match by the first column to update existing records if Record ID is missing
+                        const firstField = currentCustomFields[0];
+                        const matchVal = row[firstField.fieldLabel];
+                        if (matchVal !== undefined && matchVal !== '') {
+                            const existingIdx = savedData.findIndex(r => r[firstField.fieldName] == matchVal);
+                            if (existingIdx > -1) {
+                                isUpdate = true;
+                                existingRecord = savedData[existingIdx];
+                                newId = existingRecord.id || existingRecord._id;
+                            }
                         }
                     }
                     
-                    const newId = isUpdate ? existingRecord.id : ('cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5));
+                    if (!newId) {
+                        newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+                    }
                     
                     let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId };
                     let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId };
@@ -836,8 +852,11 @@
                                     val = localDate.toISOString().slice(0, 16);
                                 }
                             }
-                            newRow[f.fieldName] = val;
-                            apiPayload[f.fieldName] = val;
+                            // Do not overwrite existing data with empty strings during an update
+                            if (!(isUpdate && val === '')) {
+                                newRow[f.fieldName] = val;
+                                apiPayload[f.fieldName] = val;
+                            }
                         } else if (!isUpdate) {
                             newRow[f.fieldName] = '';
                             apiPayload[f.fieldName] = '';
