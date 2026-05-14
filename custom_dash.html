@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Objects | RISE Tech Revolution</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="apiClient.js"></script>
+    <style>
+        :root {
+            --slds-blue: #0176d3;
+            --slds-dark-blue: #0b5cab;
+            --slds-bg: #f3f3f3;
+            --slds-text: #181818;
+            --slds-border: #dddbda;
+            --slds-card-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background: var(--slds-bg);
+            color: var(--slds-text);
+        }
+
+        /* --- Header & Navigation --- */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fff;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--slds-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--slds-blue);
+            letter-spacing: 0.5px;
+        }
+
+        .search-container {
+            flex: 0 1 400px;
+        }
+
+        .search-container input {
+            width: 100%;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--slds-border);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-container input:focus {
+            border-color: var(--slds-blue);
+        }
+
+        .navbar {
+            background: #fff;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--slds-border);
+            display: flex;
+            gap: 24px;
+        }
+
+        .navbar a {
+            padding: 12px 0;
+            color: #444;
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-bottom: 3px solid transparent;
+            cursor: grab;
+        }
+
+        .navbar a:active {
+            cursor: grabbing;
+        }
+
+        .navbar a.active {
+            color: var(--slds-blue);
+            border-bottom-color: var(--slds-blue);
+            font-weight: 600;
+        }
+
+        /* --- Content Area --- */
+        .content {
+            padding: 24px;
+            max-width: 1600px;
+            margin: auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .page-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 400;
+        }
+
+        /* --- Table Card --- */
+        .table-card {
+            background: #fff;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            box-shadow: var(--slds-card-shadow);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: #f8f9fa;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--slds-border);
+            color: #444;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--slds-border);
+        }
+
+        tr:hover {
+            background: #f1f7fb;
+        }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid var(--slds-border);
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button.primary {
+            background: var(--slds-blue);
+            color: white;
+            border: none;
+        }
+
+        button.primary:hover {
+            background: var(--slds-dark-blue);
+        }
+
+        /* --- Modal & Settings --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background: #fff;
+            margin: 5% auto;
+            padding: 0;
+            width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--slds-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 12px;
+            border-top: 1px solid var(--slds-border);
+            text-align: right;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        }
+
+        #fieldOrderList li {
+            padding: 10px;
+            border: 1px solid var(--slds-border);
+            margin-bottom: 5px;
+            border-radius: 4px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+        }
+
+        /* --- Pagination --- */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 4px;
+            border: 1px solid var(--slds-border);
+            box-shadow: var(--slds-card-shadow);
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid var(--slds-border);
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #444;
+        }
+
+        .pagination button.active {
+            background: var(--slds-blue);
+            color: #fff;
+            border-color: var(--slds-blue);
+        }
+
+        .pagination button:disabled {
+            background: #f8f9fa;
+            cursor: not-allowed;
+            color: #999;
+        }
+        
+        .pagination span {
+            padding: 0 5px;
+            color: #666;
+        }
+        
+        .sort-icon {
+            font-size: 11px;
+            color: #888;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="logo">RISE TECH REVOLUTION</div>
+        <div class="search-container">
+            <input type="text" id="searchInput" onkeyup="handleSearch()" placeholder="Search...">
+        </div>
+        <div class="profile" style="font-weight:600; color:#555;">Admin User</div>
+    </header>
+
+    <nav class="navbar" id="mainNavbar">
+    </nav>
+
+    <!-- Dynamic Custom Object Section -->
+    <section class="content" id="customObjectContent">
+        <div class="page-header">
+            <h2 id="customObjectTitle">Custom Object</h2>
+            <div style="display: flex; gap: 10px;">
+                <button id="bulkDeleteBtn" onclick="deleteSelectedRecords()" style="background: #e74c3c; color: white; border: none; display: none;">🗑️ Delete Selected</button>
+                <button onclick="openTableSettingsModal()"><i class="fas fa-cog"></i> ⚙️ Settings</button>
+                <button onclick="openFieldOrderModal()"><i class="fas fa-sort"></i> ↕️ Field Order</button>
+                <button onclick="printTableReport()"><i class="fas fa-print"></i> 🖨️ Print Report</button>
+                <button onclick="exportData()" style="background: #27ae60; color: white; border: none;">Export Excel</button>
+                <button onclick="document.getElementById('importDataInput').click()" style="background: #17a2b8; color: white; border: none;">Import Data</button>
+                <input type="file" id="importDataInput" style="display: none;" accept=".xlsx, .xls, .csv" onchange="importData(this)">
+                <button class="primary" onclick="openCustomRecordModal()">+ New Record</button>
+            </div>
+        </div>
+        <div class="table-card" style="overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 240px);">
+            <table id="customTable">
+                <thead id="customTableHead"></thead>
+                <tbody id="customTableBody"></tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div class="pagination-container" id="paginationWrapper" style="display:none;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="totalRecordsDisplay" style="font-weight: bold; color: var(--slds-blue);"></span>
+                <select id="rowsPerPageSelect" onchange="changeRowsPerPage()" style="padding: 6px; border: 1px solid var(--slds-border); border-radius: 4px; font-size: 13px;">
+                    <option value="50" selected>50 rows</option>
+                    <option value="100">100 rows</option>
+                    <option value="200">200 rows</option>
+                    <option value="500">500 rows</option>
+                </select>
+            </div>
+            <div id="paginationInfo" style="color: #666; font-size: 13px;"></div>
+            <div class="pagination" id="paginationControls"></div>
+        </div>
+    </section>
+
+    <!-- Dynamic Form Modal -->
+    <div id="customRecordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;" id="customModalTitle">New Record</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeCustomRecordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" id="customFormContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeCustomRecordModal()">Cancel</button>
+                <button class="primary" onclick="saveCustomRecord()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Settings Modal -->
+    <div id="tableSettingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Table Settings</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="document.getElementById('tableSettingsModal').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                    <button onclick="toggleAllColumns(true)">Select All</button>
+                    <button onclick="toggleAllColumns(false)">Deselect All</button>
+                </div>
+                <div id="columnToggles" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="document.getElementById('tableSettingsModal').style.display='none'">Close</button>
+                <button class="primary" onclick="saveColumnSettings()">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Field Order Modal -->
+    <div id="fieldOrderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Field Order</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="document.getElementById('fieldOrderModal').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <ul id="fieldOrderList" style="list-style: none; padding: 0; margin: 0;"></ul>
+            </div>
+            <div class="modal-footer">
+                <button onclick="document.getElementById('fieldOrderModal').style.display='none'">Close</button>
+                <button class="primary" onclick="saveFieldOrder()">Save Order</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleSearch() {
+            currentPage = 1;
+            renderCustomTable();
+        }
+
+        // Initialize
+        window.onload = async () => {
+            const currentUser = localStorage.getItem('currentUser') || 'Admin User';
+            const profileEl = document.querySelector('.profile');
+            if (profileEl) profileEl.innerText = currentUser;
+
+            try {
+                if (typeof apiClient !== 'undefined') {
+                    if (apiClient.getCustomFields) {
+                        const res = await apiClient.getCustomFields();
+                        const fields = Array.isArray(res) ? res : (res?.data || null);
+                        if (fields) {
+                            customFields = fields;
+                            localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
+                        } else {
+                            customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                        }
+                    }
+                    
+                    if (apiClient.getSettings) {
+                        const res = await apiClient.getSettings();
+                        const settings = res?.data || res || {};
+                        if (settings && settings.crmCustomPages) {
+                            localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
+                        }
+                    }
+                } else {
+                    customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                }
+            } catch (e) {
+                customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            }
+
+            customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+
+            loadCustomTabs();
+            if (customPages.length > 0) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetPageId = urlParams.get('pageId');
+                
+                let targetTab = null;
+                if (targetPageId) {
+                    const tabs = document.querySelectorAll('#mainNavbar a');
+                    tabs.forEach(tab => {
+                        if (tab.dataset.pageId === targetPageId) targetTab = tab;
+                    });
+                }
+                
+                if (targetTab) {
+                    targetTab.click();
+                } else {
+                    const firstTab = document.querySelector('#mainNavbar a');
+                    if (firstTab) firstTab.click();
+                }
+            } else {
+                document.getElementById('customObjectContent').style.display = 'block';
+                document.getElementById('customObjectTitle').innerText = 'No Custom Objects Found';
+                document.getElementById('customTableHead').innerHTML = '';
+                document.getElementById('customTableBody').innerHTML = '<tr><td style="text-align:center; padding: 30px;">Go to Object Manager to create custom objects.</td></tr>';
+                const headerDiv = document.querySelector('.page-header div');
+                if (headerDiv) {
+                    headerDiv.style.display = 'none';
+                }
+            }
+        };
+
+        // --- Custom Objects Logic ---
+        let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+        let customFields = [];
+        let currentActivePageId = null;
+        let editCustomRecordId = null;
+        let currentCustomFields = [];
+        let columnVisibility = {};
+
+        let currentPage = 1;
+        let rowsPerPage = 50;
+        let currentSortColumn = null;
+        let currentSortDirection = 'asc';
+        let currentFilteredData = [];
+
+        function loadCustomTabs() {
+            const nav = document.getElementById('mainNavbar');
+            nav.innerHTML = '';
+            customPages.forEach(p => {
+                const a = document.createElement('a');
+                a.href = "#";
+                a.innerText = p.label;
+                a.dataset.pageId = p.pageId;
+                a.onclick = function (e) { e.preventDefault(); switchTab(p.pageId, this, p.label); };
+                nav.appendChild(a);
+            });
+
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(nav, {
+                    animation: 150,
+                    onEnd: async function (evt) {
+                        const movedItem = customPages.splice(evt.oldIndex, 1)[0];
+                        customPages.splice(evt.newIndex, 0, movedItem);
+                        localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
+
+                        if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
+                            try {
+                                const res = await apiClient.getSettings();
+                                const settings = res?.data || res || {};
+                                settings.crmCustomPages = customPages;
+                                await apiClient.saveSettings(settings);
+                            } catch(e) {}
+                        }
+                    }
+                });
+            }
+        }
+
+        async function switchTab(pageId, tabElement, pageLabel = '') {
+            document.querySelectorAll('#mainNavbar a').forEach(a => a.classList.remove('active'));
+            tabElement.classList.add('active');
+            currentActivePageId = pageId;
+            const searchInput = document.getElementById('searchInput');
+
+            document.getElementById('customObjectContent').style.display = 'block';
+            document.getElementById('customObjectTitle').innerText = pageLabel;
+            searchInput.placeholder = `Search ${pageLabel}...`;
+            currentCustomFields = customFields.filter(f => f.moduleName === pageId).sort((a, b) => (a.order || 0) - (b.order || 0));
+            columnVisibility = JSON.parse(localStorage.getItem('customDashColVis_' + pageId)) || {};
+            currentPage = 1;
+            currentSortColumn = null;
+            currentSortDirection = 'asc';
+            document.getElementById('paginationWrapper').style.display = 'flex';
+
+            // Fetch from backend
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
+                    const res = await apiClient.getCustomRecords(pageId);
+                    const records = Array.isArray(res) ? res : (res?.data || []);
+                    
+                    let localData = JSON.parse(localStorage.getItem('data_' + pageId));
+                    if (!Array.isArray(localData)) localData = [];
+                    
+                    const fetchedMap = new Map(records.map(r => [r._id || r.id, r]));
+                    
+                    localData.forEach(localRecord => {
+                        if (localRecord && (localRecord._id || localRecord.id)) {
+                            const recId = localRecord._id || localRecord.id;
+                            if (!fetchedMap.has(recId)) {
+                                records.push(localRecord);
+                            } else {
+                                const apiRecord = fetchedMap.get(recId);
+                                const localTime = new Date(localRecord.updatedAt || 0).getTime();
+                                const apiTime = new Date(apiRecord.updatedAt || 0).getTime();
+                                if (localTime > apiTime) {
+                                    const idx = records.findIndex(r => (r._id || r.id) === recId);
+                                    if (idx > -1) records[idx] = localRecord;
+                                }
+                            }
+                        }
+                    });
+
+                    const mappedRecords = records.map(r => ({ ...r, id: r._id || r.id }));
+                    localStorage.setItem('data_' + pageId, JSON.stringify(mappedRecords));
+                }
+            } catch (e) {
+                console.warn("Failed to fetch custom records from API", e);
+            }
+
+            renderCustomTable();
+        }
+
+        function renderCustomTable() {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const thead = document.getElementById('customTableHead');
+            const tbody = document.getElementById('customTableBody');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            if (currentCustomFields.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td style="text-align:center; padding: 30px;">No fields defined yet. Go to Object Manager to add fields.</td></tr>';
+                document.getElementById('paginationWrapper').style.display = 'none';
+                return;
+            } else {
+                document.getElementById('paginationWrapper').style.display = 'flex';
+            }
+
+            const visibleFields = currentCustomFields.filter(f => {
+                if (columnVisibility[f.fieldName] !== undefined) return columnVisibility[f.fieldName];
+                return f.showInGrid !== false;
+            });
+
+            let thHTML = '<tr><th style="width: 40px;"><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAllRecords(this)"></th><th>S.No</th>';
+            visibleFields.forEach(f => {
+                const icon = currentSortColumn === f.fieldName ? (currentSortDirection === 'asc' ? '▲' : '▼') : '';
+                thHTML += `<th style="cursor:pointer;" onclick="handleSort('${f.fieldName}')">${f.fieldLabel} <span class="sort-icon">${icon}</span></th>`;
+            });
+            thHTML += '<th>Actions</th></tr>';
+            thead.innerHTML = thHTML;
+
+            tbody.innerHTML = '';
+            currentFilteredData = data.filter(row => {
+                return Object.values(row).some(v => String(v).toLowerCase().includes(searchTerm));
+            });
+
+            if (currentSortColumn) {
+                currentFilteredData.sort((a, b) => {
+                    let valA = String(a[currentSortColumn] || "").toLowerCase();
+                    let valB = String(b[currentSortColumn] || "").toLowerCase();
+                    
+                    const numA = parseFloat(valA);
+                    const numB = parseFloat(valB);
+                    if(!isNaN(numA) && !isNaN(numB)) {
+                        return currentSortDirection === 'asc' ? numA - numB : numB - numA;
+                    }
+                    
+                    return currentSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                });
+            }
+
+            const totalItems = currentFilteredData.length;
+            const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+            const paginatedData = currentFilteredData.slice(startIndex, endIndex);
+
+            if (paginatedData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${visibleFields.length + 3}" style="text-align:center; padding: 30px;">No records found.</td></tr>`;
+            } else {
+                paginatedData.forEach((row, i) => {
+                    let tr = `<tr><td><input type="checkbox" class="record-checkbox" value="${row.id}" onclick="updateBulkDeleteBtn()"></td><td>${startIndex + i + 1}</td>`;
+                    visibleFields.forEach(f => {
+                        let val = row[f.fieldName];
+                        if (val !== undefined && val !== null && val !== '') {
+                            if (f.fieldType === 'currency' || f.fieldType === 'number') {
+                                let num = parseFloat(val);
+                                if (!isNaN(num)) {
+                                    val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                                    if (f.prefix || f.currencySymbol) val = (f.prefix || f.currencySymbol) + ' ' + val;
+                                    if (f.suffix) val = val + ' ' + f.suffix;
+                                }
+                            } else if (f.fieldType === 'date') {
+                                const d = new Date(val);
+                                if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
+                            } else if (f.fieldType === 'datetime') {
+                                const d = new Date(val);
+                                if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                            } else {
+                                if (f.prefix) val = f.prefix + ' ' + val;
+                                if (f.suffix) val = val + ' ' + f.suffix;
+                            }
+                        } else {
+                            val = '-';
+                        }
+                        tr += `<td>${val}</td>`;
+                    });
+                    tr += `<td>
+                        <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
+                        <button onclick="deleteCustomRecord('${row.id}')" style="color:#c62828; border:none; background:none; padding:0; cursor:pointer;">Delete</button>
+                    </td></tr>`;
+                    tbody.innerHTML += tr;
+                });
+            }
+            
+            renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+            updateBulkDeleteBtn();
+        }
+
+        function openCustomRecordModal(recordData = null) {
+            editCustomRecordId = recordData && recordData.id ? recordData.id : null;
+            document.getElementById('customModalTitle').innerText = editCustomRecordId ? "Edit Record" : "New Record";
+            const container = document.getElementById('customFormContainer');
+            container.innerHTML = '';
+
+            currentCustomFields.forEach(f => {
+                const reqHtml = f.isRequired ? '<span style="color:red">*</span>' : '';
+                const val = recordData ? (recordData[f.fieldName] || '') : '';
+                let inputHtml = '';
+                if (f.fieldType === 'select') {
+                    inputHtml = `<select id="${f.fieldName}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
+                    (f.options || []).forEach(o => inputHtml += `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`);
+                    inputHtml += `</select>`;
+                } else if (f.fieldType === 'textarea') {
+                    inputHtml = `<textarea id="${f.fieldName}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; grid-column: 1 / -1;">${val}</textarea>`;
+                } else {
+                    inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="${f.fieldName}" value="${val}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                }
+                const fullWidth = f.fieldType === 'textarea' ? 'style="grid-column: 1 / -1;"' : '';
+                container.innerHTML += `<div ${fullWidth}><label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">${f.fieldLabel} ${reqHtml}</label>${inputHtml}</div>`;
+            });
+            document.getElementById('customRecordModal').style.display = 'block';
+        }
+
+        function closeCustomRecordModal() {
+            editCustomRecordId = null;
+            document.getElementById('customRecordModal').style.display = 'none';
+        }
+
+        function editCustomRecord(id) {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = data.find(r => r.id === id);
+            if (record) openCustomRecordModal(record);
+        }
+
+        async function saveCustomRecord() {
+            let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let newId = editCustomRecordId || ('cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+            let currentUser = localStorage.getItem('currentUser') || 'System';
+            let newRow = { id: newId, _id: newId, moduleName: currentActivePageId, createdBy: currentUser, updatedAt: new Date().toISOString() };
+            let apiPayload = { _id: newId, moduleName: currentActivePageId, createdBy: currentUser, updatedAt: new Date().toISOString() };
+            let hasError = false;
+
+            if (editCustomRecordId) {
+                const existing = data.find(r => r.id === editCustomRecordId || r._id === editCustomRecordId);
+                if (existing) {
+                    newRow.createdBy = existing.createdBy || currentUser;
+                    apiPayload.createdBy = existing.createdBy || currentUser;
+                    newRow.createdAt = existing.createdAt || new Date().toISOString();
+                    apiPayload.createdAt = existing.createdAt || new Date().toISOString();
+                }
+            } else {
+                newRow.createdAt = new Date().toISOString();
+                apiPayload.createdAt = new Date().toISOString();
+            }
+
+            currentCustomFields.forEach(f => {
+                const val = document.getElementById(f.fieldName).value;
+                if (f.isRequired && !val) hasError = true;
+                newRow[f.fieldName] = val;
+                apiPayload[f.fieldName] = val;
+            });
+
+            if (hasError) return alert("Please fill all required fields");
+
+            if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                try {
+                    const res = await apiClient.saveCustomRecord(apiPayload);
+                    if (res && res.data && res.data._id) {
+                        newRow.id = res.data._id;
+                        newRow._id = res.data._id;
+                    }
+                } catch(err) { console.warn("API sync failed", err); }
+            }
+
+            if (editCustomRecordId) {
+                const index = data.findIndex(r => r.id === editCustomRecordId || r._id === editCustomRecordId);
+                if (index !== -1) data[index] = newRow;
+            } else {
+                data.push(newRow);
+            }
+
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
+            closeCustomRecordModal();
+            renderCustomTable();
+        }
+
+        async function deleteCustomRecord(id, skipConfirm = false) {
+            if (!skipConfirm && !confirm("Delete this record?")) return;
+            let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            data = data.filter(r => r.id !== id && r._id !== id);
+            
+            if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
+                await apiClient.deleteCustomRecord(id).catch(err => console.warn("API delete failed", err));
+            }
+
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
+            if (!skipConfirm) renderCustomTable();
+        }
+
+        function toggleSelectAllRecords(source) {
+            const checkboxes = document.querySelectorAll('.record-checkbox');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+            const btn = document.getElementById('bulkDeleteBtn');
+            if (btn) {
+                btn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                btn.innerHTML = `🗑️ Delete Selected (${checkedCount})`;
+            }
+            const selectAllCb = document.getElementById('selectAllCheckbox');
+            if (selectAllCb) {
+                const totalCheckboxes = document.querySelectorAll('.record-checkbox').length;
+                selectAllCb.checked = totalCheckboxes > 0 && checkedCount === totalCheckboxes;
+            }
+        }
+
+        async function deleteSelectedRecords() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return;
+            if (!confirm(`Are you sure you want to delete ${checkboxes.length} selected record(s)?`)) return;
+            
+            const idsToDelete = Array.from(checkboxes).map(cb => cb.value);
+            for (const id of idsToDelete) {
+                await deleteCustomRecord(id, true);
+            }
+            renderCustomTable();
+        }
+
+        function exportData() {
+            if (!currentActivePageId) return alert("No active page.");
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            if (data.length === 0) return alert("No data to export.");
+
+            const exportData = data.map(row => {
+                const obj = { 'Record ID': row.id || row._id };
+                currentCustomFields.forEach(f => {
+                    let val = row[f.fieldName];
+                    if (val !== undefined && val !== null && val !== '') {
+                        if (f.fieldType === 'currency' || f.fieldType === 'number') {
+                            let num = parseFloat(val);
+                            if (!isNaN(num)) {
+                                val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                                if (f.prefix || f.currencySymbol) val = (f.prefix || f.currencySymbol) + ' ' + val;
+                                if (f.suffix) val = val + ' ' + f.suffix;
+                            }
+                        } else if (f.fieldType === 'date') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
+                        } else if (f.fieldType === 'datetime') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                        } else {
+                            if (f.prefix) val = f.prefix + ' ' + val;
+                            if (f.suffix) val = val + ' ' + f.suffix;
+                        }
+                    } else {
+                        val = '';
+                    }
+                    obj[f.fieldLabel] = val;
+                });
+                return obj;
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, currentActivePageId);
+            XLSX.writeFile(wb, `${currentActivePageId}_export.xlsx`);
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+                if (jsonData.length === 0) {
+                    alert("The file is empty or formatted incorrectly.");
+                    input.value = '';
+                    return;
+                }
+
+                let savedData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+                let added = 0;
+                let updated = 0;
+
+                for (const row of jsonData) {
+                    const recordId = row['Record ID'] || row['id'] || row['_id'];
+                    let isUpdate = false;
+                    let existingRecord = {};
+                    let newId = null;
+                    
+                    if (recordId) {
+                        const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
+                        if (existingIdx > -1) {
+                            isUpdate = true;
+                            existingRecord = savedData[existingIdx];
+                            newId = existingRecord.id || existingRecord._id;
+                        }
+                    } else if (currentCustomFields.length > 0) {
+                        // Fallback: Match by the first column to update existing records if Record ID is missing
+                        const firstField = currentCustomFields[0];
+                        const matchVal = row[firstField.fieldLabel];
+                        if (matchVal !== undefined && matchVal !== '') {
+                            const existingIdx = savedData.findIndex(r => r[firstField.fieldName] == matchVal);
+                            if (existingIdx > -1) {
+                                isUpdate = true;
+                                existingRecord = savedData[existingIdx];
+                                newId = existingRecord.id || existingRecord._id;
+                            }
+                        }
+                    }
+                    
+                    if (!newId) {
+                        newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+                    }
+                    
+                    let currentUser = localStorage.getItem('currentUser') || 'System';
+                    let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                    let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                    
+                    if (!isUpdate) {
+                        newRow.createdBy = currentUser;
+                        newRow.createdAt = new Date().toISOString();
+                        apiPayload.createdBy = currentUser;
+                        apiPayload.createdAt = new Date().toISOString();
+                    }
+
+                    currentCustomFields.forEach(f => {
+                        let val = row[f.fieldLabel];
+                        
+                        if (val !== undefined) {
+                            if (val instanceof Date) {
+                                const offset = val.getTimezoneOffset() * 60000;
+                                const localDate = new Date(val.getTime() - offset);
+                                
+                                if (f.fieldType === 'date') {
+                                    val = localDate.toISOString().split('T')[0];
+                                } else if (f.fieldType === 'datetime') {
+                                    val = localDate.toISOString().slice(0, 16);
+                                }
+                            }
+                            // Do not overwrite existing data with empty strings during an update
+                            if (!(isUpdate && val === '')) {
+                                newRow[f.fieldName] = val;
+                                apiPayload[f.fieldName] = val;
+                            }
+                        } else if (!isUpdate) {
+                            newRow[f.fieldName] = '';
+                            apiPayload[f.fieldName] = '';
+                        }
+                    });
+                    
+                    if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                        try {
+                            const res = await apiClient.saveCustomRecord(apiPayload);
+                            if (res && res.data && res.data._id && !isUpdate) {
+                                newRow.id = res.data._id;
+                                newRow._id = res.data._id;
+                            }
+                        } catch(err) { console.warn("API sync failed", err); }
+                    }
+                    
+                    if (isUpdate) {
+                        const idx = savedData.findIndex(r => r.id === newRow.id || r._id === newRow._id);
+                        savedData[idx] = newRow;
+                        updated++;
+                    } else {
+                        savedData.push(newRow);
+                        added++;
+                    }
+                }
+
+                localStorage.setItem('data_' + currentActivePageId, JSON.stringify(savedData));
+                renderCustomTable();
+                alert(`Import successful: ${added} added, ${updated} updated.`);
+                input.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- Settings / Columns Logic ---
+        function openTableSettingsModal() {
+            if (!currentActivePageId) return alert("No active page.");
+            const container = document.getElementById('columnToggles');
+            container.innerHTML = '';
+            currentCustomFields.forEach(f => {
+                let isChecked = columnVisibility[f.fieldName];
+                if (isChecked === undefined) isChecked = f.showInGrid !== false;
+                
+                const label = document.createElement('label');
+                label.style.display = 'flex';
+                label.style.alignItems = 'center';
+                label.style.gap = '8px';
+                label.style.cursor = 'pointer';
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = 'col_' + f.fieldName;
+                cb.checked = isChecked;
+                
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(f.fieldLabel));
+                container.appendChild(label);
+            });
+            document.getElementById('tableSettingsModal').style.display = 'block';
+        }
+
+        function toggleAllColumns(state) {
+            currentCustomFields.forEach(f => {
+                const cb = document.getElementById('col_' + f.fieldName);
+                if (cb) cb.checked = state;
+            });
+        }
+
+        function saveColumnSettings() {
+            currentCustomFields.forEach(f => {
+                const cb = document.getElementById('col_' + f.fieldName);
+                if (cb) columnVisibility[f.fieldName] = cb.checked;
+            });
+            localStorage.setItem('customDashColVis_' + currentActivePageId, JSON.stringify(columnVisibility));
+            document.getElementById('tableSettingsModal').style.display = 'none';
+            renderCustomTable();
+        }
+
+        // --- Field Order Logic ---
+        function openFieldOrderModal() {
+            if (!currentActivePageId) return alert("No active page.");
+            const list = document.getElementById('fieldOrderList');
+            list.innerHTML = '';
+            currentCustomFields.forEach(f => {
+                const li = document.createElement('li');
+                li.dataset.fieldId = f._id || f.fieldName;
+                li.innerHTML = `<span style="color:#999; cursor:grab; margin-right:10px;">☰</span> <span>${f.fieldLabel}</span> <code style="font-size:11px;color:#666;margin-left:auto;">${f.fieldName}</code>`;
+                list.appendChild(li);
+            });
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(list, { animation: 150 });
+            }
+            document.getElementById('fieldOrderModal').style.display = 'block';
+        }
+
+        async function saveFieldOrder() {
+            const listItems = document.querySelectorAll('#fieldOrderList li');
+            const newOrderIds = Array.from(listItems).map(li => li.dataset.fieldId);
+            
+            currentCustomFields.sort((a, b) => newOrderIds.indexOf(a._id || a.fieldName) - newOrderIds.indexOf(b._id || b.fieldName));
+            currentCustomFields.forEach((f, i) => f.order = i);
+            
+            currentCustomFields.forEach(cf => {
+                const idx = customFields.findIndex(f => (f._id || f.fieldName) === (cf._id || cf.fieldName));
+                if (idx > -1) customFields[idx].order = cf.order;
+            });
+            localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
+            
+            if (typeof apiClient !== 'undefined' && apiClient.reorderCustomFields) {
+                const payload = currentCustomFields.map(f => ({ _id: f._id, order: f.order }));
+                apiClient.reorderCustomFields(payload).catch(console.warn);
+            }
+            
+            document.getElementById('fieldOrderModal').style.display = 'none';
+            renderCustomTable();
+        }
+
+        // --- Print Report Logic ---
+        function printTableReport() {
+            if (!currentActivePageId) return alert("No active page.");
+            const tableHTML = document.getElementById('customTable').outerHTML;
+            const title = document.getElementById('customObjectTitle').innerText;
+
+            let html = `<!DOCTYPE html><html><head><title>Print Report - ${title}</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f8fafc; font-weight: 600; }
+                @media print { .no-print { display: none !important; } th:last-child, td:last-child { display: none !important; } }
+            </style></head><body>
+            <h2 style="text-align:center;">${title} Report</h2>
+            ${tableHTML}
+            <div style="text-align:center; margin-top:30px;" class="no-print">
+                <button onclick="window.print()" style="padding:10px 20px; font-size:16px; background:#0176d3; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
+            </div></body></html>`;
+
+            const win = window.open('', '', 'width=900,height=700');
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+        }
+
+        // --- Sorting and Pagination Engine ---
+        function handleSort(column) {
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+            }
+            renderCustomTable();
+        }
+
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rowsPerPageSelect').value);
+            currentPage = 1;
+            renderCustomTable();
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            renderCustomTable();
+        }
+
+        function renderPagination(totalItems, start, end, totalPages) {
+            const info = document.getElementById("paginationInfo");
+            const controls = document.getElementById("paginationControls");
+            const totalDisplay = document.getElementById("totalRecordsDisplay");
+
+            if (totalDisplay) totalDisplay.innerText = `Total Records: ${totalItems}`;
+
+            if (totalItems === 0) {
+                if (info) info.innerText = "No records found";
+                if (controls) controls.innerHTML = "";
+                return;
+            }
+
+            if (info) info.innerText = `Showing ${start} to ${end} of ${totalItems} entries`;
+            let html = `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const activeStyle = i === currentPage ? 'class="active"' : '';
+                    html += `<button ${activeStyle} onclick="changePage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span>...</span>`;
+                }
+            }
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+            if (controls) controls.innerHTML = html;
+        }
+    </script>
+
+</body>
+
+</html>
