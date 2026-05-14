@@ -414,8 +414,23 @@
 
             loadCustomTabs();
             if (customPages.length > 0) {
-                const firstTab = document.querySelector('#mainNavbar a');
-                if (firstTab) firstTab.click();
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetPageId = urlParams.get('pageId');
+                
+                let targetTab = null;
+                if (targetPageId) {
+                    const tabs = document.querySelectorAll('#mainNavbar a');
+                    tabs.forEach(tab => {
+                        if (tab.dataset.pageId === targetPageId) targetTab = tab;
+                    });
+                }
+                
+                if (targetTab) {
+                    targetTab.click();
+                } else {
+                    const firstTab = document.querySelector('#mainNavbar a');
+                    if (firstTab) firstTab.click();
+                }
             } else {
                 document.getElementById('customObjectContent').style.display = 'block';
                 document.getElementById('customObjectTitle').innerText = 'No Custom Objects Found';
@@ -449,6 +464,7 @@
                 const a = document.createElement('a');
                 a.href = "#";
                 a.innerText = p.label;
+                a.dataset.pageId = p.pageId;
                 a.onclick = function (e) { e.preventDefault(); switchTab(p.pageId, this, p.label); };
                 nav.appendChild(a);
             });
