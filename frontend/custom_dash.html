@@ -531,7 +531,31 @@
             } else {
                 paginatedData.forEach((row, i) => {
                     let tr = `<tr><td><input type="checkbox" class="record-checkbox" value="${row.id}" onclick="updateBulkDeleteBtn()"></td><td>${startIndex + i + 1}</td>`;
-                    visibleFields.forEach(f => tr += `<td>${row[f.fieldName] || '-'}</td>`);
+                    visibleFields.forEach(f => {
+                        let val = row[f.fieldName];
+                        if (val !== undefined && val !== null && val !== '') {
+                            if (f.fieldType === 'currency' || f.fieldType === 'number') {
+                                let num = parseFloat(val);
+                                if (!isNaN(num)) {
+                                    val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                                    if (f.prefix || f.currencySymbol) val = (f.prefix || f.currencySymbol) + ' ' + val;
+                                    if (f.suffix) val = val + ' ' + f.suffix;
+                                }
+                            } else if (f.fieldType === 'date') {
+                                const d = new Date(val);
+                                if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
+                            } else if (f.fieldType === 'datetime') {
+                                const d = new Date(val);
+                                if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                            } else {
+                                if (f.prefix) val = f.prefix + ' ' + val;
+                                if (f.suffix) val = val + ' ' + f.suffix;
+                            }
+                        } else {
+                            val = '-';
+                        }
+                        tr += `<td>${val}</td>`;
+                    });
                     tr += `<td>
                         <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
                         <button onclick="deleteCustomRecord('${row.id}')" style="color:#c62828; border:none; background:none; padding:0; cursor:pointer;">Delete</button>
@@ -663,7 +687,29 @@
             const exportData = data.map(row => {
                 const obj = {};
                 currentCustomFields.forEach(f => {
-                    obj[f.fieldLabel] = row[f.fieldName] || '';
+                    let val = row[f.fieldName];
+                    if (val !== undefined && val !== null && val !== '') {
+                        if (f.fieldType === 'currency' || f.fieldType === 'number') {
+                            let num = parseFloat(val);
+                            if (!isNaN(num)) {
+                                val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                                if (f.prefix || f.currencySymbol) val = (f.prefix || f.currencySymbol) + ' ' + val;
+                                if (f.suffix) val = val + ' ' + f.suffix;
+                            }
+                        } else if (f.fieldType === 'date') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
+                        } else if (f.fieldType === 'datetime') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                        } else {
+                            if (f.prefix) val = f.prefix + ' ' + val;
+                            if (f.suffix) val = val + ' ' + f.suffix;
+                        }
+                    } else {
+                        val = '';
+                    }
+                    obj[f.fieldLabel] = val;
                 });
                 return obj;
             });

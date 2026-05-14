@@ -1563,9 +1563,45 @@
                         } else {
                             html += `<td><span class="cell-empty">—</span></td>`;
                         }
+                    } else if (field.fieldType === 'date') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) {
+                            let display = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                            html += `<td title="${display}">${display}</td>`;
+                        } else {
+                            html += `<td><span class="cell-empty">—</span></td>`;
+                        }
+                    } else if (field.fieldType === 'datetime') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) {
+                            let display = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                            html += `<td title="${display}">${display}</td>`;
+                        } else {
+                            html += `<td><span class="cell-empty">—</span></td>`;
+                        }
+                    } else if (field.fieldType === 'currency') {
+                        let num = parseFloat(val);
+                        if (!isNaN(num)) {
+                            let display = num.toLocaleString('en-IN', { minimumFractionDigits: field.currencyDecimals !== undefined ? field.currencyDecimals : 2, maximumFractionDigits: field.currencyDecimals !== undefined ? field.currencyDecimals : 2 });
+                            if (field.prefix || field.currencySymbol) display = `${field.prefix || field.currencySymbol} ${display}`;
+                            if (field.suffix) display = `${display} ${field.suffix}`;
+                            html += `<td title="${display}">${display}</td>`;
+                        } else {
+                            html += `<td><span class="cell-empty">—</span></td>`;
+                        }
+                    } else if (field.fieldType === 'number') {
+                        let num = parseFloat(val);
+                        if (!isNaN(num)) {
+                            let display = num.toLocaleString('en-IN', { maximumFractionDigits: 4 });
+                            if (field.prefix) display = `${field.prefix} ${display}`;
+                            if (field.suffix) display = `${display} ${field.suffix}`;
+                            html += `<td title="${display}">${display}</td>`;
+                        } else {
+                            html += `<td><span class="cell-empty">—</span></td>`;
+                        }
                     } else {
                         let display = String(val);
-                        if (field.prefix || field.currencySymbol) display = `${field.prefix || field.currencySymbol} ${display}`;
+                        if (field.prefix) display = `${field.prefix} ${display}`;
                         if (field.suffix) display = `${display} ${field.suffix}`;
                         // FIX: title attribute shows full text on hover when cell is clipped
                         html += `<td title="${display}">${display}</td>`;
@@ -2156,9 +2192,30 @@
                                 else val = f.name || 'Attachment';
                             } catch (e) { val = 'Attachment'; }
                         } else val = '—';
-                    }
-                    else {
-                        if (field.prefix || field.currencySymbol) val = `${field.prefix || field.currencySymbol} ${val}`;
+                    } else if (field.fieldType === 'date') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                        else val = '—';
+                    } else if (field.fieldType === 'datetime') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                        else val = '—';
+                    } else if (field.fieldType === 'currency') {
+                        let num = parseFloat(val);
+                        if (!isNaN(num)) {
+                            val = num.toLocaleString('en-IN', { minimumFractionDigits: field.currencyDecimals !== undefined ? field.currencyDecimals : 2, maximumFractionDigits: field.currencyDecimals !== undefined ? field.currencyDecimals : 2 });
+                            if (field.prefix || field.currencySymbol) val = `${field.prefix || field.currencySymbol} ${val}`;
+                            if (field.suffix) val = `${val} ${field.suffix}`;
+                        } else val = '—';
+                    } else if (field.fieldType === 'number') {
+                        let num = parseFloat(val);
+                        if (!isNaN(num)) {
+                            val = num.toLocaleString('en-IN', { maximumFractionDigits: 4 });
+                            if (field.prefix) val = `${field.prefix} ${val}`;
+                            if (field.suffix) val = `${val} ${field.suffix}`;
+                        } else val = '—';
+                    } else {
+                        if (field.prefix) val = `${field.prefix} ${val}`;
                         if (field.suffix) val = `${val} ${field.suffix}`;
                     }
                     tableHTML += `<td>${val}</td>`;
@@ -2255,8 +2312,29 @@
                             } else val = f.name || 'Attachment';
                         } catch (e) { val = 'Attachment'; }
                     } else val = '—';
-                }
-                else {
+                } else if (field.fieldType === 'date') {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                    else val = '—';
+                } else if (field.fieldType === 'datetime') {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                    else val = '—';
+                } else if (field.fieldType === 'currency') {
+                    let num = parseFloat(val);
+                    if (!isNaN(num)) {
+                        val = num.toLocaleString('en-IN', { minimumFractionDigits: field.currencyDecimals !== undefined ? field.currencyDecimals : 2, maximumFractionDigits: field.currencyDecimals !== undefined ? field.currencyDecimals : 2 });
+                        if (field.prefix || field.currencySymbol) val = `${field.prefix || field.currencySymbol} ${val}`;
+                        if (field.suffix) val = `${val} ${field.suffix}`;
+                    } else val = '—';
+                } else if (field.fieldType === 'number') {
+                    let num = parseFloat(val);
+                    if (!isNaN(num)) {
+                        val = num.toLocaleString('en-IN', { maximumFractionDigits: 4 });
+                        if (field.prefix) val = `${field.prefix} ${val}`;
+                        if (field.suffix) val = `${val} ${field.suffix}`;
+                    } else val = '—';
+                } else {
                     if (field.prefix) val = field.prefix + ' ' + val;
                     if (field.suffix) val += ' ' + field.suffix;
                 }
