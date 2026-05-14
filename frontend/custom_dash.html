@@ -387,6 +387,10 @@
 
         // Initialize
         window.onload = async () => {
+            const currentUser = localStorage.getItem('currentUser') || 'Admin User';
+            const profileEl = document.querySelector('.profile');
+            if (profileEl) profileEl.innerText = currentUser;
+
             try {
                 if (typeof apiClient !== 'undefined') {
                     if (apiClient.getCustomFields) {
@@ -510,11 +514,33 @@
             // Fetch from backend
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
-                    const records = await apiClient.getCustomRecords(pageId);
-                    if (records) {
-                        const mappedRecords = records.map(r => ({ ...r, id: r._id || r.id }));
-                        localStorage.setItem('data_' + pageId, JSON.stringify(mappedRecords));
-                    }
+                    const res = await apiClient.getCustomRecords(pageId);
+                    const records = Array.isArray(res) ? res : (res?.data || []);
+                    
+                    let localData = JSON.parse(localStorage.getItem('data_' + pageId));
+                    if (!Array.isArray(localData)) localData = [];
+                    
+                    const fetchedMap = new Map(records.map(r => [r._id || r.id, r]));
+                    
+                    localData.forEach(localRecord => {
+                        if (localRecord && (localRecord._id || localRecord.id)) {
+                            const recId = localRecord._id || localRecord.id;
+                            if (!fetchedMap.has(recId)) {
+                                records.push(localRecord);
+                            } else {
+                                const apiRecord = fetchedMap.get(recId);
+                                const localTime = new Date(localRecord.updatedAt || 0).getTime();
+                                const apiTime = new Date(apiRecord.updatedAt || 0).getTime();
+                                if (localTime > apiTime) {
+                                    const idx = records.findIndex(r => (r._id || r.id) === recId);
+                                    if (idx > -1) records[idx] = localRecord;
+                                }
+                            }
+                        }
+                    });
+
+                    const mappedRecords = records.map(r => ({ ...r, id: r._id || r.id }));
+                    localStorage.setItem('data_' + pageId, JSON.stringify(mappedRecords));
                 }
             } catch (e) {
                 console.warn("Failed to fetch custom records from API", e);
@@ -661,9 +687,23 @@
         async function saveCustomRecord() {
             let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
             let newId = editCustomRecordId || ('cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
-            let newRow = { id: newId, _id: newId, moduleName: currentActivePageId };
-            let apiPayload = { _id: newId, moduleName: currentActivePageId };
+            let currentUser = localStorage.getItem('currentUser') || 'System';
+            let newRow = { id: newId, _id: newId, moduleName: currentActivePageId, createdBy: currentUser, updatedAt: new Date().toISOString() };
+            let apiPayload = { _id: newId, moduleName: currentActivePageId, createdBy: currentUser, updatedAt: new Date().toISOString() };
             let hasError = false;
+
+            if (editCustomRecordId) {
+                const existing = data.find(r => r.id === editCustomRecordId || r._id === editCustomRecordId);
+                if (existing) {
+                    newRow.createdBy = existing.createdBy || currentUser;
+                    apiPayload.createdBy = existing.createdBy || currentUser;
+                    newRow.createdAt = existing.createdAt || new Date().toISOString();
+                    apiPayload.createdAt = existing.createdAt || new Date().toISOString();
+                }
+            } else {
+                newRow.createdAt = new Date().toISOString();
+                apiPayload.createdAt = new Date().toISOString();
+            }
 
             currentCustomFields.forEach(f => {
                 const val = document.getElementById(f.fieldName).value;
@@ -835,8 +875,16 @@
                         newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
                     }
                     
-                    let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId };
-                    let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId };
+                    let currentUser = localStorage.getItem('currentUser') || 'System';
+                    let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                    let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                    
+                    if (!isUpdate) {
+                        newRow.createdBy = currentUser;
+                        newRow.createdAt = new Date().toISOString();
+                        apiPayload.createdBy = currentUser;
+                        apiPayload.createdAt = new Date().toISOString();
+                    }
 
                     currentCustomFields.forEach(f => {
                         let val = row[f.fieldLabel];
