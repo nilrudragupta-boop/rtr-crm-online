@@ -1491,6 +1491,17 @@
             renderCustomFieldsTable();
         }
 
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
+                    const settings = await apiClient.getSettings();
+                    if (settings && settings.crmCustomPages) {
+                        localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
+                    }
+                }
+            } catch (e) { console.warn(e); }
+        });
+
         function populateCfModuleFilter() {
             const filter = document.getElementById('cfModuleFilter');
             if (!filter) return;
@@ -1973,7 +1984,18 @@
             const val = document.getElementById('pageLabel').value;
             document.getElementById('pageId').value = 'obj_' + val.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/_$/, '');
         }
-        function savePage() {
+        async function syncCustomPagesToBackend(pages) {
+            if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
+                try {
+                    const settings = await apiClient.getSettings() || {};
+                    settings.crmCustomPages = pages;
+                    await apiClient.saveSettings(settings);
+                } catch (e) {
+                    console.warn("Failed to sync custom pages to backend", e);
+                }
+            }
+        }
+        async function savePage() {
             const label = document.getElementById('pageLabel').value.trim();
             const pageId = document.getElementById('pageId').value.trim();
             const icon = document.getElementById('pageIcon').value;
@@ -1982,6 +2004,7 @@
             if (customPages.some(p => p.pageId === pageId)) return cfmToast('A page with this API name already exists.', 'error');
             customPages.push({ pageId, label, icon });
             localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
+            await syncCustomPagesToBackend(customPages);
             cfmToast('Custom page created! It will now appear as a Target Module.', 'success');
             closePageModal();
             populateCfModuleDatalist();
@@ -2022,33 +2045,36 @@
             new Sortable(list, {
                 handle: '.cfm-grip',
                 animation: 150,
-                onEnd: function (evt) {
+                onEnd: async function (evt) {
                     let pages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
                     const movedItem = pages.splice(evt.oldIndex, 1)[0];
                     pages.splice(evt.newIndex, 0, movedItem);
                     localStorage.setItem('crmCustomPages', JSON.stringify(pages));
+                    await syncCustomPagesToBackend(pages);
                     renderCustomPageList(); // Refresh indices
                     populateCfModuleDatalist();
                 }
             });
         }
-        function editCustomPage(index) {
+        async function editCustomPage(index) {
             let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             const newLabel = prompt("Enter new label for custom page:", customPages[index].label);
             if (newLabel && newLabel.trim() !== "" && newLabel !== customPages[index].label) {
                 customPages[index].label = newLabel.trim();
                 localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
+                await syncCustomPagesToBackend(customPages);
                 cfmToast('Custom page label updated.', 'success');
                 renderCustomPageList();
                 populateCfModuleDatalist();
                 populateCfModuleFilter();
             }
         }
-        function deleteCustomPage(index) {
+        async function deleteCustomPage(index) {
             let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             if (confirm(`Are you sure you want to delete the custom page "${customPages[index].label}"? Existing records mapped to this page will become inaccessible.`)) {
                 customPages.splice(index, 1);
                 localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
+                await syncCustomPagesToBackend(customPages);
                 cfmToast('Custom page deleted.', 'success');
                 renderCustomPageList();
                 populateCfModuleDatalist();

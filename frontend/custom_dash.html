@@ -386,13 +386,22 @@
         // Initialize
         window.onload = async () => {
             try {
-                if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
-                    const fields = await apiClient.getCustomFields();
-                    if (fields) {
-                        customFields = fields;
-                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
-                    } else {
-                        customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                if (typeof apiClient !== 'undefined') {
+                    if (apiClient.getCustomFields) {
+                        const fields = await apiClient.getCustomFields();
+                        if (fields) {
+                            customFields = fields;
+                            localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
+                        } else {
+                            customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                        }
+                    }
+                    
+                    if (apiClient.getSettings) {
+                        const settings = await apiClient.getSettings();
+                        if (settings && settings.crmCustomPages) {
+                            localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
+                        }
                     }
                 } else {
                     customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
@@ -400,6 +409,8 @@
             } catch (e) {
                 customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
             }
+
+            customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
 
             loadCustomTabs();
             if (customPages.length > 0) {
@@ -410,12 +421,15 @@
                 document.getElementById('customObjectTitle').innerText = 'No Custom Objects Found';
                 document.getElementById('customTableHead').innerHTML = '';
                 document.getElementById('customTableBody').innerHTML = '<tr><td style="text-align:center; padding: 30px;">Go to Object Manager to create custom objects.</td></tr>';
-                document.querySelector('#customObjectContent button').style.display = 'none';
+                const headerDiv = document.querySelector('.page-header div');
+                if (headerDiv) {
+                    headerDiv.style.display = 'none';
+                }
             }
         };
 
         // --- Custom Objects Logic ---
-        const customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+        let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
         let customFields = [];
         let currentActivePageId = null;
         let editCustomRecordId = null;
@@ -442,10 +456,18 @@
             if (typeof Sortable !== 'undefined') {
                 new Sortable(nav, {
                     animation: 150,
-                    onEnd: function (evt) {
+                    onEnd: async function (evt) {
                         const movedItem = customPages.splice(evt.oldIndex, 1)[0];
                         customPages.splice(evt.newIndex, 0, movedItem);
                         localStorage.setItem('crmCustomPages', JSON.stringify(customPages));
+
+                        if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
+                            try {
+                                const settings = await apiClient.getSettings() || {};
+                                settings.crmCustomPages = customPages;
+                                await apiClient.saveSettings(settings);
+                            } catch(e) {}
+                        }
                     }
                 });
             }
