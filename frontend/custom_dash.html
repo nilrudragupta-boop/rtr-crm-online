@@ -131,7 +131,9 @@
             border-bottom: 2px solid var(--slds-border);
             color: #444;
             font-weight: 600;
-            position: relative;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         td {
@@ -299,7 +301,7 @@
                 <button class="primary" onclick="openCustomRecordModal()">+ New Record</button>
             </div>
         </div>
-        <div class="table-card" style="overflow-x: auto;">
+        <div class="table-card" style="overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 240px);">
             <table id="customTable">
                 <thead id="customTableHead"></thead>
                 <tbody id="customTableBody"></tbody>
@@ -414,8 +416,23 @@
 
             loadCustomTabs();
             if (customPages.length > 0) {
-                const firstTab = document.querySelector('#mainNavbar a');
-                if (firstTab) firstTab.click();
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetPageId = urlParams.get('pageId');
+                
+                let targetTab = null;
+                if (targetPageId) {
+                    const tabs = document.querySelectorAll('#mainNavbar a');
+                    tabs.forEach(tab => {
+                        if (tab.dataset.pageId === targetPageId) targetTab = tab;
+                    });
+                }
+                
+                if (targetTab) {
+                    targetTab.click();
+                } else {
+                    const firstTab = document.querySelector('#mainNavbar a');
+                    if (firstTab) firstTab.click();
+                }
             } else {
                 document.getElementById('customObjectContent').style.display = 'block';
                 document.getElementById('customObjectTitle').innerText = 'No Custom Objects Found';
@@ -449,6 +466,7 @@
                 const a = document.createElement('a');
                 a.href = "#";
                 a.innerText = p.label;
+                a.dataset.pageId = p.pageId;
                 a.onclick = function (e) { e.preventDefault(); switchTab(p.pageId, this, p.label); };
                 nav.appendChild(a);
             });
@@ -771,7 +789,7 @@
             const reader = new FileReader();
             reader.onload = async function(e) {
                 const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
@@ -791,7 +809,18 @@
                     const apiPayload = { _id: newId, moduleName: currentActivePageId };
 
                     currentCustomFields.forEach(f => {
-                        const val = row[f.fieldLabel] !== undefined ? row[f.fieldLabel] : '';
+                        let val = row[f.fieldLabel] !== undefined ? row[f.fieldLabel] : '';
+                        
+                        if (val instanceof Date) {
+                            const offset = val.getTimezoneOffset() * 60000;
+                            const localDate = new Date(val.getTime() - offset);
+                            
+                            if (f.fieldType === 'date') {
+                                val = localDate.toISOString().split('T')[0];
+                            } else if (f.fieldType === 'datetime') {
+                                val = localDate.toISOString().slice(0, 16);
+                            }
+                        }
                         newRow[f.fieldName] = val;
                         apiPayload[f.fieldName] = val;
                     });
