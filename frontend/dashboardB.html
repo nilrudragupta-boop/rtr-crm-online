@@ -814,6 +814,11 @@
                         <i class="fas fa-user-tie"></i>
                         <span class="nav-text">Employees</span>
                     </button>
+                    <button class="nav-item" onclick="openWindow('custom_module.html', 1200, 800)"
+                        data-permission-id="perm_custom_sheet" title="Custom Sheet">
+                        <i class="fas fa-table"></i>
+                        <span class="nav-text">Custom Sheet</span>
+                    </button>
                 </div>
 
                 <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 10px 0;"></div>
@@ -2940,17 +2945,13 @@
 
             // Inject Dynamic Custom Pages
             function loadDynamicCustomPages() {
-                const customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
-                // Any module not in this array is treated as a Custom Page
-                const standardModules = ['Customer', 'Invoice', 'Item', 'Supplier'];
-                const customModules = [...new Set(customFields.map(f => f.moduleName).filter(m => !standardModules.includes(m)))];
-
+                const customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
                 const wrapper = document.getElementById('dynamicPagesWrapper');
                 if (wrapper) {
-                    wrapper.innerHTML = customModules.map(m => `
-                    <button class="nav-item" onclick="openWindow('custom_module.html?module=${encodeURIComponent(m)}', 1000, 700)" title="${m}">
-                        <i class="fas fa-folder-open" style="color: #f39c12;"></i>
-                        <span class="nav-text">${m}</span>
+                    wrapper.innerHTML = customPages.map(p => `
+                    <button class="nav-item" onclick="openWindow('custom_module.html?module=${encodeURIComponent(p.pageId)}', 1200, 800)" title="${p.label}">
+                        <i class="${p.icon || 'fas fa-folder-open'}" style="color: #f39c12;"></i>
+                        <span class="nav-text">${p.label}</span>
                     </button>
                 `).join('');
                 }

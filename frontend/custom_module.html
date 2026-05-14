@@ -1275,7 +1275,9 @@
             }
             let css = '';
             moduleFields.forEach((f, i) => {
-                if (columnVisibility[f.fieldName] === false) {
+                let isVisible = columnVisibility[f.fieldName];
+                if (isVisible === undefined) isVisible = f.showInGrid !== false;
+                if (!isVisible) {
                     // FIX: column index is i+2 because:
                     //   child 1 = '#' (serial number)
                     //   child 2..N = data columns
@@ -1292,7 +1294,8 @@
             container.innerHTML = '';
 
             moduleFields.forEach(f => {
-                const isChecked = columnVisibility[f.fieldName] !== false; // true by default
+                let isChecked = columnVisibility[f.fieldName];
+                if (isChecked === undefined) isChecked = f.showInGrid !== false; // true by default
 
                 const label = document.createElement('label');
                 label.style.display = 'flex';
@@ -2128,7 +2131,11 @@
             }
 
             // Identify visible columns based on user settings
-            const visibleFields = moduleFields.filter(f => columnVisibility[f.fieldName] !== false);
+            const visibleFields = moduleFields.filter(f => {
+                let isVisible = columnVisibility[f.fieldName];
+                if (isVisible === undefined) isVisible = f.showInGrid !== false;
+                return isVisible;
+            });
 
             let tableHTML = '<table><thead><tr><th>#</th>';
             visibleFields.forEach(f => tableHTML += `<th>${f.fieldLabel}</th>`);

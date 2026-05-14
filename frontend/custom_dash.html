@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Objects | RISE Tech Revolution</title>
+    <style>
+        :root {
+            --slds-blue: #0176d3;
+            --slds-dark-blue: #0b5cab;
+            --slds-bg: #f3f3f3;
+            --slds-text: #181818;
+            --slds-border: #dddbda;
+            --slds-card-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background: var(--slds-bg);
+            color: var(--slds-text);
+        }
+
+        /* --- Header & Navigation --- */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fff;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--slds-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--slds-blue);
+            letter-spacing: 0.5px;
+        }
+
+        .search-container {
+            flex: 0 1 400px;
+        }
+
+        .search-container input {
+            width: 100%;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--slds-border);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-container input:focus {
+            border-color: var(--slds-blue);
+        }
+
+        .navbar {
+            background: #fff;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--slds-border);
+            display: flex;
+            gap: 24px;
+        }
+
+        .navbar a {
+            padding: 12px 0;
+            color: #444;
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-bottom: 3px solid transparent;
+        }
+
+        .navbar a.active {
+            color: var(--slds-blue);
+            border-bottom-color: var(--slds-blue);
+            font-weight: 600;
+        }
+
+        /* --- Content Area --- */
+        .content {
+            padding: 24px;
+            max-width: 1600px;
+            margin: auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .page-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 400;
+        }
+
+        /* --- Table Card --- */
+        .table-card {
+            background: #fff;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            box-shadow: var(--slds-card-shadow);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: #f8f9fa;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--slds-border);
+            color: #444;
+            font-weight: 600;
+            position: relative;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--slds-border);
+        }
+
+        tr:hover {
+            background: #f1f7fb;
+        }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid var(--slds-border);
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button.primary {
+            background: var(--slds-blue);
+            color: white;
+            border: none;
+        }
+
+        button.primary:hover {
+            background: var(--slds-dark-blue);
+        }
+
+        /* --- Modal & Settings --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background: #fff;
+            margin: 5% auto;
+            padding: 0;
+            width: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--slds-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 12px;
+            border-top: 1px solid var(--slds-border);
+            text-align: right;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="logo">RISE TECH REVOLUTION</div>
+        <div class="search-container">
+            <input type="text" id="searchInput" onkeyup="handleSearch()" placeholder="Search...">
+        </div>
+        <div class="profile" style="font-weight:600; color:#555;">Admin User</div>
+    </header>
+
+    <nav class="navbar" id="mainNavbar">
+    </nav>
+
+    <!-- Dynamic Custom Object Section -->
+    <section class="content" id="customObjectContent">
+        <div class="page-header">
+            <h2 id="customObjectTitle">Custom Object</h2>
+            <button class="primary" onclick="openCustomRecordModal()">+ New Record</button>
+        </div>
+        <div class="table-card" style="overflow-x: auto;">
+            <table id="customTable">
+                <thead id="customTableHead"></thead>
+                <tbody id="customTableBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Dynamic Form Modal -->
+    <div id="customRecordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;" id="customModalTitle">New Record</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeCustomRecordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" id="customFormContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeCustomRecordModal()">Cancel</button>
+                <button class="primary" onclick="saveCustomRecord()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleSearch() {
+            renderCustomTable();
+        }
+
+        // Initialize
+        window.onload = async () => {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
+                    const fields = await apiClient.getCustomFields();
+                    if (fields) {
+                        customFields = fields;
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
+                    } else {
+                        customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                    }
+                } else {
+                    customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                }
+            } catch (e) {
+                customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            }
+
+            loadCustomTabs();
+            if (customPages.length > 0) {
+                const firstTab = document.querySelector('#mainNavbar a');
+                if (firstTab) firstTab.click();
+            } else {
+                document.getElementById('customObjectContent').style.display = 'block';
+                document.getElementById('customObjectTitle').innerText = 'No Custom Objects Found';
+                document.getElementById('customTableHead').innerHTML = '';
+                document.getElementById('customTableBody').innerHTML = '<tr><td style="text-align:center; padding: 30px;">Go to Object Manager to create custom objects.</td></tr>';
+                document.querySelector('#customObjectContent button').style.display = 'none';
+            }
+        };
+
+        // --- Custom Objects Logic ---
+        const customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+        let customFields = [];
+        let currentActivePageId = null;
+        let editCustomRecordId = null;
+        let currentCustomFields = [];
+
+        function loadCustomTabs() {
+            const nav = document.getElementById('mainNavbar');
+            customPages.forEach(p => {
+                const a = document.createElement('a');
+                a.href = "#";
+                a.innerText = p.label;
+                a.onclick = function (e) { e.preventDefault(); switchTab(p.pageId, this, p.label); };
+                nav.appendChild(a);
+            });
+        }
+
+        function switchTab(pageId, tabElement, pageLabel = '') {
+            document.querySelectorAll('#mainNavbar a').forEach(a => a.classList.remove('active'));
+            tabElement.classList.add('active');
+            currentActivePageId = pageId;
+            const searchInput = document.getElementById('searchInput');
+
+            document.getElementById('customObjectContent').style.display = 'block';
+            document.getElementById('customObjectTitle').innerText = pageLabel;
+            searchInput.placeholder = `Search ${pageLabel}...`;
+            currentCustomFields = customFields.filter(f => f.moduleName === pageId).sort((a, b) => (a.order || 0) - (b.order || 0));
+            renderCustomTable();
+        }
+
+        function renderCustomTable() {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const thead = document.getElementById('customTableHead');
+            const tbody = document.getElementById('customTableBody');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            if (currentCustomFields.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td style="text-align:center; padding: 30px;">No fields defined yet. Go to Object Manager to add fields.</td></tr>';
+                return;
+            }
+
+            let thHTML = '<tr><th>S.No</th>';
+            currentCustomFields.forEach(f => thHTML += `<th>${f.fieldLabel}</th>`);
+            thHTML += '<th>Actions</th></tr>';
+            thead.innerHTML = thHTML;
+
+            tbody.innerHTML = '';
+            const filteredData = data.filter(row => {
+                return Object.values(row).some(v => String(v).toLowerCase().includes(searchTerm));
+            });
+
+            filteredData.forEach((row, i) => {
+                let tr = `<tr><td>${i + 1}</td>`;
+                currentCustomFields.forEach(f => tr += `<td>${row[f.fieldName] || '-'}</td>`);
+                tr += `<td>
+                    <button onclick="editCustomRecord('${row.id}')" style="color:#1976d2; border:none; background:none; padding:0; margin-right:10px; cursor:pointer;">Edit</button>
+                    <button onclick="deleteCustomRecord('${row.id}')" style="color:#c62828; border:none; background:none; padding:0; cursor:pointer;">Delete</button>
+                </td></tr>`;
+                tbody.innerHTML += tr;
+            });
+        }
+
+        function openCustomRecordModal(recordData = null) {
+            editCustomRecordId = recordData && recordData.id ? recordData.id : null;
+            document.getElementById('customModalTitle').innerText = editCustomRecordId ? "Edit Record" : "New Record";
+            const container = document.getElementById('customFormContainer');
+            container.innerHTML = '';
+
+            currentCustomFields.forEach(f => {
+                const reqHtml = f.isRequired ? '<span style="color:red">*</span>' : '';
+                const val = recordData ? (recordData[f.fieldName] || '') : '';
+                let inputHtml = '';
+                if (f.fieldType === 'select') {
+                    inputHtml = `<select id="${f.fieldName}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
+                    (f.options || []).forEach(o => inputHtml += `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`);
+                    inputHtml += `</select>`;
+                } else if (f.fieldType === 'textarea') {
+                    inputHtml = `<textarea id="${f.fieldName}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; grid-column: 1 / -1;">${val}</textarea>`;
+                } else {
+                    inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="${f.fieldName}" value="${val}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                }
+                const fullWidth = f.fieldType === 'textarea' ? 'style="grid-column: 1 / -1;"' : '';
+                container.innerHTML += `<div ${fullWidth}><label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">${f.fieldLabel} ${reqHtml}</label>${inputHtml}</div>`;
+            });
+            document.getElementById('customRecordModal').style.display = 'block';
+        }
+
+        function closeCustomRecordModal() {
+            editCustomRecordId = null;
+            document.getElementById('customRecordModal').style.display = 'none';
+        }
+
+        function editCustomRecord(id) {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = data.find(r => r.id === id);
+            if (record) openCustomRecordModal(record);
+        }
+
+        function saveCustomRecord() {
+            let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let newRow = { id: editCustomRecordId || Date.now().toString() };
+            let hasError = false;
+
+            currentCustomFields.forEach(f => {
+                const val = document.getElementById(f.fieldName).value;
+                if (f.isRequired && !val) hasError = true;
+                newRow[f.fieldName] = val;
+            });
+
+            if (hasError) return alert("Please fill all required fields");
+
+            if (editCustomRecordId) {
+                const index = data.findIndex(r => r.id === editCustomRecordId);
+                if (index !== -1) data[index] = newRow;
+            } else {
+                data.push(newRow);
+            }
+
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
+            closeCustomRecordModal();
+            renderCustomTable();
+        }
+
+        function deleteCustomRecord(id) {
+            if (!confirm("Delete this record?")) return;
+            let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            data = data.filter(r => r.id !== id);
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
+            renderCustomTable();
+        }
+    </script>
+
+</body>
+
+</html>
