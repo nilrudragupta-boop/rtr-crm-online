@@ -451,7 +451,7 @@
             }
         }
 
-        function switchTab(pageId, tabElement, pageLabel = '') {
+        async function switchTab(pageId, tabElement, pageLabel = '') {
             document.querySelectorAll('#mainNavbar a').forEach(a => a.classList.remove('active'));
             tabElement.classList.add('active');
             currentActivePageId = pageId;
@@ -466,6 +466,20 @@
             currentSortColumn = null;
             currentSortDirection = 'asc';
             document.getElementById('paginationWrapper').style.display = 'flex';
+
+            // Fetch from backend
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
+                    const records = await apiClient.getCustomRecords(pageId);
+                    if (records) {
+                        const mappedRecords = records.map(r => ({ ...r, id: r._id || r.id }));
+                        localStorage.setItem('data_' + pageId, JSON.stringify(mappedRecords));
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to fetch custom records from API", e);
+            }
+
             renderCustomTable();
         }
 
@@ -604,10 +618,10 @@
             if (record) openCustomRecordModal(record);
         }
 
-        function saveCustomRecord() {
+        async function saveCustomRecord() {
             let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
-            let newId = editCustomRecordId || Date.now().toString();
-            let newRow = { id: newId };
+            let newId = editCustomRecordId || ('cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+            let newRow = { id: newId, _id: newId, moduleName: currentActivePageId };
             let apiPayload = { _id: newId, moduleName: currentActivePageId };
             let hasError = false;
 
@@ -620,15 +634,21 @@
 
             if (hasError) return alert("Please fill all required fields");
 
+            if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                try {
+                    const res = await apiClient.saveCustomRecord(apiPayload);
+                    if (res && res.data && res.data._id) {
+                        newRow.id = res.data._id;
+                        newRow._id = res.data._id;
+                    }
+                } catch(err) { console.warn("API sync failed", err); }
+            }
+
             if (editCustomRecordId) {
-                const index = data.findIndex(r => r.id === editCustomRecordId);
+                const index = data.findIndex(r => r.id === editCustomRecordId || r._id === editCustomRecordId);
                 if (index !== -1) data[index] = newRow;
             } else {
                 data.push(newRow);
-            }
-
-            if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
-                apiClient.saveCustomRecord(apiPayload).catch(err => console.warn("API sync failed", err));
             }
 
             localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
@@ -636,17 +656,17 @@
             renderCustomTable();
         }
 
-        function deleteCustomRecord(id) {
-            if (!confirm("Delete this record?")) return;
+        async function deleteCustomRecord(id, skipConfirm = false) {
+            if (!skipConfirm && !confirm("Delete this record?")) return;
             let data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
-            data = data.filter(r => r.id !== id);
+            data = data.filter(r => r.id !== id && r._id !== id);
             
             if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
-                apiClient.deleteCustomRecord(id).catch(err => console.warn("API delete failed", err));
+                await apiClient.deleteCustomRecord(id).catch(err => console.warn("API delete failed", err));
             }
 
             localStorage.setItem('data_' + currentActivePageId, JSON.stringify(data));
-            renderCustomTable();
+            if (!skipConfirm) renderCustomTable();
         }
 
         function toggleSelectAllRecords(source) {
@@ -675,8 +695,10 @@
             if (!confirm(`Are you sure you want to delete ${checkboxes.length} selected record(s)?`)) return;
             
             const idsToDelete = Array.from(checkboxes).map(cb => cb.value);
-            for (const id of idsToDelete) deleteCustomRecord(id);
-            // deleteCustomRecord already updates localStorage and re-renders table per ID
+            for (const id of idsToDelete) {
+                await deleteCustomRecord(id, true);
+            }
+            renderCustomTable();
         }
 
         function exportData() {
@@ -742,8 +764,8 @@
                 let added = 0;
 
                 for (const row of jsonData) {
-                    const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-                    const newRow = { id: newId };
+                    const newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+                    const newRow = { id: newId, _id: newId, moduleName: currentActivePageId };
                     const apiPayload = { _id: newId, moduleName: currentActivePageId };
 
                     currentCustomFields.forEach(f => {
@@ -751,12 +773,18 @@
                         newRow[f.fieldName] = val;
                         apiPayload[f.fieldName] = val;
                     });
-                    savedData.push(newRow);
-                    added++;
                     
                     if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
-                        await apiClient.saveCustomRecord(apiPayload).catch(err => console.warn("API sync failed", err));
+                        try {
+                            const res = await apiClient.saveCustomRecord(apiPayload);
+                            if (res && res.data && res.data._id) {
+                                newRow.id = res.data._id;
+                                newRow._id = res.data._id;
+                            }
+                        } catch(err) { console.warn("API sync failed", err); }
                     }
+                    savedData.push(newRow);
+                    added++;
                 }
 
                 localStorage.setItem('data_' + currentActivePageId, JSON.stringify(savedData));
