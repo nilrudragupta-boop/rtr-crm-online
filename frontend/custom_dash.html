@@ -1136,9 +1136,26 @@
             const container = document.getElementById('importMappingContainer');
             let html = `
                 <div style="display: grid; grid-template-columns: 1fr 1fr 60px; gap: 10px; font-weight: bold; border-bottom: 1px solid var(--slds-border); padding-bottom: 5px;">
-                    <div>Custom Field</div>
+                    <div>System / Custom Field</div>
                     <div>Excel Column</div>
                     <div style="text-align:center;">Update?</div>
+                </div>
+            `;
+            
+            // Auto-detect the Record ID column
+            const matchedIdHeader = pendingImportHeaders.find(h => ['record id', 'id', '_id'].includes(h.trim().toLowerCase())) || '';
+            let idSelectHtml = `<select id="map_record_id" style="width:100%; padding:6px; border:1px solid var(--slds-border); border-radius:4px;">
+                <option value="">-- Auto / Insert as New --</option>`;
+            pendingImportHeaders.forEach(h => {
+                idSelectHtml += `<option value="${h}" ${h === matchedIdHeader ? 'selected' : ''}>${h}</option>`;
+            });
+            idSelectHtml += `</select>`;
+
+            html += `
+                <div style="display: grid; grid-template-columns: 1fr 1fr 60px; gap: 10px; align-items: center; margin-top: 5px; padding-bottom: 10px; border-bottom: 1px dashed var(--slds-border);">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--slds-blue);">Record ID (For Updates)</div>
+                    <div>${idSelectHtml}</div>
+                    <div style="text-align:center; color: #888;" title="Used to find and update existing records">🔑</div>
                 </div>
             `;
             
@@ -1210,15 +1227,25 @@
                     }
                 });
 
+                const idMapSelect = document.getElementById('map_record_id');
+                const idMapping = idMapSelect ? idMapSelect.value : null;
+
                 for (const row of pendingImportData) {
                     // Match existing records
-                    const recordId = row['Record ID'] || row['id'] || row['_id'];
+                    let recordId = null;
+                    if (idMapping && row[idMapping] !== undefined) {
+                        recordId = String(row[idMapping]).trim();
+                    } else {
+                        const idKey = Object.keys(row).find(k => ['record id', 'id', '_id'].includes(k.trim().toLowerCase()));
+                        if (idKey && row[idKey] !== undefined) recordId = String(row[idKey]).trim();
+                    }
+
                     let isUpdate = false;
                     let existingRecord = {};
                     let newId = null;
 
                     if (recordId) {
-                        const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
+                        const existingIdx = savedData.findIndex(r => String(r.id) === recordId || String(r._id) === recordId);
                         if (existingIdx > -1) {
                             isUpdate = true;
                             existingRecord = savedData[existingIdx];
