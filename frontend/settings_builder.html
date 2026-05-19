@@ -1958,7 +1958,8 @@
             for (let v of uniqueVars) {
                 let val = prompt(`Enter dummy value for variable '${v}':`, "10");
                 if (val === null) return;
-                dummyCode += `const ${v} = ${isNaN(val) || val === '' ? `"${val}"` : val};\n`;
+                let num = parseFloat(val);
+                dummyCode += `const ${v} = ${isNaN(num) ? '"' + String(val || '').replace(/"/g, '\\"') + '"' : num};\n`;
             }
 
             try {
@@ -1979,7 +1980,12 @@
             for (let v of uniqueVars) {
                 let val = prompt(`Enter dummy value for variable '${v}' (e.g. true, false, 100, "Text"):`, "true");
                 if (val === null) return;
-                dummyCode += `const ${v} = ${val === 'true' || val === 'false' || !isNaN(val) ? val : `"${val}"`};\n`;
+                if (val === 'true' || val === 'false') {
+                    dummyCode += `const ${v} = ${val};\n`;
+                } else {
+                    let num = parseFloat(val);
+                    dummyCode += `const ${v} = ${isNaN(num) ? '"' + String(val || '').replace(/"/g, '\\"') + '"' : num};\n`;
+                }
             }
 
             try {

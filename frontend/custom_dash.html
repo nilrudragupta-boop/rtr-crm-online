@@ -786,21 +786,24 @@
                     let tr = `<tr><td><input type="checkbox" class="record-checkbox" value="${row.id}" onclick="updateBulkDeleteBtn()"></td><td>${startIndex + i + 1}</td>`;
                     visibleFields.forEach(f => {
                         let val;
-                        if (f.fieldType === 'calculated' && f.calculation) {
+                        if (f.fieldType === 'calculated' && f.calculationFormula) {
                             try {
-                                let formula = f.calculation.toString();
-                                const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                                let formula = f.calculationFormula.toString();
+                                const vars = formula.match(/\bcf_[a-zA-Z0-9_]+\b/g) || [];
+                                const uniqueVars = [...new Set(vars)];
                                 let formulaIsValid = true;
-                                fieldNamesInFormula.forEach(placeholder => {
-                                    const fieldName = placeholder.substring(1, placeholder.length - 1);
-                                    if (row[fieldName] === undefined || row[fieldName] === null || row[fieldName] === '') {
+                                
+                                const funcVals = uniqueVars.map(fieldName => {
+                                    let v = row[fieldName];
+                                    if (v === undefined || v === null || v === '') {
                                         formulaIsValid = false;
                                     }
-                                    const fieldValue = parseFloat(row[fieldName]) || 0;
-                                    formula = formula.replace(new RegExp(placeholder, 'g'), fieldValue);
+                                    let num = parseFloat(v);
+                                    return isNaN(num) ? String(v || '') : num;
                                 });
+                                
                                 if (formulaIsValid) {
-                                    val = new Function('return ' + formula)();
+                                    val = new Function(...uniqueVars, 'return ' + formula)(...funcVals);
                                 } else {
                                     val = null;
                                 }
@@ -883,30 +886,28 @@
 
         function updateCalculatedFieldsInModal() {
             currentCustomFields.forEach(f => {
-                if (f.fieldType === 'calculated' && f.calculation) {
+                if (f.fieldType === 'calculated' && f.calculationFormula) {
                     try {
-                        let formula = f.calculation.toString();
-                        const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                        let formula = f.calculationFormula.toString();
+                        const vars = formula.match(/\bcf_[a-zA-Z0-9_]+\b/g) || [];
+                        const uniqueVars = [...new Set(vars)];
                         let formulaIsValid = true;
                         
-                        fieldNamesInFormula.forEach(placeholder => {
-                            const fieldName = placeholder.substring(1, placeholder.length - 1);
+                        const funcVals = uniqueVars.map(fieldName => {
                             const inputEl = document.getElementById(fieldName);
                             let val = inputEl ? inputEl.value : '';
                             
                             if (val === undefined || val === null || val === '') {
                                 formulaIsValid = false;
                             }
-                            const fieldValue = parseFloat(val) || 0;
-                            
-                            // Using split().join() is safer than new RegExp() when braces are involved
-                            formula = formula.split(placeholder).join(fieldValue); 
+                            let num = parseFloat(val);
+                            return isNaN(num) ? String(val || '') : num;
                         });
                         
                         const calcEl = document.getElementById(f.fieldName);
                         if (calcEl) {
                             if (formulaIsValid) {
-                                calcEl.value = new Function('return ' + formula)();
+                                calcEl.value = new Function(...uniqueVars, 'return ' + formula)(...funcVals);
                             } else {
                                 calcEl.value = '';
                             }
@@ -1045,21 +1046,24 @@
                 const obj = { 'Record ID': row.id || row._id };
                 currentCustomFields.forEach(f => {
                     let val;
-                    if (f.fieldType === 'calculated' && f.calculation) {
+                    if (f.fieldType === 'calculated' && f.calculationFormula) {
                         try {
-                            let formula = f.calculation.toString();
-                            const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                            let formula = f.calculationFormula.toString();
+                            const vars = formula.match(/\bcf_[a-zA-Z0-9_]+\b/g) || [];
+                            const uniqueVars = [...new Set(vars)];
                             let formulaIsValid = true;
-                            fieldNamesInFormula.forEach(placeholder => {
-                                const fieldName = placeholder.substring(1, placeholder.length - 1);
-                                if (row[fieldName] === undefined || row[fieldName] === null || row[fieldName] === '') {
+                            
+                            const funcVals = uniqueVars.map(fieldName => {
+                                let v = row[fieldName];
+                                if (v === undefined || v === null || v === '') {
                                     formulaIsValid = false;
                                 }
-                                const fieldValue = parseFloat(row[fieldName]) || 0;
-                                formula = formula.replace(new RegExp(placeholder, 'g'), fieldValue);
+                                let num = parseFloat(v);
+                                return isNaN(num) ? String(v || '') : num;
                             });
+                            
                             if (formulaIsValid) {
-                                val = new Function('return ' + formula)();
+                                val = new Function(...uniqueVars, 'return ' + formula)(...funcVals);
                             } else {
                                 val = null;
                             }
