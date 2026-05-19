@@ -471,6 +471,11 @@
         </div>
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:9999; justify-content:center; align-items:center;">
+        <div class="spinner"></div>
+    </div>
+
     <script>
         function handleSearch() {
             currentPage = 1;
@@ -951,111 +956,170 @@
             XLSX.writeFile(wb, `${currentActivePageId}_export.xlsx`);
         }
 
+        let pendingImportData = [];
+        let pendingImportHeaders = [];
+
         function importData(input) {
             const file = input.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = async function (e) {
+            reader.onload = function (e) {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+                pendingImportData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                if (jsonData.length === 0) {
+                if (pendingImportData.length === 0) {
                     alert("The file is empty or formatted incorrectly.");
                     input.value = '';
                     return;
                 }
 
-                let currentUser = localStorage.getItem('currentUser') || 'System';
-                let allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
-                let savedData = allData.filter(r => r.createdBy === currentUser);
-                const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
-                let added = 0;
-                let updated = 0;
+                // Extract headers from the first data row
+                pendingImportHeaders = Object.keys(pendingImportData[0] || {});
+                showImportMappingModal();
+                input.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
 
-                for (const row of jsonData) {
-                    const recordId = row['Record ID'] || row['id'] || row['_id'];
-                    let isUpdate = false;
-                    let existingRecord = {};
-                    let newId = null;
+        function showImportMappingModal() {
+            const container = document.getElementById('importMappingContainer');
+            let html = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr 60px; gap: 10px; font-weight: bold; border-bottom: 1px solid var(--slds-border); padding-bottom: 5px;">
+                    <div>Custom Field</div>
+                    <div>Excel Column</div>
+                    <div style="text-align:center;">Update?</div>
+                </div>
+            `;
+            
+            currentCustomFields.forEach(f => {
+                // Attempt to auto-map by matching strings
+                const matchedHeader = pendingImportHeaders.find(h => h.toLowerCase() === f.fieldLabel.toLowerCase()) || '';
+                
+                let selectHtml = `<select id="map_${f.fieldName}" style="width:100%; padding:6px; border:1px solid var(--slds-border); border-radius:4px;">
+                    <option value="">-- Ignore --</option>`;
+                pendingImportHeaders.forEach(h => {
+                    selectHtml += `<option value="${h}" ${h === matchedHeader ? 'selected' : ''}>${h}</option>`;
+                });
+                selectHtml += `</select>`;
 
-                    if (recordId) {
-                        const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
-                        if (existingIdx > -1) {
-                            isUpdate = true;
-                            existingRecord = savedData[existingIdx];
-                            newId = existingRecord.id || existingRecord._id;
-                        }
+                html += `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 60px; gap: 10px; align-items: center;">
+                        <div style="font-size: 13px;">${f.fieldLabel} ${f.isRequired ? '<span style="color:red">*</span>' : ''}</div>
+                        <div>${selectHtml}</div>
+                        <div style="text-align:center;"><input type="checkbox" id="import_${f.fieldName}" ${matchedHeader ? 'checked' : ''}></div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+            document.getElementById('importMappingModal').style.display = 'block';
+        }
+
+        function closeImportMappingModal() {
+            document.getElementById('importMappingModal').style.display = 'none';
+            pendingImportData = [];
+            pendingImportHeaders = [];
+        }
+
+        async function processImportData() {
+            let currentUser = localStorage.getItem('currentUser') || 'System';
+            let allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let savedData = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+            let added = 0;
+            let updated = 0;
+
+            // Gather mapping config from checkboxes
+            const fieldMapping = {};
+            currentCustomFields.forEach(f => {
+                const mapSelect = document.getElementById('map_' + f.fieldName);
+                const importCheck = document.getElementById('import_' + f.fieldName);
+                if (mapSelect && importCheck && importCheck.checked && mapSelect.value) {
+                    fieldMapping[f.fieldName] = mapSelect.value;
+                }
+            });
+
+            for (const row of pendingImportData) {
+                // Match existing records
+                const recordId = row['Record ID'] || row['id'] || row['_id'];
+                let isUpdate = false;
+                let existingRecord = {};
+                let newId = null;
+
+                if (recordId) {
+                    const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
+                    if (existingIdx > -1) {
+                        isUpdate = true;
+                        existingRecord = savedData[existingIdx];
+                        newId = existingRecord.id || existingRecord._id;
                     }
+                }
 
-                    if (!newId) {
-                        newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
-                    }
+                if (!newId) newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
 
-                    let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
-                    let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                // Use existingRecord as the baseline, preserving unmapped values 
+                let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
 
-                    if (!isUpdate) {
-                        newRow.createdBy = currentUser;
-                        newRow.createdAt = new Date().toISOString();
-                        apiPayload.createdBy = currentUser;
-                        apiPayload.createdAt = new Date().toISOString();
-                    }
+                if (!isUpdate) {
+                    newRow.createdBy = currentUser;
+                    newRow.createdAt = new Date().toISOString();
+                    apiPayload.createdBy = currentUser;
+                    apiPayload.createdAt = new Date().toISOString();
+                }
 
-                    currentCustomFields.forEach(f => {
-                        let val = row[f.fieldLabel];
-
+                currentCustomFields.forEach(f => {
+                    const mappedHeader = fieldMapping[f.fieldName];
+                    
+                    if (mappedHeader) {
+                        let val = row[mappedHeader];
                         if (val !== undefined) {
                             if (val instanceof Date) {
                                 const offset = val.getTimezoneOffset() * 60000;
                                 const localDate = new Date(val.getTime() - offset);
-
-                                if (f.fieldType === 'date') {
-                                    val = localDate.toISOString().split('T')[0];
-                                } else if (f.fieldType === 'datetime') {
-                                    val = localDate.toISOString().slice(0, 16);
-                                }
+                                if (f.fieldType === 'date') val = localDate.toISOString().split('T')[0];
+                                else if (f.fieldType === 'datetime') val = localDate.toISOString().slice(0, 16);
                             }
-                            // Do not overwrite existing data with empty strings during an update
                             if (!(isUpdate && val === '')) {
                                 newRow[f.fieldName] = val;
                                 apiPayload[f.fieldName] = val;
                             }
-                        } else if (!isUpdate) {
-                            newRow[f.fieldName] = '';
-                            apiPayload[f.fieldName] = '';
                         }
-                    });
-
-                    if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
-                        try {
-                            const res = await apiClient.saveCustomRecord(apiPayload);
-                            if (res && res.data && res.data._id && !isUpdate) {
-                                newRow.id = res.data._id;
-                                newRow._id = res.data._id;
-                            }
-                        } catch (err) { console.warn("API sync failed", err); }
+                    } else if (!isUpdate && existingRecord[f.fieldName] === undefined) {
+                        // Initialize unmapped fields on entirely new records
+                        newRow[f.fieldName] = '';
+                        apiPayload[f.fieldName] = '';
                     }
+                });
 
-                    if (isUpdate) {
-                        const idx = savedData.findIndex(r => r.id === newRow.id || r._id === newRow._id);
-                        savedData[idx] = newRow;
-                        updated++;
-                    } else {
-                        savedData.push(newRow);
-                        added++;
-                    }
+                if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                    try {
+                        const res = await apiClient.saveCustomRecord(apiPayload);
+                        if (res && res.data && res.data._id && !isUpdate) {
+                            newRow.id = res.data._id;
+                            newRow._id = res.data._id;
+                        }
+                    } catch (err) { console.warn("API sync failed", err); }
                 }
 
-                localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...savedData]));
-                renderCustomTable();
-                alert(`Import successful: ${added} added, ${updated} updated.`);
-                input.value = '';
-            };
-            reader.readAsArrayBuffer(file);
+                if (isUpdate) {
+                    const idx = savedData.findIndex(r => r.id === newRow.id || r._id === newRow._id);
+                    savedData[idx] = newRow;
+                    updated++;
+                } else {
+                    savedData.push(newRow);
+                    added++;
+                }
+            }
+
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...savedData]));
+            renderCustomTable();
+            alert(`Import successful: ${added} added, ${updated} updated.`);
+            closeImportMappingModal();
         }
 
         // --- Settings / Columns Logic ---
