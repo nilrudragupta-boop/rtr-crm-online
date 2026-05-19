@@ -789,6 +789,8 @@
                         if (f.fieldType === 'calculated' && f.calculationFormula) {
                             try {
                                 let formula = f.calculationFormula.toString();
+                                // Auto-correct missing braces around field keys for backwards compatibility
+                                formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
                                 const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
                                 let formulaIsValid = true;
                                 
@@ -804,6 +806,7 @@
                                 
                                 if (formulaIsValid) {
                                     val = new Function('return ' + formula)();
+                                    if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
                                 } else {
                                     val = null;
                                 }
@@ -889,6 +892,8 @@
                 if (f.fieldType === 'calculated' && f.calculationFormula) {
                     try {
                         let formula = f.calculationFormula.toString();
+                        // Auto-correct missing braces around field keys
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
                         const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
                         let formulaIsValid = true;
                         
@@ -907,7 +912,9 @@
                         const calcEl = document.getElementById(f.fieldName);
                         if (calcEl) {
                             if (formulaIsValid) {
-                                calcEl.value = new Function('return ' + formula)();
+                                let res = new Function('return ' + formula)();
+                                if (typeof res === 'number' && (!isFinite(res) || isNaN(res))) res = '';
+                                calcEl.value = res;
                             } else {
                                 calcEl.value = '';
                             }
@@ -1049,6 +1056,8 @@
                     if (f.fieldType === 'calculated' && f.calculationFormula) {
                         try {
                             let formula = f.calculationFormula.toString();
+                            // Auto-correct missing braces around field keys
+                            formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
                             const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
                             let formulaIsValid = true;
                             
@@ -1064,6 +1073,7 @@
                             
                             if (formulaIsValid) {
                                 val = new Function('return ' + formula)();
+                                if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
                             } else {
                                 val = null;
                             }

@@ -1953,6 +1953,8 @@
         function testFormula() {
             let formula = document.getElementById('cfFormula').value;
             if (!formula) return alert('Enter a formula first.');
+            // Auto-correct missing braces around field keys
+            formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
             const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
             const uniqueVars = [...new Set(fieldNamesInFormula)];
 
@@ -1964,8 +1966,13 @@
             }
 
             try {
-                const fn = new Function('return ' + formula);
-                alert("Valid! Result: " + fn());
+                let fn = new Function('return ' + formula);
+                let res = fn();
+                if (typeof res === 'number' && (!isFinite(res) || isNaN(res))) {
+                    alert("Valid syntax, but evaluates to: " + res);
+                } else {
+                    alert("Valid! Result: " + res);
+                }
             } catch (e) {
                 alert("Error in Javascript syntax:\n" + e.message);
             }
@@ -1974,6 +1981,8 @@
         function testCondition() {
             let cond = document.getElementById('cfCondition').value;
             if (!cond) return alert('Enter a condition first.');
+            // Auto-correct missing braces around field keys
+            cond = cond.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
             const fieldNamesInFormula = cond.match(/{[^{}]+}/g) || [];
             const uniqueVars = [...new Set(fieldNamesInFormula)];
 
