@@ -355,6 +355,41 @@
             background-color: var(--slds-blue);
             opacity: 0.5;
         }
+
+        /* --- Spinner & Progress Bar --- */
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--slds-blue);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .progress-container {
+            width: 80%;
+            max-width: 400px;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            margin-top: 20px;
+            overflow: hidden;
+            border: 1px solid var(--slds-border);
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: var(--slds-blue);
+            width: 0%;
+            transition: width 0.1s ease-in-out;
+        }
+        .progress-text {
+            margin-top: 10px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
     </style>
 </head>
 
@@ -1037,93 +1072,130 @@
             let added = 0;
             let updated = 0;
 
-            // Gather mapping config from checkboxes
-            const fieldMapping = {};
-            currentCustomFields.forEach(f => {
-                const mapSelect = document.getElementById('map_' + f.fieldName);
-                const importCheck = document.getElementById('import_' + f.fieldName);
-                if (mapSelect && importCheck && importCheck.checked && mapSelect.value) {
-                    fieldMapping[f.fieldName] = mapSelect.value;
-                }
-            });
+             const totalRows = pendingImportData.length;
+            let processedRows = 0;
 
-            for (const row of pendingImportData) {
-                // Match existing records
-                const recordId = row['Record ID'] || row['id'] || row['_id'];
-                let isUpdate = false;
-                let existingRecord = {};
-                let newId = null;
+            const overlay = document.getElementById('loadingOverlay');
+            const progressContainer = document.getElementById('importProgressContainer');
+            const progressBar = document.getElementById('importProgressBar');
+            const progressText = document.getElementById('importProgressText');
 
-                if (recordId) {
-                    const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
-                    if (existingIdx > -1) {
-                        isUpdate = true;
-                        existingRecord = savedData[existingIdx];
-                        newId = existingRecord.id || existingRecord._id;
-                    }
-                }
+            // 1. Show overlay UI
+            if (overlay) overlay.style.display = 'flex';
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (progressText) {
+                progressText.style.display = 'block';
+                progressText.innerText = `Processing 0 of ${totalRows}...`;
+            }
 
-                if (!newId) newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+            // 2. Add a tiny delay so the browser can paint the overlay to the screen
+            await new Promise(resolve => setTimeout(resolve, 50));
 
-                // Use existingRecord as the baseline, preserving unmapped values 
-                let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
-                let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
-
-                if (!isUpdate) {
-                    newRow.createdBy = currentUser;
-                    newRow.createdAt = new Date().toISOString();
-                    apiPayload.createdBy = currentUser;
-                    apiPayload.createdAt = new Date().toISOString();
-                }
-
+            try {
+                // Gather mapping config from checkboxes
+                const fieldMapping = {};
                 currentCustomFields.forEach(f => {
-                    const mappedHeader = fieldMapping[f.fieldName];
-                    
-                    if (mappedHeader) {
-                        let val = row[mappedHeader];
-                        if (val !== undefined) {
-                            if (val instanceof Date) {
-                                const offset = val.getTimezoneOffset() * 60000;
-                                const localDate = new Date(val.getTime() - offset);
-                                if (f.fieldType === 'date') val = localDate.toISOString().split('T')[0];
-                                else if (f.fieldType === 'datetime') val = localDate.toISOString().slice(0, 16);
-                            }
-                            if (!(isUpdate && val === '')) {
-                                newRow[f.fieldName] = val;
-                                apiPayload[f.fieldName] = val;
-                            }
-                        }
-                    } else if (!isUpdate && existingRecord[f.fieldName] === undefined) {
-                        // Initialize unmapped fields on entirely new records
-                        newRow[f.fieldName] = '';
-                        apiPayload[f.fieldName] = '';
+                    const mapSelect = document.getElementById('map_' + f.fieldName);
+                    const importCheck = document.getElementById('import_' + f.fieldName);
+                    if (mapSelect && importCheck && importCheck.checked && mapSelect.value) {
+                        fieldMapping[f.fieldName] = mapSelect.value;
                     }
                 });
 
-                if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
-                    try {
-                        const res = await apiClient.saveCustomRecord(apiPayload);
-                        if (res && res.data && res.data._id && !isUpdate) {
-                            newRow.id = res.data._id;
-                            newRow._id = res.data._id;
+                for (const row of pendingImportData) {
+                    // Match existing records
+                    const recordId = row['Record ID'] || row['id'] || row['_id'];
+                    let isUpdate = false;
+                    let existingRecord = {};
+                    let newId = null;
+
+                    if (recordId) {
+                        const existingIdx = savedData.findIndex(r => r.id === recordId || r._id === recordId);
+                        if (existingIdx > -1) {
+                            isUpdate = true;
+                            existingRecord = savedData[existingIdx];
+                            newId = existingRecord.id || existingRecord._id;
                         }
-                    } catch (err) { console.warn("API sync failed", err); }
+                    }
+
+                    if (!newId) newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+
+                    // Use existingRecord as the baseline, preserving unmapped values 
+                    let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                    let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+
+                    if (!isUpdate) {
+                        newRow.createdBy = currentUser;
+                        newRow.createdAt = new Date().toISOString();
+                        apiPayload.createdBy = currentUser;
+                        apiPayload.createdAt = new Date().toISOString();
+                    }
+
+                    currentCustomFields.forEach(f => {
+                        const mappedHeader = fieldMapping[f.fieldName];
+                        
+                        if (mappedHeader) {
+                            let val = row[mappedHeader];
+                            if (val !== undefined) {
+                                if (val instanceof Date) {
+                                    const offset = val.getTimezoneOffset() * 60000;
+                                    const localDate = new Date(val.getTime() - offset);
+                                    if (f.fieldType === 'date') val = localDate.toISOString().split('T')[0];
+                                    else if (f.fieldType === 'datetime') val = localDate.toISOString().slice(0, 16);
+                                }
+                                if (!(isUpdate && val === '')) {
+                                    newRow[f.fieldName] = val;
+                                    apiPayload[f.fieldName] = val;
+                                }
+                            }
+                        } else if (!isUpdate && existingRecord[f.fieldName] === undefined) {
+                            // Initialize unmapped fields on entirely new records
+                            newRow[f.fieldName] = '';
+                            apiPayload[f.fieldName] = '';
+                        }
+                    });
+
+                    if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                        try {
+                            const res = await apiClient.saveCustomRecord(apiPayload);
+                            if (res && res.data && res.data._id && !isUpdate) {
+                                newRow.id = res.data._id;
+                                newRow._id = res.data._id;
+                            }
+                        } catch (err) { console.warn("API sync failed", err); }
+                    }
+
+                    if (isUpdate) {
+                        const idx = savedData.findIndex(r => r.id === newRow.id || r._id === newRow._id);
+                        savedData[idx] = newRow;
+                        updated++;
+                    } else {
+                        savedData.push(newRow);
+                        added++;
+                    }
+
+                    // 3. Update Progress Bar state
+                    processedRows++;
+                    if (progressBar) progressBar.style.width = Math.round((processedRows / totalRows) * 100) + '%';
+                    if (progressText) progressText.innerText = `Processing ${processedRows} of ${totalRows}...`;
+                    
+                    // 4. Yield briefly so the UI can draw the updated progress bar
+                    if (processedRows % 10 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
                 }
 
-                if (isUpdate) {
-                    const idx = savedData.findIndex(r => r.id === newRow.id || r._id === newRow._id);
-                    savedData[idx] = newRow;
-                    updated++;
-                } else {
-                    savedData.push(newRow);
-                    added++;
-                }
+                localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...savedData]));
+                renderCustomTable();
+                alert(`Import successful: ${added} added, ${updated} updated.`);
+                closeImportMappingModal();
+            } finally {
+                // 5. Securely wipe & hide overlay afterwards
+                if (overlay) overlay.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (progressText) progressText.style.display = 'none';
+                if (progressBar) progressBar.style.width = '0%';
             }
-
-            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...savedData]));
-            renderCustomTable();
-            alert(`Import successful: ${added} added, ${updated} updated.`);
-            closeImportMappingModal();
         }
 
         // --- Settings / Columns Logic ---
