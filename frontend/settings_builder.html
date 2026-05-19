@@ -1058,9 +1058,9 @@
                             </div>
                             <div class="cfm-code-box" style="margin-top:8px">
                                 <b>Examples:</b><br>
-                                <code>cf_price * cf_qty</code> — multiply<br>
-                                <code>(cf_basic + cf_tax) * 0.9</code> — discount<br>
-                                <code>cf_first + ' ' + cf_last</code> — concat
+                                <code>{cf_price} * {cf_qty}</code> — multiply<br>
+                                <code>({cf_basic} + {cf_tax}) * 0.9</code> — discount<br>
+                                <code>{cf_first} + ' ' + {cf_last}</code> — concat
                             </div>
                         </div>
                     </div>
@@ -1103,9 +1103,9 @@
                             </button>
                         </div>
                         <div class="cfm-code-box" style="margin-top:6px">
-                            <code>cf_is_active === true</code><br>
-                            <code>cf_type === 'Export'</code><br>
-                            <code>cf_amount > 100</code>
+                            <code>{cf_is_active} === true</code><br>
+                            <code>{cf_type} === 'Export'</code><br>
+                            <code>{cf_amount} > 100</code>
                         </div>
                     </div>
 
@@ -1438,8 +1438,9 @@
             if (!sel || !sel.value) return;
             const inp = document.getElementById('cfFormula');
             const s = inp.selectionStart, e = inp.selectionEnd;
-            inp.value = inp.value.substring(0, s) + sel.value + inp.value.substring(e);
-            inp.selectionStart = inp.selectionEnd = s + sel.value.length;
+            const insertVal = '{' + sel.value + '}';
+            inp.value = inp.value.substring(0, s) + insertVal + inp.value.substring(e);
+            inp.selectionStart = inp.selectionEnd = s + insertVal.length;
             inp.focus();
         }
 
@@ -1448,8 +1449,9 @@
             if (!sel || !sel.value) return;
             const inp = document.getElementById('cfCondition');
             const s = inp.selectionStart, e = inp.selectionEnd;
-            inp.value = inp.value.substring(0, s) + sel.value + inp.value.substring(e);
-            inp.selectionStart = inp.selectionEnd = s + sel.value.length;
+            const insertVal = '{' + sel.value + '}';
+            inp.value = inp.value.substring(0, s) + insertVal + inp.value.substring(e);
+            inp.selectionStart = inp.selectionEnd = s + insertVal.length;
             inp.focus();
         }
 
@@ -1949,21 +1951,20 @@
 
         // ── Test Logic Helpers ──
         function testFormula() {
-            const formula = document.getElementById('cfFormula').value;
+            let formula = document.getElementById('cfFormula').value;
             if (!formula) return alert('Enter a formula first.');
-            const vars = formula.match(/\bcf_[a-zA-Z0-9_]+\b/g) || [];
-            const uniqueVars = [...new Set(vars)];
+            const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+            const uniqueVars = [...new Set(fieldNamesInFormula)];
 
-            let dummyCode = "";
             for (let v of uniqueVars) {
                 let val = prompt(`Enter dummy value for variable '${v}':`, "10");
                 if (val === null) return;
-                let num = parseFloat(val);
-                dummyCode += `const ${v} = ${isNaN(num) ? '"' + String(val || '').replace(/"/g, '\\"') + '"' : num};\n`;
+                let num = parseFloat(val) || 0;
+                formula = formula.split(v).join(num);
             }
 
             try {
-                const fn = new Function(`${dummyCode} return ${formula};`);
+                const fn = new Function('return ' + formula);
                 alert("Valid! Result: " + fn());
             } catch (e) {
                 alert("Error in Javascript syntax:\n" + e.message);
@@ -1971,25 +1972,23 @@
         }
 
         function testCondition() {
-            const cond = document.getElementById('cfCondition').value;
+            let cond = document.getElementById('cfCondition').value;
             if (!cond) return alert('Enter a condition first.');
-            const vars = cond.match(/\bcf_[a-zA-Z0-9_]+\b/g) || [];
-            const uniqueVars = [...new Set(vars)];
+            const fieldNamesInFormula = cond.match(/{[^{}]+}/g) || [];
+            const uniqueVars = [...new Set(fieldNamesInFormula)];
 
-            let dummyCode = "";
             for (let v of uniqueVars) {
                 let val = prompt(`Enter dummy value for variable '${v}' (e.g. true, false, 100, "Text"):`, "true");
                 if (val === null) return;
-                if (val === 'true' || val === 'false') {
-                    dummyCode += `const ${v} = ${val};\n`;
+                if (val === 'true' || val === 'false' || !isNaN(parseFloat(val))) {
+                    cond = cond.split(v).join(val);
                 } else {
-                    let num = parseFloat(val);
-                    dummyCode += `const ${v} = ${isNaN(num) ? '"' + String(val || '').replace(/"/g, '\\"') + '"' : num};\n`;
+                    cond = cond.split(v).join(`"${String(val || '').replace(/"/g, '\\"')}"`);
                 }
             }
 
             try {
-                const fn = new Function(`${dummyCode} return ${cond};`);
+                const fn = new Function('return ' + cond);
                 alert("Valid! Result: " + fn());
             } catch (e) {
                 alert("Error in Javascript syntax:\n" + e.message);
