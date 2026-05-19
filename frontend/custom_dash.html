@@ -863,19 +863,61 @@
                 const reqHtml = f.isRequired ? '<span style="color:red">*</span>' : '';
                 const val = recordData ? (recordData[f.fieldName] || '') : '';
                 let inputHtml = '';
-                if (f.fieldType === 'select') {
-                    inputHtml = `<select id="${f.fieldName}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
+                if (f.fieldType === 'calculated') {
+                    inputHtml = `<input type="text" id="${f.fieldName}" value="${val}" readonly style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; background-color:#f1f3f5; cursor:not-allowed;" />`;
+                } else if (f.fieldType === 'select') {
+                    inputHtml = `<select id="${f.fieldName}" onchange="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
                     (f.options || []).forEach(o => inputHtml += `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`);
                     inputHtml += `</select>`;
                 } else if (f.fieldType === 'textarea') {
-                    inputHtml = `<textarea id="${f.fieldName}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; grid-column: 1 / -1;">${val}</textarea>`;
+                    inputHtml = `<textarea id="${f.fieldName}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; grid-column: 1 / -1;">${val}</textarea>`;
                 } else {
-                    inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="${f.fieldName}" value="${val}" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                    inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="${f.fieldName}" value="${val}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
                 }
                 const fullWidth = f.fieldType === 'textarea' ? 'style="grid-column: 1 / -1;"' : '';
                 container.innerHTML += `<div ${fullWidth}><label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">${f.fieldLabel} ${reqHtml}</label>${inputHtml}</div>`;
             });
             document.getElementById('customRecordModal').style.display = 'block';
+            updateCalculatedFieldsInModal();
+        }
+
+        function updateCalculatedFieldsInModal() {
+            currentCustomFields.forEach(f => {
+                if (f.fieldType === 'calculated' && f.calculation) {
+                    try {
+                        let formula = f.calculation.toString();
+                        const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                        let formulaIsValid = true;
+                        
+                        fieldNamesInFormula.forEach(placeholder => {
+                            const fieldName = placeholder.substring(1, placeholder.length - 1);
+                            const inputEl = document.getElementById(fieldName);
+                            let val = inputEl ? inputEl.value : '';
+                            
+                            if (val === undefined || val === null || val === '') {
+                                formulaIsValid = false;
+                            }
+                            const fieldValue = parseFloat(val) || 0;
+                            
+                            // Using split().join() is safer than new RegExp() when braces are involved
+                            formula = formula.split(placeholder).join(fieldValue); 
+                        });
+                        
+                        const calcEl = document.getElementById(f.fieldName);
+                        if (calcEl) {
+                            if (formulaIsValid) {
+                                calcEl.value = new Function('return ' + formula)();
+                            } else {
+                                calcEl.value = '';
+                            }
+                        }
+                    } catch (e) { 
+                        console.error("Calculation error for field", f.fieldName, e); 
+                        const calcEl = document.getElementById(f.fieldName);
+                        if (calcEl) calcEl.value = '#CALC!'; 
+                    }
+                }
+            });
         }
 
         function closeCustomRecordModal() {
