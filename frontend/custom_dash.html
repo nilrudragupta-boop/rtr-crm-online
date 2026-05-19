@@ -785,9 +785,31 @@
                 paginatedData.forEach((row, i) => {
                     let tr = `<tr><td><input type="checkbox" class="record-checkbox" value="${row.id}" onclick="updateBulkDeleteBtn()"></td><td>${startIndex + i + 1}</td>`;
                     visibleFields.forEach(f => {
-                        let val = row[f.fieldName];
+                        let val;
+                        if (f.fieldType === 'calculated' && f.calculation) {
+                            try {
+                                let formula = f.calculation.toString();
+                                const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                                let formulaIsValid = true;
+                                fieldNamesInFormula.forEach(placeholder => {
+                                    const fieldName = placeholder.substring(1, placeholder.length - 1);
+                                    if (row[fieldName] === undefined || row[fieldName] === null || row[fieldName] === '') {
+                                        formulaIsValid = false;
+                                    }
+                                    const fieldValue = parseFloat(row[fieldName]) || 0;
+                                    formula = formula.replace(new RegExp(placeholder, 'g'), fieldValue);
+                                });
+                                if (formulaIsValid) {
+                                    val = new Function('return ' + formula)();
+                                } else {
+                                    val = null;
+                                }
+                            } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                        } else {
+                            val = row[f.fieldName];
+                        }
                         if (val !== undefined && val !== null && val !== '') {
-                            if (f.fieldType === 'currency' || f.fieldType === 'number') {
+                            if (f.fieldType === 'currency' || f.fieldType === 'number' || (f.fieldType === 'calculated' && typeof val === 'number')) {
                                 let num = parseFloat(val);
                                 if (!isNaN(num)) {
                                     val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
@@ -980,9 +1002,31 @@
             const exportData = data.map(row => {
                 const obj = { 'Record ID': row.id || row._id };
                 currentCustomFields.forEach(f => {
-                    let val = row[f.fieldName];
+                    let val;
+                    if (f.fieldType === 'calculated' && f.calculation) {
+                        try {
+                            let formula = f.calculation.toString();
+                            const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                            let formulaIsValid = true;
+                            fieldNamesInFormula.forEach(placeholder => {
+                                const fieldName = placeholder.substring(1, placeholder.length - 1);
+                                if (row[fieldName] === undefined || row[fieldName] === null || row[fieldName] === '') {
+                                    formulaIsValid = false;
+                                }
+                                const fieldValue = parseFloat(row[fieldName]) || 0;
+                                formula = formula.replace(new RegExp(placeholder, 'g'), fieldValue);
+                            });
+                            if (formulaIsValid) {
+                                val = new Function('return ' + formula)();
+                            } else {
+                                val = null;
+                            }
+                        } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                    } else {
+                        val = row[f.fieldName];
+                    }
                     if (val !== undefined && val !== null && val !== '') {
-                        if (f.fieldType === 'currency' || f.fieldType === 'number') {
+                        if (f.fieldType === 'currency' || f.fieldType === 'number' || (f.fieldType === 'calculated' && typeof val === 'number')) {
                             let num = parseFloat(val);
                             if (!isNaN(num)) {
                                 val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
