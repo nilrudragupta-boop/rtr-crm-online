@@ -877,6 +877,37 @@
                     inputHtml += `</select>`;
                 } else if (f.fieldType === 'textarea') {
                     inputHtml = `<textarea id="${f.fieldName}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; grid-column: 1 / -1;">${val}</textarea>`;
+                } else if (f.fieldType === 'lookup') {
+                    let lookupOptions = [];
+                    try {
+                        const targetModule = f.lookupModule;
+                        const displayField = f.lookupDisplay;
+                        
+                        if (targetModule) {
+                            if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                                const customers = JSON.parse(localStorage.getItem('customers')) || [];
+                                lookupOptions = customers.map(c => displayField ? c[displayField] : (c.name || c.id));
+                            } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                                const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                lookupOptions = suppliers.map(s => displayField ? s[displayField] : (s.name || s.id));
+                            } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                                const items = JSON.parse(localStorage.getItem('items')) || [];
+                                lookupOptions = items.map(i => displayField ? i[displayField] : (i.name || i.id));
+                            } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                                const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+                                lookupOptions = invoices.map(i => displayField ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id));
+                            } else {
+                                const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                lookupOptions = customData.map(r => displayField ? r[displayField] : r.id);
+                            }
+                        }
+                        lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
+                    } catch(e) { console.warn("Error loading lookup options", e); }
+                    
+                    inputHtml = `<input type="text" id="${f.fieldName}" value="${val}" list="lookupList_${f.fieldName}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                    inputHtml += `<datalist id="lookupList_${f.fieldName}">`;
+                    lookupOptions.forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}"></option>`);
+                    inputHtml += `</datalist>`;
                 } else {
                     inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="${f.fieldName}" value="${val}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
                 }
