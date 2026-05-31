@@ -241,6 +241,11 @@ const apiClient = {
     saveEmployee: (data) => apiClient._saveCollection('employees', data),
     deleteEmployee: (id) => apiClient._deleteCollection('employees', id),
 
+    // --- Cheques ---
+    getCheques: () => apiClient._getCollection('cheques'),
+    saveCheque: (data) => apiClient._saveCollection('cheques', data),
+    deleteCheque: (id) => apiClient._deleteCollection('cheques', id),
+
     // --- Medicines ---
     getMedicines: () => apiClient._getCollection('medicines'),
     saveMedicine: (data) => apiClient._saveCollection('medicines', data),

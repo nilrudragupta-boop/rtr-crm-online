@@ -420,7 +420,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_day_book', label: 'Day Book' },
     { id: 'perm_cash_flow', label: 'Cash Flow' },
     { id: 'perm_custom_fields', label: 'Custom Field Settings' },
-    { id: 'perm_custom_sheet', label: 'Custom Sheet' }
+    { id: 'perm_custom_sheet', label: 'Custom Sheet' },
+    { id: 'perm_cheque_print', label: 'Cheque Print' }
 ];
 
 function getCurrentUser() {
