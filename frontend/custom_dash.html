@@ -413,6 +413,8 @@
             <div style="display: flex; gap: 10px;">
                 <button id="bulkDeleteBtn" onclick="deleteSelectedRecords()"
                     style="background: #e74c3c; color: white; border: none; display: none;">🗑️ Delete Selected</button>
+                <button id="bulkEditBtn" onclick="openBulkEditModal()"
+                    style="background: #f39c12; color: white; border: none; display: none;">✏️ Edit Selected</button>
                 <button onclick="openTableSettingsModal()"><i class="fas fa-cog"></i> ⚙️ Settings</button>
                 <button onclick="openFieldOrderModal()"><i class="fas fa-sort"></i> ↕️ Field Order</button>
                 <button onclick="printTableReport()"><i class="fas fa-print"></i> 🖨️ Print Report</button>
@@ -520,6 +522,29 @@
             <div class="modal-footer">
                 <button onclick="closeImportMappingModal()">Cancel</button>
                 <button class="primary" onclick="processImportData()">Confirm Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Edit Modal -->
+    <div id="bulkEditModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Bulk Edit Records</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeBulkEditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">Select Field to Edit</label>
+                    <select id="bulkEditFieldSelect" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" onchange="renderBulkEditInput()">
+                        <option value="">-- Select Field --</option>
+                    </select>
+                </div>
+                <div id="bulkEditInputContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeBulkEditModal()">Cancel</button>
+                <button class="primary" onclick="applyBulkEdit()">Apply Changes</button>
             </div>
         </div>
     </div>
@@ -1128,6 +1153,11 @@
                 btn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
                 btn.innerHTML = `🗑️ Delete Selected (${checkedCount})`;
             }
+            const editBtn = document.getElementById('bulkEditBtn');
+            if (editBtn) {
+                editBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                editBtn.innerHTML = `✏️ Edit Selected (${checkedCount})`;
+            }
             const selectAllCb = document.getElementById('selectAllCheckbox');
             if (selectAllCb) {
                 const totalCheckboxes = document.querySelectorAll('.record-checkbox').length;
@@ -1509,6 +1539,133 @@
                 if (progressText) progressText.style.display = 'none';
                 if (progressBar) progressBar.style.width = '0%';
             }
+        }
+
+        function openBulkEditModal() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return;
+
+            const select = document.getElementById('bulkEditFieldSelect');
+            select.innerHTML = '<option value="">-- Select Field --</option>';
+            currentCustomFields.forEach(f => {
+                if (f.fieldType !== 'calculated') {
+                    select.innerHTML += `<option value="${f.fieldName}">${f.fieldLabel}</option>`;
+                }
+            });
+            document.getElementById('bulkEditInputContainer').innerHTML = '';
+            document.getElementById('bulkEditModal').style.display = 'block';
+        }
+
+        function closeBulkEditModal() {
+            document.getElementById('bulkEditModal').style.display = 'none';
+        }
+
+        function renderBulkEditInput() {
+            const fieldName = document.getElementById('bulkEditFieldSelect').value;
+            const container = document.getElementById('bulkEditInputContainer');
+            container.innerHTML = '';
+            if (!fieldName) return;
+
+            const f = currentCustomFields.find(x => x.fieldName === fieldName);
+            if (!f) return;
+
+            let inputHtml = '';
+            if (f.fieldType === 'select') {
+                inputHtml = `<select id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
+                (f.options || []).forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}">${o}</option>`);
+                inputHtml += `</select>`;
+            } else if (f.fieldType === 'textarea') {
+                inputHtml = `<textarea id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"></textarea>`;
+            } else if (f.fieldType === 'lookup') {
+                let lookupOptions = [];
+                try {
+                    const targetModule = f.lookupModule;
+                    const displayField = f.lookupDisplay;
+                    if (targetModule) {
+                        if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                            const customers = JSON.parse(localStorage.getItem('customers')) || [];
+                             lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
+                        } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+                            lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
+                        } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                            const items = JSON.parse(localStorage.getItem('items')) || [];
+                            lookupOptions = items.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.name || i.id) }));
+                        } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                            const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+                            lookupOptions = invoices.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
+                        } else {
+                            const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                            lookupOptions = customData.map(r => ({ id: r.id, label: (displayField && r[displayField] !== undefined) ? r[displayField] : r.id }));
+                        }
+                    }
+                    lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
+                } catch(e) { console.warn("Error loading lookup options", e); }
+                
+                const uniqueOps = [];
+                const seen = new Set();
+                lookupOptions.forEach(o => {
+                    if (o && o.id && !seen.has(o.id)) {
+                        seen.add(o.id);
+                        uniqueOps.push(o);
+                    }
+                });
+
+                inputHtml = `<select id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;">
+                    <option value="">-- Select --</option>`;
+                uniqueOps.forEach(o => {
+                    inputHtml += `<option value="${String(o.id).replace(/"/g, '&quot;')}">${String(o.label).replace(/</g, '&lt;')}</option>`;
+                });
+                inputHtml += `</select>`;
+            } else {
+                 inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+            }
+            
+            container.innerHTML = `<label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">New Value for ${f.fieldLabel}</label>${inputHtml}`;
+        }
+
+        async function applyBulkEdit() {
+            const fieldName = document.getElementById('bulkEditFieldSelect').value;
+            const valInput = document.getElementById('bulkEditValue');
+            
+            if (!fieldName) {
+                alert("Please select a field to edit.");
+                return;
+            }
+            
+            const newValue = valInput ? valInput.value : '';
+
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return;
+            if (!confirm(`Are you sure you want to update ${checkboxes.length} records?`)) return;
+
+            const idsToEdit = Array.from(checkboxes).map(cb => cb.value);
+            let currentUser = localStorage.getItem('currentUser') || 'System';
+            
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let data = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+            
+            for (const id of idsToEdit) {
+                const index = data.findIndex(r => r.id === id || r._id === id);
+                if (index !== -1) {
+                    let existingRecord = data[index];
+                    let newRow = { ...existingRecord, updatedAt: new Date().toISOString() };
+                    newRow[fieldName] = newValue;
+                    
+                    if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                        try {
+                            await apiClient.saveCustomRecord(newRow);
+                        } catch (err) { console.warn("API sync failed", err); }
+                    }
+
+                    data[index] = newRow;
+                }
+            }
+            
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
+            closeBulkEditModal();
+            renderCustomTable();
         }
 
         // --- Settings / Columns Logic ---
