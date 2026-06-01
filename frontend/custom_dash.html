@@ -1646,26 +1646,51 @@
             let data = allData.filter(r => r.createdBy === currentUser);
             const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
             
-            for (const id of idsToEdit) {
-                const index = data.findIndex(r => r.id === id || r._id === id);
-                if (index !== -1) {
-                    let existingRecord = data[index];
-                    let newRow = { ...existingRecord, updatedAt: new Date().toISOString() };
-                    newRow[fieldName] = newValue;
-                    
-                    if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
-                        try {
-                            await apiClient.saveCustomRecord(newRow);
-                        } catch (err) { console.warn("API sync failed", err); }
-                    }
+            const overlay = document.getElementById('loadingOverlay');
+            const progressContainer = document.getElementById('importProgressContainer');
+            const progressBar = document.getElementById('importProgressBar');
+            const progressText = document.getElementById('importProgressText');
+            const total = idsToEdit.length;
+            let processed = 0;
 
-                    data[index] = newRow;
-                }
+            if (overlay) overlay.style.display = 'flex';
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (progressText) {
+                progressText.style.display = 'block';
+                progressText.innerText = `Processing 0 of ${total}...`;
             }
             
-            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
-            closeBulkEditModal();
-            renderCustomTable();
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            try {
+                for (const id of idsToEdit) {
+                    const index = data.findIndex(r => r.id === id || r._id === id);
+                    if (index !== -1) {
+                        let existingRecord = data[index];
+                        let newRow = { ...existingRecord, updatedAt: new Date().toISOString() };
+                        newRow[fieldName] = newValue;
+                        
+                        if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                            try {
+                                await apiClient.saveCustomRecord(newRow);
+                            } catch (err) { console.warn("API sync failed", err); }
+                        }
+                        data[index] = newRow;
+                    }
+                    processed++;
+                    if (progressBar) progressBar.style.width = Math.round((processed / total) * 100) + '%';
+                    if (progressText) progressText.innerText = `Processing ${processed} of ${total}...`;
+                    if (processed % 10 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
+                closeBulkEditModal();
+                renderCustomTable();
+            } finally {
+                if (overlay) overlay.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (progressText) progressText.style.display = 'none';
+                if (progressBar) progressBar.style.width = '0%';
+            }
         }
 
         // --- Settings / Columns Logic ---
