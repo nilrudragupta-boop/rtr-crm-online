@@ -1535,14 +1535,15 @@
                                     <div class="cfm-field-group">
                                         <label class="cfm-label">Source Module <span class="req-star">*</span></label>
                                         <input type="text" id="cfLookupModule" class="cfm-input" list="cfModuleList"
-                                            placeholder="e.g., Customer, Supplier">
+                                            placeholder="e.g., Customer, Supplier" oninput="populateLookupDisplayFields()">
                                         <div class="cfm-hint">Which module's records will appear in the popup list.
                                         </div>
                                     </div>
                                     <div class="cfm-field-group">
                                         <label class="cfm-label">Display Field</label>
-                                        <input type="text" id="cfLookupDisplay" class="cfm-input"
-                                            placeholder="e.g., companyName, fullName">
+                                        <select id="cfLookupDisplay" class="cfm-select">
+                                            <option value="">-- Select Display Field --</option>
+                                        </select>
                                         <div class="cfm-hint">Which field from the source record to show.</div>
                                     </div>
                                 </div>
@@ -2844,6 +2845,43 @@ function createResponse(obj) {
                     inp.focus();
                 }
 
+                function populateLookupDisplayFields() {
+                    const moduleName = document.getElementById('cfLookupModule').value.trim();
+                    const displaySelect = document.getElementById('cfLookupDisplay');
+                    if (!displaySelect) return;
+                    
+                    const currentVal = displaySelect.value;
+                    displaySelect.innerHTML = '<option value="">-- Select Display Field --</option>';
+                    
+                    let fields = [];
+                    
+                    if (moduleName.toLowerCase() === 'customer' || moduleName.toLowerCase() === 'customers') {
+                        fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'contact', fieldLabel: 'Contact'}, {fieldName: 'email', fieldLabel: 'Email'}, {fieldName: 'gstin', fieldLabel: 'GSTIN'}];
+                    } else if (moduleName.toLowerCase() === 'supplier' || moduleName.toLowerCase() === 'suppliers') {
+                        fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'contact', fieldLabel: 'Contact'}, {fieldName: 'email', fieldLabel: 'Email'}, {fieldName: 'gstin', fieldLabel: 'GSTIN'}];
+                    } else if (moduleName.toLowerCase() === 'item' || moduleName.toLowerCase() === 'items') {
+                        fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'itemCode', fieldLabel: 'Item Code'}, {fieldName: 'category', fieldLabel: 'Category'}, {fieldName: 'price', fieldLabel: 'Price'}];
+                    } else if (moduleName.toLowerCase() === 'invoice' || moduleName.toLowerCase() === 'invoices') {
+                        fields = [{fieldName: 'invoice_no', fieldLabel: 'Invoice No'}, {fieldName: 'customer_name', fieldLabel: 'Customer Name'}, {fieldName: 'date', fieldLabel: 'Date'}];
+                    } else if (moduleName) {
+                        const customFields = customFieldsCache.filter(f => f.moduleName === moduleName);
+                        fields = customFields.map(f => ({fieldName: f.fieldName, fieldLabel: f.fieldLabel}));
+                    }
+                    
+                    fields.push({fieldName: 'id', fieldLabel: 'Record ID'});
+                    
+                    fields.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.fieldName;
+                        opt.textContent = `${f.fieldLabel} (${f.fieldName})`;
+                        displaySelect.appendChild(opt);
+                    });
+                    
+                    if (currentVal && fields.some(f => f.fieldName === currentVal)) {
+                        displaySelect.value = currentVal;
+                    }
+                }
+
                 // ── Show/hide type-specific panels ──
                 function toggleCfOptions() {
                     const type = document.getElementById('cfType').value;
@@ -3184,6 +3222,7 @@ function createResponse(obj) {
                         document.getElementById('cfUrlLabel').value = f.urlLabel || '';
                     if (f.fieldType === 'lookup') {
                         document.getElementById('cfLookupModule').value = f.lookupModule || '';
+                        populateLookupDisplayFields();
                         document.getElementById('cfLookupDisplay').value = f.lookupDisplay || '';
                     }
 

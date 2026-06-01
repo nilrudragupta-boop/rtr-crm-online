@@ -813,36 +813,66 @@
                             } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
                         } else if (f.fieldType === 'lookup') {
                             const rawVal = row[f.fieldName];
-                            val = rawVal;
+                            let displayText = rawVal;
+                            let linkUrl = '#';
+                            let linkTitle = 'View record';
                             if (rawVal) {
                                 try {
                                     const targetModule = f.lookupModule;
                                     const displayField = f.lookupDisplay;
                                     if (targetModule) {
                                         let sourceData = [];
-                                        if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                                        const targetModuleLower = targetModule.toLowerCase();
+                                        if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
                                             sourceData = JSON.parse(localStorage.getItem('customers')) || [];
                                             const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
-                                        } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `customer.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                                linkTitle = `View customer: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
                                             sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
                                             const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
-                                        } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `supplier.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                                linkTitle = `View supplier: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
                                             sourceData = JSON.parse(localStorage.getItem('items')) || [];
                                             const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
-                                        } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `item.html?search=${encodeURIComponent(match.name || match.itemCode || match.id)}`;
+                                                linkTitle = `View item: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
                                             sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
                                             const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                            if (match) {
+                                                const invNo = match.invoice_no || match.invoiceNo || match.id;
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : invNo;
+                                                linkUrl = `invoiceB.html?invoiceNo=${encodeURIComponent(invNo)}`;
+                                                linkTitle = `View invoice: ${displayText}`;
+                                            }
                                         } else {
                                             sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
                                             const match = sourceData.find(x => (x.id || x._id) === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.id || match._id);
+                                            if (match) {
+                                                const potentialDisplay = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || rawVal);
+                                                displayText = potentialDisplay;
+                                                linkUrl = `custom_dash.html?pageId=${encodeURIComponent(targetModule)}&search=${encodeURIComponent(rawVal)}`;
+                                                linkTitle = `View records in ${targetModule}`;
+                                            }
                                         }
                                     }
                                 } catch(e) { console.warn("Error resolving lookup value", e); }
+                            }
+                            if (linkUrl !== '#') {
+                                val = `<a href="${linkUrl}" target="_blank" title="${linkTitle}" style="color: var(--slds-blue); text-decoration: none; font-weight: 500;">${displayText || rawVal}</a>`;
+                            } else {
+                                val = displayText || rawVal;
                             }
                         } else {
                             val = row[f.fieldName];
@@ -919,19 +949,19 @@
                         if (targetModule) {
                             if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
                                 const customers = JSON.parse(localStorage.getItem('customers')) || [];
-                                 lookupOptions = customers.map(c => ({ id: c.id, label: displayField ? c[displayField] : (c.name || c.id) }));
+                                 lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
                             } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
                                 const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
-                                lookupOptions = suppliers.map(s => ({ id: s.id, label: displayField ? s[displayField] : (s.name || s.id) }));
+                                lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
                             } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
                                 const items = JSON.parse(localStorage.getItem('items')) || [];
-                                lookupOptions = items.map(i => ({ id: i.id, label: displayField ? i[displayField] : (i.name || i.id) }));
+                                lookupOptions = items.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.name || i.id) }));
                             } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
                                 const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
-                                lookupOptions = invoices.map(i => ({ id: i.id, label: displayField ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
+                                lookupOptions = invoices.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
                             } else {
                                 const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
-                                lookupOptions = customData.map(r => ({ id: r.id, label: displayField ? r[displayField] : r.id }));
+                                lookupOptions = customData.map(r => ({ id: r.id, label: (displayField && r[displayField] !== undefined) ? r[displayField] : r.id }));
                             }
                         }
                         lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
@@ -1155,36 +1185,66 @@
                         } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
                         } else if (f.fieldType === 'lookup') {
                             const rawVal = row[f.fieldName];
-                            val = rawVal;
+                            let displayText = rawVal;
+                            let linkUrl = '#';
+                            let linkTitle = 'View record';
                             if (rawVal) {
                                 try {
                                     const targetModule = f.lookupModule;
                                     const displayField = f.lookupDisplay;
                                     if (targetModule) {
                                         let sourceData = [];
-                                        if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                                        const targetModuleLower = targetModule.toLowerCase();
+                                        if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
                                             sourceData = JSON.parse(localStorage.getItem('customers')) || [];
                                             const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
-                                        } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `customer.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                                linkTitle = `View customer: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
                                             sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
                                             const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
-                                        } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `supplier.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                                linkTitle = `View supplier: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
                                             sourceData = JSON.parse(localStorage.getItem('items')) || [];
                                             const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
-                                        } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `item.html?search=${encodeURIComponent(match.name || match.itemCode || match.id)}`;
+                                                linkTitle = `View item: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
                                             sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
                                             const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                            if (match) {
+                                                const invNo = match.invoice_no || match.invoiceNo || match.id;
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : invNo;
+                                                linkUrl = `invoiceB.html?invoiceNo=${encodeURIComponent(invNo)}`;
+                                                linkTitle = `View invoice: ${displayText}`;
+                                            }
                                         } else {
                                             sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
                                             const match = sourceData.find(x => (x.id || x._id) === rawVal);
-                                            if (match) val = displayField ? match[displayField] : (match.id || match._id);
+                                            if (match) {
+                                                const potentialDisplay = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || rawVal);
+                                                displayText = potentialDisplay;
+                                                linkUrl = `custom_dash.html?pageId=${encodeURIComponent(targetModule)}&search=${encodeURIComponent(rawVal)}`;
+                                                linkTitle = `View records in ${targetModule}`;
+                                            }
                                         }
                                     }
                                 } catch(e) {}
+                            }
+                            if (linkUrl !== '#') {
+                                val = `<a href="${linkUrl}" target="_blank" title="${linkTitle}" style="color: var(--slds-blue); text-decoration: none; font-weight: 500;">${displayText || rawVal}</a>`;
+                            } else {
+                                val = displayText || rawVal;
                             }
                     } else {
                         val = row[f.fieldName];

@@ -1136,6 +1136,38 @@
                                  <input type="hidden" id="${id}" class="dynamic-input" ${data} ${reqAttr}>
                                  <div id="${id}_preview" class="mt-2" style="font-size:12px;"></div>`;
                     break;
+                case 'lookup':
+                    let lookupOptions = [];
+                    try {
+                        const targetModule = field.lookupModule;
+                        const displayField = field.lookupDisplay;
+                        if (targetModule) {
+                            if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                                const customers = JSON.parse(localStorage.getItem('customers')) || [];
+                                 lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
+                            } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                                const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
+                            } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                                const items = JSON.parse(localStorage.getItem('items')) || [];
+                                lookupOptions = items.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.name || i.id) }));
+                            } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                                const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+                                lookupOptions = invoices.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
+                            } else {
+                                const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                lookupOptions = customData.map(r => ({ id: r.id, label: (displayField && r[displayField] !== undefined) ? r[displayField] : r.id }));
+                            }
+                        }
+                        lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
+                    } catch(e) { console.warn("Error loading lookup options", e); }
+                    const uniqueOps = []; const seen = new Set();
+                    lookupOptions.forEach(o => { if (o && o.id && !seen.has(o.id)) { seen.add(o.id); uniqueOps.push(o); } });
+                    let lOpts = uniqueOps.map(o => `<option value="${String(o.id).replace(/"/g, '&quot;')}">${String(o.label).replace(/</g, '&lt;')}</option>`).join('');
+                    inputHTML = `<select id="${id}" class="form-select dynamic-input" ${data} ${reqAttr} ${css}>
+                       <option value="">— Select —</option>${lOpts}
+                     </select>`;
+                    break;
                 default:
                     inputHTML = `<input type="text" id="${id}" class="${cls}" ${data} ${reqAttr} placeholder="${field.fieldLabel}…" ${css}>`;
             }
@@ -1608,6 +1640,38 @@
                         } else {
                             html += `<td><span class="cell-empty">—</span></td>`;
                         }
+                    } else if (field.fieldType === 'lookup') {
+                        let displayText = val;
+                        try {
+                            const targetModule = field.lookupModule;
+                            const displayField = field.lookupDisplay;
+                            if (targetModule && val) {
+                                let sourceData = [];
+                                const targetModuleLower = targetModule.toLowerCase();
+                                if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                    sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                    const match = sourceData.find(x => x.id === val);
+                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                    sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                    const match = sourceData.find(x => x.id === val);
+                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                    sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                    const match = sourceData.find(x => x.id === val);
+                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                    sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                    const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === val);
+                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                } else {
+                                    sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                    const match = sourceData.find(x => (x.id || x._id) === val);
+                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || val);
+                                }
+                            }
+                        } catch(e) {}
+                        html += `<td title="${displayText}">${displayText}</td>`;
                     } else {
                         let display = String(val);
                         if (field.prefix) display = `${field.prefix} ${display}`;
@@ -2140,6 +2204,36 @@
                             const fileObj = JSON.parse(v);
                             v = fileObj.name || 'Attachment';
                         } catch (e) { v = 'Attachment'; }
+                    } else if (f.fieldType === 'lookup' && v) {
+                        try {
+                            const targetModule = f.lookupModule;
+                            const displayField = f.lookupDisplay;
+                            if (targetModule) {
+                                let sourceData = [];
+                                const targetModuleLower = targetModule.toLowerCase();
+                                if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                    sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                    const match = sourceData.find(x => x.id === v);
+                                    if (match) v = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                    sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                    const match = sourceData.find(x => x.id === v);
+                                    if (match) v = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                    sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                    const match = sourceData.find(x => x.id === v);
+                                    if (match) v = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                    sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                    const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === v);
+                                    if (match) v = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                } else {
+                                    sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                    const match = sourceData.find(x => (x.id || x._id) === v);
+                                    if (match) v = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || v);
+                                }
+                            }
+                        } catch(e) {}
                     }
                     return `"${String(v).replace(/"/g, '""')}"`;
                 }).join(',')
@@ -2201,6 +2295,36 @@
                                 else val = f.name || 'Attachment';
                             } catch (e) { val = 'Attachment'; }
                         } else val = '—';
+                    } else if (field.fieldType === 'lookup' && val !== '—') {
+                        try {
+                            const targetModule = field.lookupModule;
+                            const displayField = field.lookupDisplay;
+                            if (targetModule) {
+                                let sourceData = [];
+                                const targetModuleLower = targetModule.toLowerCase();
+                                if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                    sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                    const match = sourceData.find(x => x.id === val);
+                                    if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                    sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                    const match = sourceData.find(x => x.id === val);
+                                    if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                    sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                    const match = sourceData.find(x => x.id === val);
+                                    if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                    sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                    const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === val);
+                                    if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                } else {
+                                    sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                    const match = sourceData.find(x => (x.id || x._id) === val);
+                                    if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || val);
+                                }
+                            }
+                        } catch(e) {}
                     } else if (field.fieldType === 'date') {
                         const d = new Date(val);
                         if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
@@ -2321,6 +2445,36 @@
                             } else val = f.name || 'Attachment';
                         } catch (e) { val = 'Attachment'; }
                     } else val = '—';
+                } else if (field.fieldType === 'lookup' && val !== '—') {
+                    try {
+                        const targetModule = field.lookupModule;
+                        const displayField = field.lookupDisplay;
+                        if (targetModule) {
+                            let sourceData = [];
+                            const targetModuleLower = targetModule.toLowerCase();
+                            if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                const match = sourceData.find(x => x.id === val);
+                                if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                            } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                const match = sourceData.find(x => x.id === val);
+                                if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                            } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                const match = sourceData.find(x => x.id === val);
+                                if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                            } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === val);
+                                if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                            } else {
+                                sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                const match = sourceData.find(x => (x.id || x._id) === val);
+                                if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || val);
+                            }
+                        }
+                    } catch(e) {}
                 } else if (field.fieldType === 'date') {
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
