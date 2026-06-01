@@ -2009,21 +2009,26 @@
         function testFormula() {
             let formula = document.getElementById('cfFormula').value;
             if (!formula) return alert('Enter a formula first.');
-            
-            formula = formula.replace(/\{(\w+)\}/g, '$1');
-            const fieldNamesInFormula = formula.match(/\bcf_[a-zA-Z0-9_]+\b/g) || [];
+            // Auto-correct missing braces around field keys
+            formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+            const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
             const uniqueVars = [...new Set(fieldNamesInFormula)];
 
-            let dummyCode = "";
             for (let v of uniqueVars) {
                 let val = prompt(`Enter dummy value for variable '${v}':`, "10");
                 if (val === null) return;
-                dummyCode += `const ${v} = ${isNaN(val) || val === '' ? `"${val}"` : val};\n`;
+                let num = parseFloat(val) || 0;
+                formula = formula.split(v).join(num);
             }
 
             try {
-                const fn = new Function(`${dummyCode} return ${formula};`);
-                alert("Valid! Result: " + fn());
+                let fn = new Function('return ' + formula);
+                let res = fn();
+                if (typeof res === 'number' && (!isFinite(res) || isNaN(res))) {
+                    alert("Valid syntax, but evaluates to: " + res);
+                } else {
+                    alert("Valid! Result: " + res);
+                }
             } catch (e) {
                 alert("Error in Javascript syntax:\n" + e.message);
             }
@@ -2032,20 +2037,23 @@
         function testCondition() {
             let cond = document.getElementById('cfCondition').value;
             if (!cond) return alert('Enter a condition first.');
-            
-            cond = cond.replace(/\{(\w+)\}/g, '$1');
-            const fieldNamesInFormula = cond.match(/\bcf_[a-zA-Z0-9_]+\b/g) || [];
+            // Auto-correct missing braces around field keys
+            cond = cond.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+            const fieldNamesInFormula = cond.match(/{[^{}]+}/g) || [];
             const uniqueVars = [...new Set(fieldNamesInFormula)];
 
-            let dummyCode = "";
             for (let v of uniqueVars) {
                 let val = prompt(`Enter dummy value for variable '${v}' (e.g. true, false, 100, "Text"):`, "true");
                 if (val === null) return;
-                dummyCode += `const ${v} = ${val === 'true' || val === 'false' || !isNaN(val) ? val : `"${val}"`};\n`;
+                if (val === 'true' || val === 'false' || !isNaN(parseFloat(val))) {
+                    cond = cond.split(v).join(val);
+                } else {
+                    cond = cond.split(v).join(`"${String(val || '').replace(/"/g, '\\"')}"`);
+                }
             }
 
             try {
-                const fn = new Function(`${dummyCode} return ${cond};`);
+                const fn = new Function('return ' + cond);
                 alert("Valid! Result: " + fn());
             } catch (e) {
                 alert("Error in Javascript syntax:\n" + e.message);

@@ -813,19 +813,28 @@
                         let val;
                         if (f.fieldType === 'calculated' && f.calculationFormula) {
                             try {
-                                 let formula = f.calculationFormula.toString().replace(/\{(\w+)\}/g, '$1');
-                            const keys = Object.keys(row);
-                            const vals = Object.values(row).map(v => {
-                                const num = parseFloat(v);
-                                return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                let formula = f.calculationFormula.toString();
+                                // Auto-correct missing braces around field keys for backwards compatibility
+                                formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                                const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                                let formulaIsValid = true;
+                                
+                                fieldNamesInFormula.forEach(placeholder => {
+                                    const fieldName = placeholder.substring(1, placeholder.length - 1);
+                                    let v = row[fieldName];
+                                    if (v === undefined || v === null || v === '') {
+                                        formulaIsValid = false;
+                                    }
+                                    const fieldValue = parseFloat(v) || 0;
+                                    formula = formula.split(placeholder).join(fieldValue);
                                 });
                                 
-                                try {
-                                const fn = new Function(...keys, `return ${formula};`);
-                                val = fn(...vals);
+                                if (formulaIsValid) {
+                                    val = new Function('return ' + formula)();
                                     if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
-                                } catch (evalErr) { val = '#CALC!'; }
-
+                                } else {
+                                    val = null;
+                                }
                             } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
                         } else if (f.fieldType === 'lookup') {
                             const rawVal = row[f.fieldName];
@@ -1012,24 +1021,33 @@
             currentCustomFields.forEach(f => {
                 if (f.fieldType === 'calculated' && f.calculationFormula) {
                     try {
-                        let formula = f.calculationFormula.toString().replace(/\{(\w+)\}/g, '$1');
-                        const keys = currentCustomFields.map(cf => cf.fieldName);
-                        const vals = keys.map(k => {
-                            const inputEl = document.getElementById(k);
-                            const val = inputEl ? inputEl.value : '';
-                            const num = parseFloat(val);
-                            return (!isNaN(num) && String(val).trim() !== '') ? num : val;
-                        });
+                        let formula = f.calculationFormula.toString();
+                        // Auto-correct missing braces around field keys
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                        let formulaIsValid = true;
                         
+                        fieldNamesInFormula.forEach(placeholder => {
+                            const fieldName = placeholder.substring(1, placeholder.length - 1);
+                            const inputEl = document.getElementById(fieldName);
+                            let val = inputEl ? inputEl.value : '';
+                            
+                            if (val === undefined || val === null || val === '') {
+                                formulaIsValid = false;
+                            }
+                            const fieldValue = parseFloat(val) || 0;
+                            formula = formula.split(placeholder).join(fieldValue);
+                        });
                         
                         const calcEl = document.getElementById(f.fieldName);
                         if (calcEl) {
-                            try {
-                                const fn = new Function(...keys, `return ${formula};`);
-                                let res = fn(...vals);
+                            if (formulaIsValid) {
+                                let res = new Function('return ' + formula)();
                                 if (typeof res === 'number' && (!isFinite(res) || isNaN(res))) res = '';
                                 calcEl.value = res;
-                            } catch (evalErr) { calcEl.value = ''; }
+                            } else {
+                                calcEl.value = '';
+                            }
                         }
                     } catch (e) { 
                         console.error("Calculation error for field", f.fieldName, e); 
@@ -1153,10 +1171,37 @@
             if (!confirm(`Are you sure you want to delete ${checkboxes.length} selected record(s)?`)) return;
 
             const idsToDelete = Array.from(checkboxes).map(cb => cb.value);
-            for (const id of idsToDelete) {
-                await deleteCustomRecord(id, true);
+            const overlay = document.getElementById('loadingOverlay');
+            const progressContainer = document.getElementById('importProgressContainer');
+            const progressBar = document.getElementById('importProgressBar');
+            const progressText = document.getElementById('importProgressText');
+            const total = idsToDelete.length;
+            let processed = 0;
+
+            if (overlay) overlay.style.display = 'flex';
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (progressText) {
+                progressText.style.display = 'block';
+                progressText.innerText = `Deleting 0 of ${total}...`;
             }
-            renderCustomTable();
+            
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            try {
+                for (const id of idsToDelete) {
+                    await deleteCustomRecord(id, true);
+                    processed++;
+                    if (progressBar) progressBar.style.width = Math.round((processed / total) * 100) + '%';
+                    if (progressText) progressText.innerText = `Deleting ${processed} of ${total}...`;
+                    if (processed % 10 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                renderCustomTable();
+            } finally {
+                if (overlay) overlay.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (progressText) progressText.style.display = 'none';
+                if (progressBar) progressBar.style.width = '0%';
+            }
         }
 
         function exportData() {
@@ -1172,18 +1217,28 @@
                     let val;
                     if (f.fieldType === 'calculated' && f.calculationFormula) {
                         try {
-                            let formula = f.calculationFormula.toString().replace(/\{(\w+)\}/g, '$1');
-                            const keys = Object.keys(row);
-                            const vals = Object.values(row).map(v => {
-                                const num = parseFloat(v);
-                                return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                            let formula = f.calculationFormula.toString();
+                            // Auto-correct missing braces around field keys
+                            formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                            const fieldNamesInFormula = formula.match(/{[^{}]+}/g) || [];
+                            let formulaIsValid = true;
+                            
+                            fieldNamesInFormula.forEach(placeholder => {
+                                const fieldName = placeholder.substring(1, placeholder.length - 1);
+                                let v = row[fieldName];
+                                if (v === undefined || v === null || v === '') {
+                                    formulaIsValid = false;
+                                }
+                                const fieldValue = parseFloat(v) || 0;
+                                formula = formula.split(placeholder).join(fieldValue);
                             });
                             
-                            try {
-                                const fn = new Function(...keys, `return ${formula};`);
-                                val = fn(...vals);
+                            if (formulaIsValid) {
+                                val = new Function('return ' + formula)();
                                 if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
-                            } catch (evalErr) { val = '#CALC!'; }
+                            } else {
+                                val = null;
+                            }
                         } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
                         } else if (f.fieldType === 'lookup') {
                             const rawVal = row[f.fieldName];
