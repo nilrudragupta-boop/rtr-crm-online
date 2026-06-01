@@ -1195,8 +1195,8 @@
             moduleFields.forEach(field => {
                 if (field.fieldType === 'calculated' && field.calculationFormula) {
                     try {
-                        const keys = Object.keys(currentState);
-                        const vals = Object.values(currentState);
+                        const keys = moduleFields.map(f => f.fieldName);
+                        const vals = keys.map(k => currentState[k] !== undefined ? currentState[k] : 0);
                         let formula = field.calculationFormula.toString().replace(/\{(\w+)\}/g, '$1');
                         const fn = new Function(...keys, `return ${formula};`);
                         let result = fn(...vals);
@@ -1243,8 +1243,8 @@
                 const wrapper = document.getElementById(`wrapper_${field.fieldName}`);
                 if (!wrapper) return;
                 try {
-                    const keys = Object.keys(currentState);
-                    const vals = Object.values(currentState);
+                    const keys = moduleFields.map(f => f.fieldName);
+                    const vals = keys.map(k => currentState[k] !== undefined ? currentState[k] : 0);
 
                     // Handle safely checking undefined items
                     let condition = field.visibilityCondition.toString().replace(/\{(\w+)\}/g, '$1');
