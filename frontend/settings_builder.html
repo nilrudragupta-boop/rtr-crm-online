@@ -1024,8 +1024,9 @@
                         <div class="cfm-section-div"><i class="fas fa-search"></i> Lookup Settings</div>
                         <div class="cfm-field-group">
                             <label class="cfm-label">Source Module <span class="req-star">*</span></label>
-                            <input type="text" id="cfLookupModule" class="cfm-input" list="cfModuleList"
-                                placeholder="e.g., Customer, Supplier">
+                            <select id="cfLookupModule" class="cfm-select">
+                                <option value="">-- Select Source Module --</option>
+                            </select>
                             <div class="cfm-hint">Which module's records will appear in the popup list.
                             </div>
                         </div>
@@ -1546,11 +1547,20 @@
                 ...myFields.map(f => f.moduleName)
             ].filter(Boolean))].sort();
 
-            dl.innerHTML = all.map(m => {
+            const optionsHtml = all.map(m => {
                 const pageDef = customPages.find(p => p.pageId === m);
                 const display = pageDef ? `${pageDef.label} (${m})` : m;
                 return `<option value="${m}">${display}</option>`;
             }).join('');
+
+            dl.innerHTML = optionsHtml;
+
+            const lookupSelect = document.getElementById('cfLookupModule');
+            if (lookupSelect) {
+                const currentVal = lookupSelect.value;
+                lookupSelect.innerHTML = '<option value="">-- Select Source Module --</option>' + optionsHtml;
+                if (currentVal) lookupSelect.value = currentVal;
+            }
 
             const secDl = document.getElementById('cfSectionList');
             if (secDl) {
@@ -1605,6 +1615,13 @@
                 const pageDef = customPages.find(p => p.pageId === field.moduleName);
                 const modDisplay = pageDef ? `${pageDef.label} <span style="color:#94a3b8; font-weight:normal; font-size:11px">(${field.moduleName})</span>` : field.moduleName;
 
+                let lookupDisplayStr = '';
+                if (field.fieldType === 'lookup' && field.lookupModule) {
+                    const lPageDef = customPages.find(p => p.pageId === field.lookupModule);
+                    const lModDisplay = lPageDef ? lPageDef.label : field.lookupModule;
+                    lookupDisplayStr = ` <span style="opacity:0.8; font-weight:normal; margin-left:3px;">→ ${lModDisplay}</span>`;
+                }
+
                 tr.innerHTML = `
                     <td style="text-align:center">
                         ${!search ? `<i class="fas fa-grip-vertical cfm-grip"></i>` : ''}
@@ -1624,7 +1641,7 @@
                     <td>
                         <span class="cfm-type-badge ${badgeClass}">
                             <i class="${typeDef.icon}" style="font-size:9px"></i>
-                            ${typeDef.label || field.fieldType}
+                            ${typeDef.label || field.fieldType}${lookupDisplayStr}
                         </span>
                     </td>
                     <td style="font-size:11.5px;color:#64748b;font-weight:600">${gridLabel}</td>

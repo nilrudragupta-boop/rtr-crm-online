@@ -811,6 +811,39 @@
                                     val = null;
                                 }
                             } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                        } else if (f.fieldType === 'lookup') {
+                            const rawVal = row[f.fieldName];
+                            val = rawVal;
+                            if (rawVal) {
+                                try {
+                                    const targetModule = f.lookupModule;
+                                    const displayField = f.lookupDisplay;
+                                    if (targetModule) {
+                                        let sourceData = [];
+                                        if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                                            sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
+                                        } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                                            sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
+                                        } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                                            sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
+                                        } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                                            sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                            const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                        } else {
+                                            sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                            const match = sourceData.find(x => (x.id || x._id) === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.id || match._id);
+                                        }
+                                    }
+                                } catch(e) { console.warn("Error resolving lookup value", e); }
+                            }
                         } else {
                             val = row[f.fieldName];
                         }
@@ -886,28 +919,39 @@
                         if (targetModule) {
                             if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
                                 const customers = JSON.parse(localStorage.getItem('customers')) || [];
-                                lookupOptions = customers.map(c => displayField ? c[displayField] : (c.name || c.id));
+                                 lookupOptions = customers.map(c => ({ id: c.id, label: displayField ? c[displayField] : (c.name || c.id) }));
                             } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
                                 const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
-                                lookupOptions = suppliers.map(s => displayField ? s[displayField] : (s.name || s.id));
+                                lookupOptions = suppliers.map(s => ({ id: s.id, label: displayField ? s[displayField] : (s.name || s.id) }));
                             } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
                                 const items = JSON.parse(localStorage.getItem('items')) || [];
-                                lookupOptions = items.map(i => displayField ? i[displayField] : (i.name || i.id));
+                                lookupOptions = items.map(i => ({ id: i.id, label: displayField ? i[displayField] : (i.name || i.id) }));
                             } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
                                 const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
-                                lookupOptions = invoices.map(i => displayField ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id));
+                                lookupOptions = invoices.map(i => ({ id: i.id, label: displayField ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
                             } else {
                                 const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
-                                lookupOptions = customData.map(r => displayField ? r[displayField] : r.id);
+                                lookupOptions = customData.map(r => ({ id: r.id, label: displayField ? r[displayField] : r.id }));
                             }
                         }
                         lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
                     } catch(e) { console.warn("Error loading lookup options", e); }
                     
-                    inputHtml = `<input type="text" id="${f.fieldName}" value="${val}" list="lookupList_${f.fieldName}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
-                    inputHtml += `<datalist id="lookupList_${f.fieldName}">`;
-                    lookupOptions.forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}"></option>`);
-                    inputHtml += `</datalist>`;
+                     const uniqueOps = [];
+                    const seen = new Set();
+                    lookupOptions.forEach(o => {
+                        if (o && o.id && !seen.has(o.id)) {
+                            seen.add(o.id);
+                            uniqueOps.push(o);
+                        }
+                    });
+
+                    inputHtml = `<select id="${f.fieldName}" onchange="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;">
+                        <option value="">-- Select --</option>`;
+                    uniqueOps.forEach(o => {
+                        inputHtml += `<option value="${String(o.id).replace(/"/g, '&quot;')}" ${o.id === val ? 'selected' : ''}>${String(o.label).replace(/</g, '&lt;')}</option>`;
+                    });
+                    inputHtml += `</select>`;
                 } else {
                     inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="${f.fieldName}" value="${val}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
                 }
@@ -1109,6 +1153,39 @@
                                 val = null;
                             }
                         } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                        } else if (f.fieldType === 'lookup') {
+                            const rawVal = row[f.fieldName];
+                            val = rawVal;
+                            if (rawVal) {
+                                try {
+                                    const targetModule = f.lookupModule;
+                                    const displayField = f.lookupDisplay;
+                                    if (targetModule) {
+                                        let sourceData = [];
+                                        if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                                            sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
+                                        } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                                            sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
+                                        } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                                            sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.name || match.id);
+                                        } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                                            sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                            const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                        } else {
+                                            sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                            const match = sourceData.find(x => (x.id || x._id) === rawVal);
+                                            if (match) val = displayField ? match[displayField] : (match.id || match._id);
+                                        }
+                                    }
+                                } catch(e) {}
+                            }
                     } else {
                         val = row[f.fieldName];
                     }
