@@ -1197,7 +1197,8 @@
                     try {
                         const keys = Object.keys(currentState);
                         const vals = Object.values(currentState);
-                        const fn = new Function(...keys, `return ${field.calculationFormula};`);
+                        let formula = field.calculationFormula.toString().replace(/\{(\w+)\}/g, '$1');
+                        const fn = new Function(...keys, `return ${formula};`);
                         let result = fn(...vals);
 
                         if (typeof result === 'number' && !isNaN(result)) {
@@ -1246,7 +1247,7 @@
                     const vals = Object.values(currentState);
 
                     // Handle safely checking undefined items
-                    let condition = field.visibilityCondition;
+                    let condition = field.visibilityCondition.toString().replace(/\{(\w+)\}/g, '$1');
                     if (!condition.includes('return')) {
                         condition = `return ${condition};`;
                     }
