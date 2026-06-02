@@ -101,6 +101,12 @@
         .badge-cancelled { background: #e74c3c; }
         .badge-recurring { background: #3498db; margin-left: 5px; font-size: 10px; }
 
+        .party-type-label { font-size: 11px; font-weight: normal; margin-left: 4px; }
+        .party-type-customer { color: #007bff; }
+        .party-type-supplier { color: #fd7e14; }
+        body.dark-mode .party-type-customer { color: #58a6ff; }
+        body.dark-mode .party-type-supplier { color: #f0883e; }
+
         /* Modal Styles */
         .modal {
             display: none;
@@ -163,12 +169,19 @@
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
                 <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"> 🌙 Dark Mode
             </label>
+            <button class="btn-danger" onclick="deleteSelected()" id="bulkDeleteBtn" style="display:none;"><i class="fas fa-trash"></i> Delete Selected</button>
             <button class="btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> New Follow-up</button>
         </div>
     </div>
 
     <div class="controls">
         <input type="text" id="searchBox" placeholder="Search party, notes..." style="width:200px;" oninput="renderTable()">
+        <label>Party Type:</label>
+        <select id="filterPartyType" onchange="renderTable()" style="width:120px;">
+            <option value="">All</option>
+            <option value="Customer">Customer</option>
+            <option value="Supplier">Supplier</option>
+        </select>
         <label>Status:</label>
         <select id="filterStatus" onchange="renderTable()" style="width:120px;">
             <option value="">All</option>
@@ -186,6 +199,7 @@
         <table id="followUpTable">
             <thead>
                 <tr>
+                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
                     <th style="width: 100px;">Date</th>
                     <th>Party Name</th>
                     <th style="width: 120px;">Contact</th>
@@ -207,6 +221,14 @@
             </div>
             <input type="hidden" id="fuId">
             
+            <div class="form-group">
+                <label>Party Type *</label>
+                <select id="fuPartyType" onchange="populatePartyList()">
+                    <option value="Customer">Customer</option>
+                    <option value="Supplier">Supplier</option>
+                </select>
+            </div>
+
             <div class="form-group">
                 <label>Party / Customer Name *</label>
                 <input type="text" id="fuParty" placeholder="Enter name" list="partyList" onchange="autofillContact()">
@@ -284,12 +306,12 @@
         }
 
         function populatePartyList() {
-            const customers = JSON.parse(localStorage.getItem('customers')) || [];
-            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            const partyType = document.getElementById('fuPartyType').value;
+            const data = JSON.parse(localStorage.getItem(partyType === 'Customer' ? 'customers' : 'suppliers')) || [];
             const list = document.getElementById('partyList');
             list.innerHTML = '';
             
-            [...customers, ...suppliers].forEach(c => {
+            data.forEach(c => {
                 if (c.name) {
                     const opt = document.createElement('option');
                     opt.value = c.name;
@@ -313,11 +335,45 @@
             document.getElementById('recurringOptions').style.display = isChecked ? 'block' : 'none';
         }
 
+        let selectedIds = new Set();
+
+        function toggleSelectAll() {
+            const isChecked = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.selectRow').forEach(cb => {
+                cb.checked = isChecked;
+                if (isChecked) selectedIds.add(cb.value);
+                else selectedIds.delete(cb.value);
+            });
+            updateBulkDeleteBtn();
+        }
+
+        function toggleRowSelection(id) {
+            if (selectedIds.has(id)) selectedIds.delete(id);
+            else selectedIds.add(id);
+            
+            const selectAllCb = document.getElementById('selectAll');
+            const allRows = document.querySelectorAll('.selectRow');
+            if (allRows.length > 0 && selectedIds.size === allRows.length) selectAllCb.checked = true;
+            else selectAllCb.checked = false;
+            
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const btn = document.getElementById('bulkDeleteBtn');
+            if (selectedIds.size > 0) {
+                btn.style.display = 'inline-block';
+                btn.innerHTML = `<i class="fas fa-trash"></i> Delete Selected (${selectedIds.size})`;
+            } else btn.style.display = 'none';
+        }
+
         function openModal(id = null) {
             document.getElementById('modalTitle').innerText = id ? "Edit Follow-up" : "New Follow-up";
             if (id) {
                 const f = followUps.find(x => x.id === id);
                 document.getElementById('fuId').value = f.id;
+                document.getElementById('fuPartyType').value = f.partyType || 'Customer';
+                populatePartyList();
                 document.getElementById('fuParty').value = f.partyName;
                 document.getElementById('fuContact').value = f.contact || '';
                 document.getElementById('fuDate').value = f.date;
@@ -327,6 +383,8 @@
                 document.getElementById('fuFrequency').value = f.frequency || 'Weekly';
             } else {
                 document.getElementById('fuId').value = '';
+                document.getElementById('fuPartyType').value = 'Customer';
+                populatePartyList();
                 document.getElementById('fuParty').value = '';
                 document.getElementById('fuContact').value = '';
                 document.getElementById('fuDate').valueAsDate = new Date();
@@ -346,6 +404,7 @@
         function saveFollowUp() {
             const id = document.getElementById('fuId').value;
             const partyName = document.getElementById('fuParty').value.trim();
+            const partyType = document.getElementById('fuPartyType').value;
             const contact = document.getElementById('fuContact').value.trim();
             const date = document.getElementById('fuDate').value;
             const time = document.getElementById('fuTime').value;
@@ -357,7 +416,7 @@
 
             const payload = {
                 id: id || 'fu_' + Date.now(),
-                partyName, contact, date, time, notes, isRecurring, frequency,
+                partyName, partyType, contact, date, time, notes, isRecurring, frequency,
                 status: id ? followUps.find(f => f.id === id).status : 'Pending',
                 createdAt: new Date().toISOString()
             };
@@ -410,6 +469,17 @@
             renderTable();
         }
 
+        function deleteSelected() {
+            if (selectedIds.size === 0) return;
+            if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected follow-up(s)?`)) return;
+            followUps = followUps.filter(f => !selectedIds.has(f.id));
+            localStorage.setItem('follow_ups', JSON.stringify(followUps));
+            selectedIds.clear();
+            document.getElementById('selectAll').checked = false;
+            updateBulkDeleteBtn();
+            renderTable();
+        }
+
         function openWhatsApp(contact, notes) {
             if (!contact) return alert("No contact number found.");
             const cleanNo = contact.replace(/\D/g, '');
@@ -432,21 +502,23 @@
             
             const search = document.getElementById('searchBox').value.toLowerCase();
             const filterStatus = document.getElementById('filterStatus').value;
+            const filterPartyType = document.getElementById('filterPartyType') ? document.getElementById('filterPartyType').value : '';
             const fromDate = document.getElementById('filterFromDate').value;
             const toDate = document.getElementById('filterToDate').value;
 
             let filtered = followUps.filter(f => {
                 const matchSearch = f.partyName.toLowerCase().includes(search) || (f.notes || '').toLowerCase().includes(search);
                 const matchStatus = filterStatus ? f.status === filterStatus : true;
+                const matchPartyType = filterPartyType ? (f.partyType || 'Customer') === filterPartyType : true;
                 const matchDate = (!fromDate || f.date >= fromDate) && (!toDate || f.date <= toDate);
-                return matchSearch && matchStatus && matchDate;
+                return matchSearch && matchStatus && matchDate && matchPartyType;
             });
 
             // Sort by date nearest first
             filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#666;">No follow-ups found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No follow-ups found.</td></tr>';
                 return;
             }
 
@@ -459,6 +531,10 @@
                 else if (f.status === 'Cancelled') statusBadge = `<span class="badge badge-cancelled">Cancelled</span>`;
 
                 let recurringBadge = f.isRecurring ? `<span class="badge badge-recurring" title="Repeats ${f.frequency}"><i class="fas fa-sync-alt"></i></span>` : '';
+                
+                const pType = f.partyType || 'Customer';
+                const pClass = pType === 'Customer' ? 'party-type-customer' : 'party-type-supplier';
+                const isChecked = selectedIds.has(f.id) ? 'checked' : '';
 
                 let actionsHtml = '';
                 if (f.status === 'Pending') {
@@ -473,9 +549,10 @@
                 `;
 
                 tr.innerHTML = `
+                    <td style="text-align: center;"><input type="checkbox" class="selectRow" value="${f.id}" ${isChecked} onchange="toggleRowSelection('${f.id}')"></td>
                     <td>${new Date(f.date).toLocaleDateString('en-GB')}
                         ${f.time ? `<br><small style="color:#555;">${formatTime(f.time)}</small>` : ''}</td>
-                    <td style="font-weight:600; color:#2c3e50;">${f.partyName} ${recurringBadge}</td>
+                    <td style="font-weight:600; color:#2c3e50;">${f.partyName} <span class="party-type-label ${pClass}">(${pType})</span> ${recurringBadge}</td>
                     <td>${f.contact || '-'}</td>
                     <td>${f.notes || '-'}</td>
                     <td style="text-align:center;">${statusBadge}</td>
