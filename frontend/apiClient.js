@@ -77,11 +77,12 @@ const apiClient = {
     getLoginHistory: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/login-history${apiClient._getAuthQuery()}`);
+            if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : [];
+            return result.success ? result.data : null;
         } catch (error) {
             console.error('Error fetching login history:', error);
-            return [];
+            return null;
         }
     },
 
@@ -89,11 +90,12 @@ const apiClient = {
     getCustomers: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/customers${apiClient._getAuthQuery()}`);
+            if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : [];
+            return result.success ? result.data : null;
         } catch (error) {
             console.error('Error fetching customers:', error);
-            return [];
+            return null;
         }
     },
 
@@ -123,11 +125,12 @@ const apiClient = {
     getInvoices: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/invoices${apiClient._getAuthQuery()}`);
+            if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : [];
+            return result.success ? result.data : null;
         } catch (error) {
             console.error('Error fetching invoices:', error);
-            return [];
+            return null;
         }
     },
 
@@ -157,11 +160,12 @@ const apiClient = {
     _getCollection: async (collectionName) => {
         try {
             const response = await fetch(`${API_BASE_URL}/${collectionName}${apiClient._getAuthQuery()}`);
+            if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : [];
+            return result.success ? result.data : null;
         } catch (error) {
             console.error(`Error fetching ${collectionName}:`, error);
-            return [];
+            return null;
         }
     },
     _saveCollection: async (collectionName, data) => {
@@ -258,11 +262,12 @@ const apiClient = {
         if (endDate) qs += `&endDate=${encodeURIComponent(endDate)}`;
         try {
             const response = await fetch(`${API_BASE_URL}/marketing-visits${qs}`);
+            if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : [];
+            return result.success ? result.data : null;
         } catch (error) {
             console.error('Error fetching marketing-visits:', error);
-            return [];
+            return null;
         }
     },
     saveMarketingVisit: (data) => apiClient._saveCollection('marketing-visits', data),
@@ -302,11 +307,12 @@ const apiClient = {
     getCustomRecords: async (moduleName) => {
         try {
             const response = await fetch(`${API_BASE_URL}/custom-records/${moduleName}${apiClient._getAuthQuery()}`);
+            if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : [];
+            return result.success ? result.data : null;
         } catch (error) {
             console.error(`Error fetching custom records for ${moduleName}:`, error);
-            return [];
+            return null;
         }
     },
     saveCustomRecord: (data) => apiClient._saveCollection('custom-records', data),
@@ -316,11 +322,12 @@ const apiClient = {
     getShadowLedger: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/shadow_ledger${apiClient._getAuthQuery()}`);
+            if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : [];
+            return result.success ? result.data : null;
         } catch (error) {
             console.error('Error fetching shadow ledger:', error);
-            return [];
+            return null;
         }
     },
     saveShadowLedger: async (data) => {

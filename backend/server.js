@@ -819,6 +819,40 @@ app.delete('/api/marketing-visits/:id', async (req, res) => {
 });
 
 
+// --- Follow-ups ---
+const followUpSchema = new mongoose.Schema({ id: { type: String, required: true, unique: true } }, { strict: false, timestamps: true });
+const FollowUp = mongoose.model('FollowUp', followUpSchema);
+
+app.get('/api/follow-ups', async (req, res) => {
+    try {
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const followUps = await FollowUp.find(query).sort({ createdAt: -1 });
+        res.json({ success: true, data: followUps });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/follow-ups', async (req, res) => {
+    try {
+        const payload = req.body;
+        if (!payload.createdBy && req.query.user) payload.createdBy = req.query.user;
+        const updated = await FollowUp.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
+        res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/follow-ups/:id', async (req, res) => {
+    try {
+        await FollowUp.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- Custom Field Routes ---
 app.get('/api/custom-fields', async (req, res) => {
     try {
@@ -954,6 +988,7 @@ app.post('/api/restore', async (req, res) => {
         await restoreCollection(Medicine, backupData['medicines']);
         await restoreCollection(MedPayment, backupData['med_payments']);
         await restoreCollection(MedPurchaseInvoice, backupData['med_purchase_invoices']);
+        await restoreCollection(FollowUp, backupData['follow_ups']);
 
         for (const key of Object.keys(backupData)) {
             if (key.startsWith('CUSTOM_RECORDS_')) await restoreCollection(CustomRecord, backupData[key], '_id');
