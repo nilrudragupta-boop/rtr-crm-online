@@ -247,7 +247,9 @@
                 <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"> 🌙 Dark Mode
             </label>
             <button class="btn-danger" onclick="deleteSelected()" id="bulkDeleteBtn" style="display:none;"><i
-                    class="fas fa-trash"></i> Delete Selected</button>
+                    class="fas fa-trash"></i> Delete Selected</button>\
+                    <button class="btn-primary" onclick="fetchFollowUpsData()" style="background:#17a2b8;"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button class="btn-primary" onclick="fetchFollowUpsData()" style="background:#17a2b8;"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button class="btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> New Follow-up</button>
         </div>
     </div>
@@ -392,7 +394,7 @@
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getFollowUps) {
                     const remoteData = await apiClient.getFollowUps();
-                    if (remoteData && remoteData.length > 0) {
+                    if (remoteData) {
                         followUps = remoteData;
                         localStorage.setItem('follow_ups', JSON.stringify(followUps));
                     }
@@ -634,8 +636,8 @@
             const fromDate = document.getElementById('filterFromDate').value;
             const toDate = document.getElementById('filterToDate').value;
 
-            let filtered = followUps.filter(f => {
-                const matchSearch = f.partyName.toLowerCase().includes(search) || (f.notes || '').toLowerCase().includes(search);
+            let filtered = followUps.filter(f => {                
+                const matchSearch = (f.partyName || '').toLowerCase().includes(search) || (f.notes || '').toLowerCase().includes(search);
                 const matchStatus = filterStatus ? f.status === filterStatus : true;
                 const matchPartyType = filterPartyType ? (f.partyType || 'Customer') === filterPartyType : true;
                 const matchDate = (!fromDate || f.date >= fromDate) && (!toDate || f.date <= toDate);
