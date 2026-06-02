@@ -659,6 +659,7 @@
                                 id="sort-icon-vendor_name" class="sort-icon"></span></th>
                         <th>Ref No</th>
                         <th>Mode</th>
+                        <th>Bank Account</th>
                         <th style="cursor:pointer;" onclick="handleSort('debit_amount')">Debit (Cost) <span
                                 id="sort-icon-debit_amount" class="sort-icon"></span></th>
                         <th style="cursor:pointer;" onclick="handleSort('gst_amount')">GST <span
@@ -2144,6 +2145,8 @@
             const filterFromDate = document.getElementById('filterFromDate').value;
             const filterToDate = document.getElementById('filterToDate').value;
 
+            const bankAccounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
+
             // Build nature map for lookup
             const schema = getMergedSchema();
             const natureMap = {};
@@ -2214,6 +2217,12 @@
                 const displayVendor = getVendorName(e.vendorId, e.vendor_name);
                 const nature = natureMap[e.expense_category] || 'Indirect Expense';
 
+                let bankName = '-';
+                if (e.payment_mode !== 'Cash' && e.accountId) {
+                    const acc = bankAccounts.find(a => a.id === e.accountId);
+                    if (acc) bankName = acc.name + (acc.number ? ` (${acc.number})` : '');
+                }
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                 <td>${new Date(e.expense_date).toLocaleDateString('en-GB')}</td>
@@ -2223,6 +2232,7 @@
                 <td>${displayVendor}</td>
                 <td>${e.invoice_number || '-'}</td>
                 <td>${e.payment_mode}</td>
+                <td>${bankName}</td>
                 <td>₹ ${e.debit_amount.toFixed(2)}</td>
                 <td>₹ ${e.gst_amount.toFixed(2)}</td>
                 <td><strong>₹ ${e.total_amount.toFixed(2)}</strong></td>
@@ -2239,7 +2249,7 @@
             trFoot.style.backgroundColor = '#e9ecef';
             trFoot.style.fontWeight = 'bold';
             trFoot.innerHTML = `
-            <td colspan="7" style="text-align:right;">Total:</td>
+            <td colspan="8" style="text-align:right;">Total:</td>
             <td>₹ ${totalDebit.toFixed(2)}</td>
             <td>₹ ${totalGst.toFixed(2)}</td>
             <td>₹ ${grandTotal.toFixed(2)}</td>
@@ -2399,7 +2409,19 @@
         }
 
         function exportToExcel() {
-            const ws = XLSX.utils.json_to_sheet(expenses);
+            const bankAccounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
+            const exportData = expenses.map(e => {
+                let bankName = '-';
+                if (e.payment_mode !== 'Cash' && e.accountId) {
+                    const acc = bankAccounts.find(a => a.id === e.accountId);
+                    if (acc) bankName = acc.name + (acc.number ? ` (${acc.number})` : '');
+                }
+                return {
+                    ...e,
+                    bank_account: bankName
+                };
+            });
+            const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Expenses");
             XLSX.writeFile(wb, "Expense_Ledger.xlsx");
