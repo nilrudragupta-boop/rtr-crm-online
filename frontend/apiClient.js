@@ -149,16 +149,7 @@ const apiClient = {
     deleteInvoice: (id) => apiClient._deleteCollection('invoices', id),
 
     // --- Credit/Debit Notes ---
-    getCreditDebitNotes: async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/credit-debit-notes${apiClient._getAuthQuery()}`);
-            const result = await response.json();
-            return result.success ? result.data : [];
-        } catch (error) {
-            console.error('Error fetching credit/debit notes:', error);
-            return [];
-        }
-    },
+    getCreditDebitNotes: () => apiClient._getCollection('credit-debit-notes'),
     saveCreditDebitNote: async (data) => apiClient._saveCollection('credit-debit-notes', data),
     deleteCreditDebitNote: async (id) => apiClient._deleteCollection('credit-debit-notes', id),
 
@@ -276,6 +267,11 @@ const apiClient = {
     },
     saveMarketingVisit: (data) => apiClient._saveCollection('marketing-visits', data),
     deleteMarketingVisit: (id) => apiClient._deleteCollection('marketing-visits', id),
+
+    // --- Follow-ups ---
+    getFollowUps: () => apiClient._getCollection('follow-ups'),
+    saveFollowUp: (data) => apiClient._saveCollection('follow-ups', data),
+    deleteFollowUp: (id) => apiClient._deleteCollection('follow-ups', id),
 
     // --- Scraps & Production (for stock calculation) ---
     getScraps: () => apiClient._getCollection('scraps'),

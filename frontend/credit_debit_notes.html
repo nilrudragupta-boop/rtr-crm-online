@@ -13,6 +13,7 @@
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
     <script src="creditDebitService.js"></script>
+    <script src="apiClient.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
@@ -618,6 +619,27 @@
                 notes = localNotes;
             }
             renderTable();
+            fetchSupplementaryData();
+        }
+
+        async function fetchSupplementaryData() {
+            if (typeof apiClient !== 'undefined') {
+                try {
+                    const [remoteInvoices, remoteCustomers, remotePurchases, remoteSuppliers] = await Promise.all([
+                        apiClient.getInvoices ? apiClient.getInvoices() : Promise.resolve([]),
+                        apiClient.getCustomers ? apiClient.getCustomers() : Promise.resolve([]),
+                        apiClient.getPurchases ? apiClient.getPurchases() : Promise.resolve([]),
+                        apiClient.getSuppliers ? apiClient.getSuppliers() : Promise.resolve([])
+                    ]);
+
+                    if (remoteInvoices && remoteInvoices.length > 0) { invoices = remoteInvoices; localStorage.setItem('invoices', JSON.stringify(invoices)); }
+                    if (remoteCustomers && remoteCustomers.length > 0) { customers = remoteCustomers; localStorage.setItem('customers', JSON.stringify(customers)); }
+                    if (remotePurchases && remotePurchases.length > 0) { purchases = remotePurchases; localStorage.setItem('purchases', JSON.stringify(purchases)); }
+                    if (remoteSuppliers && remoteSuppliers.length > 0) { suppliers = remoteSuppliers; localStorage.setItem('suppliers', JSON.stringify(suppliers)); }
+                } catch (e) {
+                    console.warn("API sync for supplementary data failed", e);
+                }
+            }
         }
 
         function toggleGreyButtons() {
