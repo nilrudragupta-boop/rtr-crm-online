@@ -1143,6 +1143,13 @@
                         </div>
                         <div class="card-icon"><i class="fas fa-wallet"></i></div>
                     </div>
+                    <div class="card" id="followUpWidget" style="display: none; border-left-color: #3498db;">
+                        <div class="card-content">
+                            <div class="card-title" style="color: #3498db;">Pending Follow-ups</div>
+                            <div class="card-value" id="kpiFollowUps">0</div>
+                        </div>
+                        <div class="card-icon"><i class="fas fa-headset"></i></div>
+                    </div>
                     <div class="card">
                         <div class="card-content" style="width: 100%;">
                             <div class="card-title">System Health</div>
@@ -2191,6 +2198,11 @@
                 </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
+                    <input type="checkbox" id="showFollowUpToggle" onchange="toggleFollowUpWidget()">
+                    Show Follow-up Widget 📞
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
                     <input type="checkbox" id="showSyncDiagnosticsToggle" onchange="toggleSyncDiagnosticsWidget()">
                     Show Sync & Diagnostics 🔄
                 </label>
@@ -2870,6 +2882,13 @@
                 expWidget.style.display = showExp ? 'flex' : 'none';
             }
 
+            // Load Follow-up Widget preference
+            const showFollowUp = localStorage.getItem('showFollowUpWidget') === 'true';
+            const followUpWidget = document.getElementById('followUpWidget');
+            if (followUpWidget) {
+                followUpWidget.style.display = showFollowUp ? 'flex' : 'none';
+            }
+
             // Load Sync & Diagnostics Widget preference
             const showSyncDiag = localStorage.getItem('showSyncDiagnosticsWidget') === 'true';
             const syncDiagWidget = document.getElementById('syncDiagnosticsWidget');
@@ -3522,6 +3541,12 @@
                 }
             });
 
+            let pendingFollowUps = 0;
+            try {
+                const followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                pendingFollowUps = followUps.filter(f => f.status === 'Pending').length;
+            } catch (e) { }
+
 
             // Stock Value Calculation (Simplified)
             // Reusing logic from stock_report.html would be ideal, but for dashboard we approximate
@@ -3570,6 +3595,7 @@
             const kpiStock = document.getElementById('kpiStock');
             const kpiProduction = document.getElementById('kpiProduction');
             const kpiExpenses = document.getElementById('kpiExpenses');
+            const kpiFollowUps = document.getElementById('kpiFollowUps');
 
             // Check Summary Lock
             const sumPass = localStorage.getItem('pass_summary');
@@ -3583,6 +3609,7 @@
                 kpiStock.innerText = lockedText;
                 if (kpiProduction) kpiProduction.innerText = lockedText;
                 if (kpiExpenses) kpiExpenses.innerText = lockedText;
+                if (kpiFollowUps) kpiFollowUps.innerText = lockedText;
             } else {
                 kpiSales.dataset.rawValue = formatCurrency(salesTotal);
                 kpiPurchases.dataset.rawValue = formatCurrency(purchaseTotal);
@@ -3590,6 +3617,7 @@
                 kpiStock.dataset.rawValue = formatCurrency(totalStockValue);
                 if (kpiProduction) kpiProduction.dataset.rawValue = formatCurrency(productionTotal);
                 if (kpiExpenses) kpiExpenses.dataset.rawValue = formatCurrency(expenseTotal);
+                if (kpiFollowUps) kpiFollowUps.dataset.rawValue = pendingFollowUps;
                 updateDataVisibility();
             }
             // 2. Low Stock Table
@@ -3628,10 +3656,14 @@
             const icon = document.getElementById('eyeIcon');
             if (icon) icon.className = isHidden ? 'fas fa-eye-slash' : 'fas fa-eye';
 
-            const ids = ['kpiSales', 'kpiPurchases', 'kpiReceivables', 'kpiStock', 'kpiProduction', 'kpiExpenses'];
+            const ids = ['kpiSales', 'kpiPurchases', 'kpiReceivables', 'kpiStock', 'kpiProduction', 'kpiExpenses', 'kpiFollowUps'];
             ids.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.innerText = isHidden ? '****' : (el.dataset.rawValue || '₹ 0.00');
+                if (el) {
+                    let fallback = '₹ 0.00';
+                    if (id === 'kpiFollowUps') fallback = '0';
+                    el.innerText = isHidden ? '****' : (el.dataset.rawValue || fallback);
+                }
             });
 
             const chart = document.getElementById('mainChart');
@@ -6200,8 +6232,19 @@
         }
 
         function dismissReminder(localId) {
-            const reminders = JSON.parse(localStorage.getItem('reminders')) || [];
             const today = new Date().toISOString().split('T')[0];
+            
+            if (localId.startsWith('fu_')) {
+                const followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                const index = followUps.findIndex(f => f.id === localId);
+                if (index > -1) {
+                    followUps[index].dismissedOn = today;
+                    localStorage.setItem('follow_ups', JSON.stringify(followUps));
+                    showDueReminders({ openModal: true });
+                }
+                return;
+            }
+            const reminders = JSON.parse(localStorage.getItem('reminders')) || [];            
             const index = reminders.findIndex(r => r.__localId === localId);
             if (index > -1) {
                 reminders[index].dismissedOn = today;
@@ -6210,13 +6253,26 @@
             }
         }
 
-        function snoozeReminder(localId, minutes) {
-            const reminders = JSON.parse(localStorage.getItem('reminders')) || [];
+        function snoozeReminder(localId, minutes) {            
             const mins = parseInt(minutes, 10);
             if (isNaN(mins) || mins < 1) { alert('Enter valid snooze minutes (>=1)'); return; }
+            const snoozeIso = new Date(Date.now() + mins * 60000).toISOString();
+            
+            if (localId.startsWith('fu_')) {
+                const followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                const index = followUps.findIndex(f => f.id === localId);
+                if (index > -1) {
+                    followUps[index].snoozedUntil = snoozeIso;
+                    localStorage.setItem('follow_ups', JSON.stringify(followUps));
+                    showDueReminders({ openModal: true });
+                }
+                return;
+            }
+            
+            const reminders = JSON.parse(localStorage.getItem('reminders')) || [];
             const index = reminders.findIndex(r => r.__localId === localId);
             if (index > -1) {
-                reminders[index].snoozedUntil = new Date(Date.now() + mins * 60000).toISOString();
+                reminders[index].snoozedUntil = snoozeIso;
                 localStorage.setItem('reminders', JSON.stringify(reminders));
                 showDueReminders({ openModal: true }); // Refresh modal content
             }
@@ -6225,6 +6281,10 @@
         function showDueReminders(options = { openModal: false }) {
             let reminders = [];
             try { reminders = JSON.parse(localStorage.getItem('reminders')) || []; } catch (e) { console.warn("Failed to parse reminders", e); }
+            
+            let followUps = [];
+            try { followUps = JSON.parse(localStorage.getItem('follow_ups')) || []; } catch (e) { console.warn("Failed to parse follow ups", e); }
+
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
 
@@ -6232,9 +6292,28 @@
                 if (!r.reminderDate) return false;
                 if (r.dismissedOn === todayStr) return false;
                 if (r.snoozedUntil && new Date(r.snoozedUntil) > now) return false;
-                const reminderDateTime = new Date(`${r.reminderDate}T${r.reminderTime || '00:00:00'}`);
-                return reminderDateTime <= now;
+                 const reminderDateTime = new Date(`${r.reminderDate}T${r.reminderTime || '09:00:00'}`);
+                return reminderDateTime <= now;                
             });
+
+             const dueFollowUps = followUps.filter(f => {
+                if (f.status !== 'Pending') return false;
+                if (!f.date) return false;
+                if (f.dismissedOn === todayStr) return false;
+                if (f.snoozedUntil && new Date(f.snoozedUntil) > now) return false;
+                const followUpDateTime = new Date(`${f.date}T${f.time || '09:00:00'}`);
+                return followUpDateTime <= now;
+            }).map(f => ({
+                __localId: f.id,
+                cname: f.partyName,
+                reminderFor: 'Follow-up',
+                billNo: '-',
+                reminderDate: f.date,
+                 reminderTime: f.time || '',
+                message: f.notes || 'No message.'
+            }));
+
+            const allDueReminders = [...dueReminders, ...dueFollowUps];
 
             const reminderBell = document.getElementById('reminderBell');
             const reminderCountEl = document.getElementById('reminderCount');
@@ -6245,7 +6324,7 @@
             if (!reminderBell || !reminderCountEl || !dueModal || !dueList || !dismissAllBtn) return;
 
             const previousCount = parseInt(reminderCountEl.innerText) || 0;
-            const currentCount = dueReminders.length;
+            const currentCount = allDueReminders.length;
 
             if (currentCount > 0) {
                 reminderCountEl.innerText = currentCount;
@@ -6262,12 +6341,20 @@
 
             if (options.openModal && currentCount > 0) {
                 dueList.innerHTML = '';
-                dueReminders.forEach(r => {
+                allDueReminders.forEach(r => {
                     const item = document.createElement('div');
                     item.className = 'reminder-item';
                     let timeStr = r.reminderTime ? ` (at ${formatTime(r.reminderTime)})` : '';
+
+                    let editAction = '';
+                    if (r.__localId.startsWith('fu_')) {
+                        editAction = `onclick="openWindow('follow_up.html?id=${r.__localId}', 1100, 700); closeDueModal();" style="cursor:pointer;" title="Click to edit this follow-up"`;
+                    } else {
+                        editAction = `onclick="openWindow('reminder.html?id=${r.__localId}', 1100, 700); closeDueModal();" style="cursor:pointer;" title="Click to edit this reminder"`;
+                    }
+
                     item.innerHTML = `
-                        <div style="font-weight:bold;">${r.cname} - ${r.reminderFor}</div>
+                        <div style="font-weight:bold;" ${editAction}>${r.cname} - ${r.reminderFor}</div>
                         <div style="font-size:12px; color:#666;">Bill: ${r.billNo} | Due: ${new Date(r.reminderDate).toLocaleDateString()}${timeStr}</div>
                         <div style="white-space:pre-wrap;margin-top:6px; padding: 5px; background: rgba(0,0,0,0.02); border-radius: 4px;">${r.message || 'No message.'}</div>
                         <div style="margin-top:5px;">
@@ -6284,12 +6371,19 @@
 
             dismissAllBtn.onclick = () => {
                 const reminders = JSON.parse(localStorage.getItem('reminders')) || [];
+                const followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
                 const today = new Date().toISOString().split('T')[0];
-                dueReminders.forEach(due => {
-                    const index = reminders.findIndex(r => r.__localId === due.__localId);
-                    if (index > -1) reminders[index].dismissedOn = today;
+                allDueReminders.forEach(due => {
+                    if (due.__localId.startsWith('fu_')) {
+                        const index = followUps.findIndex(f => f.id === due.__localId);
+                        if (index > -1) followUps[index].dismissedOn = today;
+                    } else {
+                        const index = reminders.findIndex(r => r.__localId === due.__localId);
+                        if (index > -1) reminders[index].dismissedOn = today;
+                    }
                 });
                 localStorage.setItem('reminders', JSON.stringify(reminders));
+                localStorage.setItem('follow_ups', JSON.stringify(followUps));
                 closeDueModal();
                 showDueReminders({ openModal: false });
             };
@@ -6319,6 +6413,11 @@
             const isExpEnabled = localStorage.getItem('showExpenseWidget') === 'true';
             const expToggle = document.getElementById('showExpenseToggle');
             if (expToggle) expToggle.checked = isExpEnabled;
+
+            const isFollowUpEnabled = localStorage.getItem('showFollowUpWidget') === 'true';
+            const followUpToggle = document.getElementById('showFollowUpToggle');
+            if (followUpToggle) followUpToggle.checked = isFollowUpEnabled;
+
             const isSyncDiagEnabled = localStorage.getItem('showSyncDiagnosticsWidget') === 'true';
             const syncDiagToggle = document.getElementById('showSyncDiagnosticsToggle');
             if (syncDiagToggle) syncDiagToggle.checked = isSyncDiagEnabled;
@@ -6346,6 +6445,13 @@
             const isEnabled = document.getElementById('showExpenseToggle').checked;
             localStorage.setItem('showExpenseWidget', isEnabled);
             const widget = document.getElementById('expenseWidget');
+            if (widget) widget.style.display = isEnabled ? 'flex' : 'none';
+        }
+
+        function toggleFollowUpWidget() {
+            const isEnabled = document.getElementById('showFollowUpToggle').checked;
+            localStorage.setItem('showFollowUpWidget', isEnabled);
+            const widget = document.getElementById('followUpWidget');
             if (widget) widget.style.display = isEnabled ? 'flex' : 'none';
         }
 

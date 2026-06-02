@@ -218,11 +218,16 @@
                 <input type="text" id="fuContact" placeholder="Phone/Mobile">
             </div>
 
-            <div class="form-group">
-                <label>Follow-up Date *</label>
-                <input type="date" id="fuDate">
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Follow-up Date *</label>
+                    <input type="date" id="fuDate">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Follow-up Time (Optional)</label>
+                    <input type="time" id="fuTime">
+                </div>
             </div>
-
             <div class="form-group">
                 <label>Notes / Reason</label>
                 <textarea id="fuNotes" rows="3" placeholder="What needs to be discussed?"></textarea>
@@ -262,6 +267,13 @@
             }
             populatePartyList();
             renderTable();
+
+            // Check for URL parameter to open a specific follow-up
+            const urlParams = new URLSearchParams(window.location.search);
+            const followUpId = urlParams.get('id');
+            if (followUpId) {
+                openModal(followUpId);
+            }
         });
 
         function toggleDarkMode() {
@@ -309,6 +321,7 @@
                 document.getElementById('fuParty').value = f.partyName;
                 document.getElementById('fuContact').value = f.contact || '';
                 document.getElementById('fuDate').value = f.date;
+                document.getElementById('fuTime').value = f.time || '';
                 document.getElementById('fuNotes').value = f.notes || '';
                 document.getElementById('fuRecurring').checked = f.isRecurring || false;
                 document.getElementById('fuFrequency').value = f.frequency || 'Weekly';
@@ -317,6 +330,7 @@
                 document.getElementById('fuParty').value = '';
                 document.getElementById('fuContact').value = '';
                 document.getElementById('fuDate').valueAsDate = new Date();
+                document.getElementById('fuTime').value = '';
                 document.getElementById('fuNotes').value = '';
                 document.getElementById('fuRecurring').checked = false;
                 document.getElementById('fuFrequency').value = 'Weekly';
@@ -334,6 +348,7 @@
             const partyName = document.getElementById('fuParty').value.trim();
             const contact = document.getElementById('fuContact').value.trim();
             const date = document.getElementById('fuDate').value;
+            const time = document.getElementById('fuTime').value;
             const notes = document.getElementById('fuNotes').value.trim();
             const isRecurring = document.getElementById('fuRecurring').checked;
             const frequency = document.getElementById('fuFrequency').value;
@@ -342,7 +357,7 @@
 
             const payload = {
                 id: id || 'fu_' + Date.now(),
-                partyName, contact, date, notes, isRecurring, frequency,
+                partyName, contact, date, time, notes, isRecurring, frequency,
                 status: id ? followUps.find(f => f.id === id).status : 'Pending',
                 createdAt: new Date().toISOString()
             };
@@ -402,6 +417,15 @@
             window.open(`https://wa.me/91${cleanNo}?text=${msg}`, '_blank');
         }
 
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            const [h, m] = timeStr.split(':');
+            const hours = parseInt(h, 10);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const formattedH = hours % 12 || 12;
+            return `${formattedH}:${m} ${ampm}`;
+        }
+
         function renderTable() {
             const tbody = document.getElementById('followUpBody');
             tbody.innerHTML = '';
@@ -449,7 +473,8 @@
                 `;
 
                 tr.innerHTML = `
-                    <td>${new Date(f.date).toLocaleDateString('en-GB')}</td>
+                    <td>${new Date(f.date).toLocaleDateString('en-GB')}
+                        ${f.time ? `<br><small style="color:#555;">${formatTime(f.time)}</small>` : ''}</td>
                     <td style="font-weight:600; color:#2c3e50;">${f.partyName} ${recurringBadge}</td>
                     <td>${f.contact || '-'}</td>
                     <td>${f.notes || '-'}</td>

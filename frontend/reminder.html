@@ -2794,11 +2794,25 @@ Thanking You
                 // Ignore if snoozed until a future time
                 if (r.snoozedUntil && new Date(r.snoozedUntil) > now) return false;
 
-                const reminderDateTime = new Date(`${r.reminderDate}T${r.reminderTime || '00:00:00'}`);
+                 const reminderDateTime = new Date(`${r.reminderDate}T${r.reminderTime || '09:00:00'}`);
                 // Show if the reminder time is in the past
                 return reminderDateTime <= now;
             });
-            if (due.length === 0) { hideModal(); return; }
+            
+            let followUps = [];
+            try { followUps = JSON.parse(localStorage.getItem('follow_ups')) || []; } catch (e) { }
+            const dueFollowUps = followUps.filter(f => {
+                if (f.status !== 'Pending') return false;
+                if (!f.date) return false;
+                if (f.dismissedOn === todayStr) return false;
+                if (f.snoozedUntil && new Date(f.snoozedUntil) > now) return false;
+                const followUpDateTime = new Date(`${f.date}T${f.time || '09:00:00'}`);
+
+                return followUpDateTime <= now;
+            }).map(f => ({ __localId: f.id, cname: f.partyName, reminderFor: 'Follow-up', billNo: '-', reminderDate: f.date, reminderTime: '', message: f.notes || 'No message.' }));
+            
+            const allDue = [...due, ...dueFollowUps];
+            if (allDue.length === 0) { hideModal(); return; }
 
             // Prevent re-rendering if modal is already open (preserves snooze input)
             if (!document.getElementById('dueModal').classList.contains('hidden')) return;
@@ -2806,22 +2820,39 @@ Thanking You
             playNotificationSound();
             const dueList = document.getElementById('dueList');
             dueList.innerHTML = '';
-            due.forEach(r => {
+            allDue.forEach(r => {
                 let timeStr = r.reminderTime ? ` (⏰ ${formatTime(r.reminderTime)})` : '';
                 const item = document.createElement('div');
                 item.className = 'reminder-item';
-                item.innerHTML = `<div style="font-weight:bold">${r.cname} - ${r.reminderFor}${timeStr}</div><div style="white-space:pre-wrap;margin-top:6px">${r.message}</div>`;
+
+                 let editAction = '';
+                if (r.__localId.startsWith('fu_')) {
+                    editAction = `onclick="openWindow('follow_up.html?id=${r.__localId}', 1100, 700); hideModal();" style="cursor:pointer;" title="Click to edit this follow-up"`;
+                }
+
+                item.innerHTML = `
+                <div style="font-weight:bold;" ${editAction}>${r.cname} - ${r.reminderFor}</div>
+                    <div style="font-size:12px; color:#666;">Bill: ${r.billNo} | Due: ${new Date(r.reminderDate).toLocaleDateString()}${timeStr}</div>
+                    <div style="white-space:pre-wrap;margin-top:6px; padding: 5px; background: rgba(0,0,0,0.02); border-radius: 4px;">${r.message || 'No message.'}</div>
+                `;
                 // Dismiss button
                 const dismissBtn = document.createElement('button');
                 dismissBtn.textContent = 'Dismiss';
                 dismissBtn.onclick = () => {
                     stopNotificationSound();
-                    const idx = data.findIndex(d => d.__localId === r.__localId);
-                    if (idx > -1) {
-                        data[idx].dismissedOn = todayStr;
-                        try { localStorage.setItem('reminders', JSON.stringify(data)); } catch (e) { console.error('Failed to save dismissed state', e); }
-                        updateStorageStatus();
-                        loadTable();
+                    if (r.__localId.startsWith('fu_')) {
+                        const fIdx = followUps.findIndex(f => f.id === r.__localId);
+                        if (fIdx > -1) { followUps[fIdx].dismissedOn = todayStr; localStorage.setItem('follow_ups', JSON.stringify(followUps)); }
+                    } else {
+                        const idx = data.findIndex(d => d.__localId === r.__localId);
+                        if (idx > -1) {
+                            data[idx].dismissedOn = todayStr;
+                            try { localStorage.setItem('reminders', JSON.stringify(data)); } catch (e) { console.error('Failed to save dismissed state', e); }
+                            updateStorageStatus();
+                            loadTable();
+                        }
+
+                    
                         item.remove();
                         if (!dueList.querySelector('.reminder-item')) hideModal();
                     }
@@ -2841,12 +2872,17 @@ Thanking You
                     stopNotificationSound();
                     const minutes = parseInt(snoozeInput.value, 10);
                     if (isNaN(minutes) || minutes < 1) { alert('Enter valid snooze minutes (>=1)'); return; }
-                    const idx = data.findIndex(d => d.__localId === r.__localId);
-                    if (idx > -1) {
-                        data[idx].snoozedUntil = new Date(Date.now() + minutes * 60000).toISOString();
-                        try { localStorage.setItem('reminders', JSON.stringify(data)); } catch (e) { console.error('Failed to save snooze state', e); }
-                        updateStorageStatus();
-                        loadTable();
+                     if (r.__localId.startsWith('fu_')) {
+                        const fIdx = followUps.findIndex(f => f.id === r.__localId);
+                        if (fIdx > -1) { followUps[fIdx].snoozedUntil = new Date(Date.now() + minutes * 60000).toISOString(); localStorage.setItem('follow_ups', JSON.stringify(followUps)); }
+                    } else {
+                        const idx = data.findIndex(d => d.__localId === r.__localId);
+                        if (idx > -1) {
+                            data[idx].snoozedUntil = new Date(Date.now() + minutes * 60000).toISOString();
+                            try { localStorage.setItem('reminders', JSON.stringify(data)); } catch (e) { console.error('Failed to save snooze state', e); }
+                            updateStorageStatus();
+                            loadTable();
+                        }
                         item.remove();
                         if (!dueList.querySelector('.reminder-item')) hideModal();
                         alert(`Snoozed for ${minutes} minute(s)`);
@@ -2864,11 +2900,17 @@ Thanking You
             // Dismiss All
             document.getElementById('dismissAllBtn').onclick = () => {
                 stopNotificationSound();
-                due.forEach(dueReminder => {
-                    const idx = data.findIndex(d => d.__localId === dueReminder.__localId);
-                    if (idx > -1) data[idx].dismissedOn = todayStr;
+                allDue.forEach(dueReminder => {
+                    if (dueReminder.__localId.startsWith('fu_')) {
+                        const fIdx = followUps.findIndex(f => f.id === dueReminder.__localId);
+                        if (fIdx > -1) followUps[fIdx].dismissedOn = todayStr;
+                    } else {
+                        const idx = data.findIndex(d => d.__localId === dueReminder.__localId);
+                        if (idx > -1) data[idx].dismissedOn = todayStr;
+                    }
                 });
                 try { localStorage.setItem('reminders', JSON.stringify(data)); } catch (e) { console.error('Failed to save dismissed state', e); }
+                try { localStorage.setItem('follow_ups', JSON.stringify(followUps)); } catch (e) { }
                 updateStorageStatus();
                 loadTable();
                 hideModal();
