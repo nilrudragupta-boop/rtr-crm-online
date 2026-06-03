@@ -932,6 +932,10 @@
                         <i class="fas fa-calendar-alt"></i>
                         <span class="nav-text">Google Calendar</span>
                     </button>
+                    <button class="nav-item" onclick="openGoogleSheetModal()" title="Google Sheet">
+                        <i class="fas fa-file-excel" style="color: #10b981;"></i>
+                        <span class="nav-text">Google Sheet</span>
+                    </button>
                     <button class="nav-item" onclick="openCalculatorModal()" title="Calculator">
                         <i class="fas fa-calculator"></i>
                         <span class="nav-text">Calculator</span>
@@ -1601,6 +1605,48 @@
                 <button onclick="resetCalendarUrl()"
                     style="padding: 8px 16px; background: var(--secondary-color); color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 5px;">Reset
                     Default</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Sheet Modal -->
+    <div id="googleSheetModal" class="modal">
+        <div class="modal-content"
+            style="width: 90%; max-width: 1000px; height: 85vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h3 style="margin: 0; color: #10b981;">📊 Google Sheet</h3>
+                    <button onclick="openGoogleSheetSettings()"
+                        style="background: none; border: none; cursor: pointer; color: var(--secondary-color); font-size: 1.1rem;"
+                        title="Settings"><i class="fas fa-cog"></i></button>
+                </div>
+                <span class="close-modal"
+                    onclick="document.getElementById('googleSheetModal').style.display='none'">&times;</span>
+            </div>
+            <div style="flex: 1; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; position: relative;">
+                <div id="googleSheetPlaceholder" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; color: var(--secondary-color); background: rgba(0,0,0,0.02);">
+                    <i class="fas fa-file-excel" style="font-size: 48px; margin-bottom: 15px; color: #10b981;"></i>
+                    <p>No Google Sheet connected.</p>
+                    <button style="padding: 10px 20px; font-size: 14px; margin-top: 10px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="openGoogleSheetSettings()">Configure Now</button>
+                </div>
+                <iframe id="googleSheetFrame" src="" style="border: 0; position: relative; z-index: 2;" width="100%" height="100%" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Sheet Settings Modal -->
+    <div id="googleSheetSettingsModal" class="modal" style="z-index: 2200;">
+        <div class="modal-content" style="width: 450px;">
+            <span class="close-modal"
+                onclick="document.getElementById('googleSheetSettingsModal').style.display='none'">&times;</span>
+            <h3>⚙️ Google Sheet Settings</h3>
+            <p style="font-size: 13px; color: #666;">Enter the published link or share URL of your Google Sheet.</p>
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">Sheet URL:</label>
+            <input type="text" id="googleSheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/..."
+                style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box; border: 1px solid var(--border-color); border-radius: 4px;">
+            <div style="text-align: right; margin-top: 10px;">
+                <button onclick="saveGoogleSheetUrl()" style="padding: 8px 16px; background: var(--success-color); color: white; border: none; border-radius: 4px; cursor: pointer;">Save</button>
+                <button onclick="resetGoogleSheetUrl()" style="padding: 8px 16px; background: var(--danger-color); color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 5px;">Clear</button>
             </div>
         </div>
     </div>
@@ -4123,6 +4169,7 @@
             ...FAVORITE_ITEMS,
             { id: 'qa_employee', label: 'Employees', icon: 'fa-user-tie', url: 'employee.html', width: 1000, height: 700, perm: 'perm_employee_manager' },
             { id: 'qa_calendar', label: 'Calendar', icon: 'fa-calendar-alt', action: 'openCalendarModal' },
+            { id: 'qa_google_sheet', label: 'Google Sheet', icon: 'fa-file-excel', action: 'openGoogleSheetModal' },
             { id: 'qa_calculator', label: 'Calculator', icon: 'fa-calculator', action: 'openCalculatorModal' },
             { id: 'qa_gst_calculator', label: 'GST Calculator', icon: 'fa-percent', action: 'openGstCalculatorModal' },
             { id: 'qa_notes', label: 'Notes', icon: 'fa-sticky-note', action: 'openNotesModal' },
@@ -4775,6 +4822,43 @@
                 document.getElementById('calendarSettingsModal').style.display = 'none';
                 alert("Reset to default calendar.");
             }
+        }
+
+        // --- Google Sheet Logic ---
+        function openGoogleSheetModal() {
+            const url = localStorage.getItem("googleSheetUrl") || "";
+            const frame = document.getElementById('googleSheetFrame');
+            const placeholder = document.getElementById('googleSheetPlaceholder');
+            
+            if (url) {
+                if (frame.src !== url) frame.src = url;
+                frame.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else {
+                frame.style.display = 'none';
+                placeholder.style.display = 'flex';
+            }
+            document.getElementById('googleSheetModal').style.display = 'flex';
+        }
+
+        function openGoogleSheetSettings() {
+            document.getElementById('googleSheetUrlInput').value = localStorage.getItem("googleSheetUrl") || "";
+            document.getElementById('googleSheetSettingsModal').style.display = 'flex';
+        }
+
+        function saveGoogleSheetUrl() {
+            const url = document.getElementById('googleSheetUrlInput').value;
+            if (url) {
+                localStorage.setItem("googleSheetUrl", url);
+                document.getElementById('googleSheetSettingsModal').style.display = 'none';
+                openGoogleSheetModal();
+            }
+        }
+
+        function resetGoogleSheetUrl() {
+            localStorage.removeItem("googleSheetUrl");
+            document.getElementById('googleSheetSettingsModal').style.display = 'none';
+            openGoogleSheetModal();
         }
 
         // --- Notes Logic ---
