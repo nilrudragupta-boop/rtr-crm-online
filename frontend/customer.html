@@ -815,6 +815,9 @@
             <div id="custAttachmentPreviews" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
         </div>
 
+        <div id="dynamicFieldsContainer"
+            style="display: none; flex-basis: 100%; flex-wrap: wrap; gap: 8px; margin-top: 10px;"></div>
+
         <button class="action" id="saveBtn" onclick="saveCustomer()">Save</button>
         <button class="clear" onclick="confirmClearForm()">Clear</button>
     </div>
@@ -1172,11 +1175,10 @@
         let invoices = JSON.parse(localStorage.getItem("invoices")) || [];
         let creditNotes = JSON.parse(localStorage.getItem("credit_debit_notes")) || [];
 
-        // Column visibility state (14 columns total including checkbox and actions)
-        let columnVisibility = JSON.parse(localStorage.getItem("customerColumnVisibility")) || new Array(14).fill(true);
-        if (columnVisibility.length !== 14) {
-            columnVisibility = new Array(14).fill(true);
-        }
+        let dynamicFieldsList = [];
+        let baseFixedCols = 14;
+        let columnVisibility = [];
+
         let isGreyButtons = localStorage.getItem("customerGreyButtons") === "true";
 
         // Action Button Visibility
@@ -1197,6 +1199,37 @@
         // Fix: Ensure all customers have an ID (in case they were added via Invoice page without one)
         customers.forEach(c => { if (!c.id) c.id = generateUniqueId(); });
 
+        function loadDynamicFieldsConfig() {
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            dynamicFieldsList = allFields.filter(f => f.moduleName === 'Customer' && f.isActive && f.showInGrid !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            const theadTr = document.querySelector("#customerTable thead tr");
+            document.querySelectorAll(".dyn-th").forEach(th => th.remove());
+
+            const actionsTh = theadTr.lastElementChild;
+            dynamicFieldsList.forEach(f => {
+                const th = document.createElement("th");
+                th.className = "dyn-th";
+                th.style.cursor = "pointer";
+                th.onclick = () => handleHeaderClick(f.fieldName);
+                th.innerHTML = `${escapeHtml(f.fieldLabel)} <span id="sort-icon-${f.fieldName}"></span>`;
+                theadTr.insertBefore(th, actionsTh);
+            });
+
+            const totalCols = baseFixedCols + dynamicFieldsList.length;
+            let currentVis = JSON.parse(localStorage.getItem("customerColumnVisibility"));
+            if (!currentVis || currentVis.length !== totalCols) {
+                let newVis = new Array(totalCols).fill(true);
+                if (currentVis) {
+                    for (let i = 0; i < Math.min(currentVis.length, totalCols); i++) newVis[i] = currentVis[i];
+                }
+                columnVisibility = newVis;
+                localStorage.setItem("customerColumnVisibility", JSON.stringify(columnVisibility));
+            } else {
+                columnVisibility = currentVis;
+            }
+        }
+
 
 
         async function fetchCustomersData() {
@@ -1207,13 +1240,19 @@
                 await new Promise(resolve => setTimeout(resolve, 15));
             }
 
-            const remoteData = await apiClient.getCustomers();
-            if (remoteData && remoteData.length > 0) {
-                customers = remoteData;
-                localStorage.setItem("customers", JSON.stringify(customers));
-            } else {
+            try {
+                const res = await apiClient.getCustomers();
+                if (res && res.success !== false) {
+                    customers = Array.isArray(res) ? res : (res.data || []);
+                    localStorage.setItem("customers", JSON.stringify(customers));
+                } else {
+                    customers = localCustomers;
+                }
+            } catch (e) {
+                console.warn(e);
                 customers = localCustomers;
             }
+
             if (!customers.some(c => c.name === "ANONYMOUS")) {
                 const anonId = generateUniqueId();
                 const anon = {
@@ -1492,23 +1531,23 @@
             const searchContact = document.getElementById("searchContact").value.trim();
             if (!Array.isArray(data)) return;
             data.forEach((c, i) => {
-                tbody.insertAdjacentHTML('beforeend', `
+                let trHtml = `
         <tr data-id="${c.id}">
           <td><input type="checkbox" class="cust-checkbox" value="${c.id}"></td>
           <td>${startIndex + i + 1}</td>
           <td>${highlightMatch(c.name, searchTerm)}</td>
           <td>${highlightMatch(c.address, searchTerm)}</td>
           <td>${c.contact ? c.contact.split(/[, ]+/).filter(n => n).map(num => {
-              const cleanNo = num.replace(/\D/g, '');
-              const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt"></i></a>` : '';
-              const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(num)}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
-              return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(num, [searchTerm, searchContact])}${waLink}</div>`;
-          }).join('') : '-'}</td>
+                    const cleanNo = num.replace(/\D/g, '');
+                    const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt"></i></a>` : '';
+                    const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(num)}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
+                    return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(num, [searchTerm, searchContact])}${waLink}</div>`;
+                }).join('') : '-'}</td>
           <td>${c.email ? String(c.email).split(/[, ]+/).filter(e => e).map(em => {
-              const mailLink = `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(em)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(String(em), searchTerm)}</a>`;
-              const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); showToast('Email copied to clipboard', 'success');" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy"></i></a>`;
-              return `<div style="white-space:nowrap; margin-bottom:2px;">${mailLink}${copyLink}</div>`;
-          }).join('') : '-'}</td>
+                    const mailLink = `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(em)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(String(em), searchTerm)}</a>`;
+                    const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); showToast('Email copied to clipboard', 'success');" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy"></i></a>`;
+                    return `<div style="white-space:nowrap; margin-bottom:2px;">${mailLink}${copyLink}</div>`;
+                }).join('') : '-'}</td>
           <td>${highlightMatch(c.pin || '', searchTerm)}</td>
           <td>${highlightMatch(c.district || '', searchTerm)}</td>
           <td>${highlightMatch(c.state || '', searchTerm)}</td>
@@ -1518,7 +1557,15 @@
           <td style="font-weight:bold; color:${(c.outstanding || 0) > 0.01 ? '#dc3545' : '#28a745'}; white-space: nowrap;">
             ${(c.outstanding || 0).toFixed(2)}
             <button class="action-btn btn-action-receipt" data-action="receipt" data-id="${c.id}" title="Download Payment Receipt Against Total Outstanding Balance" style="background:none; color:#27ae60; padding:0; border:none; cursor:pointer; font-size:16px; vertical-align:middle; margin-left:8px;"><i class="fas fa-print"></i></button>
-          </td>
+          </td>`;
+
+                dynamicFieldsList.forEach(f => {
+                    let val = c[f.fieldName];
+                    if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                    trHtml += `<td>${val !== undefined && val !== '' ? highlightMatch(String(val), searchTerm) : '-'}</td>`;
+                });
+
+                trHtml += `
           <td>
             <div class="action-dropdown" id="actionDropdown-${c.id}">
                 <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
@@ -1533,7 +1580,8 @@
             </div>
           </td>
         </tr>
-      `);
+      `;
+                tbody.insertAdjacentHTML('beforeend', trHtml);
             });
             document.getElementById("selectAll").checked = false;
             updateColumnStyles();
@@ -1709,6 +1757,15 @@
 
             const payload = { name, address, contact, email, pin, district, state, stateCode, gst, creditLimit, openingBalance, openingBalanceType, attachments: currentCustomerAttachments, updatedAt: new Date().toISOString() };
 
+            document.querySelectorAll('.dynamic-field').forEach(f => {
+                const fn = f.dataset.fieldName;
+                if (f.type === 'checkbox') {
+                    payload[fn] = f.checked;
+                } else {
+                    payload[fn] = f.value;
+                }
+            });
+
             if (id) {
                 payload.id = id;
                 const idx = customers.findIndex(c => String(c.id) === String(id));
@@ -1837,6 +1894,7 @@
             document.getElementById("custOpeningBalanceType").value = "Dr";
             currentCustomerAttachments = [];
             renderCustomerAttachments();
+            renderDynamicFields();
             document.getElementById("custName").focus();
         }
 
@@ -1883,7 +1941,7 @@
                 const contactStr = String(c.contact || '').toLowerCase();
 
                 // Search across all displayed columns
-                const rowText = [
+                const searchVals = [
                     c.name,
                     c.address,
                     contactStr,
@@ -1894,7 +1952,10 @@
                     c.gst,
                     c.openingBalance,
                     c.creditLimit
-                ].map(val => String(val || '').toLowerCase()).join(' ');
+                ];
+                dynamicFieldsList.forEach(f => searchVals.push(c[f.fieldName]));
+
+                const rowText = searchVals.map(val => String(val || '').toLowerCase()).join(' ');
 
                 const matchesKeyword = rowText.includes(keyword);
                 const matchesContact = contactStr.includes(contactKeyword);
@@ -1955,6 +2016,7 @@
 
         function updateHeaderIcons() {
             const cols = ['name', 'address', 'contact', 'email', 'pin', 'district', 'state', 'gst', 'creditLimit', 'openingBalance', 'outstanding'];
+            dynamicFieldsList.forEach(f => cols.push(f.fieldName));
             cols.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
                 if (icon) icon.textContent = (currentSortColumn === col) ? (currentSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
@@ -2000,10 +2062,14 @@
                 tr.appendChild(tdValue);
             }
 
-            // Column 13 (Actions)
-            if (columnVisibility[13]) {
-                const tdAction = document.createElement('td');
-                tr.appendChild(tdAction);
+            // Remaining columns: dynamic fields + Actions
+            const startDyn = 13;
+            const endCol = 13 + dynamicFieldsList.length; // Actions is at endCol
+            for (let i = startDyn; i <= endCol; i++) {
+                if (columnVisibility[i]) {
+                    const tdEmpty = document.createElement('td');
+                    tr.appendChild(tdEmpty);
+                }
             }
 
             tfoot.appendChild(tr);
@@ -2078,9 +2144,11 @@
             if (!customers.length) return showToast("No data to export");
 
             const headers = ["Name", "Address", "Contact", "Email", "PIN", "District", "State", "State Code", "GST", "Credit Limit", "Opening Balance", "Opening Balance Type"];
+            dynamicFieldsList.forEach(f => headers.push(f.fieldLabel));
+
             const rows = customers.map(c => {
                 const escape = (t) => `"${String(t || "").replace(/"/g, '""')}"`;
-                return [
+                const rowData = [
                     escape(c.name),
                     escape(c.address),
                     escape(c.contact),
@@ -2093,7 +2161,9 @@
                     escape(c.creditLimit),
                     escape(c.openingBalance),
                     escape(c.openingBalanceType)
-                ].join(",");
+                ];
+                dynamicFieldsList.forEach(f => rowData.push(escape(c[f.fieldName])));
+                return rowData.join(",");
             });
 
             const csvContent = [headers.join(",")].concat(rows).join("\n");
@@ -2169,6 +2239,10 @@
                             updatedAt: new Date().toISOString()
                         };
 
+                        dynamicFieldsList.forEach(f => {
+                            customerData[f.fieldName] = getVal(f.fieldLabel);
+                        });
+
                         let idx = customerMap.has(name.toLowerCase()) ? customerMap.get(name.toLowerCase()) : -1;
 
                         if (idx > -1) {
@@ -2235,6 +2309,7 @@
             doc.text("Generated on: " + new Date().toLocaleDateString(), 14, 16);
 
             const tableColumn = ["Sl", "Name", "Address", "Contact", "GST", "Credit Limit", "Op. Bal", "Outstanding"];
+            dynamicFieldsList.forEach(f => tableColumn.push(f.fieldLabel));
             const tableRows = [];
 
             customers.forEach((c, index) => {
@@ -2249,6 +2324,11 @@
                     c.openingBalance ? (c.openingBalance + ' ' + (c.openingBalanceType || 'Dr')) : '-',
                     outstanding.toFixed(2)
                 ];
+                dynamicFieldsList.forEach(f => {
+                    let val = c[f.fieldName];
+                    if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                    rowData.push(val || '');
+                });
                 tableRows.push(rowData);
             });
 
@@ -2441,6 +2521,8 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
+            loadDynamicFieldsConfig();
+            renderDynamicFields();
             fetchCustomersData();
             initFirebase();
             applyTheme();
