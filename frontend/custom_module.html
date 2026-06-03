@@ -939,6 +939,30 @@
         <p style="color:white; margin-top:15px; font-size:18px; font-weight:bold;">Loading...</p>
     </div>
 
+    <!-- ══ ATTACHMENT PREVIEW MODAL ══════════════════════════ -->
+    <div class="modal fade" id="attachmentPreviewModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content" style="border-radius:var(--radius-lg);border:1px solid var(--neutral-200);">
+                <div class="modal-header" style="border-bottom:1px solid var(--neutral-200);">
+                    <h5 class="modal-title" id="previewAttachmentTitle" style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-paperclip" style="color:var(--primary)"></i> Attachment Preview
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding:20px; text-align: center; background: var(--neutral-100);">
+                    <div id="previewAttachmentContent" style="min-height: 200px; max-height: 60vh; overflow: auto; display: flex; align-items: center; justify-content: center;">
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid var(--neutral-200);">
+                    <button type="button" class="btn btn-outline-custom" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary-custom" id="downloadAttachmentBtn">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ══════════════════════════════════════════════════════ -->
     <script>
 
@@ -1657,9 +1681,9 @@
                             try {
                                 const f = JSON.parse(val);
                                 if (f.type && f.type.startsWith('image/')) {
-                                    html += `<td><img src="${f.data}" style="height:32px; width:32px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid #ccc;" onclick="window.open('${f.data}')" title="${f.name}"></td>`;
+                                    html += `<td><img src="${f.data}" style="height:32px; width:32px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid var(--neutral-200);" onclick="previewCustomAttachment('${row._id}', '${field.fieldName}'); event.stopPropagation();" title="${f.name}"></td>`;
                                 } else {
-                                    html += `<td><a href="${f.data}" download="${f.name}" class="btn btn-sm btn-outline-custom p-1" style="font-size:11px;" title="Download File"><i class="fas fa-download"></i> File</a></td>`;
+                                    html += `<td><a href="javascript:void(0)" onclick="previewCustomAttachment('${row._id}', '${field.fieldName}'); event.stopPropagation();" class="btn btn-sm btn-outline-custom p-1" style="font-size:11px;" title="Preview File"><i class="fas fa-eye"></i> File</a></td>`;
                                 }
                             } catch (e) { html += `<td><span class="cell-empty">Invalid Format</span></td>`; }
                         } else {
@@ -2005,9 +2029,9 @@
                                 try {
                                     const fileObj = JSON.parse(val);
                                     if (fileObj.type && fileObj.type.startsWith('image/')) {
-                                        previewDiv.innerHTML = `<img src="${fileObj.data}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--neutral-200);"> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${input.id}')">Remove</button>`;
+                                        previewDiv.innerHTML = `<img src="${fileObj.data}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--neutral-200); cursor:pointer;" onclick="previewFileObj('${input.id}')"> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${input.id}')">Remove</button>`;
                                     } else {
-                                        previewDiv.innerHTML = `<span class="badge bg-light text-dark border"><i class="fas fa-file me-1"></i> ${fileObj.name}</span> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${input.id}')">Remove</button>`;
+                                        previewDiv.innerHTML = `<a href="javascript:void(0)" onclick="previewFileObj('${input.id}')"><span class="badge bg-light text-dark border"><i class="fas fa-file me-1"></i> ${fileObj.name}</span></a> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${input.id}')">Remove</button>`;
                                     }
                                 } catch (e) { previewDiv.innerHTML = ''; }
                             } else { previewDiv.innerHTML = ''; }
@@ -2134,9 +2158,9 @@
                 hiddenInput.value = JSON.stringify(fileData);
 
                 if (file.type.startsWith('image/')) {
-                    previewDiv.innerHTML = `<img src="${e.target.result}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--neutral-200);"> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${id}')">Remove</button>`;
+                    previewDiv.innerHTML = `<img src="${e.target.result}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--neutral-200); cursor:pointer;" onclick="previewFileObj('${id}')"> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${id}')">Remove</button>`;
                 } else {
-                    previewDiv.innerHTML = `<span class="badge bg-light text-dark border"><i class="fas fa-file me-1"></i> ${file.name}</span> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${id}')">Remove</button>`;
+                    previewDiv.innerHTML = `<a href="javascript:void(0)" onclick="previewFileObj('${id}')"><span class="badge bg-light text-dark border"><i class="fas fa-file me-1"></i> ${file.name}</span></a> <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="clearFile('${id}')">Remove</button>`;
                 }
 
                 applyCalculations();
@@ -2156,6 +2180,52 @@
 
             applyCalculations();
             applyVisibilityRules();
+        }
+
+        function previewCustomAttachment(rowId, fieldName) {
+            const record = moduleData.find(r => r._id === rowId);
+            if (record && record[fieldName]) {
+                try {
+                    const fileObj = JSON.parse(record[fieldName]);
+                    showPreviewModal(fileObj);
+                } catch(e) { console.error("Error parsing file object", e); }
+            }
+        }
+
+        function previewFileObj(fieldId) {
+            const hiddenInput = document.getElementById(fieldId);
+            if (hiddenInput && hiddenInput.value) {
+                try {
+                    const fileObj = JSON.parse(hiddenInput.value);
+                    showPreviewModal(fileObj);
+                } catch(e) { console.error("Error parsing file object", e); }
+            }
+        }
+
+        function showPreviewModal(fileObj) {
+            document.getElementById('previewAttachmentTitle').innerHTML = `<i class="fas fa-paperclip" style="color:var(--primary)"></i> ${fileObj.name}`;
+            const content = document.getElementById('previewAttachmentContent');
+
+            if (fileObj.type && fileObj.type.startsWith('image/')) {
+                content.innerHTML = `<img src="${fileObj.data}" style="max-width: 100%; max-height: 55vh; object-fit: contain; border-radius: 4px;">`;
+            } else if (fileObj.type === 'application/pdf') {
+                content.innerHTML = `<iframe src="${fileObj.data}" style="width: 100%; height: 55vh; border: none; border-radius: 4px;"></iframe>`;
+            } else {
+                content.innerHTML = `<p style="padding: 20px; color: var(--neutral-600);">Preview not available for this file type.</p>`;
+            }
+
+            const downloadBtn = document.getElementById('downloadAttachmentBtn');
+            downloadBtn.onclick = function () {
+                const a = document.createElement('a');
+                a.href = fileObj.data;
+                a.download = fileObj.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            const modal = new bootstrap.Modal(document.getElementById('attachmentPreviewModal'));
+            modal.show();
         }
 
         // ─────────────────────────────────────────────────────────
