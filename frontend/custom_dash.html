@@ -558,6 +558,21 @@
         <div class="progress-text" id="importProgressText" style="display: none;">Processing 0 of 0...</div>
     </div>
 
+    <!-- Attachment Preview Modal -->
+    <div id="attachmentPreviewModal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 800px; width: 90%; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--slds-blue);" id="previewAttachmentTitle">Attachment Preview</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="document.getElementById('attachmentPreviewModal').style.display='none'">&times;</span>
+            </div>
+            <div id="previewAttachmentContent" style="flex: 1; overflow: auto; text-align: center; background: #eee; border-radius: 4px; padding: 10px; min-height: 200px; margin: 20px;">
+            </div>
+            <div class="modal-footer">
+                <button class="primary" id="downloadAttachmentBtn"><i class="fas fa-download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         function handleSearch() {
             currentPage = 1;
@@ -896,9 +911,9 @@
                                 try {
                                     const fileObj = JSON.parse(rawVal);
                                     if (fileObj.type && fileObj.type.startsWith('image/')) {
-                                        val = `<img src="${fileObj.data}" style="height:32px; width:32px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid #ccc;" onclick="window.open('${fileObj.data}')" title="${fileObj.name}">`;
+                                        val = `<img src="${fileObj.data}" style="height:32px; width:32px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid #ccc;" onclick="previewCustomAttachment('${row.id}', '${f.fieldName}'); event.stopPropagation();" title="${fileObj.name}">`;
                                     } else {
-                                        val = `<a href="${fileObj.data}" download="${fileObj.name}" style="color: var(--slds-blue); text-decoration: underline;">${fileObj.name}</a>`;
+                                        val = `<a href="javascript:void(0)" onclick="previewCustomAttachment('${row.id}', '${f.fieldName}'); event.stopPropagation();" style="color: var(--slds-blue); text-decoration: underline;">${fileObj.name}</a>`;
                                     }
                                 } catch (e) { val = '-'; }
                             } else {
@@ -1072,9 +1087,9 @@
                         try {
                             const fileObj = JSON.parse(val);
                             if (fileObj.type && fileObj.type.startsWith('image/')) {
-                                previewHtml = `<img src="${fileObj.data}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border);"> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                                previewHtml = `<img src="${fileObj.data}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border); cursor:pointer;" onclick="previewFileObj('${f.fieldName}')"> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
                             } else {
-                                previewHtml = `<a href="${fileObj.data}" download="${fileObj.name}">${fileObj.name}</a> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                                previewHtml = `<a href="javascript:void(0)" onclick="previewFileObj('${f.fieldName}')">${fileObj.name}</a> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
                             }
                         } catch (e) {}
                     }
@@ -1192,15 +1207,15 @@
             const file = event.target.files[0];
             const hiddenInput = document.getElementById(id);
             const previewDiv = document.getElementById(id + '_preview');
+            const fileInput = document.getElementById(id + '_file');
 
             if (!file) {
-                clearFile(id);
                 return;
             }
 
             if (file.size > 2 * 1024 * 1024) {
                 alert('File is too large. Maximum size is 2MB.');
-                clearFile(id);
+                if (fileInput) fileInput.value = '';
                 return;
             }
 
@@ -1214,9 +1229,9 @@
                 hiddenInput.value = JSON.stringify(fileData);
 
                 if (file.type.startsWith('image/')) {
-                    previewDiv.innerHTML = `<img src="${e.target.result}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border);"> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                    previewDiv.innerHTML = `<img src="${e.target.result}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border); cursor:pointer;" onclick="previewFileObj('${id}')"> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
                 } else {
-                    previewDiv.innerHTML = `<a href="${e.target.result}" download="${file.name}">${file.name}</a> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                    previewDiv.innerHTML = `<a href="javascript:void(0)" onclick="previewFileObj('${id}')">${file.name}</a> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
                 }
             };
             reader.readAsDataURL(file);
@@ -1230,6 +1245,52 @@
             if (hiddenInput) hiddenInput.value = '';
             if (fileInput) fileInput.value = '';
             if (previewDiv) previewDiv.innerHTML = '';
+        }
+
+        function previewCustomAttachment(rowId, fieldName) {
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = allData.find(r => r.id === rowId || r._id === rowId);
+            if (record && record[fieldName]) {
+                try {
+                    const fileObj = JSON.parse(record[fieldName]);
+                    showPreviewModal(fileObj);
+                } catch(e) { console.error("Error parsing file object", e); }
+            }
+        }
+
+        function previewFileObj(fieldName) {
+            const hiddenInput = document.getElementById(fieldName);
+            if (hiddenInput && hiddenInput.value) {
+                try {
+                    const fileObj = JSON.parse(hiddenInput.value);
+                    showPreviewModal(fileObj);
+                } catch(e) { console.error("Error parsing file object", e); }
+            }
+        }
+
+        function showPreviewModal(fileObj) {
+            document.getElementById('previewAttachmentTitle').innerText = fileObj.name;
+            const content = document.getElementById('previewAttachmentContent');
+
+            if (fileObj.type && fileObj.type.startsWith('image/')) {
+                content.innerHTML = `<img src="${fileObj.data}" style="max-width: 100%; max-height: 60vh; object-fit: contain;">`;
+            } else if (fileObj.type === 'application/pdf') {
+                content.innerHTML = `<iframe src="${fileObj.data}" style="width: 100%; height: 60vh; border: none;"></iframe>`;
+            } else {
+                content.innerHTML = `<p style="padding: 20px;">Preview not available for this file type.</p>`;
+            }
+
+            const downloadBtn = document.getElementById('downloadAttachmentBtn');
+            downloadBtn.onclick = function () {
+                const a = document.createElement('a');
+                a.href = fileObj.data;
+                a.download = fileObj.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            document.getElementById('attachmentPreviewModal').style.display = 'block';
         }
 
         function closeCustomRecordModal() {
