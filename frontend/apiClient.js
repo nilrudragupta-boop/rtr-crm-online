@@ -92,7 +92,9 @@ const apiClient = {
             const response = await fetch(`${API_BASE_URL}/customers${apiClient._getAuthQuery()}`);
             if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : null;
+            if (Array.isArray(result)) return result;
+            if (result && result.data !== undefined) return result.data;
+            return result;
         } catch (error) {
             console.error('Error fetching customers:', error);
             return null;
@@ -127,7 +129,9 @@ const apiClient = {
             const response = await fetch(`${API_BASE_URL}/invoices${apiClient._getAuthQuery()}`);
             if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : null;
+            if (Array.isArray(result)) return result;
+            if (result && result.data !== undefined) return result.data;
+            return result;
         } catch (error) {
             console.error('Error fetching invoices:', error);
             return null;
@@ -162,7 +166,9 @@ const apiClient = {
             const response = await fetch(`${API_BASE_URL}/${collectionName}${apiClient._getAuthQuery()}`);
             if (!response.ok) return null;
             const result = await response.json();
-            return result.success ? result.data : null;
+            if (Array.isArray(result)) return result;
+            if (result && result.data !== undefined) return result.data;
+            return result;
         } catch (error) {
             console.error(`Error fetching ${collectionName}:`, error);
             return null;

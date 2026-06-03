@@ -1242,9 +1242,27 @@
 
             try {
                 const res = await apiClient.getCustomers();
-                if (res && res.success !== false) {
-                    let remoteCustomers = Array.isArray(res) ? res : (res.data || []);
-                    
+                if (res) {
+                    let remoteCustomers = Array.isArray(res) ? res : (res.data || res || []);
+
+                    const fetchedMap = new Map(remoteCustomers.map(r => [String(r.id), r]));
+
+                    localCustomers.forEach(localRecord => {
+                        if (localRecord && localRecord.id) {
+                            if (!fetchedMap.has(String(localRecord.id))) {
+                                remoteCustomers.push(localRecord);
+                            } else {
+                                const apiRecord = fetchedMap.get(String(localRecord.id));
+                                const localTime = new Date(localRecord.updatedAt || 0).getTime();
+                                const apiTime = new Date(apiRecord.updatedAt || 0).getTime();
+                                if (localTime > apiTime) {
+                                    const idx = remoteCustomers.findIndex(r => String(r.id) === String(localRecord.id));
+                                    if (idx > -1) remoteCustomers[idx] = localRecord;
+                                }
+                            }
+                        }
+                    });
+
                     // Merge local dynamic fields into remote response to prevent data loss if backend schema is strict
                     if (dynamicFieldsList && dynamicFieldsList.length > 0) {
                         remoteCustomers = remoteCustomers.map(rc => {
@@ -1959,16 +1977,16 @@
 
                 // Search across all displayed columns
                 const searchVals = [
-                    c.name,
-                    c.address,
+                    c.name || "",
+                    c.address || "",
                     contactStr,
-                    c.email,
-                    c.pin,
-                    c.district,
-                    c.state,
-                    c.gst,
-                    c.openingBalance,
-                    c.creditLimit
+                    c.email || "",
+                    c.pin || "",
+                    c.district || "",
+                    c.state || "",
+                    c.gst || "",
+                    c.openingBalance || "",
+                    c.creditLimit || ""
                 ];
                 dynamicFieldsList.forEach(f => searchVals.push(c[f.fieldName]));
 
@@ -2098,7 +2116,7 @@
 
             invoices.forEach(inv => {
                 const cName = inv.customer_name || (inv.customer && inv.customer.name) || "";
-                if (cName.toLowerCase() === c.name.toLowerCase()) {
+                if (cName.toLowerCase() === (c.name || "").toLowerCase()) {
                     const total = parseFloat(inv.invoice_total || inv.total || 0);
                     const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
                     balance += (total - paid);
@@ -2106,7 +2124,7 @@
             });
 
             creditNotes.forEach(n => {
-                if (n.customer_name.toLowerCase() === c.name.toLowerCase() && n.status !== 'CANCELLED') {
+                if ((n.customer_name || "").toLowerCase() === (c.name || "").toLowerCase() && n.status !== 'CANCELLED') {
                     const amt = parseFloat(n.total_amount) || 0;
                     if (n.type === 'CREDIT') balance -= amt;
                     else if (n.type === 'DEBIT') balance += amt;
@@ -2537,10 +2555,23 @@
             style.textContent = css;
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
+            // Sync Custom Fields definitions from API on startup to map them properly
+            if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
+                try {
+                    const fields = await apiClient.getCustomFields();
+                    if (fields && Array.isArray(fields)) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields));
+                    } else if (fields && fields.data) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields.data));
+                    }
+                } catch (e) {
+                    console.warn("Failed to fetch custom fields", e);
+                }
+            }
             loadDynamicFieldsConfig();
             renderDynamicFields();
-            fetchCustomersData();
+            await fetchCustomersData();
             initFirebase();
             applyTheme();
             applyCompactView();
