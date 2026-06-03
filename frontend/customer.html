@@ -814,6 +814,9 @@
                 accept="image/*,.pdf" style="padding: 4px;">
             <div id="custAttachmentPreviews" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
         </div>
+        
+        <!-- Dynamic Fields Container -->
+        <div class="form-group" style="flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 15px;" id="dynamicFieldsContainer"></div>
 
         <button class="action" id="saveBtn" onclick="saveCustomer()">Save</button>
         <button class="clear" onclick="confirmClearForm()">Clear</button>
@@ -849,36 +852,7 @@
 
     <table id="customerTable">
         <thead>
-            <tr>
-                <th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
-                <th>Sl. No</th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('name')">Name <span id="sort-icon-name"></span>
-                </th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('address')">Address <span
-                        id="sort-icon-address"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('contact')">Contact <span
-                        id="sort-icon-contact"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('email')">Email <span
-                        id="sort-icon-email"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('pin')">PIN <span id="sort-icon-pin"></span>
-                </th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('district')">District <span
-                        id="sort-icon-district"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('state')">State <span
-                        id="sort-icon-state"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('gst')">GST <span id="sort-icon-gst"></span>
-                </th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('creditLimit')">Credit Limit <span
-                        id="sort-icon-creditLimit"></span>
-                </th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('openingBalance')">Opening Bal <span
-                        id="sort-icon-openingBalance"></span>
-                </th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('outstanding')">Total Outstanding <span
-                        id="sort-icon-outstanding"></span>
-                </th>
-                <th style="width: 120px;">Actions</th>
-            </tr>
+            <tr id="customerTableHeadRow"></tr>
         </thead>
         <tbody></tbody>
         <tfoot id="customerTableFooter"></tfoot>
@@ -1173,10 +1147,21 @@
         let creditNotes = JSON.parse(localStorage.getItem("credit_debit_notes")) || [];
 
         // Column visibility state (14 columns total including checkbox and actions)
-        let columnVisibility = JSON.parse(localStorage.getItem("customerColumnVisibility")) || new Array(14).fill(true);
-        if (columnVisibility.length !== 14) {
-            columnVisibility = new Array(14).fill(true);
+        let columnVisibility = JSON.parse(localStorage.getItem("customerColumnVisibility")) || [];
+        function initColumnVisibility() {
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFieldsCount = allFields.filter(f => f.moduleName === 'Customer' && f.isActive && f.showInGrid !== false).length;
+            const totalExpectedCols = 14 + customFieldsCount;
+            if (columnVisibility.length !== totalExpectedCols) {
+                let newVis = new Array(totalExpectedCols).fill(true);
+                if (columnVisibility.length > 0) {
+                    columnVisibility.forEach((v, i) => { if (i < newVis.length) newVis[i] = v; });
+                }
+                columnVisibility = newVis;
+                localStorage.setItem("customerColumnVisibility", JSON.stringify(columnVisibility));
+            }
         }
+        initColumnVisibility();
         let isGreyButtons = localStorage.getItem("customerGreyButtons") === "true";
 
         // Action Button Visibility
@@ -1485,13 +1470,130 @@
             }).join('');
         }
 
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const moduleFields = allFields.filter(f => f.moduleName === 'Customer' && f.isActive);
+
+            if (moduleFields.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'flex';
+            container.innerHTML = '<div style="flex-basis: 100%; font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px;">Additional Details</div>';
+
+            moduleFields.sort((a, b) => a.order - b.order).forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'flex: 1; min-width: 150px; display: flex; flex-direction: column;';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+                label.style.cssText = 'font-size: 12px; margin-bottom: 2px; color: #666; font-weight: bold;';
+
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    input.style.cssText = 'padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%;';
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.style.cssText = 'width: auto; margin-right: 8px; cursor: pointer;';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType === 'number' ? 'number' : (field.fieldType === 'date' ? 'date' : 'text');
+                    input.placeholder = field.fieldLabel;
+                    input.style.cssText = 'padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%; box-sizing: border-box;';
+                }
+
+                input.className = 'dynamic-field';
+                input.dataset.fieldName = field.fieldName;
+                if (field.isRequired) input.required = true;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
+
         function renderTable(data, startIndex = 0) {
+            const theadTr = document.getElementById("customerTableHeadRow");
             const tbody = document.querySelector("#customerTable tbody");
             tbody.innerHTML = "";
             const searchTerm = document.getElementById("searchBox").value.trim();
             const searchContact = document.getElementById("searchContact").value.trim();
+
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Customer' && f.isActive && f.showInGrid !== false).sort((a, b) => a.order - b.order);
+
+            let thHtml = `<th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                <th>Sl. No</th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('name')">Name <span id="sort-icon-name"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('address')">Address <span id="sort-icon-address"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('contact')">Contact <span id="sort-icon-contact"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('email')">Email <span id="sort-icon-email"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('pin')">PIN <span id="sort-icon-pin"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('district')">District <span id="sort-icon-district"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('state')">State <span id="sort-icon-state"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('gst')">GST <span id="sort-icon-gst"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('creditLimit')">Credit Limit <span id="sort-icon-creditLimit"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('openingBalance')">Opening Bal <span id="sort-icon-openingBalance"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('outstanding')">Total Outstanding <span id="sort-icon-outstanding"></span></th>`;
+                
+            customFields.forEach(cf => {
+                thHtml += `<th style="cursor:pointer;" onclick="handleHeaderClick('${cf.fieldName}')">${cf.fieldLabel} <span id="sort-icon-${cf.fieldName}"></span></th>`;
+            });
+            thHtml += `<th style="width: 120px;">Actions</th>`;
+            theadTr.innerHTML = thHtml;
             if (!Array.isArray(data)) return;
             data.forEach((c, i) => {
+                let customTds = '';
+                customFields.forEach(cf => {
+                    let val = c[cf.fieldName];
+                    if (val === undefined || val === null || val === '') {
+                        val = '-';
+                    } else if (cf.fieldType === 'boolean') {
+                        val = (val === true || val === 'true') ? 'Yes' : 'No';
+                    } else if (cf.fieldType === 'date') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                    } else if (cf.fieldType === 'currency' || cf.fieldType === 'number') {
+                        let num = parseFloat(val);
+                        if (!isNaN(num)) {
+                            val = num.toLocaleString('en-IN', { minimumFractionDigits: cf.currencyDecimals ?? 2, maximumFractionDigits: cf.currencyDecimals ?? 2 });
+                            if (cf.prefix || cf.currencySymbol) val = (cf.prefix || cf.currencySymbol) + ' ' + val;
+                            if (cf.suffix) val = val + ' ' + cf.suffix;
+                        }
+                    }
+                    customTds += `<td>${val}</td>`;
+                });
                 tbody.insertAdjacentHTML('beforeend', `
         <tr data-id="${c.id}">
           <td><input type="checkbox" class="cust-checkbox" value="${c.id}"></td>
@@ -1519,6 +1621,7 @@
             ${(c.outstanding || 0).toFixed(2)}
             <button class="action-btn btn-action-receipt" data-action="receipt" data-id="${c.id}" title="Download Payment Receipt Against Total Outstanding Balance" style="background:none; color:#27ae60; padding:0; border:none; cursor:pointer; font-size:16px; vertical-align:middle; margin-left:8px;"><i class="fas fa-print"></i></button>
           </td>
+          ${customTds}
           <td>
             <div class="action-dropdown" id="actionDropdown-${c.id}">
                 <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
@@ -1709,6 +1812,17 @@
 
             const payload = { name, address, contact, email, pin, district, state, stateCode, gst, creditLimit, openingBalance, openingBalanceType, attachments: currentCustomerAttachments, updatedAt: new Date().toISOString() };
 
+            // Attach Dynamic Fields
+            document.querySelectorAll('.dynamic-field').forEach(input => {
+                if (input.type === 'checkbox') {
+                    payload[input.dataset.fieldName] = input.checked;
+                } else if (input.multiple) {
+                    payload[input.dataset.fieldName] = Array.from(input.selectedOptions).map(o => o.value);
+                } else {
+                    payload[input.dataset.fieldName] = input.value;
+                }
+            });
+
             if (id) {
                 payload.id = id;
                 const idx = customers.findIndex(c => String(c.id) === String(id));
@@ -1837,6 +1951,8 @@
             document.getElementById("custOpeningBalanceType").value = "Dr";
             currentCustomerAttachments = [];
             renderCustomerAttachments();
+            renderDynamicFields(cust);
+            renderDynamicFields({});
             document.getElementById("custName").focus();
         }
 
@@ -1954,7 +2070,9 @@
         }
 
         function updateHeaderIcons() {
-            const cols = ['name', 'address', 'contact', 'email', 'pin', 'district', 'state', 'gst', 'creditLimit', 'openingBalance', 'outstanding'];
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Customer' && f.isActive && f.showInGrid !== false);
+            const cols = ['name', 'address', 'contact', 'email', 'pin', 'district', 'state', 'gst', 'creditLimit', 'openingBalance', 'outstanding', ...customFields.map(cf => cf.fieldName)];
             cols.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
                 if (icon) icon.textContent = (currentSortColumn === col) ? (currentSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
@@ -1964,6 +2082,9 @@
         function renderFooter(totalOp, totalOut) {
             const tfoot = document.getElementById('customerTableFooter');
             tfoot.innerHTML = '';
+
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Customer' && f.isActive && f.showInGrid !== false).sort((a, b) => a.order - b.order);
 
             const tr = document.createElement('tr');
             tr.style.fontWeight = 'bold';
@@ -2000,8 +2121,16 @@
                 tr.appendChild(tdValue);
             }
 
-            // Column 13 (Actions)
-            if (columnVisibility[13]) {
+            // Custom Columns
+            for (let i = 13; i < 13 + customFields.length; i++) {
+                if (columnVisibility[i]) {
+                    const tdValue = document.createElement('td');
+                    tr.appendChild(tdValue);
+                }
+            }
+
+            // Column Actions
+            if (columnVisibility[13 + customFields.length]) {
                 const tdAction = document.createElement('td');
                 tr.appendChild(tdAction);
             }
@@ -2077,10 +2206,13 @@
         function exportCustomersCSV() {
             if (!customers.length) return showToast("No data to export");
 
-            const headers = ["Name", "Address", "Contact", "Email", "PIN", "District", "State", "State Code", "GST", "Credit Limit", "Opening Balance", "Opening Balance Type"];
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Customer' && f.isActive);
+
+            const headers = ["Name", "Address", "Contact", "Email", "PIN", "District", "State", "State Code", "GST", "Credit Limit", "Opening Balance", "Opening Balance Type", ...customFields.map(cf => cf.fieldLabel)];
             const rows = customers.map(c => {
                 const escape = (t) => `"${String(t || "").replace(/"/g, '""')}"`;
-                return [
+                const rowArr = [
                     escape(c.name),
                     escape(c.address),
                     escape(c.contact),
@@ -2093,7 +2225,11 @@
                     escape(c.creditLimit),
                     escape(c.openingBalance),
                     escape(c.openingBalanceType)
-                ].join(",");
+                ];
+                customFields.forEach(cf => {
+                    rowArr.push(escape(c[cf.fieldName]));
+                });
+                return rowArr.join(",");
             });
 
             const csvContent = [headers.join(",")].concat(rows).join("\n");
@@ -2234,7 +2370,10 @@
             doc.setFontSize(10);
             doc.text("Generated on: " + new Date().toLocaleDateString(), 14, 16);
 
-            const tableColumn = ["Sl", "Name", "Address", "Contact", "GST", "Credit Limit", "Op. Bal", "Outstanding"];
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Customer' && f.isActive && f.showInGrid !== false).sort((a, b) => a.order - b.order);
+
+            const tableColumn = ["Sl", "Name", "Address", "Contact", "GST", "Credit Limit", "Op. Bal", "Outstanding", ...customFields.map(cf => cf.fieldLabel)];
             const tableRows = [];
 
             customers.forEach((c, index) => {
@@ -2249,6 +2388,9 @@
                     c.openingBalance ? (c.openingBalance + ' ' + (c.openingBalanceType || 'Dr')) : '-',
                     outstanding.toFixed(2)
                 ];
+                customFields.forEach(cf => {
+                    rowData.push(c[cf.fieldName] !== undefined ? c[cf.fieldName] : '-');
+                });
                 tableRows.push(rowData);
             });
 
@@ -2359,7 +2501,7 @@
             const items = headers.map((th, index) => {
                 let text = th.innerText.trim();
                 // Skip checkbox column (index 0) and Actions column (last index) from being toggled
-                if (index === 0) return null;
+                if (index === 0 || index === headers.length - 1) return null;
                 return { index, text };
             }).filter(item => item !== null);
 
@@ -2386,8 +2528,7 @@
         }
 
         function toggleAllColumns(isVisible) {
-            // Only toggle data columns (1 to length-2)
-            for (let i = 1; i < columnVisibility.length; i++) {
+            for (let i = 1; i < columnVisibility.length - 1; i++) {
                 columnVisibility[i] = isVisible;
             }
             localStorage.setItem("customerColumnVisibility", JSON.stringify(columnVisibility));
@@ -2443,6 +2584,7 @@
         document.addEventListener("DOMContentLoaded", () => {
             fetchCustomersData();
             initFirebase();
+            renderDynamicFields({});
             applyTheme();
             applyCompactView();
             applyGreyButtons();

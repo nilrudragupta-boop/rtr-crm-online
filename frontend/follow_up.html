@@ -316,6 +316,7 @@
                 <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"> 🌙 Dark Mode
             </label>
             <button class="btn-danger" onclick="deleteSelected()" id="bulkDeleteBtn" style="display:none;"><i class="fas fa-trash"></i> Delete Selected</button>
+            <button class="btn-primary" onclick="openSettingsModal()" style="background:#607d8b;"><i class="fas fa-cog"></i> Settings</button>
             <button class="btn-primary" onclick="fetchFollowUpsData()" style="background:#17a2b8;"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button class="btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> New Follow-up</button>
         </div>
@@ -346,22 +347,7 @@
     <div style="overflow-x:auto;">
         <table id="followUpTable">
             <thead>
-                <tr>
-                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll"
-                            onclick="toggleSelectAll()"></th>
-                    <th style="width: 100px; cursor: pointer;" onclick="handleSort('date')">Date <span
-                            id="sort-icon-date" style="font-size: 11px;"></span></th>
-                    <th style="cursor: pointer;" onclick="handleSort('partyName')">Party Name <span
-                            id="sort-icon-partyName" style="font-size: 11px;"></span></th>
-                    <th style="width: 120px; cursor: pointer;" onclick="handleSort('contact')">Contact <span
-                            id="sort-icon-contact" style="font-size: 11px;"></span></th>
-                    <th style="cursor: pointer;" onclick="handleSort('notes')">Notes / Reason <span id="sort-icon-notes"
-                            style="font-size: 11px;"></span></th>
-                    <th style="width: 140px; text-align: center; cursor: pointer;" onclick="handleSort('status')">Status
-                        <span id="sort-icon-status" style="font-size: 11px;"></span>
-                    </th>
-                    <th style="width: 150px; text-align: center;">Actions</th>
-                </tr>
+                <tr id="followUpHeadRow"></tr>
             </thead>
             <tbody id="followUpBody"></tbody>
         </table>
@@ -428,6 +414,9 @@
                         'Completed', a new pending follow-up will be auto-generated based on this frequency.</small>
                 </div>
             </div>
+            
+            <!-- Dynamic Fields Container -->
+            <div class="form-group" style="grid-column: span 2; display: flex; flex-wrap: wrap; gap: 15px;" id="dynamicFieldsContainer"></div>
 
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn-secondary" onclick="closeModal()">Cancel</button>
@@ -436,10 +425,28 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="width: 400px; max-width: 90%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #2c3e50;">⚙️ Table Settings</h3>
+                <span class="close-modal" onclick="closeSettingsModal()">&times;</span>
+            </div>
+            <p style="font-size:14px; color:#666; margin-bottom:10px;">Select custom fields to display:</p>
+            <div id="columnToggles" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:left; max-height:300px; overflow-y:auto; margin-bottom: 15px;">
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn-secondary" onclick="closeSettingsModal()">Close</button>
+                <button class="btn-success" onclick="saveColumnSettings()">Apply</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
         let currentSortColumn = 'date';
         let currentSortDirection = 'asc';
+        let columnVisibility = JSON.parse(localStorage.getItem('followUpColumnVis')) || {};
 
         document.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem("appThemeMode") === "dark") {
@@ -546,6 +553,130 @@
             } else btn.style.display = 'none';
         }
 
+        function openSettingsModal() {
+            const container = document.getElementById('columnToggles');
+            container.innerHTML = '';
+            
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Follow-up' && f.isActive).sort((a, b) => a.order - b.order);
+
+            if (customFields.length === 0) {
+                container.innerHTML = '<p style="grid-column: span 2; color: #999; font-size: 13px; text-align: center;">No custom fields available.</p>';
+            }
+
+            customFields.forEach(f => {
+                let isChecked = columnVisibility[f.fieldName];
+                if (isChecked === undefined) isChecked = f.showInGrid !== false;
+
+                const label = document.createElement('label');
+                label.style.cssText = 'display:flex; align-items:center; gap:5px; cursor:pointer; font-size:13px; margin:0;';
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = 'col_' + f.fieldName;
+                cb.checked = isChecked;
+                cb.style.margin = '0';
+                cb.style.width = 'auto';
+
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(f.fieldLabel));
+                container.appendChild(label);
+            });
+
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function saveColumnSettings() {
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Follow-up' && f.isActive);
+
+            customFields.forEach(f => {
+                const cb = document.getElementById('col_' + f.fieldName);
+                if (cb) columnVisibility[f.fieldName] = cb.checked;
+            });
+
+            localStorage.setItem('followUpColumnVis', JSON.stringify(columnVisibility));
+            closeSettingsModal();
+            renderTable();
+        }
+
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const moduleFields = allFields.filter(f => f.moduleName === 'Follow-up' && f.isActive);
+
+            if (moduleFields.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'flex';
+            container.innerHTML = '<div style="flex-basis: 100%; font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px;">Additional Details</div>';
+
+            moduleFields.sort((a, b) => a.order - b.order).forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'flex: 1; min-width: 150px; display: flex; flex-direction: column;';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+                label.style.cssText = 'font-size: 12px; margin-bottom: 2px; color: #666; font-weight: bold;';
+
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    input.style.cssText = 'padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%;';
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.style.cssText = 'width: auto; margin-right: 8px; cursor: pointer;';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType === 'number' ? 'number' : (field.fieldType === 'date' ? 'date' : 'text');
+                    input.placeholder = field.fieldLabel;
+                    input.style.cssText = 'padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%; box-sizing: border-box;';
+                }
+
+                input.className = 'dynamic-field';
+                input.dataset.fieldName = field.fieldName;
+                if (field.isRequired) input.required = true;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
+
         function duplicateFollowUp(id) {
             const f = followUps.find(x => x.id === id);
             if (!f) return;
@@ -563,6 +694,7 @@
             document.getElementById('fuFrequency').value = f.frequency || 'Weekly';
             
             toggleRecurringOptions();
+            renderDynamicFields(f);
             document.getElementById('followUpModal').style.display = 'flex';
         }
 
@@ -580,6 +712,7 @@
                 document.getElementById('fuNotes').value = f.notes || '';
                 document.getElementById('fuRecurring').checked = f.isRecurring || false;
                 document.getElementById('fuFrequency').value = f.frequency || 'Weekly';
+                renderDynamicFields(f);
             } else {
                 document.getElementById('fuId').value = '';
                 document.getElementById('fuPartyType').value = 'Customer';
@@ -591,6 +724,7 @@
                 document.getElementById('fuNotes').value = '';
                 document.getElementById('fuRecurring').checked = false;
                 document.getElementById('fuFrequency').value = 'Weekly';
+                renderDynamicFields({});
             }
             toggleRecurringOptions();
             document.getElementById('followUpModal').style.display = 'flex';
@@ -619,6 +753,15 @@
                 status: id ? followUps.find(f => f.id === id).status : 'Pending',
                 createdAt: new Date().toISOString()
             };
+            
+            // Attach Dynamic Fields
+            document.querySelectorAll('.dynamic-field').forEach(input => {
+                if (input.type === 'checkbox') {
+                    payload[input.dataset.fieldName] = input.checked;
+                } else {
+                    payload[input.dataset.fieldName] = input.value;
+                }
+            });
 
             if (id) {
                 const idx = followUps.findIndex(f => f.id === id);
@@ -719,6 +862,25 @@
         function renderTable() {
             const tbody = document.getElementById('followUpBody');
             tbody.innerHTML = '';
+            
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => {
+                if (f.moduleName !== 'Follow-up' || !f.isActive) return false;
+                let isVisible = columnVisibility[f.fieldName];
+                if (isVisible === undefined) isVisible = f.showInGrid !== false;
+                return isVisible;
+            }).sort((a, b) => a.order - b.order);
+
+            const theadTr = document.getElementById('followUpHeadRow');
+            let thHtml = `<th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                <th style="width: 100px; cursor: pointer;" onclick="handleSort('date')">Date <span id="sort-icon-date" style="font-size: 11px;"></span></th>
+                <th style="cursor: pointer;" onclick="handleSort('partyName')">Party Name <span id="sort-icon-partyName" style="font-size: 11px;"></span></th>
+                <th style="width: 120px; cursor: pointer;" onclick="handleSort('contact')">Contact <span id="sort-icon-contact" style="font-size: 11px;"></span></th>
+                <th style="cursor: pointer;" onclick="handleSort('notes')">Notes / Reason <span id="sort-icon-notes" style="font-size: 11px;"></span></th>
+                <th style="width: 140px; text-align: center; cursor: pointer;" onclick="handleSort('status')">Status <span id="sort-icon-status" style="font-size: 11px;"></span></th>`;
+            customFields.forEach(cf => { thHtml += `<th style="cursor: pointer;" onclick="handleSort('${cf.fieldName}')">${cf.fieldLabel} <span id="sort-icon-${cf.fieldName}" style="font-size: 11px;"></span></th>`; });
+            thHtml += `<th style="width: 150px; text-align: center;">Actions</th>`;
+            theadTr.innerHTML = thHtml;
 
             const search = document.getElementById('searchBox').value.toLowerCase();
             const filterStatus = document.getElementById('filterStatus').value;
@@ -751,13 +913,14 @@
                 }
             });
 
-            ['date', 'partyName', 'contact', 'notes', 'status'].forEach(col => {
+            const sortColumns = ['date', 'partyName', 'contact', 'notes', 'status', ...customFields.map(cf => cf.fieldName)];
+            sortColumns.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
                 if (icon) icon.innerHTML = (currentSortColumn === col) ? (currentSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No follow-ups found.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="${7 + customFields.length}" style="text-align:center; padding:20px; color:#666;">No follow-ups found.</td></tr>`;
                 return;
             }
 
@@ -801,6 +964,27 @@
                     contactHtml = `<div style="white-space:nowrap; display:flex; align-items:center;">${callLink}<span>${f.contact}</span>${waLink}</div>`;
                 }
 
+                let customTds = '';
+                customFields.forEach(cf => {
+                    let val = f[cf.fieldName];
+                    if (val === undefined || val === null || val === '') {
+                        val = '-';
+                    } else if (cf.fieldType === 'boolean') {
+                        val = (val === true || val === 'true') ? 'Yes' : 'No';
+                    } else if (cf.fieldType === 'date') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) val = d.toLocaleDateString('en-GB');
+                    } else if (cf.fieldType === 'currency' || cf.fieldType === 'number') {
+                        let num = parseFloat(val);
+                        if (!isNaN(num)) {
+                            val = num.toLocaleString('en-IN', { minimumFractionDigits: cf.currencyDecimals ?? 2, maximumFractionDigits: cf.currencyDecimals ?? 2 });
+                            if (cf.prefix || cf.currencySymbol) val = (cf.prefix || cf.currencySymbol) + ' ' + val;
+                            if (cf.suffix) val = val + ' ' + cf.suffix;
+                        }
+                    }
+                    customTds += `<td>${val}</td>`;
+                });
+
                 tr.innerHTML = `
                     <td style="text-align: center;"><input type="checkbox" class="selectRow" value="${f.id}" ${isChecked} onchange="toggleRowSelection('${f.id}')"></td>
                     <td>${new Date(f.date).toLocaleDateString('en-GB')}
@@ -809,6 +993,7 @@
                     <td>${contactHtml}</td>
                     <td>${f.notes || '-'}</td>
                     <td style="text-align:center;">${statusBadge}</td>
+                    ${customTds}
                     <td style="text-align:center; white-space:nowrap;">${actionsHtml}</td>
                 `;
                 tbody.appendChild(tr);
