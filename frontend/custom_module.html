@@ -1228,8 +1228,16 @@
                 } else if (el.multiple) {
                     currentState[el.dataset.fieldName] = Array.from(el.selectedOptions).map(o => o.value);
                 } else {
-                    const num = parseFloat(el.value);
-                    currentState[el.dataset.fieldName] = (!isNaN(num) && el.value.trim() !== '') ? num : el.value;
+                    let val = el.value;
+                    const f = moduleFields.find(x => x.fieldName === el.dataset.fieldName);
+                    if (f && ['number', 'currency', 'calculated'].includes(f.fieldType)) {
+                        let clean = String(val).replace(/[^0-9.-]/g, '');
+                        const num = Number(clean);
+                        currentState[el.dataset.fieldName] = (!isNaN(num) && clean.trim() !== '') ? num : val;
+                    } else {
+                        const num = Number(val);
+                        currentState[el.dataset.fieldName] = (!isNaN(num) && val.trim() !== '') ? num : val;
+                    }
                 }
             });
 
@@ -1276,7 +1284,16 @@
                 } else if (el.multiple) {
                     currentState[el.dataset.fieldName] = Array.from(el.selectedOptions).map(o => o.value);
                 } else {
-                    currentState[el.dataset.fieldName] = el.value;
+                    let val = el.value;
+                    const f = moduleFields.find(x => x.fieldName === el.dataset.fieldName);
+                    if (f && ['number', 'currency', 'calculated'].includes(f.fieldType)) {
+                        let clean = String(val).replace(/[^0-9.-]/g, '');
+                        const num = Number(clean);
+                        currentState[el.dataset.fieldName] = (!isNaN(num) && clean.trim() !== '') ? num : val;
+                    } else {
+                        const num = Number(val);
+                        currentState[el.dataset.fieldName] = (!isNaN(num) && val.trim() !== '') ? num : val;
+                    }
                 }
             });
 
