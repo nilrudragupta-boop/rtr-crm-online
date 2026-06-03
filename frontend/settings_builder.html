@@ -682,6 +682,18 @@
             border-color: #bae6fd;
         }
 
+        .tb-richtext {
+            background: #fdf2f8;
+            color: #db2777;
+            border-color: #fbcfe8;
+        }
+
+        .tb-autonumber {
+            background: #dcfce7;
+            color: #0f766e;
+            border-color: #a7f3d0;
+        }
+
         /* Row actions */
         .cfm-act-btn {
             width: 28px;
@@ -933,9 +945,16 @@
                     <div id="cfOptionsWrapper" style="display:none">
                         <div class="cfm-section-div"><i class="fas fa-list-ul"></i> Dropdown Options</div>
                         <div class="cfm-field-group">
+                            <label class="cfm-label">Depends On (Optional)</label>
+                            <select id="cfDependsOnSelect" class="cfm-select">
+                                <option value="">— None —</option>
+                            </select>
+                            <div class="cfm-hint">Select a parent field to make this dropdown dependent.</div>
+                        </div>
+                        <div class="cfm-field-group">
                             <label class="cfm-label">Options (comma separated) <span class="req-star">*</span></label>
                             <input type="text" id="cfOptions" class="cfm-input" placeholder="e.g., A+, O+, B-, AB+">
-                            <div class="cfm-hint">Each option separated by a comma.</div>
+                            <div class="cfm-hint">Normal format: Opt1, Opt2. Dependent format: Parent1:Opt1,Opt2 | Parent2:Opt3</div>
                         </div>
                     </div>
 
@@ -1064,6 +1083,25 @@
                                 <code>({cf_basic} + {cf_tax}) * 0.9</code> — discount<br>
                                 <code>{cf_first} + ' ' + {cf_last}</code> — concat
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Auto Number config -->
+                    <div id="cfAutoNumberWrapper" style="display:none">
+                        <div class="cfm-section-div"><i class="fas fa-list-ol"></i> Auto Number Settings</div>
+                        <div class="cfm-2col">
+                            <div class="cfm-field-group">
+                                <label class="cfm-label">Prefix</label>
+                                <input type="text" id="cfAutoPrefix" class="cfm-input" placeholder="e.g., INV-">
+                            </div>
+                            <div class="cfm-field-group">
+                                <label class="cfm-label">Starting Number <span class="req-star">*</span></label>
+                                <input type="number" id="cfAutoStart" class="cfm-input" value="1" min="1">
+                            </div>
+                        </div>
+                        <div class="cfm-field-group">
+                            <label class="cfm-label">Minimum Digits</label>
+                            <input type="number" id="cfAutoDigits" class="cfm-input" value="4" min="1" placeholder="e.g., 4 for 0001">
                         </div>
                     </div>
 
@@ -1365,14 +1403,17 @@
             { value: 'lookup', label: 'Lookup', sub: 'Relation', icon: 'fas fa-search-plus', color: '#9a3412', bg: '#fff7ed' },
             { value: 'calculated', label: 'Calculated', sub: 'Formula', icon: 'fas fa-calculator', color: '#be123c', bg: '#fff1f2' },
             { value: 'textarea', label: 'Long Text', sub: 'Multi-line', icon: 'fas fa-align-left', color: '#475569', bg: '#f8fafc' },
-            { value: 'file', label: 'File / Image', sub: 'Attachment', icon: 'fas fa-paperclip', color: '#0369a1', bg: '#e0f2fe' },
+            { value: 'richtext', label: 'Rich Text', sub: 'HTML Editor', icon: 'fas fa-file-word', color: '#db2777', bg: '#fdf2f8' },
+            { value: 'autonumber', label: 'Auto Number', sub: 'Sequential ID', icon: 'fas fa-sort-numeric-up', color: '#0f766e', bg: '#dcfce7' },
+            { value: 'file', label: 'Attachment', sub: 'File / Image', icon: 'fas fa-paperclip', color: '#0369a1', bg: '#e0f2fe' },
         ];
 
         const TYPE_BADGE_CLASS = {
             text: 'tb-text', number: 'tb-number', date: 'tb-date', datetime: 'tb-datetime',
             boolean: 'tb-boolean', select: 'tb-select', multiselect: 'tb-multiselect',
             phone: 'tb-phone', email: 'tb-email', currency: 'tb-currency',
-            url: 'tb-url', lookup: 'tb-lookup', calculated: 'tb-calculated', textarea: 'tb-text', file: 'tb-file'
+            url: 'tb-url', lookup: 'tb-lookup', calculated: 'tb-calculated', textarea: 'tb-text', file: 'tb-file',
+            richtext: 'tb-richtext', autonumber: 'tb-autonumber'
         };
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1421,17 +1462,20 @@
         // ── Populate insert-field selectors ──
         function populateInsertFields() {
             const moduleName = document.getElementById('cfModule').value.trim();
-            ['cfFieldInsertSelect', 'cfVisibilityInsertSelect'].forEach(id => {
+            ['cfFieldInsertSelect', 'cfVisibilityInsertSelect', 'cfDependsOnSelect'].forEach(id => {
                 const sel = document.getElementById(id);
                 if (!sel) return;
-                sel.innerHTML = '<option value="">— Insert field —</option>';
+                const currentVal = sel.value;
+                sel.innerHTML = '<option value="">— ' + (id === 'cfDependsOnSelect' ? 'None' : 'Insert field') + ' —</option>';
                 if (!moduleName) return;
                 customFieldsCache.filter(f => f.moduleName === moduleName).forEach(f => {
+                    if (id === 'cfDependsOnSelect' && !['select', 'multiselect', 'text', 'radio'].includes(f.fieldType)) return;
                     const o = document.createElement('option');
                     o.value = f.fieldName;
                     o.textContent = `${f.fieldLabel} (${f.fieldName})`;
                     sel.appendChild(o);
                 });
+                sel.value = currentVal;
             });
         }
 
@@ -1506,6 +1550,7 @@
                 cfUrlWrapper: type === 'url',
                 cfLookupWrapper: type === 'lookup',
                 cfCalcWrapper: type === 'calculated',
+                cfAutoNumberWrapper: type === 'autonumber',
             };
             Object.entries(panels).forEach(([id, show]) => {
                 const el = document.getElementById(id);
@@ -1758,10 +1803,13 @@
             if (id) payload._id = id;
 
             if (type === 'select') {
-                payload.options = document.getElementById('cfOptions').value.split(',').map(s => s.trim()).filter(Boolean);
+                payload.dependsOn = document.getElementById('cfDependsOnSelect').value;
+                payload.optionsRaw = document.getElementById('cfOptions').value;
+                payload.options = payload.optionsRaw.split(/[|,:]/).map(s => s.trim()).filter(Boolean);
             }
             if (type === 'multiselect') {
-                payload.options = document.getElementById('cfMultiOptions').value.split(',').map(s => s.trim()).filter(Boolean);
+                payload.optionsRaw = document.getElementById('cfMultiOptions').value;
+                payload.options = payload.optionsRaw.split(',').map(s => s.trim()).filter(Boolean);
             }
             if (type === 'currency') {
                 payload.currencySymbol = document.getElementById('cfCurrencySymbol').value.trim() || '₹';
@@ -1780,6 +1828,11 @@
             if (type === 'lookup') {
                 payload.lookupModule = document.getElementById('cfLookupModule').value.trim();
                 payload.lookupDisplay = document.getElementById('cfLookupDisplay').value.trim();
+            }
+            if (type === 'autonumber') {
+                payload.autoPrefix = document.getElementById('cfAutoPrefix').value.trim();
+                payload.autoStart = parseInt(document.getElementById('cfAutoStart').value) || 1;
+                payload.autoDigits = parseInt(document.getElementById('cfAutoDigits').value) || 4;
             }
 
             const errs = cfmValidate(payload);
@@ -1838,10 +1891,12 @@
 
             selectType(f.fieldType);
 
-            if (f.fieldType === 'select')
-                document.getElementById('cfOptions').value = (f.options || []).join(', ');
+            if (f.fieldType === 'select') {
+                document.getElementById('cfDependsOnSelect').value = f.dependsOn || '';
+                document.getElementById('cfOptions').value = f.optionsRaw || (f.options || []).join(', ');
+            }
             if (f.fieldType === 'multiselect')
-                document.getElementById('cfMultiOptions').value = (f.options || []).join(', ');
+                document.getElementById('cfMultiOptions').value = f.optionsRaw || (f.options || []).join(', ');
             if (f.fieldType === 'currency') {
                 document.getElementById('cfCurrencySymbol').value = f.currencySymbol || '₹';
                 document.getElementById('cfCurrencyDecimals').value = f.currencyDecimals ?? 2;
@@ -1856,6 +1911,11 @@
                 document.getElementById('cfLookupModule').value = f.lookupModule || '';
                 populateLookupDisplayFields();
                 document.getElementById('cfLookupDisplay').value = f.lookupDisplay || '';
+            }
+            if (f.fieldType === 'autonumber') {
+                document.getElementById('cfAutoPrefix').value = f.autoPrefix || '';
+                document.getElementById('cfAutoStart').value = f.autoStart || 1;
+                document.getElementById('cfAutoDigits').value = f.autoDigits || 4;
             }
 
             document.getElementById('cfm-form-title').textContent = 'Edit Field';
@@ -1914,7 +1974,7 @@
         function clearCustomFieldForm() {
             ['cfId', 'cfModule', 'cfSection', 'cfLabel', 'cfName', 'cfCondition', 'cfFormula',
                 'cfPrefix', 'cfSuffix', 'cfOptions', 'cfMultiOptions', 'cfCurrencySymbol',
-                'cfUrlLabel', 'cfLookupModule', 'cfLookupDisplay'].forEach(id => {
+                'cfUrlLabel', 'cfLookupModule', 'cfLookupDisplay', 'cfDependsOnSelect', 'cfAutoPrefix', 'cfAutoStart', 'cfAutoDigits'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.value = '';
                 });

@@ -960,6 +960,39 @@
         let formVisible = true;
         let columnVisibility = {};
 
+        function getDependentOptions(optionsRaw, parentVal) {
+            if (!parentVal || !optionsRaw) return [];
+            const parts = String(optionsRaw).split('|');
+            for (let part of parts) {
+                const [p, childs] = part.split(':');
+                if (p && childs && p.trim() === String(parentVal).trim()) {
+                    return childs.split(',').map(s => s.trim()).filter(Boolean);
+                }
+            }
+            return [];
+        }
+
+        function handleDependentFields(parentFieldName) {
+            const parentInput = document.getElementById(`field_${parentFieldName}`);
+            if (!parentInput) return;
+            const parentVal = parentInput.value;
+            
+            moduleFields.forEach(f => {
+                if (f.dependsOn === parentFieldName && f.fieldType === 'select') {
+                    const childSelect = document.getElementById(`field_${f.fieldName}`);
+                    if (childSelect) {
+                        const currentVal = childSelect.value;
+                        childSelect.innerHTML = '<option value="">— Select —</option>';
+                        const newOptions = getDependentOptions(f.optionsRaw, parentVal);
+                        newOptions.forEach(o => {
+                            childSelect.innerHTML += `<option value="${String(o).replace(/"/g, '&quot;')}" ${o === currentVal ? 'selected' : ''}>${o}</option>`;
+                        });
+                        childSelect.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+        }
+
         // ─────────────────────────────────────────────────────────
         // 2. Init
         // ─────────────────────────────────────────────────────────
@@ -1044,7 +1077,7 @@
 
             // Attach listeners
             document.querySelectorAll('.dynamic-input').forEach(el => {
-                el.addEventListener('change', () => { applyCalculations(); applyVisibilityRules(); });
+                el.addEventListener('change', () => { handleDependentFields(el.dataset.fieldName); applyCalculations(); applyVisibilityRules(); });
                 el.addEventListener('input', () => { applyCalculations(); applyVisibilityRules(); });
             });
 
@@ -1064,8 +1097,13 @@
 
             switch (field.fieldType) {
                 case 'select':
-                    const opts = (field.options || []).map(o => `<option value="${o}">${o}</option>`).join('');
-                    inputHTML = `<select id="${id}" class="form-select dynamic-input" ${data} ${reqAttr} ${css}>
+                    let optionsToRender = [];
+                    if (field.dependsOn && field.optionsRaw && field.optionsRaw.includes(':')) {
+                    } else {
+                        optionsToRender = field.optionsRaw && field.optionsRaw.includes(',') && !field.optionsRaw.includes(':') ? field.optionsRaw.split(',').map(s=>s.trim()) : (field.options || []);
+                    }
+                    const opts = optionsToRender.map(o => `<option value="${String(o).replace(/"/g, '&quot;')}">${o}</option>`).join('');
+                    inputHTML = `<select id="${id}" class="form-select dynamic-input" ${data} ${reqAttr} ${css} onchange="handleDependentFields('${field.fieldName}')">
                        <option value="">— Select —</option>${opts}
                      </select>`;
                     break;
@@ -1098,6 +1136,7 @@
                      </div>`;
                     break;
                 case 'textarea':
+                case 'richtext':
                     inputHTML = `<textarea id="${id}" class="${cls}" rows="3" ${data} ${reqAttr} placeholder="${field.fieldLabel}…" ${css}></textarea>`;
                     break;
                 case 'date':
@@ -1121,6 +1160,9 @@
                 case 'calculated':
                     const calcCss = field.customCss ? `style="font-family:var(--font-mono);font-size:12px;${field.customCss}"` : `style="font-family:var(--font-mono);font-size:12px;"`;
                     inputHTML = `<input type="text" id="${id}" class="${cls} bg-light text-muted" ${data} readonly placeholder="Auto-calculated" ${calcCss}>`;
+                    break;
+                case 'autonumber':
+                    inputHTML = `<input type="text" id="${id}" class="${cls} bg-light text-muted" ${data} readonly placeholder="Auto-generated" ${css}>`;
                     break;
                 case 'email':
                     inputHTML = `<input type="email" id="${id}" class="${cls}" ${data} ${reqAttr} placeholder="Email address" ${css}>`;
@@ -1502,6 +1544,7 @@
 
             applyFilters();
             updateStats();
+            if (!document.getElementById('recordId').value) clearForm();
             if (overlay) overlay.style.display = 'none';
         }
 
@@ -1589,8 +1632,8 @@
                         html += `<td>${val
                             ? '<span class="badge-yes"><i class="fas fa-check fa-xs me-1"></i>Yes</span>'
                             : '<span class="badge-no"><i class="fas fa-xmark fa-xs me-1"></i>No</span>'}</td>`;
-                    } else if (field.fieldType === 'multiselect' && Array.isArray(val)) {
-                        const display = val.join(', ');
+                    } else if (field.fieldType === 'multiselect') {
+                        const display = Array.isArray(val) ? val.join(', ') : (val || '—');
                         html += `<td title="${display}">${display}</td>`;
                     } else if (field.fieldType === 'file') {
                         if (val) {
@@ -1641,6 +1684,16 @@
                         } else {
                             html += `<td><span class="cell-empty">—</span></td>`;
                         }
+                    } else if (field.fieldType === 'url') {
+                        const url = String(val).startsWith('http') ? val : 'http://' + val;
+                        const linkLabel = field.urlLabel || val;
+                        html += `<td title="${val}"><a href="${url}" target="_blank" style="color: var(--primary); text-decoration: underline;" onclick="event.stopPropagation()">${linkLabel}</a></td>`;
+                    } else if (field.fieldType === 'richtext') {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = val || '';
+                        const textContent = tempDiv.textContent || tempDiv.innerText || '';
+                        const display = textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
+                        html += `<td title="${textContent.replace(/"/g, '&quot;')}">${display}</td>`;
                     } else if (field.fieldType === 'lookup') {
                         let displayText = val;
                         try {
@@ -1945,6 +1998,17 @@
                     }
                 }
             });
+            
+            moduleFields.filter(f => !f.dependsOn).forEach(f => handleDependentFields(f.fieldName));
+            
+            document.querySelectorAll('.dynamic-input').forEach(input => {
+                const key = input.dataset.fieldName;
+                if (input.tagName === 'SELECT') {
+                    if (!input.multiple) {
+                        input.value = record[key] ?? '';
+                    }
+                }
+            });
 
             applyVisibilityRules();
 
@@ -2002,6 +2066,25 @@
             });
 
             applyVisibilityRules();
+            
+            moduleFields.forEach(f => {
+                if (f.fieldType === 'autonumber') {
+                    let nextNum = f.autoStart || 1;
+                    let max = nextNum - 1;
+                    moduleData.forEach(r => {
+                        if (r[f.fieldName]) {
+                            let str = String(r[f.fieldName]);
+                            if (f.autoPrefix && str.startsWith(f.autoPrefix)) str = str.substring(f.autoPrefix.length);
+                            let num = parseInt(str, 10);
+                            if (!isNaN(num) && num > max) max = num;
+                        }
+                    });
+                    nextNum = max + 1;
+                    const val = (f.autoPrefix || '') + String(nextNum).padStart(f.autoDigits || 4, '0');
+                    const el = document.getElementById(`field_${f.fieldName}`);
+                    if (el) el.value = val;
+                }
+            });
         }
 
         // ─────────────────────────────────────────────────────────
@@ -2199,8 +2282,14 @@
                 moduleFields.map(f => {
                     let v = row[f.fieldName] ?? '';
                     if (f.fieldType === 'boolean') v = v ? 'Yes' : 'No';
-                    else if (f.fieldType === 'multiselect' && Array.isArray(v)) v = v.join('; ');
-                    else if (f.fieldType === 'file' && v) {
+                    else if (f.fieldType === 'multiselect') {
+                        v = Array.isArray(v) ? v.join('; ') : (v || '');
+                    }
+                    else if (f.fieldType === 'richtext' && v) {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = v;
+                        v = tempDiv.textContent || tempDiv.innerText || '';
+                    } else if (f.fieldType === 'file' && v) {
                         try {
                             const fileObj = JSON.parse(v);
                             v = fileObj.name || 'Attachment';
@@ -2341,6 +2430,14 @@
                             if (field.prefix || field.currencySymbol) val = `${field.prefix || field.currencySymbol} ${val}`;
                             if (field.suffix) val = `${val} ${field.suffix}`;
                         } else val = '—';
+                    } else if (field.fieldType === 'url' && val !== '—') {
+                        const url = String(val).startsWith('http') ? val : 'http://' + val;
+                        const linkLabel = field.urlLabel || val;
+                        val = `<a href="${url}" target="_blank" style="color: #2563eb; text-decoration: underline;">${linkLabel}</a>`;
+                    } else if (field.fieldType === 'richtext' && val !== '—') {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = val || '';
+                        val = tempDiv.textContent || tempDiv.innerText || '';
                     } else if (field.fieldType === 'number') {
                         let num = parseFloat(val);
                         if (!isNaN(num)) {

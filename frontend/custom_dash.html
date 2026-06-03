@@ -649,6 +649,39 @@
         let currentSortDirection = 'asc';
         let currentFilteredData = [];
 
+        function getDependentOptions(optionsRaw, parentVal) {
+            if (!parentVal || !optionsRaw) return [];
+            const parts = String(optionsRaw).split('|');
+            for (let part of parts) {
+                const [p, childs] = part.split(':');
+                if (p && childs && p.trim() === String(parentVal).trim()) {
+                    return childs.split(',').map(s => s.trim()).filter(Boolean);
+                }
+            }
+            return [];
+        }
+
+        function handleDependentFields(parentFieldName) {
+            const parentInput = document.getElementById(parentFieldName);
+            if (!parentInput) return;
+            const parentVal = parentInput.value;
+            
+            currentCustomFields.forEach(f => {
+                if (f.dependsOn === parentFieldName && f.fieldType === 'select') {
+                    const childSelect = document.getElementById(f.fieldName);
+                    if (childSelect) {
+                        const currentVal = childSelect.value;
+                        childSelect.innerHTML = '<option value="">-- Select --</option>';
+                        const newOptions = getDependentOptions(f.optionsRaw, parentVal);
+                        newOptions.forEach(o => {
+                            childSelect.innerHTML += `<option value="${String(o).replace(/"/g, '&quot;')}" ${o === currentVal ? 'selected' : ''}>${o}</option>`;
+                        });
+                        childSelect.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+        }
+
         function loadCustomTabs() {
             const nav = document.getElementById('mainNavbar');
             nav.innerHTML = '';
@@ -836,6 +869,38 @@
                                     val = null;
                                 }
                             } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                        } else if (f.fieldType === 'url') {
+                            const rawVal = row[f.fieldName];
+                            if (rawVal) {
+                                const url = String(rawVal).startsWith('http') ? rawVal : 'http://' + rawVal;
+                                const linkLabel = f.urlLabel || rawVal;
+                                val = `<a href="${url}" target="_blank" style="color: var(--slds-blue); text-decoration: underline;" onclick="event.stopPropagation()">${linkLabel}</a>`;
+                            } else {
+                                val = '-';
+                            }
+                        } else if (f.fieldType === 'multiselect') {
+                            const rawVal = row[f.fieldName];
+                            val = Array.isArray(rawVal) ? rawVal.join(', ') : String(rawVal || '-');
+                        } else if (f.fieldType === 'richtext') {
+                            const rawVal = row[f.fieldName] || '';
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = rawVal;
+                            const textContent = tempDiv.textContent || tempDiv.innerText || '';
+                            val = textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
+                        } else if (f.fieldType === 'file') {
+                            const rawVal = row[f.fieldName];
+                            if (rawVal) {
+                                try {
+                                    const fileObj = JSON.parse(rawVal);
+                                    if (fileObj.type && fileObj.type.startsWith('image/')) {
+                                        val = `<img src="${fileObj.data}" style="height:32px; width:32px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid #ccc;" onclick="window.open('${fileObj.data}')" title="${fileObj.name}">`;
+                                    } else {
+                                        val = `<a href="${fileObj.data}" download="${fileObj.name}" style="color: var(--slds-blue); text-decoration: underline;">${fileObj.name}</a>`;
+                                    }
+                                } catch (e) { val = '-'; }
+                            } else {
+                                val = '-';
+                            }
                         } else if (f.fieldType === 'lookup') {
                             const rawVal = row[f.fieldName];
                             let displayText = rawVal;
@@ -916,7 +981,7 @@
                             } else if (f.fieldType === 'datetime') {
                                 const d = new Date(val);
                                 if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
-                            } else {
+                            } else if (f.fieldType !== 'lookup' && f.fieldType !== 'url') {
                                 if (f.prefix) val = f.prefix + ' ' + val;
                                 if (f.suffix) val = val + ' ' + f.suffix;
                             }
@@ -930,6 +995,7 @@
                             <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
                             <div class="action-dropdown-content">
                                 <button onclick="editCustomRecord('${row.id}')">✏️ Edit</button>
+                                <button onclick="duplicateCustomRecord('${row.id}')">📋 Duplicate</button>
                                 <button onclick="deleteCustomRecord('${row.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
                             </div>
                         </div>
@@ -959,12 +1025,59 @@
                 let inputHtml = '';
                 if (f.fieldType === 'calculated') {
                     inputHtml = `<input type="text" id="${f.fieldName}" value="${val}" readonly style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; background-color:#f1f3f5; cursor:not-allowed;" />`;
+                } else if (f.fieldType === 'autonumber') {
+                    let finalVal = val;
+                    if (!recordData) {
+                        let nextNum = f.autoStart || 1;
+                        let max = nextNum - 1;
+                        const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+                        allData.forEach(r => {
+                            if (r[f.fieldName]) {
+                                let str = String(r[f.fieldName]);
+                                if (f.autoPrefix && str.startsWith(f.autoPrefix)) str = str.substring(f.autoPrefix.length);
+                                let num = parseInt(str, 10);
+                                if (!isNaN(num) && num > max) max = num;
+                            }
+                        });
+                        nextNum = max + 1;
+                        finalVal = (f.autoPrefix || '') + String(nextNum).padStart(f.autoDigits || 4, '0');
+                    }
+                    inputHtml = `<input type="text" id="${f.fieldName}" value="${finalVal}" readonly style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; background-color:#f1f3f5; cursor:not-allowed;" />`;
                 } else if (f.fieldType === 'select') {
-                    inputHtml = `<select id="${f.fieldName}" onchange="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
-                    (f.options || []).forEach(o => inputHtml += `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`);
+                    inputHtml = `<select id="${f.fieldName}" onchange="updateCalculatedFieldsInModal(); handleDependentFields('${f.fieldName}')" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
+                    let optionsToRender = [];
+                    if (f.dependsOn && f.optionsRaw && f.optionsRaw.includes(':')) {
+                        const parentVal = recordData ? recordData[f.dependsOn] : '';
+                        optionsToRender = getDependentOptions(f.optionsRaw, parentVal);
+                    } else {
+                        optionsToRender = f.optionsRaw && f.optionsRaw.includes(',') && !f.optionsRaw.includes(':') ? f.optionsRaw.split(',').map(s=>s.trim()) : (f.options || []);
+                    }
+                    optionsToRender.forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}" ${o === val ? 'selected' : ''}>${o}</option>`);
                     inputHtml += `</select>`;
-                } else if (f.fieldType === 'textarea') {
+                } else if (f.fieldType === 'multiselect') {
+                    const vals = Array.isArray(val) ? val : (val ? String(val).split(',').map(s => s.trim()) : []);
+                    inputHtml = `<select id="${f.fieldName}" multiple onchange="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; height: 80px;">`;
+                    (f.options || []).forEach(o => {
+                        inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}" ${vals.includes(o) ? 'selected' : ''}>${o}</option>`;
+                    });
+                    inputHtml += `</select><div style="font-size:11px; color:#666; margin-top:2px;">Hold Ctrl (Windows) or Cmd (Mac) to select multiple.</div>`;
+                } else if (f.fieldType === 'textarea' || f.fieldType === 'richtext') {
                     inputHtml = `<textarea id="${f.fieldName}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; grid-column: 1 / -1;">${val}</textarea>`;
+                } else if (f.fieldType === 'file') {
+                    let previewHtml = '';
+                    if (val) {
+                        try {
+                            const fileObj = JSON.parse(val);
+                            if (fileObj.type && fileObj.type.startsWith('image/')) {
+                                previewHtml = `<img src="${fileObj.data}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border);"> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                            } else {
+                                previewHtml = `<a href="${fileObj.data}" download="${fileObj.name}">${fileObj.name}</a> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                            }
+                        } catch (e) {}
+                    }
+                    inputHtml = `<input type="file" id="${f.fieldName}_file" onchange="handleFileSelect(event, '${f.fieldName}')" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />
+                                 <input type="hidden" id="${f.fieldName}" value="${val ? String(val).replace(/"/g, '&quot;') : ''}" />
+                                 <div id="${f.fieldName}_preview" style="margin-top:5px;">${previewHtml}</div>`;
                 } else if (f.fieldType === 'lookup') {
                     let lookupOptions = [];
                     try {
@@ -1008,13 +1121,18 @@
                     });
                     inputHtml += `</select>`;
                 } else {
-                    inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="${f.fieldName}" value="${val}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                    let inpType = 'text';
+                    if (f.fieldType === 'number') inpType = 'number';
+                    else if (f.fieldType === 'date') inpType = 'date';
+                    else if (f.fieldType === 'url') inpType = 'url';
+                    inputHtml = `<input type="${inpType}" id="${f.fieldName}" value="${val}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
                 }
                 const fullWidth = f.fieldType === 'textarea' ? 'style="grid-column: 1 / -1;"' : '';
                 container.innerHTML += `<div ${fullWidth}><label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">${f.fieldLabel} ${reqHtml}</label>${inputHtml}</div>`;
             });
             document.getElementById('customRecordModal').style.display = 'block';
             updateCalculatedFieldsInModal();
+            currentCustomFields.filter(f => !f.dependsOn).forEach(f => handleDependentFields(f.fieldName));
         }
 
         function updateCalculatedFieldsInModal() {
@@ -1058,6 +1176,50 @@
             });
         }
 
+        function handleFileSelect(event, id) {
+            const file = event.target.files[0];
+            const hiddenInput = document.getElementById(id);
+            const previewDiv = document.getElementById(id + '_preview');
+
+            if (!file) {
+                clearFile(id);
+                return;
+            }
+
+            if (file.size > 2 * 1024 * 1024) {
+                alert('File is too large. Maximum size is 2MB.');
+                clearFile(id);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const fileData = {
+                    name: file.name,
+                    type: file.type,
+                    data: e.target.result
+                };
+                hiddenInput.value = JSON.stringify(fileData);
+
+                if (file.type.startsWith('image/')) {
+                    previewDiv.innerHTML = `<img src="${e.target.result}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border);"> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                } else {
+                    previewDiv.innerHTML = `<a href="${e.target.result}" download="${file.name}">${file.name}</a> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearFile(id) {
+            const hiddenInput = document.getElementById(id);
+            const fileInput = document.getElementById(id + '_file');
+            const previewDiv = document.getElementById(id + '_preview');
+
+            if (hiddenInput) hiddenInput.value = '';
+            if (fileInput) fileInput.value = '';
+            if (previewDiv) previewDiv.innerHTML = '';
+        }
+
         function closeCustomRecordModal() {
             editCustomRecordId = null;
             document.getElementById('customRecordModal').style.display = 'none';
@@ -1067,6 +1229,17 @@
             const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
             const record = data.find(r => r.id === id);
             if (record) openCustomRecordModal(record);
+        }
+
+        function duplicateCustomRecord(id) {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = data.find(r => r.id === id);
+            if (record) {
+                let duplicate = { ...record };
+                delete duplicate.id;
+                delete duplicate._id;
+                openCustomRecordModal(duplicate);
+            }
         }
 
         async function saveCustomRecord() {
@@ -1094,8 +1267,14 @@
             }
 
             currentCustomFields.forEach(f => {
-                const val = document.getElementById(f.fieldName).value;
-                if (f.isRequired && !val) hasError = true;
+                const el = document.getElementById(f.fieldName);
+                let val;
+                if (f.fieldType === 'multiselect' && el && el.multiple) {
+                    val = Array.from(el.selectedOptions).map(o => o.value);
+                } else {
+                    val = el ? el.value : '';
+                }
+                if (f.isRequired && (!val || (Array.isArray(val) && val.length === 0))) hasError = true;
                 newRow[f.fieldName] = val;
                 apiPayload[f.fieldName] = val;
             });
@@ -1240,6 +1419,23 @@
                                 val = null;
                             }
                         } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                        } else if (f.fieldType === 'richtext') {
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = row[f.fieldName] || '';
+                            val = tempDiv.textContent || tempDiv.innerText || '';
+                        } else if (f.fieldType === 'multiselect') {
+                            const rawVal = row[f.fieldName];
+                            val = Array.isArray(rawVal) ? rawVal.join(', ') : (rawVal || '');
+                        } else if (f.fieldType === 'file') {
+                            const rawVal = row[f.fieldName];
+                            if (rawVal) {
+                                try {
+                                    const fileObj = JSON.parse(rawVal);
+                                    val = fileObj.name || 'Attachment';
+                                } catch(e) { val = 'Attachment'; }
+                            } else {
+                                val = '';
+                            }
                         } else if (f.fieldType === 'lookup') {
                             const rawVal = row[f.fieldName];
                             let displayText = rawVal;
@@ -1575,7 +1771,7 @@
             const select = document.getElementById('bulkEditFieldSelect');
             select.innerHTML = '<option value="">-- Select Field --</option>';
             currentCustomFields.forEach(f => {
-                if (f.fieldType !== 'calculated') {
+                if (f.fieldType !== 'calculated' && f.fieldType !== 'file' && f.fieldType !== 'autonumber') {
                     select.innerHTML += `<option value="${f.fieldName}">${f.fieldLabel}</option>`;
                 }
             });
@@ -1601,8 +1797,14 @@
                 inputHtml = `<select id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
                 (f.options || []).forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}">${o}</option>`);
                 inputHtml += `</select>`;
-            } else if (f.fieldType === 'textarea') {
+            } else if (f.fieldType === 'multiselect') {
+                inputHtml = `<select id="bulkEditValue" multiple style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; height: 80px;">`;
+                (f.options || []).forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}">${o}</option>`);
+                inputHtml += `</select><div style="font-size:11px; color:#666; margin-top:2px;">Hold Ctrl (Windows) or Cmd (Mac) to select multiple.</div>`;
+            } else if (f.fieldType === 'textarea' || f.fieldType === 'richtext') {
                 inputHtml = `<textarea id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"></textarea>`;
+            } else if (f.fieldType === 'file' || f.fieldType === 'autonumber') {
+                inputHtml = `<em>This field cannot be updated via bulk edit.</em>`;
             } else if (f.fieldType === 'lookup') {
                 let lookupOptions = [];
                 try {
@@ -1645,7 +1847,11 @@
                 });
                 inputHtml += `</select>`;
             } else {
-                 inputHtml = `<input type="${f.fieldType === 'number' ? 'number' : (f.fieldType === 'date' ? 'date' : 'text')}" id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                 let inpType = 'text';
+                 if (f.fieldType === 'number') inpType = 'number';
+                 else if (f.fieldType === 'date') inpType = 'date';
+                 else if (f.fieldType === 'url') inpType = 'url';
+                 inputHtml = `<input type="${inpType}" id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
             }
             
             container.innerHTML = `<label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">New Value for ${f.fieldLabel}</label>${inputHtml}`;
@@ -1660,7 +1866,18 @@
                 return;
             }
             
-            const newValue = valInput ? valInput.value : '';
+            const f = currentCustomFields.find(x => x.fieldName === fieldName);
+            if (f && (f.fieldType === 'file' || f.fieldType === 'autonumber')) {
+                alert("This field type cannot be updated via bulk edit.");
+                return;
+            }
+            
+            let newValue;
+            if (f && f.fieldType === 'multiselect' && valInput && valInput.multiple) {
+                newValue = Array.from(valInput.selectedOptions).map(o => o.value);
+            } else {
+                newValue = valInput ? valInput.value : '';
+            }
 
             const checkboxes = document.querySelectorAll('.record-checkbox:checked');
             if (checkboxes.length === 0) return;
