@@ -1243,7 +1243,24 @@
             try {
                 const res = await apiClient.getCustomers();
                 if (res && res.success !== false) {
-                    customers = Array.isArray(res) ? res : (res.data || []);
+                    let remoteCustomers = Array.isArray(res) ? res : (res.data || []);
+                    
+                    // Merge local dynamic fields into remote response to prevent data loss if backend schema is strict
+                    if (dynamicFieldsList && dynamicFieldsList.length > 0) {
+                        remoteCustomers = remoteCustomers.map(rc => {
+                            const lc = localCustomers.find(l => String(l.id) === String(rc.id));
+                            if (lc) {
+                                dynamicFieldsList.forEach(f => {
+                                    if (rc[f.fieldName] === undefined && lc[f.fieldName] !== undefined) {
+                                        rc[f.fieldName] = lc[f.fieldName];
+                                    }
+                                });
+                            }
+                            return rc;
+                        });
+                    }
+
+                    customers = remoteCustomers;
                     localStorage.setItem("customers", JSON.stringify(customers));
                 } else {
                     customers = localCustomers;
@@ -1562,7 +1579,7 @@
                 dynamicFieldsList.forEach(f => {
                     let val = c[f.fieldName];
                     if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
-                    trHtml += `<td>${val !== undefined && val !== '' ? highlightMatch(String(val), searchTerm) : '-'}</td>`;
+                    trHtml += `<td>${val !== undefined && val !== null && val !== '' ? highlightMatch(String(val), searchTerm) : '-'}</td>`;
                 });
 
                 trHtml += `
@@ -1769,7 +1786,7 @@
             if (id) {
                 payload.id = id;
                 const idx = customers.findIndex(c => String(c.id) === String(id));
-                if (idx > -1) customers[idx] = payload;
+                if (idx > -1) customers[idx] = { ...customers[idx], ...payload };
             } else {
                 payload.id = generateUniqueId();
                 customers.push(payload);
@@ -1777,7 +1794,7 @@
             localStorage.setItem("customers", JSON.stringify(customers));
 
             if (db) {
-                try { await db.collection('customers').doc(payload.id).set(payload); } catch (e) { console.error("Firestore save error", e); }
+                try { await db.collection('customers').doc(payload.id).set(payload, { merge: true }); } catch (e) { console.error("Firestore save error", e); }
             }
 
             apiClient.saveCustomer(payload).catch(e => console.warn("API sync failed", e));
