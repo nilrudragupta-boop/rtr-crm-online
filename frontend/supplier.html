@@ -416,6 +416,9 @@
                 accept="image/*,.pdf" style="padding: 4px;">
             <div id="supplierAttachmentPreviews" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
         </div>
+        
+        <!-- Dynamic Fields Container -->
+        <div class="form-group" style="flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 15px;" id="dynamicFieldsContainer"></div>
 
         <button class="action" id="saveBtn" onclick="saveSupplier()">Save</button>
         <button class="clear" id="clearBtn" onclick="confirmClearForm()">Clear</button>
@@ -450,34 +453,7 @@
     <div class="table-responsive" style="max-height: 600px; overflow-y: auto; margin-top: 15px;">
         <table id="mainSupplierTable">
             <thead>
-                <tr>
-                    <th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()">
-                    </th>
-                    <th style="width: 50px;">Sl No</th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('name')">Name <span
-                            id="sort-icon-name"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('contact')">Contact No. <span
-                            id="sort-icon-contact"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('email')">Email <span
-                            id="sort-icon-email"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('gstin')">GSTIN <span
-                            id="sort-icon-gstin"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('address')">Address <span
-                            id="sort-icon-address"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('pin')">PIN <span id="sort-icon-pin"></span>
-                    </th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('district')">District <span
-                            id="sort-icon-district"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('state')">State <span
-                            id="sort-icon-state"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('supplierType')">Type <span
-                            id="sort-icon-supplierType"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('description')">Description <span
-                            id="sort-icon-description"></span></th>
-                    <th style="cursor:pointer;" onclick="handleHeaderClick('totalDue')">Total Due <span
-                            id="sort-icon-totalDue"></span></th>
-                    <th style="width: 120px;">Actions</th>
-                </tr>
+                <tr id="supplierTableHeadRow"></tr>
             </thead>
             <tbody id="supplierTable"></tbody>
         </table>
@@ -892,11 +868,22 @@
             if (overlay) overlay.style.display = 'none';
         }
 
-        // Column visibility state (14 columns total)
-        let columnVisibility = JSON.parse(localStorage.getItem("supplierColumnVisibility")) || new Array(14).fill(true);
-        if (columnVisibility.length !== 14) {
-            columnVisibility = new Array(14).fill(true);
+        // Column visibility state (14 standard columns total including checkbox and actions)
+        let columnVisibility = JSON.parse(localStorage.getItem("supplierColumnVisibility")) || [];
+        function initColumnVisibility() {
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFieldsCount = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive && f.showInGrid !== false).length;
+            const totalExpectedCols = 14 + customFieldsCount;
+            if (columnVisibility.length !== totalExpectedCols) {
+                let newVis = new Array(totalExpectedCols).fill(true);
+                if (columnVisibility.length > 0) {
+                    columnVisibility.forEach((v, i) => { if (i < newVis.length) newVis[i] = v; });
+                }
+                columnVisibility = newVis;
+                localStorage.setItem("supplierColumnVisibility", JSON.stringify(columnVisibility));
+            }
         }
+        initColumnVisibility();
         let isGreyButtons = localStorage.getItem("supplierGreyButtons") === "true";
 
         // Action Button Visibility
@@ -1127,8 +1114,8 @@
 
             const items = headers.map((th, index) => {
                 let text = th.innerText.trim();
-                // Skip checkbox (0) only
-                if (index === 0) return null;
+                // Skip checkbox (0) and Actions (last)
+                if (index === 0 || index === headers.length - 1) return null;
                 return { index, text };
             }).filter(item => item !== null);
 
@@ -1153,7 +1140,7 @@
         }
 
         function toggleAllColumns(isVisible) {
-            for (let i = 1; i < columnVisibility.length; i++) {
+            for (let i = 1; i < columnVisibility.length - 1; i++) {
                 columnVisibility[i] = isVisible;
             }
             localStorage.setItem("supplierColumnVisibility", JSON.stringify(columnVisibility));
@@ -1238,12 +1225,129 @@
         }
 
         // 🔹 Render supplier table
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const moduleFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive);
+
+            if (moduleFields.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'flex';
+            container.innerHTML = '<div style="flex-basis: 100%; font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px;">Additional Details</div>';
+
+            moduleFields.sort((a, b) => a.order - b.order).forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'flex: 1; min-width: 150px; display: flex; flex-direction: column;';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+                label.style.cssText = 'font-size: 12px; margin-bottom: 2px; color: #666; font-weight: bold;';
+
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    input.style.cssText = 'padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%;';
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.style.cssText = 'width: auto; margin-right: 8px; cursor: pointer;';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType === 'number' ? 'number' : (field.fieldType === 'date' ? 'date' : 'text');
+                    input.placeholder = field.fieldLabel;
+                    input.style.cssText = 'padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; width: 100%; box-sizing: border-box;';
+                }
+
+                input.className = 'dynamic-field';
+                input.dataset.fieldName = field.fieldName;
+                if (field.isRequired) input.required = true;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
+
         function renderSuppliers(list, startIndex = 0) {
             const table = document.getElementById("supplierTable");
             table.innerHTML = "";
+            const theadTr = document.getElementById("supplierTableHeadRow");
             const searchTerm = document.getElementById("searchName").value.trim();
 
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive && f.showInGrid !== false).sort((a, b) => a.order - b.order);
+
+            let thHtml = `<th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                <th style="width: 50px;">Sl No</th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('name')">Name <span id="sort-icon-name"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('contact')">Contact No. <span id="sort-icon-contact"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('email')">Email <span id="sort-icon-email"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('gstin')">GSTIN <span id="sort-icon-gstin"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('address')">Address <span id="sort-icon-address"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('pin')">PIN <span id="sort-icon-pin"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('district')">District <span id="sort-icon-district"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('state')">State <span id="sort-icon-state"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('supplierType')">Type <span id="sort-icon-supplierType"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('description')">Description <span id="sort-icon-description"></span></th>
+                <th style="cursor:pointer;" onclick="handleHeaderClick('totalDue')">Total Due <span id="sort-icon-totalDue"></span></th>`;
+            customFields.forEach(cf => {
+                thHtml += `<th style="cursor:pointer;" onclick="handleHeaderClick('${cf.fieldName}')">${cf.fieldLabel} <span id="sort-icon-${cf.fieldName}"></span></th>`;
+            });
+            thHtml += `<th style="width: 120px;">Actions</th>`;
+            if (theadTr) theadTr.innerHTML = thHtml;
+
             list.forEach((s, i) => {
+                let customTds = '';
+                customFields.forEach(cf => {
+                    let val = s[cf.fieldName];
+                    if (val === undefined || val === null || val === '') {
+                        val = '-';
+                    } else if (cf.fieldType === 'boolean') {
+                        val = (val === true || val === 'true') ? 'Yes' : 'No';
+                    } else if (cf.fieldType === 'date') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                    } else if (cf.fieldType === 'currency' || cf.fieldType === 'number') {
+                        let num = parseFloat(val);
+                        if (!isNaN(num)) {
+                            val = num.toLocaleString('en-IN', { minimumFractionDigits: cf.currencyDecimals ?? 2, maximumFractionDigits: cf.currencyDecimals ?? 2 });
+                            if (cf.prefix || cf.currencySymbol) val = (cf.prefix || cf.currencySymbol) + ' ' + val;
+                            if (cf.suffix) val = val + ' ' + cf.suffix;
+                        }
+                    }
+                    customTds += `<td>${val}</td>`;
+                });
+
                 table.innerHTML += `
           <tr>
             <td><input type="checkbox" class="supplier-checkbox" value="${s.id}"></td>
@@ -1268,6 +1372,7 @@
             <td>${highlightMatch(s.supplierType, searchTerm)}</td>
             <td>${highlightMatch(s.description, searchTerm)}</td>
             <td style="font-weight:bold; color:${(s.totalDue || 0) > 0 ? '#dc3545' : '#28a745'}">₹${(s.totalDue || 0).toFixed(2)}</td>
+            ${customTds}
             <td>
                 <div class="action-dropdown" id="actionDropdown-${s.id}">
                     <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
@@ -1285,6 +1390,7 @@
             });
             const selectAll = document.getElementById("selectAll");
             if (selectAll) selectAll.checked = false;
+            updateColumnStyles();
             applyUIPermissions();
         }
 
@@ -1343,12 +1449,23 @@
             );
             if (isDuplicate) return openWarningModal("Supplier with the same Name and Contact No. already exists!");
 
+            const dynamicData = {};
+            document.querySelectorAll('.dynamic-field').forEach(input => {
+                if (input.type === 'checkbox') {
+                    dynamicData[input.dataset.fieldName] = input.checked;
+                } else if (input.multiple) {
+                    dynamicData[input.dataset.fieldName] = Array.from(input.selectedOptions).map(o => o.value);
+                } else {
+                    dynamicData[input.dataset.fieldName] = input.value;
+                }
+            });
+
             if (id) {
                 // Update
                 askConfirm("Confirm Update", "Update this supplier?", async () => {
                     const idx = suppliers.findIndex(s => s.id === id);
                     if (idx > -1) {
-                        suppliers[idx] = { ...suppliers[idx], name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments };
+                        suppliers[idx] = { ...suppliers[idx], name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments, ...dynamicData };
                         localStorage.setItem("suppliers", JSON.stringify(suppliers));
 
                         if (db) {
@@ -1364,7 +1481,7 @@
                 // Add
                 askConfirm("Confirm Addition", "Add this new supplier?", async () => {
                     const newId = Date.now().toString();
-                    const newSupplier = { id: newId, name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments, createdAt: new Date().toISOString() };
+                    const newSupplier = { id: newId, name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments, createdAt: new Date().toISOString(), ...dynamicData };
 
                     suppliers.push(newSupplier);
                     localStorage.setItem("suppliers", JSON.stringify(suppliers));
@@ -1401,6 +1518,7 @@
             document.getElementById("newDescription").value = s.description || "";
             currentSupplierAttachments = s.attachments || [];
             renderSupplierAttachments();
+            renderDynamicFields(s);
 
             const stateObj = STATE_MASTER_LIST.find(st => st.name === s.state);
             document.getElementById("newStateCode").value = s.stateCode || (stateObj ? stateObj.code : "");
@@ -1429,6 +1547,7 @@
             document.getElementById("newState").dispatchEvent(new Event('change'));
             currentSupplierAttachments = [];
             renderSupplierAttachments();
+            renderDynamicFields({});
 
             const saveBtn = document.getElementById("saveBtn");
             saveBtn.textContent = "Save";
@@ -1700,7 +1819,9 @@
         }
 
         function updateHeaderIcons() {
-            const cols = ['name', 'contact', 'email', 'gstin', 'address', 'pin', 'district', 'state', 'supplierType', 'description', 'totalDue'];
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive && f.showInGrid !== false);
+            const cols = ['name', 'contact', 'email', 'gstin', 'address', 'pin', 'district', 'state', 'supplierType', 'description', 'totalDue', ...customFields.map(cf => cf.fieldName)];
             cols.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
                 if (icon) {
@@ -1771,6 +1892,9 @@
         function exportSuppliersCSV() {
             if (!suppliers || suppliers.length === 0) return openWarningModal("No suppliers to export");
 
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive);
+
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const supplierDues = {};
             purchases.forEach(p => {
@@ -1785,11 +1909,11 @@
                 }
             });
 
-            const headers = ["Name", "Contact", "Email", "GSTIN", "Address", "PIN", "District", "State", "Type", "Description", "Total Due", "State Code"];
+            const headers = ["Name", "Contact", "Email", "GSTIN", "Address", "PIN", "District", "State", "Type", "Description", "Total Due", "State Code", ...customFields.map(cf => cf.fieldLabel)];
             const rows = suppliers.map(s => {
                 const due = supplierDues[(s.name || "").trim().toLowerCase()] || 0;
                 const escape = (t) => `"${String(t || "").replace(/"/g, '""')}"`;
-                return [
+                 const rowArr = [
                     escape(s.name),
                     escape(s.contact),
                     escape(s.email),
@@ -1802,7 +1926,11 @@
                     escape(s.description),
                     escape(due.toFixed(2)),
                     escape(s.stateCode)
-                ].join(",");
+                ];
+                customFields.forEach(cf => {
+                    rowArr.push(escape(s[cf.fieldName]));
+                });
+                return rowArr.join(",");
             });
 
             const csvContent = [headers.join(",")].concat(rows).join("\n");
@@ -2050,6 +2178,7 @@
 
         // Initial load
         fetchSuppliersData();
+        renderDynamicFields({});
         initFirebase();
         applyTheme();
         applyGreyButtons();
