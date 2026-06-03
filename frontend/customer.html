@@ -79,6 +79,9 @@
 
         th {
             background: #eee;
+            position: sticky;
+            top: 0;
+            z-index: 5;
         }
 
         .action-btn {
@@ -850,13 +853,15 @@
             data-permission-id="perm_delete_action">Delete Selected</button>
     </div>
 
-    <table id="customerTable">
-        <thead>
-            <tr id="customerTableHeadRow"></tr>
-        </thead>
-        <tbody></tbody>
-        <tfoot id="customerTableFooter"></tfoot>
-    </table>
+    <div style="overflow-x: auto; overflow-y: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-height: 65vh;">
+        <table id="customerTable">
+            <thead>
+                <tr id="customerTableHeadRow"></tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot id="customerTableFooter"></tfoot>
+        </table>
+    </div>
 
     <!-- Pagination Controls -->
     <div class="pagination-container">
@@ -1573,9 +1578,14 @@
             thHtml += `<th style="width: 120px;">Actions</th>`;
             theadTr.innerHTML = thHtml;
             if (!Array.isArray(data)) return;
-            data.forEach((c, i) => {
-                let customTds = '';
-                customFields.forEach(cf => {
+            
+            if (data.length === 0) {
+                const totalCols = 14 + customFields.length;
+                tbody.innerHTML = `<tr><td colspan="${totalCols}" style="text-align: center; padding: 20px; color: #666;">No customers found.</td></tr>`;
+            } else {
+                data.forEach((c, i) => {
+                    let customTds = '';
+                    customFields.forEach(cf => {
                     let val = c[cf.fieldName];
                     if (val === undefined || val === null || val === '') {
                         val = '-';
@@ -1637,7 +1647,8 @@
           </td>
         </tr>
       `);
-            });
+                });
+            }
             document.getElementById("selectAll").checked = false;
             updateColumnStyles();
             applyUIPermissions();
