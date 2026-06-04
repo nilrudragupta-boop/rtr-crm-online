@@ -925,6 +925,28 @@
             renderTable();
         }
 
+        function calculateNextDate(currentDateStr, frequency) {
+            if (!currentDateStr) return new Date();
+            const parts = currentDateStr.split('-');
+            const date = new Date(parts[0], parts[1] - 1, parts[2]);
+            if (isNaN(date.getTime())) return new Date();
+
+            if (frequency === 'Daily') {
+                date.setDate(date.getDate() + 1);
+            } else if (frequency === 'Weekly') {
+                date.setDate(date.getDate() + 7);
+            } else if (frequency === 'Monthly') {
+                date.setMonth(date.getMonth() + 1);
+            } else if (frequency === 'Quarterly') {
+                date.setMonth(date.getMonth() + 3);
+            } else if (frequency === 'Half-Yearly') {
+                date.setMonth(date.getMonth() + 6);
+            } else if (frequency === 'Yearly') {
+                date.setFullYear(date.getFullYear() + 1);
+            }
+            return date;
+        }
+
         async function markStatus(id, newStatus) {
     const itemIndex = followUps.findIndex(f => f.id === id);
     if (itemIndex === -1) return;
@@ -951,10 +973,15 @@
 
         if (shouldCreateNew) {
             const newDate = calculateNextDate(item.date, item.frequency);
+            const year = newDate.getFullYear();
+            const month = String(newDate.getMonth() + 1).padStart(2, '0');
+            const day = String(newDate.getDate()).padStart(2, '0');
+            const formattedDate = `${year}-${month}-${day}`;
+
             const newFollowUp = {
                 ...item,
                 id: 'fu_' + Date.now(),
-                date: newDate.toISOString().split('T')[0],
+                date: formattedDate,
                 status: 'Pending',
                 completedAt: null,
                 createdAt: new Date().toISOString(),
@@ -972,6 +999,11 @@
                 if (typeof showToast === 'function') {
                     showToast(`'To' date filter updated to show the new task.`, '#3498db');
                 }
+            }
+
+            const statusFilter = document.getElementById('filterStatus');
+            if (statusFilter && statusFilter.value === 'Completed') {
+                statusFilter.value = ''; // Reset to 'All' to ensure the new Pending task is visible
             }
 
             alert(`Automated Next Action: A new pending follow-up has been scheduled for ${newFollowUp.date}`);
