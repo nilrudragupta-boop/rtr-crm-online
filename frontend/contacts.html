@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="apiClient.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -440,6 +441,7 @@
                 <label>Remarks</label>
                 <input type="text" id="cRemarks" placeholder="Additional Notes">
             </div>
+            <div id="dynamicFieldsContainer" style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;"></div>
 
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn-secondary" onclick="closeContactModal()">Cancel</button>
@@ -530,6 +532,7 @@
         let currentSortColumn = 'name';
         let currentSortDirection = 'asc';
         let columnVisibility = JSON.parse(localStorage.getItem('contactsColumnVis')) || {};
+        let dynamicFieldsList = [];
         
         let savedButtonVisibility = JSON.parse(localStorage.getItem("contactsButtonVisibility")) || {};
         let buttonVisibility = {
@@ -545,26 +548,128 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetchContacts();
-            populateCompanyList();
-            populateNameList();
-            requestAnimationFrame(() => {
-                loadColumnWidths();
-                enableColumnResizing();
+            fetchCustomFieldsConfig().then(() => {
+                fetchContacts();
+                populateCompanyList();
+                populateNameList();
+                requestAnimationFrame(() => {
+                    loadColumnWidths();
+                    enableColumnResizing();
+                });
+                applyButtonVisibility();
             });
-            applyButtonVisibility();
         });
+
+        async function fetchCustomFieldsConfig() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
+                    const fields = await apiClient.getCustomFields();
+                    if (fields) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(Array.isArray(fields) ? fields : (fields.data || [])));
+                    }
+                }
+            } catch (error) {
+                console.warn("Failed to fetch custom fields config:", error);
+            }
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            dynamicFieldsList = allFields.filter(f => f.moduleName === MODULE_NAME && f.isActive).sort((a, b) => (a.order || 0) - (b.order || 0));
+        }
+
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            dynamicFieldsList.forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'form-group';
+                wrapper.style.flex = '1';
+                wrapper.style.minWidth = '200px';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    input.style.width = '100%';
+                    input.style.padding = '8px 12px';
+                    input.style.borderRadius = '4px';
+                    input.style.border = '1px solid #ccc';
+                    input.style.boxSizing = 'border-box';
+                    input.className = 'dynamic-field';
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.className = 'dynamic-field';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                    wrapper.style.gap = '5px';
+                    wrapper.style.display = 'flex';
+                    label.style.marginBottom = '0';
+                    input.style.width = 'auto';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType === 'number' ? 'number' : 'text';
+                    input.placeholder = field.fieldLabel;
+                    input.className = 'dynamic-field';
+                    input.style.width = '100%';
+                    input.style.padding = '8px 12px';
+                    input.style.borderRadius = '4px';
+                    input.style.border = '1px solid #ccc';
+                    input.style.boxSizing = 'border-box';
+                }
+
+                input.dataset.fieldName = field.fieldName;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
 
         // --- API & Data Handling ---
         async function fetchContacts() {
             try {
-                const res = await fetch(`/api/custom-records/${MODULE_NAME}`);
-                const json = await res.json();
-                if (json.success) {
-                    contactsData = json.data;
-                    localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
+                    const res = await apiClient.getCustomRecords(MODULE_NAME);
+                    if (res) {
+                        contactsData = res;
+                        localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                    } else {
+                        throw new Error("Failed to fetch");
+                    }
                 } else {
-                    throw new Error("Failed to fetch");
+                    const res = await fetch(`/api/custom-records/${MODULE_NAME}`);
+                    const json = await res.json();
+                    if (json.success) {
+                        contactsData = json.data;
+                        localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                    } else {
+                        throw new Error("Failed to fetch");
+                    }
                 }
             } catch (e) {
                 console.warn("API offline, loading from local storage.");
@@ -593,6 +698,12 @@
                 updatedAt: new Date().toISOString()
             };
 
+            document.querySelectorAll('#contactModal .dynamic-field').forEach(f => {
+                const fn = f.dataset.fieldName;
+                if (f.type === 'checkbox') payload[fn] = f.checked;
+                else payload[fn] = f.value;
+            });
+
             if (id) {
                 payload._id = id;
                 // Retain existing attachments if editing main data
@@ -607,14 +718,21 @@
             }
 
             try {
-                const res = await fetch(`/api/custom-records`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const json = await res.json();
-                if (json.success) {
-                    if (json.data && json.data._id) payload._id = json.data._id;
+                if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                    const res = await apiClient.saveCustomRecord(payload);
+                    if (res && res.success && res.data && res.data._id) {
+                        payload._id = res.data._id;
+                    }
+                } else {
+                    const res = await fetch(`/api/custom-records`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        if (json.data && json.data._id) payload._id = json.data._id;
+                    }
                 }
             } catch (e) {
                 console.warn("Saved locally (API Offline)");
@@ -635,7 +753,11 @@
             if (!confirm("Are you sure you want to delete this contact?")) return;
 
             try {
-                await fetch(`/api/custom-records/${id}`, { method: 'DELETE' });
+                if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
+                    await apiClient.deleteCustomRecord(id);
+                } else {
+                    await fetch(`/api/custom-records/${id}`, { method: 'DELETE' });
+                }
             } catch (e) {
                 console.warn("Deleted locally (API Offline)");
             }
@@ -683,7 +805,7 @@
 
         // --- Table Settings & Columns ---
         function getAvailableColumns() {
-            return [
+            const baseCols = [
                 { id: 'name', label: 'Name' },
                 { id: 'company', label: 'Company' },
                 { id: 'contactType', label: 'Type' },
@@ -693,6 +815,13 @@
                 { id: 'email', label: 'Email' },
                 { id: 'remarks', label: 'Remarks' }
             ];
+            
+            dynamicFieldsList.forEach(f => {
+                if (f.showInGrid !== false) {
+                    baseCols.push({ id: f.fieldName, label: f.fieldLabel });
+                }
+            });
+            return baseCols;
         }
 
         function getOrderedColumns() {
@@ -794,7 +923,12 @@
                 
                 const rowData = [escape(c.prefix)];
                 orderedCols.forEach(col => {
-                    rowData.push(escape(c[col.id]));
+                    let val = c[col.id];
+                    const dynField = dynamicFieldsList.find(f => f.fieldName === col.id);
+                    if (dynField && dynField.fieldType === 'boolean') {
+                        val = val ? 'Yes' : 'No';
+                    }
+                    rowData.push(escape(val));
                 });
                 return rowData.join(",");
             });
@@ -832,6 +966,12 @@
                     const emailIdx = headers.indexOf('email');
                     const remarksIdx = headers.indexOf('remarks');
 
+                    let dynIndices = {};
+                    dynamicFieldsList.forEach(f => {
+                        const idx = headers.indexOf(f.fieldLabel.toLowerCase());
+                        if (idx > -1) dynIndices[f.fieldName] = { idx, type: f.fieldType };
+                    });
+
                     if (nameIdx === -1) throw new Error("CSV must have a 'Name' column");
 
                     let added = 0, updated = 0;
@@ -856,6 +996,17 @@
                             updatedAt: new Date().toISOString()
                         };
 
+                        Object.keys(dynIndices).forEach(fn => {
+                            const info = dynIndices[fn];
+                            let val = getVal(info.idx);
+                            if (info.type === 'boolean') {
+                                val = val.toLowerCase() === 'yes' || val.toLowerCase() === 'true';
+                            } else if (info.type === 'number') {
+                                val = parseFloat(val) || 0;
+                            }
+                            payload[fn] = val;
+                        });
+
                         let existingIdx = contactsData.findIndex(c => c.name.toLowerCase() === name.toLowerCase() && (c.company || "").toLowerCase() === getVal(companyIdx).toLowerCase());
 
                         if (existingIdx > -1) {
@@ -871,11 +1022,15 @@
                             added++;
                         }
 
-                        fetch(`/api/custom-records`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        }).catch(e => { });
+                        if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                            apiClient.saveCustomRecord(payload).catch(e => {});
+                        } else {
+                            fetch(`/api/custom-records`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            }).catch(e => { });
+                        }
                     }
 
                     localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
@@ -967,7 +1122,8 @@
             const filtered = contactsData.filter(c => {
                 if (filterType && c.contactType !== filterType) return false;
                 if (!term) return true;
-                const rowText = [c.prefix, c.name, c.company, c.contactType, c.designation, c.department, c.mobile, c.email, c.remarks].join(' ').toLowerCase();
+                let rowText = [c.prefix, c.name, c.company, c.contactType, c.designation, c.department, c.mobile, c.email, c.remarks].join(' ').toLowerCase();
+                dynamicFieldsList.forEach(f => rowText += " " + (c[f.fieldName] || '').toString().toLowerCase());
                 return rowText.includes(term);
             });
 
@@ -1058,6 +1214,15 @@
                         trHtml += `<td>${emailHtml}</td>`;
                     } else if (col.id === 'remarks') {
                         trHtml += `<td>${highlightMatch(c.remarks, term) || '-'}</td>`;
+                    } else {
+                        const dynField = dynamicFieldsList.find(f => f.fieldName === col.id);
+                        if (dynField) {
+                            let val = c[dynField.fieldName];
+                            if (dynField.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                            trHtml += `<td>${val !== undefined && val !== null && val !== '' ? highlightMatch(String(val), term) : '-'}</td>`;
+                        } else {
+                            trHtml += `<td>${highlightMatch(c[col.id], term) || '-'}</td>`;
+                        }
                     }
                 });
 
@@ -1191,6 +1356,7 @@
             document.getElementById('cMobile').value = "";
             document.getElementById('cEmail').value = "";
             document.getElementById('cRemarks').value = "";
+            renderDynamicFields({});
             document.getElementById('contactModal').style.display = 'flex';
             document.getElementById('cName').focus();
         }
@@ -1210,6 +1376,7 @@
             document.getElementById('cMobile').value = c.mobile || "";
             document.getElementById('cEmail').value = c.email || "";
             document.getElementById('cRemarks').value = c.remarks || "";
+            renderDynamicFields(c);
 
             document.getElementById('contactModal').style.display = 'flex';
         }

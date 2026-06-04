@@ -322,6 +322,29 @@
             justify-content: center;
             gap: 10px;
         }
+
+        /* Resizable Columns */
+        #savedQuotationsTable th {
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .resizer:hover,
+        .resizing {
+            background-color: #3498db;
+            opacity: 0.5;
+        }
     </style>
 </head>
 
@@ -449,6 +472,8 @@
                     <div style="font-size:12px; margin-top:2px;">Authorized Signatory</div>
                 </div>
             </div>
+            
+            <div id="dynamicFieldsContainer" class="form-grid" style="margin-bottom: 25px;"></div>
 
             <!-- Controls -->
             <div class="controls">
@@ -476,6 +501,7 @@
                         style="width: 250px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
                 </div>
             </div>
+            <div style="overflow-x: auto;">
             <table id="savedQuotationsTable">
                 <thead>
                     <tr>
@@ -489,6 +515,7 @@
                 </thead>
                 <tbody id="savedQuotationsBody"></tbody>
             </table>
+            </div>
 
             <!-- Pagination -->
             <div class="pagination-container"
@@ -609,11 +636,110 @@
                     companyGstin: APP_SETTINGS.COMPANY_GSTIN
                 });
             }
-            fetchQuotationsData();
+            fetchCustomFieldsConfig().then(() => fetchQuotationsData());
             loadItems();
         });
 
         // 2. Load Customers
+        let dynamicFieldsList = [];
+
+        async function fetchCustomFieldsConfig() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
+                    const fields = await apiClient.getCustomFields();
+                    if (fields) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(Array.isArray(fields) ? fields : (fields.data || [])));
+                    }
+                }
+            } catch (error) {
+                console.warn("Failed to fetch custom fields config:", error);
+            }
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            dynamicFieldsList = allFields.filter(f => f.moduleName === 'Quotation' && f.isActive).sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            const theadTr = document.querySelector("#savedQuotationsTable thead tr");
+            if (theadTr) {
+                document.querySelectorAll(".dyn-th").forEach(th => th.remove());
+                const actionsTh = theadTr.lastElementChild;
+                dynamicFieldsList.forEach(f => {
+                    if (f.showInGrid !== false) {
+                        const th = document.createElement("th");
+                        th.className = "dyn-th";
+                        th.innerText = f.fieldLabel;
+                        theadTr.insertBefore(th, actionsTh);
+                    }
+                });
+            }
+
+            renderDynamicFields();
+
+            requestAnimationFrame(() => {
+                loadColumnWidths();
+                enableColumnResizing();
+            });
+        }
+
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            dynamicFieldsList.forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'form-group';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.style.width = 'auto';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                    wrapper.style.gap = '5px';
+                    wrapper.style.display = 'flex';
+                    label.style.marginBottom = '0';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType === 'number' ? 'number' : 'text';
+                    input.placeholder = field.fieldLabel;
+                }
+
+                input.className = 'dynamic-field';
+                input.dataset.fieldName = field.fieldName;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
+
         const customers = JSON.parse(localStorage.getItem("customers")) || [];
         const custList = document.getElementById("customerList");
         customers.sort((a, b) => a.name.localeCompare(b.name)).forEach(c => {
@@ -652,6 +778,73 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        function enableColumnResizing() {
+            const table = document.getElementById('savedQuotationsTable');
+            if (!table) return;
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+
+                resizer.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) {
+                        th.style.width = newWidth + 'px';
+                        th.style.minWidth = newWidth + 'px';
+                    }
+                }
+
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+
+        function saveColumnWidths() {
+            const widths = [];
+            const headers = document.querySelectorAll('#savedQuotationsTable th');
+            headers.forEach(th => {
+                widths.push(th.style.width);
+            });
+            localStorage.setItem('quotationColumnWidths', JSON.stringify(widths));
+        }
+
+        function loadColumnWidths() {
+            const savedWidths = JSON.parse(localStorage.getItem('quotationColumnWidths'));
+            if (savedWidths && Array.isArray(savedWidths)) {
+                const headers = document.querySelectorAll('#savedQuotationsTable th');
+                headers.forEach((th, index) => {
+                    if (savedWidths[index]) {
+                        th.style.width = savedWidths[index];
+                        th.style.minWidth = savedWidths[index];
+                    }
+                });
+            }
         }
 
         // 3. Table Logic
@@ -814,6 +1007,12 @@
                 terms: document.getElementById("termsConditions").value
             };
 
+            document.querySelectorAll('#dynamicFieldsContainer .dynamic-field').forEach(f => {
+                const fn = f.dataset.fieldName;
+                if (f.type === 'checkbox') quotationData[fn] = f.checked;
+                else quotationData[fn] = f.value;
+            });
+
             let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
             const existingIndex = quotations.findIndex(q => q.refNo === refNo);
 
@@ -848,6 +1047,7 @@
                 document.getElementById("custContact").value = quotation.custContact || "";
                 document.getElementById("custAddress").value = quotation.custAddress || "";
                 document.getElementById("termsConditions").value = quotation.terms || "";
+                renderDynamicFields(quotation);
 
                 const tbody = document.querySelector("#quotationTable tbody");
                 tbody.innerHTML = "";
@@ -986,7 +1186,7 @@
                 else if (q.status === 'Rejected') statusColor = '#dc3545';
 
                 const tr = document.createElement("tr");
-                tr.innerHTML = `
+                let rowHtml = `
                 <td><strong>${escapeHtml(q.refNo || '-')}</strong></td>
                 <td>${q.date ? new Date(q.date).toLocaleDateString('en-GB') : '-'}</td>
                 <td style="text-align:left;">${escapeHtml(q.custName || '-')}</td>
@@ -999,12 +1199,23 @@
                     </select>
                 </td>
                 <td style="text-align:right; font-weight:bold;">${q.grandTotal || '0.00'}</td>
-                <td style="text-align:center;" class="no-print">
+                `;
+                
+                dynamicFieldsList.forEach(f => {
+                    if (f.showInGrid !== false) {
+                        let val = q[f.fieldName];
+                        if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                        rowHtml += `<td>${val !== undefined && val !== null && val !== '' ? escapeHtml(String(val)) : '-'}</td>`;
+                    }
+                });
+                
+                rowHtml += `<td style="text-align:center;" class="no-print">
                     <button class="secondary" style="padding:4px 8px; font-size:12px; background:#607d8b;" onclick="printQuoteFromList('${escapeHtml(q.refNo)}')"><i class="fas fa-print"></i> Print</button>
                     <button class="primary" style="padding:4px 8px; font-size:12px;" onclick="editQuote('${escapeHtml(q.refNo)}')"><i class="fas fa-edit"></i> Edit</button>
                     <button class="danger" style="padding:4px 8px; font-size:12px;" onclick="deleteQuote('${escapeHtml(q.refNo)}')"><i class="fas fa-trash"></i> Delete</button>
                 </td>
             `;
+                tr.innerHTML = rowHtml;
                 tbody.appendChild(tr);
             });
 
