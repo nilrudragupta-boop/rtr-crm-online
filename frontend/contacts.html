@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -199,6 +200,29 @@
             color: #555;
             margin-bottom: 5px;
         }
+        
+        /* Sortable List Styles */
+        #columnToggles {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #columnToggles li {
+            padding: 8px 12px;
+            border: 1px solid #eee;
+            margin-bottom: 5px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 4px;
+        }
+        body.dark-mode #columnToggles li {
+            background: #333;
+            border-color: #444;
+        }
 
         .form-group input {
             width: 100%;
@@ -255,6 +279,26 @@
             background: #222;
             color: #666;
         }
+
+        /* Resizable Columns */
+        #contactsTable th {
+            position: relative;
+        }
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+        .resizer:hover, .resizing {
+            background-color: #3498db;
+            opacity: 0.5;
+        }
     </style>
 </head>
 
@@ -264,14 +308,15 @@
         <h2><i class="fas fa-address-book"></i> Contacts Directory</h2>
         <div>
             <button class="btn-primary" onclick="openContactModal()"><i class="fas fa-plus"></i> New Contact</button>
-            <button class="btn-warning" onclick="exportContactsPDF()"><i class="fas fa-file-pdf"></i> Export
+            <button class="btn-warning" id="btnExportPdf" onclick="exportContactsPDF()"><i class="fas fa-file-pdf"></i> Export
                 PDF</button>
-            <button class="btn-success" onclick="exportContactsCSV()"><i class="fas fa-file-csv"></i> Export
+            <button class="btn-success" id="btnExportCsv" onclick="exportContactsCSV()"><i class="fas fa-file-csv"></i> Export
                 CSV</button>
-            <button class="btn-info" onclick="document.getElementById('importCsvInput').click()"><i
+            <button class="btn-info" id="btnImportCsv" onclick="document.getElementById('importCsvInput').click()"><i
                     class="fas fa-file-import"></i> Import CSV</button>
             <input type="file" id="importCsvInput" accept=".csv" style="display:none"
                 onchange="importContactsCSV(this)">
+            <button class="btn-secondary" onclick="openSettingsModal()" style="background:#607d8b;"><i class="fas fa-cog"></i> Settings</button>
             <button class="btn-secondary" onclick="fetchContacts()"><i class="fas fa-sync-alt"></i> Refresh</button>
         </div>
     </div>
@@ -297,18 +342,7 @@
         style="overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-height: 70vh;">
         <table id="contactsTable">
             <thead>
-                <tr>
-                    <th style="width: 50px; text-align: center;">SL</th>
-                    <th>Name</th>
-                    <th>Company</th>
-                    <th>Type</th>
-                    <th>Designation</th>
-                    <th>Department</th>
-                    <th>Mobile</th>
-                    <th>Email</th>
-                    <th>Remarks</th>
-                    <th style="width: 180px; text-align: center;">Action</th>
-                </tr>
+                <tr id="contactsHeadRow"></tr>
             </thead>
             <tbody id="contactsBody">
                 <tr>
@@ -458,12 +492,52 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="width: 400px; max-width: 90%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #2c3e50;">⚙️ Table Settings</h3>
+                <span class="close-modal" onclick="closeSettingsModal()">&times;</span>
+            </div>
+            <div style="margin: 15px 0; text-align: left; padding-left: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h5 style="font-size: 1rem; margin-top: 0; margin-bottom: 10px;" class="text-secondary">Button Visibility</h5>
+                <label style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnExportPdfToggle" onchange="toggleButtonVisibility('btnExportPdf', this.checked)"> Show Export PDF
+                </label>
+                <label style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnExportCsvToggle" onchange="toggleButtonVisibility('btnExportCsv', this.checked)"> Show Export CSV
+                </label>
+                <label style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnImportCsvToggle" onchange="toggleButtonVisibility('btnImportCsv', this.checked)"> Show Import CSV
+                </label>
+            </div>
+            <p style="font-size:14px; color:#666; margin-bottom:10px;">Select and drag to reorder columns:</p>
+            <ul id="columnToggles" style="margin-bottom: 15px;">
+            </ul>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn-secondary" onclick="closeSettingsModal()">Close</button>
+                <button class="btn-success" onclick="saveColumnSettings()">Apply</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const MODULE_NAME = "Contacts";
         let contactsData = [];
         let currentAttachments = [];
         let currentPage = 1;
         let rowsPerPage = 20;
+        let currentSortColumn = 'name';
+        let currentSortDirection = 'asc';
+        let columnVisibility = JSON.parse(localStorage.getItem('contactsColumnVis')) || {};
+        
+        let savedButtonVisibility = JSON.parse(localStorage.getItem("contactsButtonVisibility")) || {};
+        let buttonVisibility = {
+            btnExportPdf: true,
+            btnExportCsv: true,
+            btnImportCsv: true,
+            ...savedButtonVisibility
+        };
 
         // Init Theme
         if (localStorage.getItem("appThemeMode") === "dark") {
@@ -474,6 +548,11 @@
             fetchContacts();
             populateCompanyList();
             populateNameList();
+            requestAnimationFrame(() => {
+                loadColumnWidths();
+                enableColumnResizing();
+            });
+            applyButtonVisibility();
         });
 
         // --- API & Data Handling ---
@@ -602,24 +681,122 @@
             });
         }
 
+        // --- Table Settings & Columns ---
+        function getAvailableColumns() {
+            return [
+                { id: 'name', label: 'Name' },
+                { id: 'company', label: 'Company' },
+                { id: 'contactType', label: 'Type' },
+                { id: 'designation', label: 'Designation' },
+                { id: 'department', label: 'Department' },
+                { id: 'mobile', label: 'Mobile' },
+                { id: 'email', label: 'Email' },
+                { id: 'remarks', label: 'Remarks' }
+            ];
+        }
+
+        function getOrderedColumns() {
+            const available = getAvailableColumns();
+            const savedOrder = JSON.parse(localStorage.getItem('contactsColumnOrder')) || [];
+            
+            available.sort((a, b) => {
+                let idxA = savedOrder.indexOf(a.id);
+                let idxB = savedOrder.indexOf(b.id);
+                if (idxA === -1) idxA = 999;
+                if (idxB === -1) idxB = 999;
+                return idxA - idxB;
+            });
+            return available;
+        }
+
+        function openSettingsModal() {
+            const container = document.getElementById('columnToggles');
+            container.innerHTML = '';
+            
+            for (const btnId in buttonVisibility) {
+                const toggleId = `show${btnId.charAt(0).toUpperCase() + btnId.slice(1)}Toggle`;
+                const toggle = document.getElementById(toggleId);
+                if (toggle) {
+                    toggle.checked = buttonVisibility[btnId];
+                }
+            }
+            
+            const cols = getOrderedColumns();
+
+            cols.forEach(col => {
+                let isChecked = columnVisibility[col.id];
+                if (isChecked === undefined) isChecked = true; // default to true
+
+                const li = document.createElement('li');
+                li.dataset.id = col.id;
+                li.innerHTML = `
+                    <i class="fas fa-grip-vertical" style="color: #aaa; cursor: grab;"></i>
+                    <input type="checkbox" id="col_${col.id}" ${isChecked ? 'checked' : ''} style="width: auto; margin: 0; cursor: pointer;">
+                    <label for="col_${col.id}" style="margin: 0; cursor: pointer; flex: 1; font-size: 13px;">${col.label}</label>
+                `;
+                container.appendChild(li);
+            });
+
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(container, {
+                    animation: 150,
+                    handle: '.fa-grip-vertical'
+                });
+            }
+
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function saveColumnSettings() {
+            const container = document.getElementById('columnToggles');
+            const items = container.querySelectorAll('li');
+            const newOrder = [];
+            
+            items.forEach(li => {
+                const id = li.dataset.id;
+                newOrder.push(id);
+                const cb = li.querySelector(`input[type="checkbox"]`);
+                if (cb) columnVisibility[id] = cb.checked;
+            });
+
+            localStorage.setItem('contactsColumnOrder', JSON.stringify(newOrder));
+            localStorage.setItem('contactsColumnVis', JSON.stringify(columnVisibility));
+            closeSettingsModal();
+            applySearch();
+        }
+
+        function toggleButtonVisibility(btnId, isVisible) {
+            buttonVisibility[btnId] = isVisible;
+            localStorage.setItem("contactsButtonVisibility", JSON.stringify(buttonVisibility));
+            applyButtonVisibility();
+        }
+
+        function applyButtonVisibility() {
+            for (const btnId in buttonVisibility) {
+                const btn = document.getElementById(btnId);
+                if (btn) btn.style.display = buttonVisibility[btnId] ? '' : 'none';
+            }
+        }
+
         // --- Export / Import CSV ---
         function exportContactsCSV() {
             if (contactsData.length === 0) return alert("No contacts to export.");
 
-            const headers = ["Prefix", "Name", "Company", "Type", "Designation", "Department", "Mobile", "Email", "Remarks"];
+            const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
+            const headers = ["Prefix", ...orderedCols.map(c => c.label)];
+            
             const rows = contactsData.map(c => {
                 const escape = (t) => `"${String(t || "").replace(/"/g, '""')}"`;
-                return [
-                    escape(c.prefix),
-                    escape(c.name),
-                    escape(c.company),
-                    escape(c.contactType),
-                    escape(c.designation),
-                    escape(c.department),
-                    escape(c.mobile),
-                    escape(c.email),
-                    escape(c.remarks)
-                ].join(",");
+                
+                const rowData = [escape(c.prefix)];
+                orderedCols.forEach(col => {
+                    rowData.push(escape(c[col.id]));
+                });
+                return rowData.join(",");
             });
 
             const csvContent = [headers.join(",")].concat(rows).join("\n");
@@ -753,6 +930,16 @@
             return text.split(regex).map(part => part.toLowerCase() === term.toLowerCase() ? `<span class="highlight">${escapeHtml(part)}</span>` : escapeHtml(part)).join('');
         }
 
+        function handleSort(column) {
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+            }
+            applySearch();
+        }
+
         function handleSearchInput() {
             currentPage = 1;
             applySearch();
@@ -764,6 +951,19 @@
             const tbody = document.getElementById('contactsBody');
             tbody.innerHTML = '';
 
+            const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
+            
+            const theadTr = document.getElementById('contactsHeadRow');
+            let thHtml = `<th style="width: 50px; text-align: center;">SL</th>`;
+            orderedCols.forEach(c => {
+                let widthStyle = '';
+                if (c.id === 'mobile' || c.id === 'company') widthStyle = 'width: 140px;';
+                if (c.id === 'email') widthStyle = 'width: 180px;';
+                thHtml += `<th style="${widthStyle} cursor: pointer;" onclick="handleSort('${c.id}')">${c.label} <span id="sort-icon-${c.id}" style="font-size: 11px;"></span></th>`;
+            });
+            thHtml += `<th style="width: 130px; text-align: center;">Action</th>`;
+            theadTr.innerHTML = thHtml;
+
             const filtered = contactsData.filter(c => {
                 if (filterType && c.contactType !== filterType) return false;
                 if (!term) return true;
@@ -771,9 +971,29 @@
                 return rowText.includes(term);
             });
 
+            // Sorting
+            filtered.sort((a, b) => {
+                let valA = (a[currentSortColumn] || '').toLowerCase();
+                let valB = (b[currentSortColumn] || '').toLowerCase();
+                if (currentSortColumn === 'name') {
+                    valA = ((a.prefix ? a.prefix + ' ' : '') + a.name).toLowerCase();
+                    valB = ((b.prefix ? b.prefix + ' ' : '') + b.name).toLowerCase();
+                }
+                if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Update Sort Icons
+            orderedCols.forEach(col => {
+                const icon = document.getElementById(`sort-icon-${col.id}`);
+                if (icon) icon.innerHTML = (currentSortColumn === col.id) ? (currentSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+            });
+
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 20px; color: #666;">No contacts found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${orderedCols.length + 2}" style="text-align: center; padding: 20px; color: #666;">No contacts found.</td></tr>`;
                 renderPagination(0, 0, 0, 1);
+                requestAnimationFrame(() => { loadColumnWidths(); enableColumnResizing(); });
                 return;
             }
 
@@ -785,7 +1005,7 @@
             const startIndex = (currentPage - 1) * rowsPerPage;
             const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
             
-            const paginatedData = filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '')).slice(startIndex, endIndex);
+            const paginatedData = filtered.slice(startIndex, endIndex);
 
             paginatedData.forEach((c, index) => {
                 const attachCount = c.attachments ? c.attachments.length : 0;
@@ -793,55 +1013,66 @@
 
                 const fullName = c.prefix ? `${c.prefix} ${c.name}` : c.name;
 
-                let mobileHtml = '-';
-                if (c.mobile) {
-                    const numbers = c.mobile.split(',').map(n => n.trim()).filter(n => n);
-                    mobileHtml = numbers.map(num => {
-                        const cleanNum = num.replace(/\D/g, '');
-                        let waNum = cleanNum;
-                        if (waNum.length === 10) waNum = '91' + waNum; // Default to India country code if 10 digits
-
-                        const callLink = cleanNum ? `<a href="tel:${cleanNum}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt" style="font-size:12px;"></i></a>` : '';
-                        const waLink = cleanNum ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:#25D366; text-decoration:none; margin-left:6px;" title="WhatsApp"><i class="fab fa-whatsapp" style="font-size:14px;"></i></a>` : '';
-
-                        return `<div style="margin-bottom: 2px; white-space: nowrap;">${callLink}${highlightMatch(num, term)}${waLink}</div>`;
-                    }).join('');
-                }
-
-                let typeBadge = '-';
-                if (c.contactType) {
-                    let badgeColor = '#6c757d'; // Default Secondary Grey
-                    if (c.contactType === 'Customer') badgeColor = '#27ae60'; // Success Green
-                    else if (c.contactType === 'Supplier') badgeColor = '#0d6efd'; // Primary Blue
-                    else if (c.contactType === 'Internal') badgeColor = '#f39c12'; // Warning Orange
-                    typeBadge = `<span style="background-color:${badgeColor}; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">${highlightMatch(c.contactType, term)}</span>`;
-                }
-
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="text-align: center;">${startIndex + index + 1}</td>
-                    <td style="font-weight: bold; color: #2c3e50;">${highlightMatch(fullName, term)}</td>
-                    <td>${highlightMatch(c.company, term) || '-'}</td>
-                    <td>${typeBadge}</td>
-                    <td>${highlightMatch(c.designation, term) || '-'}</td>
-                    <td>${highlightMatch(c.department, term) || '-'}</td>
-                    <td>${mobileHtml}</td>
-                    <td>${c.email ? String(c.email).split(/[, ]+/).filter(e => e).map(em => {
-                        const mailLink = `<a href="mailto:${em}" style="color:#0d6efd; text-decoration:none;"><i class="fas fa-envelope" style="font-size:12px; margin-right:4px;"></i>${highlightMatch(String(em), term)}</a>`;
-                        const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); this.style.color='#27ae60'; setTimeout(()=>this.style.color='#6c757d', 1000);" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy" style="font-size:12px;"></i></a>`;
-                        return `<div style="margin-bottom: 2px; white-space: nowrap;">${mailLink}${copyLink}</div>`;
-                    }).join('') : '-'}</td>
-                    <td>${highlightMatch(c.remarks, term) || '-'}</td>
-                    <td style="text-align: center;">
-                        <button class="btn-info" style="padding: 4px 8px; font-size: 12px;" onclick="openAttachmentsModal('${c._id}')" title="Attachments"><i class="fas fa-paperclip"></i>${attachBadge}</button>
-                        <button class="btn-warning" style="padding: 4px 8px; font-size: 12px; margin: 0 4px;" onclick="editContact('${c._id}')" title="Edit"><i class="fas fa-pen"></i></button>
-                        <button class="btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteContact('${c._id}')" title="Delete"><i class="fas fa-trash"></i></button>
-                    </td>
-                `;
+                let trHtml = `<td style="text-align: center;">${startIndex + index + 1}</td>`;
+                
+                orderedCols.forEach(col => {
+                    if (col.id === 'name') {
+                        trHtml += `<td style="font-weight: bold; color: #2c3e50;">${highlightMatch(fullName, term)}</td>`;
+                    } else if (col.id === 'company') {
+                        trHtml += `<td>${highlightMatch(c.company, term) || '-'}</td>`;
+                    } else if (col.id === 'contactType') {
+                        let typeBadge = '-';
+                        if (c.contactType) {
+                            let badgeColor = '#6c757d'; 
+                            if (c.contactType === 'Customer') badgeColor = '#27ae60'; 
+                            else if (c.contactType === 'Supplier') badgeColor = '#0d6efd'; 
+                            else if (c.contactType === 'Internal') badgeColor = '#f39c12'; 
+                            typeBadge = `<span style="background-color:${badgeColor}; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">${highlightMatch(c.contactType, term)}</span>`;
+                        }
+                        trHtml += `<td>${typeBadge}</td>`;
+                    } else if (col.id === 'designation') {
+                        trHtml += `<td>${highlightMatch(c.designation, term) || '-'}</td>`;
+                    } else if (col.id === 'department') {
+                        trHtml += `<td>${highlightMatch(c.department, term) || '-'}</td>`;
+                    } else if (col.id === 'mobile') {
+                        let mobileHtml = '-';
+                        if (c.mobile) {
+                            const numbers = c.mobile.split(',').map(n => n.trim()).filter(n => n);
+                            mobileHtml = numbers.map(num => {
+                                const cleanNum = num.replace(/\D/g, '');
+                                let waNum = cleanNum;
+                                if (waNum.length === 10) waNum = '91' + waNum;
+                                const callLink = cleanNum ? `<a href="tel:${cleanNum}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt" style="font-size:12px;"></i></a>` : '';
+                                const waLink = cleanNum ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:#25D366; text-decoration:none; margin-left:6px;" title="WhatsApp"><i class="fab fa-whatsapp" style="font-size:14px;"></i></a>` : '';
+                                return `<div style="margin-bottom: 2px; white-space: nowrap;">${callLink}${highlightMatch(num, term)}${waLink}</div>`;
+                            }).join('');
+                        }
+                        trHtml += `<td>${mobileHtml}</td>`;
+                    } else if (col.id === 'email') {
+                        let emailHtml = c.email ? String(c.email).split(/[, ]+/).filter(e => e).map(em => {
+                            const mailLink = `<a href="mailto:${em}" style="color:#0d6efd; text-decoration:none;"><i class="fas fa-envelope" style="font-size:12px; margin-right:4px;"></i>${highlightMatch(String(em), term)}</a>`;
+                            const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); this.style.color='#27ae60'; setTimeout(()=>this.style.color='#6c757d', 1000);" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy" style="font-size:12px;"></i></a>`;
+                            return `<div style="margin-bottom: 2px; white-space: nowrap;">${mailLink}${copyLink}</div>`;
+                        }).join('') : '-';
+                        trHtml += `<td>${emailHtml}</td>`;
+                    } else if (col.id === 'remarks') {
+                        trHtml += `<td>${highlightMatch(c.remarks, term) || '-'}</td>`;
+                    }
+                });
+
+                trHtml += `<td style="text-align: center; white-space: nowrap;">
+                    <button class="btn-info" style="padding: 4px 8px; font-size: 12px;" onclick="openAttachmentsModal('${c._id}')" title="Attachments"><i class="fas fa-paperclip"></i>${attachBadge}</button>
+                    <button class="btn-warning" style="padding: 4px 8px; font-size: 12px; margin: 0 4px;" onclick="editContact('${c._id}')" title="Edit"><i class="fas fa-pen"></i></button>
+                    <button class="btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteContact('${c._id}')" title="Delete"><i class="fas fa-trash"></i></button>
+                </td>`;
+                
+                tr.innerHTML = trHtml;
                 tbody.appendChild(tr);
             });
             
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+            requestAnimationFrame(() => { loadColumnWidths(); enableColumnResizing(); });
         }
 
         function renderPagination(totalItems, start, end, totalPages) {
@@ -925,18 +1156,14 @@
             doc.setFontSize(10);
             doc.text("Generated on: " + new Date().toLocaleString('en-GB'), 14, 22);
 
-            const headers = [["Sl No", "Name", "Company", "Type", "Designation", "Department", "Mobile", "Email", "Remarks"]];
-            const data = filtered.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map((c, i) => [
-                i + 1,
-                c.prefix ? `${c.prefix} ${c.name}` : c.name,
-                c.company || '-',
-                c.contactType || '-',
-                c.designation || '-',
-                c.department || '-',
-                c.mobile || '-',
-                c.email || '-',
-                c.remarks || '-'
-            ]);
+            const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
+            const headers = [["Sl No", "Prefix", ...orderedCols.map(c => c.label)]];
+            
+            const data = filtered.sort((a,b) => (a.name || '').localeCompare(b.name || '')).map((c, i) => {
+                const rowData = [i + 1, c.prefix || '-'];
+                orderedCols.forEach(col => rowData.push(c[col.id] || '-'));
+                return rowData;
+            });
 
             doc.autoTable({
                 startY: 28,
@@ -1101,6 +1328,73 @@
             };
 
             document.getElementById('filePreviewModal').style.display = 'flex';
+        }
+
+        function enableColumnResizing() {
+            const table = document.getElementById('contactsTable');
+            if (!table) return;
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+
+                resizer.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) {
+                        th.style.width = newWidth + 'px';
+                        th.style.minWidth = newWidth + 'px';
+                    }
+                }
+
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+
+        function saveColumnWidths() {
+            const widths = [];
+            const headers = document.querySelectorAll('#contactsTable th');
+            headers.forEach(th => {
+                widths.push(th.style.width);
+            });
+            localStorage.setItem('contactsColumnWidths', JSON.stringify(widths));
+        }
+
+        function loadColumnWidths() {
+            const savedWidths = JSON.parse(localStorage.getItem('contactsColumnWidths'));
+            if (savedWidths && Array.isArray(savedWidths)) {
+                const headers = document.querySelectorAll('#contactsTable th');
+                headers.forEach((th, index) => {
+                    if (savedWidths[index]) {
+                        th.style.width = savedWidths[index];
+                        th.style.minWidth = savedWidths[index];
+                    }
+                });
+            }
         }
     </script>
 </body>

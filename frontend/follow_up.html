@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="apiClient.js"></script>
     <script src="settings.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
     <style>
@@ -304,6 +305,54 @@
             background-color: #3a3a3a !important;
             color: #fff !important;
         }
+
+        /* Sortable List Styles */
+        #columnToggles {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #columnToggles li {
+            padding: 8px 12px;
+            border: 1px solid #eee;
+            margin-bottom: 5px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 4px;
+        }
+
+        body.dark-mode #columnToggles li {
+            background: #333;
+            border-color: #444;
+        }
+
+        /* Resizable Columns */
+        #followUpTable th {
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .resizer:hover,
+        .resizing {
+            background-color: #3498db;
+            opacity: 0.5;
+        }
     </style>
 </head>
 
@@ -315,9 +364,12 @@
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
                 <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"> 🌙 Dark Mode
             </label>
-            <button class="btn-danger" onclick="deleteSelected()" id="bulkDeleteBtn" style="display:none;"><i class="fas fa-trash"></i> Delete Selected</button>
-            <button class="btn-primary" onclick="openSettingsModal()" style="background:#607d8b;"><i class="fas fa-cog"></i> Settings</button>
-            <button class="btn-primary" onclick="fetchFollowUpsData()" style="background:#17a2b8;"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button class="btn-danger" onclick="deleteSelected()" id="bulkDeleteBtn" style="display:none;"><i
+                    class="fas fa-trash"></i> Delete Selected</button>
+            <button class="btn-primary" onclick="openSettingsModal()" style="background:#607d8b;"><i
+                    class="fas fa-cog"></i> Settings</button>
+            <button class="btn-primary" onclick="fetchFollowUpsData()" style="background:#17a2b8;"><i
+                    class="fas fa-sync-alt"></i> Refresh</button>
             <button class="btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> New Follow-up</button>
         </div>
     </div>
@@ -414,9 +466,10 @@
                         'Completed', a new pending follow-up will be auto-generated based on this frequency.</small>
                 </div>
             </div>
-            
+
             <!-- Dynamic Fields Container -->
-            <div class="form-group" style="grid-column: span 2; display: flex; flex-wrap: wrap; gap: 15px;" id="dynamicFieldsContainer"></div>
+            <div class="form-group" style="grid-column: span 2; display: flex; flex-wrap: wrap; gap: 15px;"
+                id="dynamicFieldsContainer"></div>
 
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn-secondary" onclick="closeModal()">Cancel</button>
@@ -432,9 +485,9 @@
                 <h3 style="margin: 0; color: #2c3e50;">⚙️ Table Settings</h3>
                 <span class="close-modal" onclick="closeSettingsModal()">&times;</span>
             </div>
-            <p style="font-size:14px; color:#666; margin-bottom:10px;">Select custom fields to display:</p>
-            <div id="columnToggles" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:left; max-height:300px; overflow-y:auto; margin-bottom: 15px;">
-            </div>
+            <p style="font-size:14px; color:#666; margin-bottom:10px;">Select and drag to reorder columns:</p>
+            <ul id="columnToggles" style="margin-bottom: 15px;">
+            </ul>
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn-secondary" onclick="closeSettingsModal()">Close</button>
                 <button class="btn-success" onclick="saveColumnSettings()">Apply</button>
@@ -462,7 +515,7 @@
             if (followUpId) {
                 openModal(followUpId);
             }
-            
+
             // Auto-refresh data every 30 seconds to stay in sync
             setInterval(fetchFollowUpsData, 30000);
         });
@@ -553,35 +606,66 @@
             } else btn.style.display = 'none';
         }
 
+        function getAvailableColumns() {
+            const standard = [
+                { id: 'date', label: 'Date', isCustom: false },
+                { id: 'partyName', label: 'Party Name', isCustom: false },
+                { id: 'contact', label: 'Contact', isCustom: false },
+                { id: 'notes', label: 'Notes / Reason', isCustom: false },
+                { id: 'status', label: 'Status', isCustom: false }
+            ];
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Follow-up' && f.isActive).map(f => ({
+                id: f.fieldName, label: f.fieldLabel, isCustom: true, fieldDef: f
+            }));
+            return [...standard, ...customFields];
+        }
+
+        function getOrderedColumns() {
+            const available = getAvailableColumns();
+            const savedOrder = JSON.parse(localStorage.getItem('followUpColumnOrder')) || [];
+
+            available.sort((a, b) => {
+                let idxA = savedOrder.indexOf(a.id);
+                let idxB = savedOrder.indexOf(b.id);
+                if (idxA === -1) idxA = 999;
+                if (idxB === -1) idxB = 999;
+                return idxA - idxB;
+            });
+            return available;
+        }
+
         function openSettingsModal() {
             const container = document.getElementById('columnToggles');
             container.innerHTML = '';
-            
-            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
-            const customFields = allFields.filter(f => f.moduleName === 'Follow-up' && f.isActive).sort((a, b) => a.order - b.order);
 
-            if (customFields.length === 0) {
-                container.innerHTML = '<p style="grid-column: span 2; color: #999; font-size: 13px; text-align: center;">No custom fields available.</p>';
+            const cols = getOrderedColumns();
+
+            if (cols.length === 0) {
+                container.innerHTML = '<p style="color: #999; font-size: 13px; text-align: center;">No fields available.</p>';
             }
 
-            customFields.forEach(f => {
-                let isChecked = columnVisibility[f.fieldName];
-                if (isChecked === undefined) isChecked = f.showInGrid !== false;
+            cols.forEach(col => {
+                let isChecked = columnVisibility[col.id];
+                if (isChecked === undefined) isChecked = col.isCustom ? (col.fieldDef.showInGrid !== false) : true;
 
-                const label = document.createElement('label');
-                label.style.cssText = 'display:flex; align-items:center; gap:5px; cursor:pointer; font-size:13px; margin:0;';
-                
-                const cb = document.createElement('input');
-                cb.type = 'checkbox';
-                cb.id = 'col_' + f.fieldName;
-                cb.checked = isChecked;
-                cb.style.margin = '0';
-                cb.style.width = 'auto';
 
-                label.appendChild(cb);
-                label.appendChild(document.createTextNode(f.fieldLabel));
-                container.appendChild(label);
+                const li = document.createElement('li');
+                li.dataset.id = col.id;
+                li.innerHTML = `
+                    <i class="fas fa-grip-vertical" style="color: #aaa; cursor: grab;"></i>
+                    <input type="checkbox" id="col_${col.id}" ${isChecked ? 'checked' : ''} style="width: auto; margin: 0; cursor: pointer;">
+                    <label for="col_${col.id}" style="margin: 0; cursor: pointer; flex: 1; font-size: 13px;">${col.label}</label>
+                `;
+                container.appendChild(li);
             });
+
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(container, {
+                    animation: 150,
+                    handle: '.fa-grip-vertical'
+                });
+            }
 
             document.getElementById('settingsModal').style.display = 'flex';
         }
@@ -591,14 +675,18 @@
         }
 
         function saveColumnSettings() {
-            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
-            const customFields = allFields.filter(f => f.moduleName === 'Follow-up' && f.isActive);
+            const container = document.getElementById('columnToggles');
+            const items = container.querySelectorAll('li');
+            const newOrder = [];
 
-            customFields.forEach(f => {
-                const cb = document.getElementById('col_' + f.fieldName);
-                if (cb) columnVisibility[f.fieldName] = cb.checked;
+            items.forEach(li => {
+                const id = li.dataset.id;
+                newOrder.push(id);
+                const cb = li.querySelector(`input[type="checkbox"]`);
+                if (cb) columnVisibility[id] = cb.checked;
             });
 
+            localStorage.setItem('followUpColumnOrder', JSON.stringify(newOrder));
             localStorage.setItem('followUpColumnVis', JSON.stringify(columnVisibility));
             closeSettingsModal();
             renderTable();
@@ -680,7 +768,7 @@
         function duplicateFollowUp(id) {
             const f = followUps.find(x => x.id === id);
             if (!f) return;
-            
+
             document.getElementById('modalTitle').innerText = "Duplicate Follow-up";
             document.getElementById('fuId').value = '';
             document.getElementById('fuPartyType').value = f.partyType || 'Customer';
@@ -692,7 +780,7 @@
             document.getElementById('fuNotes').value = f.notes || '';
             document.getElementById('fuRecurring').checked = f.isRecurring || false;
             document.getElementById('fuFrequency').value = f.frequency || 'Weekly';
-            
+
             toggleRecurringOptions();
             renderDynamicFields(f);
             document.getElementById('followUpModal').style.display = 'flex';
@@ -753,7 +841,7 @@
                 status: id ? followUps.find(f => f.id === id).status : 'Pending',
                 createdAt: new Date().toISOString()
             };
-            
+
             // Attach Dynamic Fields
             document.querySelectorAll('.dynamic-field').forEach(input => {
                 if (input.type === 'checkbox') {
@@ -862,23 +950,25 @@
         function renderTable() {
             const tbody = document.getElementById('followUpBody');
             tbody.innerHTML = '';
-            
-            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
-            const customFields = allFields.filter(f => {
-                if (f.moduleName !== 'Follow-up' || !f.isActive) return false;
-                let isVisible = columnVisibility[f.fieldName];
-                if (isVisible === undefined) isVisible = f.showInGrid !== false;
+
+            const orderedCols = getOrderedColumns().filter(c => {
+                let isVisible = columnVisibility[c.id];
+                if (isVisible === undefined) isVisible = c.isCustom ? (c.fieldDef.showInGrid !== false) : true;
                 return isVisible;
-            }).sort((a, b) => a.order - b.order);
+            });
 
             const theadTr = document.getElementById('followUpHeadRow');
-            let thHtml = `<th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
-                <th style="width: 100px; cursor: pointer;" onclick="handleSort('date')">Date <span id="sort-icon-date" style="font-size: 11px;"></span></th>
-                <th style="cursor: pointer;" onclick="handleSort('partyName')">Party Name <span id="sort-icon-partyName" style="font-size: 11px;"></span></th>
-                <th style="width: 120px; cursor: pointer;" onclick="handleSort('contact')">Contact <span id="sort-icon-contact" style="font-size: 11px;"></span></th>
-                <th style="cursor: pointer;" onclick="handleSort('notes')">Notes / Reason <span id="sort-icon-notes" style="font-size: 11px;"></span></th>
-                <th style="width: 140px; text-align: center; cursor: pointer;" onclick="handleSort('status')">Status <span id="sort-icon-status" style="font-size: 11px;"></span></th>`;
-            customFields.forEach(cf => { thHtml += `<th style="cursor: pointer;" onclick="handleSort('${cf.fieldName}')">${cf.fieldLabel} <span id="sort-icon-${cf.fieldName}" style="font-size: 11px;"></span></th>`; });
+            let thHtml = `<th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>`;
+
+            orderedCols.forEach(c => {
+                let widthStyle = '';
+                let extraStyle = '';
+                if (c.id === 'date') widthStyle = 'width: 100px;';
+                if (c.id === 'contact') widthStyle = 'width: 120px;';
+                if (c.id === 'status') { widthStyle = 'width: 140px;'; extraStyle = 'text-align: center;'; }
+
+                thHtml += `<th style="${widthStyle} ${extraStyle} cursor: pointer;" onclick="handleSort('${c.id}')">${c.label} <span id="sort-icon-${c.id}" style="font-size: 11px;"></span></th>`;
+            });
             thHtml += `<th style="width: 150px; text-align: center;">Actions</th>`;
             theadTr.innerHTML = thHtml;
 
@@ -888,7 +978,7 @@
             const fromDate = document.getElementById('filterFromDate').value;
             const toDate = document.getElementById('filterToDate').value;
 
-            let filtered = followUps.filter(f => {                
+            let filtered = followUps.filter(f => {
                 const matchSearch = (f.partyName || '').toLowerCase().includes(search) || (f.notes || '').toLowerCase().includes(search);
                 const matchStatus = filterStatus ? f.status === filterStatus : true;
                 const matchPartyType = filterPartyType ? (f.partyType || 'Customer') === filterPartyType : true;
@@ -913,14 +1003,18 @@
                 }
             });
 
-            const sortColumns = ['date', 'partyName', 'contact', 'notes', 'status', ...customFields.map(cf => cf.fieldName)];
+            const sortColumns = orderedCols.map(c => c.id);
             sortColumns.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
                 if (icon) icon.innerHTML = (currentSortColumn === col) ? (currentSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${7 + customFields.length}" style="text-align:center; padding:20px; color:#666;">No follow-ups found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${2 + orderedCols.length}" style="text-align:center; padding:20px; color:#666;">No follow-ups found.</td></tr>`;
+                requestAnimationFrame(() => {
+                    loadColumnWidths();
+                    enableColumnResizing();
+                });
                 return;
             }
 
@@ -964,39 +1058,51 @@
                     contactHtml = `<div style="white-space:nowrap; display:flex; align-items:center;">${callLink}<span>${f.contact}</span>${waLink}</div>`;
                 }
 
-                let customTds = '';
-                customFields.forEach(cf => {
-                    let val = f[cf.fieldName];
-                    if (val === undefined || val === null || val === '') {
-                        val = '-';
-                    } else if (cf.fieldType === 'boolean') {
-                        val = (val === true || val === 'true') ? 'Yes' : 'No';
-                    } else if (cf.fieldType === 'date') {
-                        const d = new Date(val);
-                        if (!isNaN(d.getTime())) val = d.toLocaleDateString('en-GB');
-                    } else if (cf.fieldType === 'currency' || cf.fieldType === 'number') {
-                        let num = parseFloat(val);
-                        if (!isNaN(num)) {
-                            val = num.toLocaleString('en-IN', { minimumFractionDigits: cf.currencyDecimals ?? 2, maximumFractionDigits: cf.currencyDecimals ?? 2 });
-                            if (cf.prefix || cf.currencySymbol) val = (cf.prefix || cf.currencySymbol) + ' ' + val;
-                            if (cf.suffix) val = val + ' ' + cf.suffix;
+                let trHtml = `<td style="text-align: center;"><input type="checkbox" class="selectRow" value="${f.id}" ${isChecked} onchange="toggleRowSelection('${f.id}')"></td>`;
+
+                orderedCols.forEach(c => {
+                    if (!c.isCustom) {
+                        if (c.id === 'date') {
+                            trHtml += `<td>${new Date(f.date).toLocaleDateString('en-GB')}${f.time ? `<br><small style="color:#555;">${formatTime(f.time)}</small>` : ''}</td>`;
+                        } else if (c.id === 'partyName') {
+                            trHtml += `<td style="font-weight:600; color:#2c3e50;">${f.partyName} <span class="party-type-label ${pClass}">(${pType})</span> ${recurringBadge}</td>`;
+                        } else if (c.id === 'contact') {
+                            trHtml += `<td>${contactHtml}</td>`;
+                        } else if (c.id === 'notes') {
+                            trHtml += `<td>${f.notes || '-'}</td>`;
+                        } else if (c.id === 'status') {
+                            trHtml += `<td style="text-align:center;">${statusBadge}</td>`;
                         }
+                    } else {
+                        let val = f[c.id];
+                        const cf = c.fieldDef;
+                        if (val === undefined || val === null || val === '') {
+                            val = '-';
+                        } else if (cf.fieldType === 'boolean') {
+                            val = (val === true || val === 'true') ? 'Yes' : 'No';
+                        } else if (cf.fieldType === 'date') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = d.toLocaleDateString('en-GB');
+                        } else if (cf.fieldType === 'currency' || cf.fieldType === 'number') {
+                            let num = parseFloat(val);
+                            if (!isNaN(num)) {
+                                val = num.toLocaleString('en-IN', { minimumFractionDigits: cf.currencyDecimals ?? 2, maximumFractionDigits: cf.currencyDecimals ?? 2 });
+                                if (cf.prefix || cf.currencySymbol) val = (cf.prefix || cf.currencySymbol) + ' ' + val;
+                                if (cf.suffix) val = val + ' ' + cf.suffix;
+                            }
+                        }
+                        trHtml += `<td>${val}</td>`;
                     }
-                    customTds += `<td>${val}</td>`;
                 });
 
-                tr.innerHTML = `
-                    <td style="text-align: center;"><input type="checkbox" class="selectRow" value="${f.id}" ${isChecked} onchange="toggleRowSelection('${f.id}')"></td>
-                    <td>${new Date(f.date).toLocaleDateString('en-GB')}
-                        ${f.time ? `<br><small style="color:#555;">${formatTime(f.time)}</small>` : ''}</td>
-                    <td style="font-weight:600; color:#2c3e50;">${f.partyName} <span class="party-type-label ${pClass}">(${pType})</span> ${recurringBadge}</td>
-                    <td>${contactHtml}</td>
-                    <td>${f.notes || '-'}</td>
-                    <td style="text-align:center;">${statusBadge}</td>
-                    ${customTds}
-                    <td style="text-align:center; white-space:nowrap;">${actionsHtml}</td>
-                `;
+                trHtml += `<td style="text-align:center; white-space:nowrap;">${actionsHtml}</td>`;
+                tr.innerHTML = trHtml;
                 tbody.appendChild(tr);
+            });
+
+            requestAnimationFrame(() => {
+                loadColumnWidths();
+                enableColumnResizing();
             });
         }
 
@@ -1020,6 +1126,74 @@
         }
         document.addEventListener('click', function (e) { if (!e.target.matches('.action-btn-main')) { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); } });
         window.addEventListener('scroll', function () { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); }, true);
+
+
+        function enableColumnResizing() {
+            const table = document.getElementById('followUpTable');
+            if (!table) return;
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+
+                resizer.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) {
+                        th.style.width = newWidth + 'px';
+                        th.style.minWidth = newWidth + 'px';
+                    }
+                }
+
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+
+        function saveColumnWidths() {
+            const widths = [];
+            const headers = document.querySelectorAll('#followUpTable th');
+            headers.forEach(th => {
+                widths.push(th.style.width);
+            });
+            localStorage.setItem('followUpColumnWidths', JSON.stringify(widths));
+        }
+
+        function loadColumnWidths() {
+            const savedWidths = JSON.parse(localStorage.getItem('followUpColumnWidths'));
+            if (savedWidths && Array.isArray(savedWidths)) {
+                const headers = document.querySelectorAll('#followUpTable th');
+                headers.forEach((th, index) => {
+                    if (savedWidths[index]) {
+                        th.style.width = savedWidths[index];
+                        th.style.minWidth = savedWidths[index];
+                    }
+                });
+            }
+        }
     </script>
 </body>
 
