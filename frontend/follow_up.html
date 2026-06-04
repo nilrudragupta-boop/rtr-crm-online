@@ -402,6 +402,22 @@
         body.dark-mode .custom-tooltip .tooltip-text::after {
             border-color: #444 transparent transparent transparent;
         }
+
+        .row-due-today {
+            background-color: #fff9c4 !important;
+        }
+
+        body.dark-mode .row-due-today {
+            background-color: #554e05 !important;
+        }
+
+        .row-overdue {
+            background-color: #ffe6e6 !important;
+        }
+
+        body.dark-mode .row-overdue {
+            background-color: #4d1a1a !important;
+        }
     </style>
 </head>
 
@@ -510,16 +526,19 @@
                             <span class="tooltip-text">When marked as 'Completed', a new pending follow-up will be auto-generated based on this frequency.</span>
                         </span>
                     </label>
-                    <select id="fuFrequency">
+                    <select id="fuFrequency" onchange="toggleCustomDays()">
                         <option value="Daily">Daily</option>
                         <option value="Weekly">Weekly</option>
                         <option value="Monthly">Monthly</option>
                         <option value="Quarterly">Quarterly</option>
                         <option value="Half-Yearly">Half-Yearly</option>
                         <option value="Yearly">Yearly</option>
+                        <option value="Custom">Custom Days</option>
                     </select>
                     <input type="number" id="fuRecurCount" placeholder="Stop after (times)" 
                            style="display:inline-block; width:140px; margin-left:10px;" min="1" title="Optional: Stop after X occurrences">
+                    <input type="number" id="fuCustomDays" placeholder="Custom Days" 
+                           style="display:none; width:110px; margin-left:10px;" min="1" title="Number of days to repeat">
                 </div>
             </div>
 
@@ -628,6 +647,11 @@
         function toggleRecurringOptions() {
             const isChecked = document.getElementById('fuRecurring').checked;
             document.getElementById('recurringOptions').style.display = isChecked ? 'block' : 'none';
+        }
+        
+        function toggleCustomDays() {
+            const freq = document.getElementById('fuFrequency').value;
+            document.getElementById('fuCustomDays').style.display = freq === 'Custom' ? 'inline-block' : 'none';
         }
 
         let selectedIds = new Set();
@@ -837,8 +861,10 @@
             document.getElementById('fuRecurring').checked = f.isRecurring || false;
             document.getElementById('fuFrequency').value = f.frequency || 'Weekly';
             document.getElementById('fuRecurCount').value = f.recurCount || '';
+            document.getElementById('fuCustomDays').value = f.customDays || '';
 
             toggleRecurringOptions();
+            toggleCustomDays();
             renderDynamicFields(f);
             document.getElementById('followUpModal').style.display = 'flex';
         }
@@ -858,6 +884,7 @@
                 document.getElementById('fuRecurring').checked = f.isRecurring || false;
                 document.getElementById('fuFrequency').value = f.frequency || 'Weekly';
             document.getElementById('fuRecurCount').value = f.recurCount || '';
+                document.getElementById('fuCustomDays').value = f.customDays || '';
                 renderDynamicFields(f);
             } else {
                 document.getElementById('fuId').value = '';
@@ -871,9 +898,11 @@
                 document.getElementById('fuRecurring').checked = false;
                 document.getElementById('fuFrequency').value = 'Weekly';
             document.getElementById('fuRecurCount').value = '';
+                document.getElementById('fuCustomDays').value = '';
                 renderDynamicFields({});
             }
             toggleRecurringOptions();
+            toggleCustomDays();
             document.getElementById('followUpModal').style.display = 'flex';
         }
 
@@ -892,6 +921,7 @@
             const isRecurring = document.getElementById('fuRecurring').checked;
             const frequency = document.getElementById('fuFrequency').value;
         const recurCount = document.getElementById('fuRecurCount').value;
+        const customDays = document.getElementById('fuCustomDays').value;
 
             if (!partyName || !date) return alert("Party Name and Date are required!");
 
@@ -899,6 +929,7 @@
                 id: id || 'fu_' + Date.now(),
                 partyName, partyType, contact, date, time, notes, isRecurring, frequency,
             recurCount: recurCount ? parseInt(recurCount) : null,
+            customDays: customDays ? parseInt(customDays) : null,
                 status: id ? followUps.find(f => f.id === id).status : 'Pending',
                 createdAt: new Date().toISOString()
             };
@@ -925,7 +956,7 @@
             renderTable();
         }
 
-        function calculateNextDate(currentDateStr, frequency) {
+        function calculateNextDate(currentDateStr, frequency, customDays) {
             if (!currentDateStr) return new Date();
             const parts = currentDateStr.split('-');
             const date = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -943,6 +974,8 @@
                 date.setMonth(date.getMonth() + 6);
             } else if (frequency === 'Yearly') {
                 date.setFullYear(date.getFullYear() + 1);
+            } else if (frequency === 'Custom' && customDays) {
+                date.setDate(date.getDate() + parseInt(customDays));
             }
             return date;
         }
@@ -972,7 +1005,7 @@
         }
 
         if (shouldCreateNew) {
-            const newDate = calculateNextDate(item.date, item.frequency);
+            const newDate = calculateNextDate(item.date, item.frequency, item.customDays);
             const year = newDate.getFullYear();
             const month = String(newDate.getMonth() + 1).padStart(2, '0');
             const day = String(newDate.getDate()).padStart(2, '0');
@@ -1158,9 +1191,20 @@
                 return;
             }
 
+            const todayDate = new Date();
+            const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+
             filtered.forEach(f => {
                 const tr = document.createElement('tr');
             tr.id = 'row-' + f.id;
+
+            if (f.status === 'Pending') {
+                if (f.date === todayStr) {
+                    tr.classList.add('row-due-today');
+                } else if (f.date < todayStr) {
+                    tr.classList.add('row-overdue');
+                }
+            }
 
                 let statusBadge = '';
                 if (f.status === 'Pending') statusBadge = `<span class="badge badge-pending">Pending</span>`;
