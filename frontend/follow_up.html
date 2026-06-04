@@ -542,6 +542,16 @@
                            style="display:inline-block; width:140px; margin-left:10px;" min="1" title="Optional: Stop after X occurrences">
                     <input type="number" id="fuCustomDays" placeholder="Custom Days" 
                            style="display:none; width:110px; margin-left:10px;" min="1" title="Number of days to repeat">
+                    <div id="allowedDaysWrapper" style="display:none; margin-top:10px; font-size: 13px;">
+                        <span style="font-weight:600; margin-right:5px;">Allowed Days:</span>
+                        <label style="margin-right:5px; cursor:pointer;"><input type="checkbox" value="1" class="fu-allowed-day" checked> Mon</label>
+                        <label style="margin-right:5px; cursor:pointer;"><input type="checkbox" value="2" class="fu-allowed-day" checked> Tue</label>
+                        <label style="margin-right:5px; cursor:pointer;"><input type="checkbox" value="3" class="fu-allowed-day" checked> Wed</label>
+                        <label style="margin-right:5px; cursor:pointer;"><input type="checkbox" value="4" class="fu-allowed-day" checked> Thu</label>
+                        <label style="margin-right:5px; cursor:pointer;"><input type="checkbox" value="5" class="fu-allowed-day" checked> Fri</label>
+                        <label style="margin-right:5px; cursor:pointer;"><input type="checkbox" value="6" class="fu-allowed-day" checked> Sat</label>
+                        <label style="margin-right:5px; cursor:pointer;"><input type="checkbox" value="0" class="fu-allowed-day" checked> Sun</label>
+                    </div>
                 </div>
             </div>
 
@@ -662,6 +672,7 @@
         function toggleCustomDays() {
             const freq = document.getElementById('fuFrequency').value;
             document.getElementById('fuCustomDays').style.display = freq === 'Custom' ? 'inline-block' : 'none';
+            document.getElementById('allowedDaysWrapper').style.display = (freq === 'Daily' || freq === 'Custom') ? 'block' : 'none';
         }
 
         let selectedIds = new Set();
@@ -873,6 +884,11 @@
             document.getElementById('fuRecurCount').value = f.recurCount || '';
             document.getElementById('fuCustomDays').value = f.customDays || '';
 
+            const allowedDays = f.allowedDays || [0,1,2,3,4,5,6];
+            document.querySelectorAll('.fu-allowed-day').forEach(cb => {
+                cb.checked = allowedDays.includes(parseInt(cb.value));
+            });
+
             toggleRecurringOptions();
             toggleCustomDays();
             renderDynamicFields(f);
@@ -896,6 +912,11 @@
             document.getElementById('fuRecurCount').value = f.recurCount || '';
                 document.getElementById('fuCustomDays').value = f.customDays || '';
                 renderDynamicFields(f);
+
+                const allowedDays = f.allowedDays || [0,1,2,3,4,5,6];
+                document.querySelectorAll('.fu-allowed-day').forEach(cb => {
+                    cb.checked = allowedDays.includes(parseInt(cb.value));
+                });
             } else {
                 document.getElementById('fuId').value = '';
                 document.getElementById('fuPartyType').value = 'Customer';
@@ -910,6 +931,10 @@
             document.getElementById('fuRecurCount').value = '';
                 document.getElementById('fuCustomDays').value = '';
                 renderDynamicFields({});
+                
+                document.querySelectorAll('.fu-allowed-day').forEach(cb => {
+                    cb.checked = true;
+                });
             }
             toggleRecurringOptions();
             toggleCustomDays();
@@ -932,14 +957,19 @@
             const frequency = document.getElementById('fuFrequency').value;
         const recurCount = document.getElementById('fuRecurCount').value;
         const customDays = document.getElementById('fuCustomDays').value;
+        const allowedDays = Array.from(document.querySelectorAll('.fu-allowed-day:checked')).map(cb => parseInt(cb.value));
 
             if (!partyName || !date) return alert("Party Name and Date are required!");
+        if (isRecurring && (frequency === 'Daily' || frequency === 'Custom') && allowedDays.length === 0) {
+            return alert("Please select at least one allowed day of the week.");
+        }
 
             const payload = {
                 id: id || 'fu_' + Date.now(),
                 partyName, partyType, contact, date, time, notes, isRecurring, frequency,
             recurCount: recurCount ? parseInt(recurCount) : null,
             customDays: customDays ? parseInt(customDays) : null,
+            allowedDays: allowedDays,
                 status: id ? followUps.find(f => f.id === id).status : 'Pending',
                 createdAt: new Date().toISOString()
             };
@@ -966,7 +996,7 @@
             renderTable();
         }
 
-        function calculateNextDate(currentDateStr, frequency, customDays) {
+        function calculateNextDate(currentDateStr, frequency, customDays, allowedDays) {
             if (!currentDateStr) return new Date();
             const parts = currentDateStr.split('-');
             const date = new Date(parts[0], parts[1] - 1, parts[2]);
@@ -987,6 +1017,15 @@
             } else if (frequency === 'Custom' && customDays) {
                 date.setDate(date.getDate() + parseInt(customDays));
             }
+            
+            if (allowedDays && allowedDays.length > 0 && allowedDays.length < 7) {
+                let attempts = 0;
+                while (!allowedDays.includes(date.getDay()) && attempts < 14) {
+                    date.setDate(date.getDate() + 1);
+                    attempts++;
+                }
+            }
+
             return date;
         }
 
@@ -1015,7 +1054,7 @@
         }
 
         if (shouldCreateNew) {
-            const newDate = calculateNextDate(item.date, item.frequency, item.customDays);
+            const newDate = calculateNextDate(item.date, item.frequency, item.customDays, item.allowedDays);
             const year = newDate.getFullYear();
             const month = String(newDate.getMonth() + 1).padStart(2, '0');
             const day = String(newDate.getDate()).padStart(2, '0');
