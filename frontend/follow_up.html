@@ -429,6 +429,9 @@
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;">
                 <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()"> 🌙 Dark Mode
             </label>
+            <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:14px;" title="Pause the 30-second background auto-refresh">
+                <input type="checkbox" id="pauseRefreshToggle" onchange="toggleAutoRefresh()"> ⏸️ Pause Refresh
+            </label>
             <button class="btn-danger" onclick="deleteSelected()" id="bulkDeleteBtn" style="display:none;"><i
                     class="fas fa-trash"></i> Delete Selected</button>
             <button class="btn-primary" onclick="openSettingsModal()" style="background:#607d8b;"><i
@@ -575,6 +578,11 @@
         let currentSortColumn = 'date';
         let currentSortDirection = 'asc';
         let columnVisibility = JSON.parse(localStorage.getItem('followUpColumnVis')) || {};
+        let isAutoRefreshPaused = false;
+
+        function toggleAutoRefresh() {
+            isAutoRefreshPaused = document.getElementById('pauseRefreshToggle').checked;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem("appThemeMode") === "dark") {
@@ -592,7 +600,9 @@
             }
 
             // Auto-refresh data every 30 seconds to stay in sync
-            setInterval(fetchFollowUpsData, 30000);
+            setInterval(() => {
+                if (!isAutoRefreshPaused) fetchFollowUpsData();
+            }, 30000);
         });
 
         async function fetchFollowUpsData() {
@@ -1022,6 +1032,7 @@
             };
             newlyCreatedId = newFollowUp.id;
             delete newFollowUp.isNew; // Clean up any temporary flags
+            delete newFollowUp._id; // Ensure the backend treats this as a completely new record
             followUps.push(newFollowUp);
             
             // Adjust the 'To' date filter if the new follow-up is outside the current range
@@ -1215,7 +1226,9 @@
                 else if (f.status === 'Completed') statusBadge = `<span class="badge badge-completed">Completed</span>`;
                 else if (f.status === 'Cancelled') statusBadge = `<span class="badge badge-cancelled">Cancelled</span>`;
 
-                let recurringBadge = f.isRecurring ? `<span class="badge badge-recurring" title="Repeats ${f.frequency}"><i class="fas fa-sync-alt"></i></span>` : '';
+            let recurLeftText = f.recurCount ? ` (${f.recurCount} left)` : '';
+            let recurLeftHtml = f.recurCount ? ` ${f.recurCount}` : '';
+            let recurringBadge = f.isRecurring ? `<span class="badge badge-recurring" title="Repeats ${f.frequency}${recurLeftText}"><i class="fas fa-sync-alt"></i>${recurLeftHtml}</span>` : '';
 
                 const pType = f.partyType || 'Customer';
                 const pClass = pType === 'Customer' ? 'party-type-customer' : 'party-type-supplier';
