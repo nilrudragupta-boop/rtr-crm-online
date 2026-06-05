@@ -443,7 +443,7 @@
     </div>
 
     <div class="controls">
-        <input type="text" id="searchBox" placeholder="Search party, notes..." style="width:200px;"
+        <input type="text" id="searchBox" placeholder="Search party, notes, dynamic fields..." style="width:250px;"
             oninput="renderTable()">
         <label>Party Type:</label>
         <select id="filterPartyType" onchange="renderTable()" style="width:120px;">
@@ -1205,8 +1205,15 @@
             const fromDate = document.getElementById('filterFromDate').value;
             const toDate = document.getElementById('filterToDate').value;
 
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(cf => cf.moduleName === 'Follow-up' && cf.isActive);
+
             let filtered = followUps.filter(f => {
-                const matchSearch = (f.partyName || '').toLowerCase().includes(search) || (f.notes || '').toLowerCase().includes(search);
+                let rowText = [f.partyName, f.contact, f.notes, f.status].join(' ').toLowerCase();
+                customFields.forEach(cf => {
+                    rowText += " " + (f[cf.fieldName] || '').toString().toLowerCase();
+                });
+                const matchSearch = !search || rowText.includes(search);
                 const matchStatus = filterStatus ? f.status === filterStatus : true;
                 const matchPartyType = filterPartyType ? (f.partyType || 'Customer') === filterPartyType : true;
                 const matchDate = (!fromDate || f.date >= fromDate) && (!toDate || f.date <= toDate);
