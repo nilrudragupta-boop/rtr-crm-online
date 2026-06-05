@@ -499,7 +499,7 @@
         <!-- Search + Sort Options -->
         <div class="row mb-3 g-2">
             <div class="col-md-2">
-                <input type="text" id="searchName" class="form-control" placeholder="Search Item"
+                <input type="text" id="searchName" class="form-control" placeholder="Global Search..."
                     oninput="currentPage=1;applyFilters()">
             </div>
             <div class="col-md-1">
@@ -2544,12 +2544,21 @@
             const isAllSelected = allCb.checked || (selectedCategories.length === document.querySelectorAll(".category-filter-cb").length);
 
             let filtered = items.filter(item => {
-                const name = (item.name || "").toLowerCase();
+                let globalMatch = true;
+                if (searchName) {
+                    globalMatch = Object.values(item).some(val => {
+                        if (typeof val === 'object' && val !== null) {
+                            // Allows searching inside objects like conversions
+                            return JSON.stringify(val).toLowerCase().includes(searchName);
+                        }
+                        return String(val || '').toLowerCase().includes(searchName);
+                    });
+                }
+
                 const code = (item.itemCode || "").toLowerCase();
                 const index = (item.indexNo || "").toLowerCase();
                 const category = (item.category || "");
                 const description = (item.description || "").toLowerCase();
-                const nameMatch = searchName ? name.includes(searchName) : true;
                 const codeMatch = searchCode ? code.includes(searchCode) : true;
                 const indexMatch = searchIndex ? index.includes(searchIndex) : true;
                 const descriptionMatch = searchDescription ? description.includes(searchDescription) : true;
@@ -2560,7 +2569,7 @@
                     else categoryMatch = selectedCategories.includes(category);
                 }
 
-                return nameMatch && codeMatch && indexMatch && categoryMatch && descriptionMatch;
+                return globalMatch && codeMatch && indexMatch && categoryMatch && descriptionMatch;
             });
 
             // Update Total Count Display
