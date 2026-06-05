@@ -1348,7 +1348,7 @@
                             if (cf.suffix) val = val + ' ' + cf.suffix;
                         }
                     }
-                    customTds += `<td>${val}</td>`;
+                    customTds += `<td>${highlightMatch(val, searchTerm)}</td>`;
                 });
 
                 table.innerHTML += `
@@ -1755,22 +1755,31 @@
             if (sortSelect === "nameAsc") { currentSortColumn = 'name'; currentSortDirection = 'asc'; }
             if (sortSelect === "nameDesc") { currentSortColumn = 'name'; currentSortDirection = 'desc'; }
 
-            let filtered = suppliers.filter(s =>
-                (search ? (
-                    s.name.toLowerCase().includes(search) ||
-                    (s.email && s.email.toLowerCase().includes(search)) ||
-                    (s.gstin && s.gstin.toLowerCase().includes(search)) ||
-                    (s.contact && s.contact.toLowerCase().includes(search)) ||
-                    (s.address && s.address.toLowerCase().includes(search)) ||
-                    (s.pin && s.pin.toLowerCase().includes(search)) ||
-                    (s.district && s.district.toLowerCase().includes(search)) ||
-                    (s.state && s.state.toLowerCase().includes(search)) ||
-                    (s.supplierType && s.supplierType.toLowerCase().includes(search)) ||
-                    (s.description && s.description.toLowerCase().includes(search))
-                ) : true) &&
-                (stateFilter ? s.state === stateFilter : true) &&
-                (distFilter ? s.district === distFilter : true)
-            );
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            const customFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive);
+
+            let filtered = suppliers.filter(s => {
+                const searchVals = [
+                    s.name || "",
+                    s.email || "",
+                    s.gstin || "",
+                    s.contact || "",
+                    s.address || "",
+                    s.pin || "",
+                    s.district || "",
+                    s.state || "",
+                    s.supplierType || "",
+                    s.description || ""
+                ];
+                
+                customFields.forEach(cf => searchVals.push(s[cf.fieldName]));
+                const rowText = searchVals.map(val => String(val || '').toLowerCase()).join(' ');
+                const matchSearch = search ? rowText.includes(search) : true;
+                
+                return matchSearch &&
+                    (stateFilter ? s.state === stateFilter : true) &&
+                    (distFilter ? s.district === distFilter : true);
+            });
 
             // Sort based on globals
             if (currentSortColumn === 'name') {
