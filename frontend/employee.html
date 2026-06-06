@@ -307,7 +307,8 @@
                 title="Manage Departments">⚙️</button>
         </div>
         <input type="number" id="empDutyHours" placeholder="Duty Hrs (Def: 8)" style="flex:1;">
-        <input type="text" id="empContact" placeholder="Contact No. (comma separated)" oninput="this.value = this.value.replace(/[^0-9, ]/g, '')" style="flex:1;">
+        <input type="text" id="empContact" placeholder="Contact No. (comma separated)"
+            oninput="this.value = this.value.replace(/[^0-9, ]/g, '')" style="flex:1;">
         <input type="text" id="empEmail" placeholder="Email (comma separated)" style="flex:1;">
         <input type="number" id="empSalary" placeholder="Salary (₹)" style="flex:1;">
         <input type="date" id="empJoiningDate" style="flex:1;">
@@ -358,20 +359,28 @@
         <select id="filterDesignation" onchange="renderTable()" style="flex:1;">
             <option value="">All Designations</option>
         </select>
-        <button class="action" onclick="openColumnSettings()" style="background:#607d8b;">⚙️ Columns</button>
-        <button class="action" onclick="openAttendanceModal()" style="background:#6f42c1;">📅 Mark Attendance</button>
-        <button class="action" onclick="exportEmployees()" style="background:#198754;">📊 Export Excel</button>
-        <button class="action" onclick="exportAttendance()" style="background:#217346;">📅 Export Attendance</button>
-        <button class="action" onclick="openSummaryModal()" style="background:#fd7e14;">📈 Attendance Summary</button>
-        <button class="action" onclick="openHolidayModal()" style="background:#e83e8c;">🎉 Holiday Calendar</button>
-        <button class="action" onclick="openPayrollModal()" style="background:#6610f2;">💰 Payroll</button>
+        <button class="action" onclick="openSettingsModal()" style="background:#607d8b;">⚙️ Settings</button>
+        <button class="action" id="btnMarkAttendance" onclick="openAttendanceModal()" style="background:#6f42c1;">📅
+            Mark Attendance</button>
+        <button class="action" id="btnExportExcel" onclick="exportEmployees()" style="background:#198754;">📊 Export
+            Excel</button>
+        <button class="action" id="btnExportAttendance" onclick="exportAttendance()" style="background:#217346;">📅
+            Export Attendance</button>
+        <button class="action" id="btnAttendanceSummary" onclick="openSummaryModal()" style="background:#fd7e14;">📈
+            Attendance Summary</button>
+        <button class="action" id="btnHolidayCalendar" onclick="openHolidayModal()" style="background:#e83e8c;">🎉
+            Holiday Calendar</button>
+        <button class="action" id="btnPayroll" onclick="openPayrollModal()" style="background:#6610f2;">💰
+            Payroll</button>
     </div>
 
     <!-- Pagination Controls -->
-    <div class="pagination-container" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+    <div class="pagination-container"
+        style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
         <div style="display: flex; align-items: center; gap: 5px;">
             <span id="totalEmployeesDisplay" style="font-weight: bold; color: #2c3e50; margin-right: 8px;"></span>
-            <select id="rowsPerPageSelect" onchange="changeRowsPerPage()" style="width: auto; padding: 4px; border: 1px solid #ccc; border-radius: 4px; margin: 0;">
+            <select id="rowsPerPageSelect" onchange="changeRowsPerPage()"
+                style="width: auto; padding: 4px; border: 1px solid #ccc; border-radius: 4px; margin: 0;">
                 <option value="10">10 rows</option>
                 <option value="20" selected>20 rows</option>
                 <option value="50">50 rows</option>
@@ -379,7 +388,9 @@
                 <option value="200">200 rows</option>
                 <option value="500">500 rows</option>
             </select>
-            <input type="number" id="goToPageInput" style="width: 60px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Go to" min="1" onchange="goToPage()">
+            <input type="number" id="goToPageInput"
+                style="width: 60px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Go to"
+                min="1" onchange="goToPage()">
         </div>
         <div id="paginationInfo" style="color: #666; font-size: 14px;"></div>
         <div class="pagination" id="paginationControls" style="display: flex; gap: 5px;"></div>
@@ -431,11 +442,16 @@
                 <table style="width:100%; font-size:13px;">
                     <thead style="position:sticky; top:0; background:#f8f9fa;">
                         <tr>
-                            <th>Employee</th>
-                            <th>In Time</th>
-                            <th>Out Time</th>
-                            <th>Status</th>
-                            <th>OT</th>
+                            <th style="cursor:pointer;" onclick="handleAttSort('name')">Employee <span
+                                    id="sort-icon-att-name"></span></th>
+                            <th style="cursor:pointer;" onclick="handleAttSort('inTime')">In Time <span
+                                    id="sort-icon-att-inTime"></span></th>
+                            <th style="cursor:pointer;" onclick="handleAttSort('outTime')">Out Time <span
+                                    id="sort-icon-att-outTime"></span></th>
+                            <th style="cursor:pointer;" onclick="handleAttSort('status')">Status <span
+                                    id="sort-icon-att-status"></span></th>
+                            <th style="cursor:pointer;" onclick="handleAttSort('ot')">OT <span
+                                    id="sort-icon-att-ot"></span></th>
                         </tr>
                     </thead>
                     <tbody id="attendanceTableBody"></tbody>
@@ -506,14 +522,22 @@
                 <table style="font-size:13px;">
                     <thead>
                         <tr>
-                            <th>Employee</th>
-                            <th>Present</th>
-                            <th>Absent</th>
-                            <th>Half-Day</th>
-                            <th>Leave</th>
-                            <th>Late</th>
-                            <th>Early</th>
-                            <th>Total Days</th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('name')">Employee <span
+                                    id="sort-icon-sum-name"></span></th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('present')">Present <span
+                                    id="sort-icon-sum-present"></span></th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('absent')">Absent <span
+                                    id="sort-icon-sum-absent"></span></th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('halfDay')">Half-Day <span
+                                    id="sort-icon-sum-halfDay"></span></th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('leave')">Leave <span
+                                    id="sort-icon-sum-leave"></span></th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('late')">Late <span
+                                    id="sort-icon-sum-late"></span></th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('early')">Early <span
+                                    id="sort-icon-sum-early"></span></th>
+                            <th style="cursor:pointer;" onclick="handleSumSort('totalDays')">Total Days <span
+                                    id="sort-icon-sum-totalDays"></span></th>
                         </tr>
                     </thead>
                     <tbody id="summaryTableBody"></tbody>
@@ -606,16 +630,53 @@
         </div>
     </div>
 
-    <!-- Column Settings Modal -->
-    <div id="columnSettingsModal" class="modal">
-        <div class="modal-content" style="width: 300px;">
-            <h3>⚙️ Table Columns</h3>
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="width: 400px; max-height: 85vh; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; color:#607d8b;">⚙️ Settings</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeModal('settingsModal')">&times;</span>
+            </div>
+            <div style="margin: 15px 0; text-align: left; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h5 style="font-size: 1rem; margin-top: 0; margin-bottom: 10px; color: #666;">Button Visibility</h5>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnMarkAttendanceToggle"
+                        onchange="toggleButtonVisibility('btnMarkAttendance', this.checked)"> Show Mark Attendance
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnExportExcelToggle"
+                        onchange="toggleButtonVisibility('btnExportExcel', this.checked)"> Show Export Excel
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnExportAttendanceToggle"
+                        onchange="toggleButtonVisibility('btnExportAttendance', this.checked)"> Show Export Attendance
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnAttendanceSummaryToggle"
+                        onchange="toggleButtonVisibility('btnAttendanceSummary', this.checked)"> Show Attendance Summary
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnHolidayCalendarToggle"
+                        onchange="toggleButtonVisibility('btnHolidayCalendar', this.checked)"> Show Holiday Calendar
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnPayrollToggle"
+                        onchange="toggleButtonVisibility('btnPayroll', this.checked)"> Show Payroll
+                </label>
+            </div>
+            <p style="font-size:14px; color:#666; margin-bottom:10px; text-align:left;">Table Columns:</p>
             <div id="columnToggles"
                 style="text-align: left; max-height: 300px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             </div>
-            <div class="modal-buttons">
+            <div class="modal-buttons" style="margin-top: 20px;">
                 <button class="action" onclick="saveColumnSettings()">Apply</button>
-                <button class="clear" onclick="closeModal('columnSettingsModal')">Close</button>
+                <button class="clear" onclick="closeModal('settingsModal')">Close</button>
             </div>
         </div>
     </div>
@@ -681,9 +742,27 @@
         let attPage = 1;
         const attRowsPerPage = 20;
         let attSearchQuery = "";
-        
+        let attSortCol = null;
+        let attSortAsc = true;
+
+        let sumSortCol = null;
+        let sumSortAsc = true;
+
         let currentPage = 1;
         let rowsPerPage = 20;
+        let sortCol = null;
+        let sortAsc = true;
+
+        function handleSort(colId) {
+            if (colId === 'photo' || colId === 'actions') return;
+            if (sortCol === colId) {
+                sortAsc = !sortAsc;
+            } else {
+                sortCol = colId;
+                sortAsc = true;
+            }
+            renderTable();
+        }
 
         function changeRowsPerPage() {
             rowsPerPage = parseInt(document.getElementById('rowsPerPageSelect').value);
@@ -734,7 +813,7 @@
             }
 
             html += `<button class="clear" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} style="padding: 4px 8px; margin: 0 2px;">Next</button>`;
-            
+
             if (controls) controls.innerHTML = html;
         }
 
@@ -824,6 +903,7 @@
                 document.getElementById("darkModeToggle").checked = true;
             }
             applyGreyButtons();
+            applyButtonVisibility();
         });
 
         function toggleDarkMode() {
@@ -936,7 +1016,19 @@
             let headerHtml = '<th>Sl No</th>';
             allColumns.forEach(col => {
                 if (columnVisibility[col.id]) {
-                    headerHtml += `<th>${col.label}</th>`;
+                    let sortIcon = '';
+                    let cursorStyle = '';
+                    let onClick = '';
+                    if (col.id !== 'photo' && col.id !== 'actions') {
+                        cursorStyle = 'cursor:pointer;';
+                        onClick = `onclick="handleSort('${col.id}')"`;
+                        if (sortCol === col.id) {
+                            sortIcon = sortAsc ? ' ▲' : ' ▼';
+                        } else {
+                            sortIcon = ' <span style="color:#ccc; font-size:10px;">▲▼</span>';
+                        }
+                    }
+                    headerHtml += `<th style="${cursorStyle}" ${onClick}>${col.label}${sortIcon}</th>`;
                 }
             });
             theadRow.innerHTML = headerHtml;
@@ -961,6 +1053,34 @@
                 return false;
             });
 
+            if (sortCol) {
+                filtered.sort((a, b) => {
+                    let valA = a[sortCol];
+                    let valB = b[sortCol];
+
+                    if (sortCol === 'status') {
+                        const defaultStatusA = a.weeklyOff === dayOfWeek ? 'Weekly Off' : (a.halfDay === dayOfWeek ? 'Half-Day' : '-');
+                        valA = (a.attendance && a.attendance[today]) ? a.attendance[today] : defaultStatusA;
+
+                        const defaultStatusB = b.weeklyOff === dayOfWeek ? 'Weekly Off' : (b.halfDay === dayOfWeek ? 'Half-Day' : '-');
+                        valB = (b.attendance && b.attendance[today]) ? b.attendance[today] : defaultStatusB;
+                    } else if (sortCol === 'salary' || sortCol === 'dutyHours' || sortCol === 'weeklyOff' || sortCol === 'halfDay') {
+                        valA = parseFloat(valA) || 0;
+                        valB = parseFloat(valB) || 0;
+                    } else if (sortCol === 'shift') {
+                        valA = a.shiftStart || '';
+                        valB = b.shiftStart || '';
+                    } else {
+                        valA = (valA || '').toString().toLowerCase();
+                        valB = (valB || '').toString().toLowerCase();
+                    }
+
+                    if (valA < valB) return sortAsc ? -1 : 1;
+                    if (valA > valB) return sortAsc ? 1 : -1;
+                    return 0;
+                });
+            }
+
             const totalItems = filtered.length;
             const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
 
@@ -974,73 +1094,73 @@
             slNo = startIndex + 1;
 
             paginatedData.forEach(emp => {
-                    let defaultStatus = '-';
-                    if (emp.weeklyOff === dayOfWeek) defaultStatus = 'Weekly Off';
-                    else if (emp.halfDay === dayOfWeek) defaultStatus = 'Half-Day';
+                let defaultStatus = '-';
+                if (emp.weeklyOff === dayOfWeek) defaultStatus = 'Weekly Off';
+                else if (emp.halfDay === dayOfWeek) defaultStatus = 'Half-Day';
 
-                    const todayStatus = (emp.attendance && emp.attendance[today]) ? emp.attendance[today] : defaultStatus;
+                const todayStatus = (emp.attendance && emp.attendance[today]) ? emp.attendance[today] : defaultStatus;
 
-                    let badgeClass = 'badge-secondary';
-                    if (todayStatus === 'Present') badgeClass = 'badge-present';
-                    else if (todayStatus === 'Absent') badgeClass = 'badge-absent';
-                    else if (todayStatus === 'Half-Day') badgeClass = 'badge-half';
-                    else if (todayStatus === 'Leave') badgeClass = 'badge-leave';
-                    else if (todayStatus === 'Late Arrival') badgeClass = 'badge-late';
-                    else if (todayStatus === 'Early Departure') badgeClass = 'badge-early';
-                    else if (todayStatus === 'Holiday') badgeClass = 'badge-holiday';
+                let badgeClass = 'badge-secondary';
+                if (todayStatus === 'Present') badgeClass = 'badge-present';
+                else if (todayStatus === 'Absent') badgeClass = 'badge-absent';
+                else if (todayStatus === 'Half-Day') badgeClass = 'badge-half';
+                else if (todayStatus === 'Leave') badgeClass = 'badge-leave';
+                else if (todayStatus === 'Late Arrival') badgeClass = 'badge-late';
+                else if (todayStatus === 'Early Departure') badgeClass = 'badge-early';
+                else if (todayStatus === 'Holiday') badgeClass = 'badge-holiday';
 
-                    const statusHtml = todayStatus === '-' ? '<span style="color:#999;">-</span>' : `<span class="badge ${badgeClass}">${todayStatus}</span>`;
+                const statusHtml = todayStatus === '-' ? '<span style="color:#999;">-</span>' : `<span class="badge ${badgeClass}">${todayStatus}</span>`;
 
-                    const photoHtml = emp.photo
-                        ? `<img src="${emp.photo}" style="width:35px; height:35px; border-radius:50%; object-fit:cover; border:1px solid #eee;">`
-                        : `<span style="font-size:24px; color:#ccc;">👤</span>`;
+                const photoHtml = emp.photo
+                    ? `<img src="${emp.photo}" style="width:35px; height:35px; border-radius:50%; object-fit:cover; border:1px solid #eee;">`
+                    : `<span style="font-size:24px; color:#ccc;">👤</span>`;
 
-                    let rowHtml = `<td>${slNo++}</td>`;
-                    if (columnVisibility.photo) rowHtml += `<td>${photoHtml}</td>`;
-                    if (columnVisibility.name) rowHtml += `<td>${emp.name}</td>`;
-                    if (columnVisibility.empCode) rowHtml += `<td>${emp.empCode || '-'}</td>`;
-                    if (columnVisibility.designation) rowHtml += `<td>${emp.designation || '-'}</td>`;
-                    if (columnVisibility.department) {
-                        const deptObj = departments.find(d => d.name === emp.department);
-                        const deptColor = deptObj ? deptObj.color : '#6c757d';
-                        rowHtml += `<td>${emp.department ? `<span class="badge" style="background-color:${deptColor}">${emp.department}</span>` : '-'}</td>`;
-                    }
-                    if (columnVisibility.dutyHours) rowHtml += `<td>${emp.dutyHours || '8'}</td>`;
-                    if (columnVisibility.contact) {
-                        rowHtml += '<td>' + (emp.contact ? String(emp.contact).split(/[, ]+/).filter(n => n).map(num => {
-                            const cleanNo = String(num).replace(/\D/g, '');
-                            const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone"></i></a>` : '';
-                            const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${String(num)}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
-                            return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${String(num)}${waLink}</div>`;
-                        }).join('') : '-') + '</td>';
-                    }
-                    if (columnVisibility.email) {
-                        rowHtml += '<td>' + (emp.email ? String(emp.email).split(/[, ]+/).filter(e => e).map(em => {
-                            const mailLink = `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(em)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${String(em)}</a>`;
-                            const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${String(em)}'); this.style.color='#27ae60'; setTimeout(()=>this.style.color='#6c757d', 1000);" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy"></i></a>`;
-                            return `<div style="white-space:nowrap; margin-bottom:2px;">${mailLink}${copyLink}</div>`;
-                        }).join('') : '-') + '</td>';
-                    }
-                    if (columnVisibility.salary) rowHtml += `<td>₹ ${emp.salary || '0'}</td>`;
-                    if (columnVisibility.joiningDate) rowHtml += `<td>${emp.joiningDate || '-'}</td>`;
-                    if (columnVisibility.shift) rowHtml += `<td>${emp.shiftStart || ''} - ${emp.shiftEnd || ''}</td>`;
-                    if (columnVisibility.weeklyOff) rowHtml += `<td>${daysMap[emp.weeklyOff] || '-'}</td>`;
-                    if (columnVisibility.halfDay) rowHtml += `<td>${daysMap[emp.halfDay] || '-'}</td>`;
-                    if (columnVisibility.status) rowHtml += `<td>${statusHtml}</td>`;
+                let rowHtml = `<td>${slNo++}</td>`;
+                if (columnVisibility.photo) rowHtml += `<td>${photoHtml}</td>`;
+                if (columnVisibility.name) rowHtml += `<td>${emp.name}</td>`;
+                if (columnVisibility.empCode) rowHtml += `<td>${emp.empCode || '-'}</td>`;
+                if (columnVisibility.designation) rowHtml += `<td>${emp.designation || '-'}</td>`;
+                if (columnVisibility.department) {
+                    const deptObj = departments.find(d => d.name === emp.department);
+                    const deptColor = deptObj ? deptObj.color : '#6c757d';
+                    rowHtml += `<td>${emp.department ? `<span class="badge" style="background-color:${deptColor}">${emp.department}</span>` : '-'}</td>`;
+                }
+                if (columnVisibility.dutyHours) rowHtml += `<td>${emp.dutyHours || '8'}</td>`;
+                if (columnVisibility.contact) {
+                    rowHtml += '<td>' + (emp.contact ? String(emp.contact).split(/[, ]+/).filter(n => n).map(num => {
+                        const cleanNo = String(num).replace(/\D/g, '');
+                        const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone"></i></a>` : '';
+                        const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${String(num)}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
+                        return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${String(num)}${waLink}</div>`;
+                    }).join('') : '-') + '</td>';
+                }
+                if (columnVisibility.email) {
+                    rowHtml += '<td>' + (emp.email ? String(emp.email).split(/[, ]+/).filter(e => e).map(em => {
+                        const mailLink = `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(em)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${String(em)}</a>`;
+                        const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${String(em)}'); this.style.color='#27ae60'; setTimeout(()=>this.style.color='#6c757d', 1000);" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy"></i></a>`;
+                        return `<div style="white-space:nowrap; margin-bottom:2px;">${mailLink}${copyLink}</div>`;
+                    }).join('') : '-') + '</td>';
+                }
+                if (columnVisibility.salary) rowHtml += `<td>₹ ${emp.salary || '0'}</td>`;
+                if (columnVisibility.joiningDate) rowHtml += `<td>${emp.joiningDate || '-'}</td>`;
+                if (columnVisibility.shift) rowHtml += `<td>${emp.shiftStart || ''} - ${emp.shiftEnd || ''}</td>`;
+                if (columnVisibility.weeklyOff) rowHtml += `<td>${daysMap[emp.weeklyOff] || '-'}</td>`;
+                if (columnVisibility.halfDay) rowHtml += `<td>${daysMap[emp.halfDay] || '-'}</td>`;
+                if (columnVisibility.status) rowHtml += `<td>${statusHtml}</td>`;
 
-                    if (columnVisibility.actions) {
-                        rowHtml += `<td>
+                if (columnVisibility.actions) {
+                    rowHtml += `<td>
                             <button class="action-btn" style="background:#17a2b8;" onclick="viewAttendance('${emp.id}')">👁️ Log</button>
                             <button class="action-btn" style="background:#ffc107; color:black;" onclick="editEmployee('${emp.id}')">✎ Edit</button>
                             <button class="action-btn" style="background:#dc3545;" onclick="deleteEmployee('${emp.id}')">🗑️ Del</button>
                         </td>`;
-                    }
+                }
 
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = rowHtml;
-                    tbody.appendChild(tr);
+                const tr = document.createElement('tr');
+                tr.innerHTML = rowHtml;
+                tbody.appendChild(tr);
             });
-            
+
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
         }
 
@@ -1162,6 +1282,16 @@
             renderAttendanceList();
         }
 
+        function handleAttSort(colId) {
+            if (attSortCol === colId) {
+                attSortAsc = !attSortAsc;
+            } else {
+                attSortCol = colId;
+                attSortAsc = true;
+            }
+            renderAttendanceList();
+        }
+
         function renderAttendanceList() {
             const date = document.getElementById('attDate').value;
             const tbody = document.getElementById('attendanceTableBody');
@@ -1171,7 +1301,45 @@
             holidayMsg.innerText = isHoliday ? `🎉 Holiday: ${isHoliday.description}` : "";
             tbody.innerHTML = '';
 
-            const filtered = employees.filter(emp => emp.name.toLowerCase().includes(attSearchQuery));
+            let filtered = employees.filter(emp => emp.name.toLowerCase().includes(attSearchQuery));
+
+            if (attSortCol) {
+                filtered.sort((a, b) => {
+                    const statusA = (a.attendance && a.attendance[date]) ? a.attendance[date] : (isHoliday ? 'Holiday' : 'Present');
+                    const statusB = (b.attendance && b.attendance[date]) ? b.attendance[date] : (isHoliday ? 'Holiday' : 'Present');
+                    const logA = (a.attendanceLog && a.attendanceLog[date]) ? a.attendanceLog[date] : { inTime: '', outTime: '', ot: 0 };
+                    const logB = (b.attendanceLog && b.attendanceLog[date]) ? b.attendanceLog[date] : { inTime: '', outTime: '', ot: 0 };
+
+                    let valA, valB;
+                    if (attSortCol === 'name') {
+                        valA = a.name.toLowerCase();
+                        valB = b.name.toLowerCase();
+                    } else if (attSortCol === 'inTime') {
+                        valA = logA.inTime || '';
+                        valB = logB.inTime || '';
+                    } else if (attSortCol === 'outTime') {
+                        valA = logA.outTime || '';
+                        valB = logB.outTime || '';
+                    } else if (attSortCol === 'status') {
+                        valA = statusA.toLowerCase();
+                        valB = statusB.toLowerCase();
+                    } else if (attSortCol === 'ot') {
+                        valA = parseFloat(logA.ot) || 0;
+                        valB = parseFloat(logB.ot) || 0;
+                    }
+
+                    if (valA < valB) return attSortAsc ? -1 : 1;
+                    if (valA > valB) return attSortAsc ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            ['name', 'inTime', 'outTime', 'status', 'ot'].forEach(col => {
+                const icon = document.getElementById(`sort-icon-att-${col}`);
+                if (icon) {
+                    icon.innerHTML = (attSortCol === col) ? (attSortAsc ? ' ▲' : ' ▼') : ' <span style="color:#ccc; font-size:10px;">▲▼</span>';
+                }
+            });
 
             const totalItems = filtered.length;
             const totalPages = Math.ceil(totalItems / attRowsPerPage) || 1;
@@ -1346,9 +1514,9 @@
                     );
                 }
             });
-            
+
             await Promise.all(syncPromises);
-            
+
             localStorage.setItem("employees", JSON.stringify(employees));
             alert("Attendance Saved!");
             closeModal('attendanceModal');
@@ -1530,6 +1698,16 @@
             document.getElementById('summaryModal').style.display = 'flex';
         }
 
+        function handleSumSort(colId) {
+            if (sumSortCol === colId) {
+                sumSortAsc = !sumSortAsc;
+            } else {
+                sumSortCol = colId;
+                sumSortAsc = true;
+            }
+            generateSummary();
+        }
+
         function generateSummary() {
             const fromDate = document.getElementById('sumFromDate').value;
             const toDate = document.getElementById('sumToDate').value;
@@ -1539,6 +1717,8 @@
             tbody.innerHTML = '';
 
             if (!fromDate || !toDate) return;
+
+            let summaryData = [];
 
             employees.forEach(emp => {
                 if (searchName && !emp.name.toLowerCase().includes(searchName)) return;
@@ -1557,16 +1737,51 @@
                     });
                 }
 
+                summaryData.push({
+                    name: emp.name,
+                    present: stats.Present,
+                    absent: stats.Absent,
+                    halfDay: stats['Half-Day'],
+                    leave: stats.Leave,
+                    late: stats['Late Arrival'],
+                    early: stats['Early Departure'],
+                    totalDays: totalDays
+                });
+            });
+
+            if (sumSortCol) {
+                summaryData.sort((a, b) => {
+                    let valA = a[sumSortCol];
+                    let valB = b[sumSortCol];
+                    if (typeof valA === 'string') {
+                        valA = valA.toLowerCase();
+                        valB = valB.toLowerCase();
+                    }
+                    if (valA < valB) return sumSortAsc ? -1 : 1;
+                    if (valA > valB) return sumSortAsc ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            ['name', 'present', 'absent', 'halfDay', 'leave', 'late', 'early', 'totalDays'].forEach(col => {
+                const icon = document.getElementById(`sort-icon-sum-${col}`);
+                if (icon) {
+                    icon.innerHTML = (sumSortCol === col) ? (sumSortAsc ? ' ▲' : ' ▼') : ' <span style="color:#ccc; font-size:10px;">▲▼</span>';
+                }
+            });
+
+            summaryData.forEach(row => {
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td style="text-align:left; font-weight:bold;">${emp.name}</td>
-                    <td style="color:#28a745; font-weight:bold;">${stats.Present}</td>
-                    <td style="color:#dc3545; font-weight:bold;">${stats.Absent}</td>
-                    <td style="color:#ffc107; font-weight:bold;">${stats['Half-Day']}</td>
-                    <td style="color:#17a2b8; font-weight:bold;">${stats.Leave}</td>
-                    <td style="color:#fd7e14; font-weight:bold;">${stats['Late Arrival']}</td>
-                    <td style="color:#e67e22; font-weight:bold;">${stats['Early Departure']}</td>
-                    <td>${totalDays}</td>
+                    <td style="text-align:left; font-weight:bold;">${row.name}</td>
+                    <td style="color:#28a745; font-weight:bold;">${row.present}</td>
+                    <td style="color:#dc3545; font-weight:bold;">${row.absent}</td>
+                    <td style="color:#ffc107; font-weight:bold;">${row.halfDay}</td>
+                    <td style="color:#17a2b8; font-weight:bold;">${row.leave}</td>
+                    <td style="color:#fd7e14; font-weight:bold;">${row.late}</td>
+                    <td style="color:#e67e22; font-weight:bold;">${row.early}</td>
+                    <td>${row.totalDays}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1940,30 +2155,89 @@
             renderDropdowns();
             renderTable();
         }
-        // --- Column Settings Logic ---
-        function openColumnSettings() {
+
+        let savedButtonVisibility = JSON.parse(localStorage.getItem("employeeButtonVisibility")) || {};
+        let buttonVisibility = {
+            btnMarkAttendance: true,
+            btnExportExcel: true,
+            btnExportAttendance: true,
+            btnAttendanceSummary: true,
+            btnHolidayCalendar: true,
+            btnPayroll: true,
+            ...savedButtonVisibility
+        };
+
+        const _globalApplyUIPermissions = window.applyUIPermissions;
+        window.applyUIPermissions = function () {
+            if (typeof _globalApplyUIPermissions === 'function') {
+                _globalApplyUIPermissions();
+            }
+            enforceButtonVisibility();
+        };
+
+        function enforceButtonVisibility() {
+            for (const btnId in buttonVisibility) {
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    if (!buttonVisibility[btnId]) {
+                        btn.style.display = 'none';
+                    } else {
+                        const hasPermission = btn.hasAttribute('data-permission-id');
+                        if (!hasPermission) {
+                            btn.style.display = '';
+                        }
+                    }
+                }
+            }
+        }
+
+        function toggleButtonVisibility(btnId, isVisible) {
+            buttonVisibility[btnId] = isVisible;
+            localStorage.setItem("employeeButtonVisibility", JSON.stringify(buttonVisibility));
+            applyButtonVisibility();
+        }
+
+        function applyButtonVisibility() {
+            if (typeof window.applyUIPermissions === 'function') {
+                window.applyUIPermissions();
+            } else {
+                enforceButtonVisibility();
+            }
+        }
+
+        // --- Settings Logic ---
+        function openSettingsModal() {
+            for (const btnId in buttonVisibility) {
+                const toggleId = `show${btnId.charAt(0).toUpperCase() + btnId.slice(1)}Toggle`;
+                const toggle = document.getElementById(toggleId);
+                if (toggle) {
+                    toggle.checked = buttonVisibility[btnId];
+                }
+            }
+
             const container = document.getElementById('columnToggles');
             container.innerHTML = '';
             allColumns.forEach(col => {
                 const div = document.createElement('div');
                 div.innerHTML = `
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
                         <input type="checkbox" id="col_${col.id}" ${columnVisibility[col.id] ? 'checked' : ''}> ${col.label}
                     </label>
                 `;
                 container.appendChild(div);
             });
-            document.getElementById('columnSettingsModal').style.display = 'flex';
+            document.getElementById('settingsModal').style.display = 'flex';
         }
 
         function saveColumnSettings() {
             allColumns.forEach(col => {
                 const cb = document.getElementById(`col_${col.id}`);
-                columnVisibility[col.id] = cb.checked;
+                if (cb) columnVisibility[col.id] = cb.checked;
             });
             localStorage.setItem("empColumnVisibility", JSON.stringify(columnVisibility));
             renderTable();
-            closeModal('columnSettingsModal');
+            closeModal('settingsModal');
+
         }
 
 
@@ -2284,13 +2558,13 @@
             });
         }
 
-    function openWhatsApp(number) {
-        if (!number) return;
-        const cleanNo = String(number).replace(/\D/g, '');
-        if (!cleanNo) return;
-        const url = `https://wa.me/91${cleanNo}`;
-        window.open(url, '_blank');
-    }
+        function openWhatsApp(number) {
+            if (!number) return;
+            const cleanNo = String(number).replace(/\D/g, '');
+            if (!cleanNo) return;
+            const url = `https://wa.me/91${cleanNo}`;
+            window.open(url, '_blank');
+        }
     </script>
 </body>
 
