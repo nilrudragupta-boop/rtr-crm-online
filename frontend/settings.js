@@ -670,11 +670,10 @@ async function confirmAndChangeAppMode(newMode) {
 
 // --- Global Developer Shortcut ---
 document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'n') {
+    if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key.toLowerCase() === 'n' || e.code === 'KeyN')) {
         // Autofill Developer Access modal if present (e.g., dashboard)
         const devAuthPass = document.getElementById('devAuthPass');
-        const devAuthModal = document.getElementById('devAuthModal');
-        if (devAuthPass && devAuthModal && devAuthModal.style.display !== 'none') {
+        if (devAuthPass) {
             e.preventDefault();
             devAuthPass.value = 'NANCY@20129830428736';
             if (typeof verifyDevAccess === 'function') {
