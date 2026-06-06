@@ -1221,7 +1221,8 @@
     <script>
 
         /* ================= GLOBAL DATA ================= */
-        const API = 'http://localhost:9883104847/api';
+            const authQuery = typeof apiClient !== 'undefined' ? apiClient._getAuthQuery() : '';
+            const API = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:9883104847/api';
 
         const district = document.getElementById('district');
         const state = document.getElementById('state');
@@ -1430,7 +1431,7 @@ service cloud.firestore {
                     const op = it.op;
                     const rec = it.record;
                     if (op === 'create') {
-                        const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create, {
+                            const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create + authQuery, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec)
                         });
                         if (res.ok) {
@@ -1443,14 +1444,14 @@ service cloud.firestore {
                         const id = rec.__remoteId;
                         let res;
                         if (id) {
-                            res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.update + '/' + encodeURIComponent(id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
+                                res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.update + '/' + encodeURIComponent(id) + authQuery, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
                         } else {
-                            res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
+                                res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create + authQuery, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
                         }
                         if (res && res.ok) { const body = await res.json(); const rid = body.id || body._id || body.remoteId; if (rid) { const idx = data.findIndex(d => d.__localId === rec.__localId); if (idx > -1) { data[idx].__remoteId = rid; data[idx].__lastModified = new Date().toISOString(); localStorage.setItem('reminders', JSON.stringify(data)); } } await deleteQueueItem(it.id); } else { console.error('Failed update', res ? await res.text() : 'no response'); }
                     } else if (op === 'delete') {
                         const id = rec.__remoteId;
-                        if (id) { const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.delete + '/' + encodeURIComponent(id), { method: 'DELETE' }); if (res.ok || res.status === 404) { await deleteQueueItem(it.id); } else { console.error('Failed delete', await res.text()); } } else { await deleteQueueItem(it.id); }
+                            if (id) { const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.delete + '/' + encodeURIComponent(id) + authQuery, { method: 'DELETE' }); if (res.ok || res.status === 404) { await deleteQueueItem(it.id); } else { console.error('Failed delete', await res.text()); } } else { await deleteQueueItem(it.id); }
                     }
                 } catch (e) { console.error('Queue processing error', e); setSyncStatus('Sync error: ' + (e.message || e), true); return; }
             }
@@ -1465,7 +1466,7 @@ service cloud.firestore {
         async function fetchFromServer() {
             if (!navigator.onLine) { setSyncStatus('Offline — cannot fetch'); return; }
             try {
-                const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.list);
+                    const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.list + authQuery);
                 if (!res.ok) { console.warn('Failed fetching remote', res.status); return; }
                 const serverData = await res.json();
                 if (!Array.isArray(serverData)) return;

@@ -284,6 +284,11 @@ const apiClient = {
     saveFollowUp: (data) => apiClient._saveCollection('follow-ups', data),
     deleteFollowUp: (id) => apiClient._deleteCollection('follow-ups', id),
 
+    // --- Reminders ---
+    getReminders: () => apiClient._getCollection('reminders'),
+    saveReminder: (data) => apiClient._saveCollection('reminders', data),
+    deleteReminder: (id) => apiClient._deleteCollection('reminders', id),
+
     // --- Scraps & Production (for stock calculation) ---
     getScraps: () => apiClient._getCollection('scraps'),
     saveScrap: (data) => apiClient._saveCollection('scraps', data),
