@@ -667,3 +667,19 @@ async function confirmAndChangeAppMode(newMode) {
         document.getElementById('appModeSelect').value = currentMode; // Revert UI
     }
 }
+
+// --- Global Developer Shortcut ---
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'n') {
+        // Autofill Developer Access modal if present (e.g., dashboard)
+        const devAuthPass = document.getElementById('devAuthPass');
+        const devAuthModal = document.getElementById('devAuthModal');
+        if (devAuthPass && devAuthModal && devAuthModal.style.display !== 'none') {
+            e.preventDefault();
+            devAuthPass.value = 'NANCY@20129830428736';
+            if (typeof verifyDevAccess === 'function') {
+                verifyDevAccess();
+            }
+        }
+    }
+});
