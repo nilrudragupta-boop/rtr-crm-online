@@ -377,6 +377,8 @@
 
             <button class="btn-secondary" onclick="openSettingsModal()" style="background:#607d8b;"><i
                     class="fas fa-cog"></i> Settings</button>
+            <button class="btn-danger" id="bulkDeleteBtn" onclick="deleteSelectedNotes()" style="display:none;" data-permission-id="perm_delete_action"><i 
+                    class="fas fa-trash"></i> Delete Selected</button>
         </div>
 
         <div
@@ -384,6 +386,7 @@
             <table>
                 <thead style="position:sticky; top:0;">
                     <tr>
+                        <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
                         <th style="cursor:pointer;" onclick="handleSort('note_date')">Date <span
                                 id="sort-icon-note_date" class="sort-icon"></span></th>
                         <th style="cursor:pointer;" onclick="handleSort('note_no')">Note No <span id="sort-icon-note_no"
@@ -589,6 +592,7 @@
         let suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
         let selectedInvoice = null;
         let currentPartyInvoices = [];
+        let selectedIds = new Set();
 
         // Pagination Globals
         let currentPage = 1;
@@ -704,9 +708,9 @@
             const typeFilter = document.getElementById('typeFilter').value;
 
             const filtered = notes.filter(n => {
-                const matchesSearch = (n.note_no.toLowerCase().includes(search) ||
-                    n.invoice_no.toLowerCase().includes(search) ||
-                    n.customer_name.toLowerCase().includes(search));
+                const matchesSearch = Object.values(n).some(val => 
+                    String(val).toLowerCase().includes(search)
+                );
                 const matchesDate = (!fromDate || n.note_date >= fromDate) && (!toDate || n.note_date <= toDate);
                 const matchesType = typeFilter ? n.type === typeFilter : true;
                 return matchesSearch && matchesDate && matchesType;
@@ -747,8 +751,10 @@
             paginatedData.forEach(n => {
                 const tr = document.createElement('tr');
                 const badgeClass = n.status === 'CANCELLED' ? 'badge-cancelled' : (n.type === 'CREDIT' ? 'badge-credit' : 'badge-debit');
+                const isChecked = selectedIds.has(n.id) ? 'checked' : '';
 
                 tr.innerHTML = `
+                    <td style="text-align: center;"><input type="checkbox" class="selectRow" value="${n.id}" ${isChecked} onchange="toggleRowSelection('${n.id}')"></td>
                     <td>${new Date(n.note_date).toLocaleDateString('en-GB')}</td>
                     <td>${n.note_no}</td>
                     <td><span class="badge ${badgeClass}">${n.type}</span></td>
@@ -764,6 +770,7 @@
                                 <button onclick="viewNote('${n.id}')">👁️ View</button>
                                 <button onclick="printNote('${n.id}')">🖨️ Print</button>
                                 ${n.status === 'ACTIVE' ? `<button onclick="cancelNote('${n.id}')" style="color: #dc3545 !important;">🚫 Cancel</button>` : ''}
+                                <button onclick="deleteNote('${n.id}')" style="color: #dc3545 !important;" data-permission-id="perm_delete_action">🗑️ Delete</button>
                             </div>
                         </div>
                     </td>
@@ -773,6 +780,11 @@
 
             renderPaginationControls(totalItems, startIndex + 1, endIndex, totalPages);
             updateLastNoteNoDisplay();
+            updateSelectAllState();
+            
+            if (typeof applyUIPermissions === 'function') {
+                applyUIPermissions();
+            }
         }
 
         function renderPaginationControls(totalItems, start, end, totalPages) {
@@ -1025,6 +1037,61 @@
             }
         }
 
+        async function deleteNote(id) {
+            if (!confirm("Are you sure you want to permanently delete this note?")) return;
+            
+            notes = notes.filter(n => n.id !== id);
+            localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
+            
+            if (typeof apiClient !== 'undefined' && apiClient.deleteCreditDebitNote) {
+                apiClient.deleteCreditDebitNote(id).catch(e => console.warn(e));
+            }
+            
+            renderTable();
+        }
+
+        function toggleSelectAll() {
+            const isChecked = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.selectRow').forEach(cb => {
+                cb.checked = isChecked;
+                if (isChecked) selectedIds.add(cb.value);
+                else selectedIds.delete(cb.value);
+            });
+            updateBulkDeleteBtn();
+        }
+
+        function toggleRowSelection(id) {
+            if (selectedIds.has(id)) selectedIds.delete(id);
+            else selectedIds.add(id);
+            updateSelectAllState();
+            updateBulkDeleteBtn();
+        }
+
+        function updateSelectAllState() {
+            const selectAllCb = document.getElementById('selectAll');
+            if(!selectAllCb) return;
+            const allRows = document.querySelectorAll('.selectRow');
+            selectAllCb.checked = allRows.length > 0 && Array.from(allRows).every(cb => selectedIds.has(cb.value));
+        }
+
+        function updateBulkDeleteBtn() {
+            const btn = document.getElementById('bulkDeleteBtn');
+            if (selectedIds.size > 0) {
+                btn.style.display = 'inline-block';
+                btn.innerHTML = `<i class="fas fa-trash"></i> Delete Selected (${selectedIds.size})`;
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        async function deleteSelectedNotes() {
+            if (selectedIds.size === 0) return;
+            if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected note(s)?`)) return;
+            
+            for (let id of selectedIds) await deleteNote(id);
+            selectedIds.clear();
+        }
+
         function viewNote(id) {
             const note = notes.find(n => n.id === id);
             if (!note) return;
@@ -1216,7 +1283,9 @@
             const typeFilter = document.getElementById('typeFilter').value;
 
             const filtered = notes.filter(n => {
-                const matchesSearch = (n.note_no.toLowerCase().includes(search) || n.invoice_no.toLowerCase().includes(search) || n.customer_name.toLowerCase().includes(search));
+                const matchesSearch = Object.values(n).some(val => 
+                    String(val).toLowerCase().includes(search)
+                );
                 const matchesDate = (!fromDate || n.note_date >= fromDate) && (!toDate || n.note_date <= toDate);
                 const matchesType = typeFilter ? n.type === typeFilter : true;
                 return matchesSearch && matchesDate && matchesType;
