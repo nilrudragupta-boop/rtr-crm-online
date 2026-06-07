@@ -1134,6 +1134,18 @@
             <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; text-align: left;">
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px;">
+                    <input type="checkbox" id="showGrandTotalScreenToggle" onchange="toggleShowGrandTotalScreen()"> Show Grand Total in Screen
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
+                    <input type="checkbox" id="showGrandTotalPrintToggle" onchange="toggleShowGrandTotalPrint()"> Show Grand Total in Print
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
+                    <input type="checkbox" id="showTotalQtyScreenToggle" onchange="toggleShowTotalQtyScreen()"> Show Total Quantity in Screen
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
                     <input type="checkbox" id="showTotalQtyToggle" onchange="toggleShowTotalQty()"> Show Total Quantity
                     in Print
                 </label>
@@ -1425,6 +1437,9 @@
             // Default hide extra fields if resetting
             [6, 7, 8, 9, 10, 11, 12].forEach(i => columnVisibility[i] = false);
         }
+        let showGrandTotalScreen = localStorage.getItem("purchaseShowGrandTotalScreen") !== "false";
+        let showGrandTotalPrint = localStorage.getItem("purchaseShowGrandTotalPrint") !== "false";
+        let showTotalQtyScreen = localStorage.getItem("purchaseShowTotalQtyScreen") !== "false";
         let showTotalQtyInPrint = localStorage.getItem("purchaseShowTotalQtyInPrint") !== "false"; // Default true
 
         let actionButtonVisibility = JSON.parse(localStorage.getItem("purchaseActionButtons")) || {
@@ -2774,104 +2789,108 @@
             if (selectAll) selectAll.checked = false;
 
             // --- Screen Footer ---
-            const trf = document.createElement("tr");
-            trf.className = "no-print";
+            if (showGrandTotalScreen) {
+                const trf = document.createElement("tr");
+                trf.className = "no-print";
 
-            // Calculate visible columns for footer groups
-            let span1 = 0;
-            for (let i = 0; i <= 18; i++) if (columnVisibility[i]) span1++; // Checkbox to Sale Price
+                // Calculate visible columns for footer groups
+                let span1 = 0;
+                for (let i = 0; i <= 18; i++) if (columnVisibility[i]) span1++; // Checkbox to Sale Price
 
-            let span2 = 0;
-            for (let i = 27; i <= 32; i++) if (columnVisibility[i]) span2++; // PayDate to Stock (including Created/Edited/Actions)
+                let span2 = 0;
+                for (let i = 27; i <= 32; i++) if (columnVisibility[i]) span2++; // PayDate to Stock (including Created/Edited/Actions)
 
-            let footerHtml = '';
+                let footerHtml = '';
 
-            if (span1 > 0) {
-                footerHtml += `<td colspan="${span1}" style="text-align:right">Grand Total:</td>`;
+                if (span1 > 0) {
+                    footerHtml += `<td colspan="${span1}" style="text-align:right">Grand Total:</td>`;
+                }
+
+                // Col 19: Gross Amount
+                if (columnVisibility[19]) {
+                    footerHtml += `<td style="font-weight:bold;">${grandTotalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                }
+
+                // Col 20: GST % (Empty)
+                if (columnVisibility[20]) {
+                    footerHtml += `<td></td>`;
+                }
+
+                // Col 21: GST Amt
+                if (columnVisibility[21]) {
+                    footerHtml += `<td style="font-weight:bold;">${grandTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                }
+
+                // Col 22: Total
+                if (columnVisibility[22]) {
+                    footerHtml += `<td style="font-weight:bold;">${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                }
+
+                // Col 23: Avg Price (Empty)
+                if (columnVisibility[23]) {
+                    footerHtml += `<td></td>`;
+                }
+
+                // Col 24: Cash
+                if (columnVisibility[24]) {
+                    footerHtml += `<td style="font-weight:bold;">${grandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                }
+
+                // Col 25: Bank
+                if (columnVisibility[25]) {
+                    footerHtml += `<td style="font-weight:bold;">${grandTotalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                }
+
+                // Col 26: Total Paid
+                if (columnVisibility[26]) {
+                    footerHtml += `<td style="font-weight:bold; color:#28a745;">${grandTotalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                }
+
+                // Col 27: Due
+                if (columnVisibility[27]) {
+                    footerHtml += `<td style="font-weight:bold; color:#dc3545;">${grandTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                }
+
+                if (span2 > 0) {
+                    footerHtml += `<td colspan="${span2}"></td>`;
+                }
+
+                trf.innerHTML = footerHtml;
+                tfoot.appendChild(trf);
             }
-
-            // Col 19: Gross Amount
-            if (columnVisibility[19]) {
-                footerHtml += `<td style="font-weight:bold;">${grandTotalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            }
-
-            // Col 20: GST % (Empty)
-            if (columnVisibility[20]) {
-                footerHtml += `<td></td>`;
-            }
-
-            // Col 21: GST Amt
-            if (columnVisibility[21]) {
-                footerHtml += `<td style="font-weight:bold;">${grandTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            }
-
-            // Col 22: Total
-            if (columnVisibility[22]) {
-                footerHtml += `<td style="font-weight:bold;">${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            }
-
-            // Col 23: Avg Price (Empty)
-            if (columnVisibility[23]) {
-                footerHtml += `<td></td>`;
-            }
-
-            // Col 24: Cash
-            if (columnVisibility[24]) {
-                footerHtml += `<td style="font-weight:bold;">${grandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            }
-
-            // Col 25: Bank
-            if (columnVisibility[25]) {
-                footerHtml += `<td style="font-weight:bold;">${grandTotalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            }
-
-            // Col 26: Total Paid
-            if (columnVisibility[26]) {
-                footerHtml += `<td style="font-weight:bold; color:#28a745;">${grandTotalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            }
-
-            // Col 27: Due
-            if (columnVisibility[27]) {
-                footerHtml += `<td style="font-weight:bold; color:#dc3545;">${grandTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            }
-
-            if (span2 > 0) {
-                footerHtml += `<td colspan="${span2}"></td>`;
-            }
-
-            trf.innerHTML = footerHtml;
-            tfoot.appendChild(trf);
 
             // --- Print Footer ---
-            const trfPrint = document.createElement("tr");
-            trfPrint.className = "print-only";
-            trfPrint.style.backgroundColor = "#f0f0f0";
+            if (showGrandTotalPrint) {
+                const trfPrint = document.createElement("tr");
+                trfPrint.className = "print-only";
+                trfPrint.style.backgroundColor = "#f0f0f0";
 
-            // Calculate visible columns for print
-            let span1_print = 0;
-            for (let i = 1; i <= 18; i++) if (columnVisibility[i]) span1_print++;
-            let span2_print = 0;
-            if (columnVisibility[28]) span2_print++; // Pay Date
-            if (columnVisibility[29]) span2_print++; // Remarks
-            if (columnVisibility[33]) span2_print++; // Stock (Index shifted)
+                // Calculate visible columns for print
+                let span1_print = 0;
+                for (let i = 1; i <= 18; i++) if (columnVisibility[i]) span1_print++;
+                let span2_print = 0;
+                if (columnVisibility[28]) span2_print++; // Pay Date
+                if (columnVisibility[29]) span2_print++; // Remarks
+                if (columnVisibility[33]) span2_print++; // Stock (Index shifted)
 
-            let footerHtmlPrint = '';
-            if (span1_print > 0) footerHtmlPrint += `<td colspan="${span1_print}" style="text-align:right">Grand Total:</td>`;
+                let footerHtmlPrint = '';
+                if (span1_print > 0) footerHtmlPrint += `<td colspan="${span1_print}" style="text-align:right">Grand Total:</td>`;
 
-            if (columnVisibility[19]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            if (columnVisibility[20]) footerHtmlPrint += `<td></td>`;
-            if (columnVisibility[21]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            if (columnVisibility[22]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            if (columnVisibility[23]) footerHtmlPrint += `<td></td>`;
-            if (columnVisibility[24]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            if (columnVisibility[25]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            if (columnVisibility[26]) footerHtmlPrint += `<td style="font-weight:bold; color:#28a745;">${grandTotalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            if (columnVisibility[27]) footerHtmlPrint += `<td style="font-weight:bold; color:#dc3545;">${grandTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[19]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[20]) footerHtmlPrint += `<td></td>`;
+                if (columnVisibility[21]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[22]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[23]) footerHtmlPrint += `<td></td>`;
+                if (columnVisibility[24]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[25]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[26]) footerHtmlPrint += `<td style="font-weight:bold; color:#28a745;">${grandTotalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[27]) footerHtmlPrint += `<td style="font-weight:bold; color:#dc3545;">${grandTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
 
-            if (span2_print > 0) footerHtmlPrint += `<td colspan="${span2_print}"></td>`;
+                if (span2_print > 0) footerHtmlPrint += `<td colspan="${span2_print}"></td>`;
 
-            trfPrint.innerHTML = footerHtmlPrint;
-            tbody.appendChild(trfPrint);
+                trfPrint.innerHTML = footerHtmlPrint;
+                tbody.appendChild(trfPrint);
+            }
 
 
             const uomSummary = Object.entries(uomTotals)
@@ -2884,21 +2903,23 @@
 
             if (uomSummary) {
                 // Screen UOM Row
-                let spanUom1 = span1; // 0-8
-                let spanUom2 = 0;
-                for (let i = 19; i <= 33; i++) if (columnVisibility[i]) spanUom2++;
+                if (showTotalQtyScreen) {
+                    let spanUom1 = span1; // 0-8
+                    let spanUom2 = 0;
+                    for (let i = 19; i <= 33; i++) if (columnVisibility[i]) spanUom2++;
 
-                const trUom = document.createElement("tr");
-                trUom.className = "no-print";
-                let uomHtml = '';
-                if (spanUom1 > 0) {
-                    uomHtml += `<td colspan="${spanUom1}" style="text-align:right">Total Quantity:</td>`;
+                    const trUom = document.createElement("tr");
+                    trUom.className = "no-print";
+                    let uomHtml = '';
+                    if (spanUom1 > 0) {
+                        uomHtml += `<td colspan="${spanUom1}" style="text-align:right">Total Quantity:</td>`;
+                    }
+                    if (spanUom2 > 0) {
+                        uomHtml += `<td colspan="${spanUom2}" style="text-align:left; font-weight:bold; color:#28a745;">${uomSummary}</td>`;
+                    }
+                    trUom.innerHTML = uomHtml;
+                    tfoot.appendChild(trUom);
                 }
-                if (spanUom2 > 0) {
-                    uomHtml += `<td colspan="${spanUom2}" style="text-align:left; font-weight:bold; color:#28a745;">${uomSummary}</td>`;
-                }
-                trUom.innerHTML = uomHtml;
-                tfoot.appendChild(trUom);
 
                 // Print UOM Row
                 if (showTotalQtyInPrint) {
@@ -2908,12 +2929,12 @@
                     let uomHtmlPrint = '';
 
                     // Span for label (same as span1_print)
-                    if (span1_print > 0) uomHtmlPrint += `<td colspan="${span1_print}" style="text-align:right; vertical-align:top;">Total Quantity:</td>`;
+                    if (typeof span1_print !== 'undefined' && span1_print > 0) uomHtmlPrint += `<td colspan="${span1_print}" style="text-align:right; vertical-align:top;">Total Quantity:</td>`;
 
                     // Span for content (rest of columns)
                     let spanRest_print = 0;
                     for (let i = 19; i <= 27; i++) if (columnVisibility[i]) spanRest_print++;
-                    spanRest_print += span2_print;
+                    if (typeof span2_print !== 'undefined') spanRest_print += span2_print;
 
                     if (spanRest_print > 0) {
                         uomHtmlPrint += `<td colspan="${spanRest_print}" style="text-align:left; font-weight:bold; color:#28a745;">${uomSummaryPrint}</td>`;
@@ -3583,6 +3604,15 @@
             $("settingsModal").style.display = 'flex';
             renderColumnToggles();
 
+            const gtScreenToggle = document.getElementById("showGrandTotalScreenToggle");
+            if (gtScreenToggle) gtScreenToggle.checked = showGrandTotalScreen;
+
+            const gtPrintToggle = document.getElementById("showGrandTotalPrintToggle");
+            if (gtPrintToggle) gtPrintToggle.checked = showGrandTotalPrint;
+
+            const qtyScreenToggle = document.getElementById("showTotalQtyScreenToggle");
+            if (qtyScreenToggle) qtyScreenToggle.checked = showTotalQtyScreen;
+
             const qtyToggle = document.getElementById("showTotalQtyToggle");
             if (qtyToggle) qtyToggle.checked = showTotalQtyInPrint;
 
@@ -3611,6 +3641,24 @@
                 searchInput.value = "";
                 filterColumnSettings();
             }
+        }
+
+        function toggleShowGrandTotalScreen() {
+            showGrandTotalScreen = document.getElementById("showGrandTotalScreenToggle").checked;
+            localStorage.setItem("purchaseShowGrandTotalScreen", showGrandTotalScreen);
+            loadPurchases();
+        }
+
+        function toggleShowGrandTotalPrint() {
+            showGrandTotalPrint = document.getElementById("showGrandTotalPrintToggle").checked;
+            localStorage.setItem("purchaseShowGrandTotalPrint", showGrandTotalPrint);
+            loadPurchases();
+        }
+
+        function toggleShowTotalQtyScreen() {
+            showTotalQtyScreen = document.getElementById("showTotalQtyScreenToggle").checked;
+            localStorage.setItem("purchaseShowTotalQtyScreen", showTotalQtyScreen);
+            loadPurchases();
         }
 
         function toggleShowTotalQty() {
@@ -3715,6 +3763,18 @@
             // Default hide extra fields
             [6, 7, 8, 9, 10, 11, 12].forEach(i => columnVisibility[i] = false);
             localStorage.removeItem("purchaseColumnVisibility");
+
+            showGrandTotalScreen = true;
+            localStorage.removeItem("purchaseShowGrandTotalScreen");
+            if (document.getElementById("showGrandTotalScreenToggle")) document.getElementById("showGrandTotalScreenToggle").checked = true;
+
+            showGrandTotalPrint = true;
+            localStorage.removeItem("purchaseShowGrandTotalPrint");
+            if (document.getElementById("showGrandTotalPrintToggle")) document.getElementById("showGrandTotalPrintToggle").checked = true;
+
+            showTotalQtyScreen = true;
+            localStorage.removeItem("purchaseShowTotalQtyScreen");
+            if (document.getElementById("showTotalQtyScreenToggle")) document.getElementById("showTotalQtyScreenToggle").checked = true;
 
             showTotalQtyInPrint = true;
             localStorage.removeItem("purchaseShowTotalQtyInPrint");
