@@ -277,7 +277,12 @@
     </div>
 
     <!-- Employee Form -->
-    <div class="controls">
+    <div class="controls" style="display: block;">
+        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 10px;" onclick="toggleEmployeeForm()">
+            <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: inherit;">Add / Edit Employee</h3>
+            <button id="toggleFormBtn" type="button" style="background:none; border:none; font-size:1.2em; padding:0; margin:0; cursor:pointer; color:inherit; box-shadow:none;">&#9650;</button>
+        </div>
+        <div id="employeeFormContainer" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
         <input type="hidden" id="empId">
         <div style="display:flex; flex-direction:column; align-items:center; margin-right:5px;">
             <img id="empPhotoPreview" src=""
@@ -348,6 +353,7 @@
         </select>
         <button class="action" onclick="saveEmployee()">💾 Save</button>
         <button class="clear" onclick="clearForm()">♻️ Clear</button>
+        </div>
     </div>
 
     <!-- Actions -->
@@ -753,6 +759,23 @@
         let sortCol = null;
         let sortAsc = true;
 
+        let isEmployeeFormVisible = localStorage.getItem("employeeFormVisible") !== "false";
+
+        function toggleEmployeeForm() {
+            isEmployeeFormVisible = !isEmployeeFormVisible;
+            localStorage.setItem("employeeFormVisible", isEmployeeFormVisible);
+            applyEmployeeFormVisibility();
+        }
+
+        function applyEmployeeFormVisibility() {
+            const container = document.getElementById('employeeFormContainer');
+            const btn = document.getElementById('toggleFormBtn');
+            if (container && btn) {
+                container.style.display = isEmployeeFormVisible ? 'flex' : 'none';
+                btn.innerHTML = isEmployeeFormVisible ? '&#9650;' : '&#9660;';
+            }
+        }
+
         function handleSort(colId) {
             if (colId === 'photo' || colId === 'actions') return;
             if (sortCol === colId) {
@@ -904,6 +927,7 @@
             }
             applyGreyButtons();
             applyButtonVisibility();
+            applyEmployeeFormVisibility();
         });
 
         function toggleDarkMode() {
@@ -1212,6 +1236,10 @@
                 shiftSelect.value = matchedShift.id;
             } else {
                 shiftSelect.value = "";
+            }
+            
+            if (!isEmployeeFormVisible) {
+                toggleEmployeeForm();
             }
         }
 

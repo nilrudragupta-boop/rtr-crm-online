@@ -780,7 +780,12 @@
     </div>
 
     <!-- Add / Update form -->
-    <div class="controls">
+    <div class="controls" style="display: block;">
+        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 10px;" onclick="toggleCustomerForm()">
+            <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: inherit;">Add / Edit Customer</h3>
+            <button id="toggleFormBtn" type="button" style="background:none; border:none; font-size:1.2em; padding:0; margin:0; cursor:pointer; color:inherit; box-shadow:none;">&#9650;</button>
+        </div>
+        <div id="customerFormContainer" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
         <input type="hidden" id="custId">
         <input type="text" id="custName" placeholder="Name">
         <input type="text" id="custAddress" placeholder="Address">
@@ -837,6 +842,7 @@
 
         <button class="action" id="saveBtn" onclick="saveCustomer()">Save</button>
         <button class="clear" onclick="confirmClearForm()">Clear</button>
+        </div>
     </div>
 
     <div class="controls">
@@ -1529,6 +1535,23 @@
             if (toggle) toggle.checked = isCompactView;
         }
 
+        let isCustomerFormVisible = localStorage.getItem("customerFormVisible") !== "false";
+
+        function toggleCustomerForm() {
+            isCustomerFormVisible = !isCustomerFormVisible;
+            localStorage.setItem("customerFormVisible", isCustomerFormVisible);
+            applyCustomerFormVisibility();
+        }
+
+        function applyCustomerFormVisibility() {
+            const container = document.getElementById('customerFormContainer');
+            const btn = document.getElementById('toggleFormBtn');
+            if (container && btn) {
+                container.style.display = isCustomerFormVisible ? 'flex' : 'none';
+                btn.innerHTML = isCustomerFormVisible ? '&#9650;' : '&#9660;';
+            }
+        }
+
         function initFirebase() {
             // Fix: Don't wipe local data if Firebase config is still placeholder
             if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
@@ -1803,6 +1826,11 @@
             currentCustomerAttachments = cust.attachments || [];
             renderCustomerAttachments();
             renderDynamicFields(cust);
+            
+            if (!isCustomerFormVisible) {
+                toggleCustomerForm();
+            }
+            
             document.getElementById("custName").focus();
         }
 
@@ -2627,6 +2655,7 @@
             updateColumnStyles();
             applyButtonVisibility();
             updateActionButtonsVisibility();
+        applyCustomerFormVisibility();
 
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 if (currentTheme === "system") {

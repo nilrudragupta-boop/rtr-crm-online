@@ -422,7 +422,12 @@
     </div>
 
     <!-- 🔹 Add Supplier Form -->
-    <div class="controls">
+    <div class="controls" style="display: block;">
+        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 10px;" onclick="toggleSupplierForm()">
+            <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: inherit;">Add / Edit Supplier</h3>
+            <button id="toggleFormBtn" type="button" style="background:none; border:none; font-size:1.2em; padding:0; margin:0; cursor:pointer; color:inherit; box-shadow:none;">&#9650;</button>
+        </div>
+        <div id="supplierFormContainer" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
         <input type="hidden" id="supplierId">
         <input type="text" id="newSupplierName" placeholder="Supplier Name">
         <input type="text" id="newContact" placeholder="Contact No. (comma separated)"
@@ -483,6 +488,7 @@
 
         <button class="action" id="saveBtn" onclick="saveSupplier()">Save</button>
         <button class="clear" id="clearBtn" onclick="confirmClearForm()">Clear</button>
+        </div>
     </div>
 
     <!-- 🔹 Search & Actions -->
@@ -1795,6 +1801,10 @@
             saveBtn.classList.replace("btn-success", "btn-warning");
             document.getElementById("clearBtn").style.display = "block";
             window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (!isSupplierFormVisible) {
+                toggleSupplierForm();
+            }
         }
 
         function clearForm() {
@@ -2448,6 +2458,23 @@
             if (toggle) toggle.checked = isCompactView;
         }
 
+        let isSupplierFormVisible = localStorage.getItem("supplierFormVisible") !== "false";
+
+        function toggleSupplierForm() {
+            isSupplierFormVisible = !isSupplierFormVisible;
+            localStorage.setItem("supplierFormVisible", isSupplierFormVisible);
+            applySupplierFormVisibility();
+        }
+
+        function applySupplierFormVisibility() {
+            const container = document.getElementById('supplierFormContainer');
+            const btn = document.getElementById('toggleFormBtn');
+            if (container && btn) {
+                container.style.display = isSupplierFormVisible ? 'flex' : 'none';
+                btn.innerHTML = isSupplierFormVisible ? '&#9650;' : '&#9660;';
+            }
+        }
+
         // Load Brand Name
 
         // Initial load
@@ -2464,6 +2491,7 @@
         applyButtonVisibility();
         updateActionButtonsVisibility();
         applyFreezePanes();
+        applySupplierFormVisibility();
 
         window.addEventListener('resize', updateFreezePanesPositions);
 
