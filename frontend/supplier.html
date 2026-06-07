@@ -86,21 +86,21 @@
             border-collapse: collapse;
             margin-top: 15px;
             background: #fff;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            border-radius: 8px;
-            overflow: hidden;
         }
 
         th,
         td {
             padding: 12px;
             text-align: center;
-            border-bottom: 1px solid #eee;
+            border: 1px solid #eee;
         }
 
         th {
-            background: #2c3e50;
-            color: white;
+            background: #cce2f3;
+            color: rgb(10, 10, 10);
+            position: sticky;
+            top: 0;
+            z-index: 5;
         }
 
         .action-btn {
@@ -139,6 +139,7 @@
             cursor: pointer;
             transition: background 0.2s;
         }
+
         .po-item:hover {
             background: #f1f1f1;
         }
@@ -235,6 +236,7 @@
 
         body.dark-mode th {
             background: #1f1f1f;
+            border-color: #444;
         }
 
         body.dark-mode td {
@@ -323,6 +325,11 @@
             color: #fff !important;
         }
 
+        #columnToggles div.dragging {
+            opacity: 0.5;
+            background: #e0e0e0 !important;
+        }
+
         #toast.toast-warning {
             background-color: #f39c12;
         }
@@ -338,8 +345,60 @@
         body.dark-mode .po-item {
             border-bottom-color: #444;
         }
+
         body.dark-mode .po-item:hover {
             background: #3a3a3a;
+        }
+
+        /* Resizable Columns */
+        #mainSupplierTable th {
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .resizer:hover,
+        .resizing {
+            background-color: #3498db;
+            opacity: 0.5;
+        }
+
+        /* Freeze Panes */
+        .freeze-panes th.frozen,
+        .freeze-panes td.frozen {
+            position: sticky;
+            z-index: 4;
+        }
+
+        .freeze-panes thead th.frozen {
+            z-index: 6;
+            top: 0;
+        }
+
+        body:not(.dark-mode) .freeze-panes tbody td.frozen {
+            background-color: #fff;
+        }
+
+        body:not(.dark-mode) .freeze-panes tbody tr:hover td.frozen {
+            background-color: #f1f1f1;
+        }
+
+        body.dark-mode .freeze-panes tbody td.frozen {
+            background-color: #2c2c2c;
+        }
+
+        body.dark-mode .freeze-panes tbody tr:hover td.frozen {
+            background-color: #3a3a3a;
         }
     </style>
     <!-- Firebase SDKs -->
@@ -366,7 +425,8 @@
     <div class="controls">
         <input type="hidden" id="supplierId">
         <input type="text" id="newSupplierName" placeholder="Supplier Name">
-        <input type="text" id="newContact" placeholder="Contact No. (comma separated)" oninput="this.value = this.value.replace(/[^0-9, ]/g, '')">
+        <input type="text" id="newContact" placeholder="Contact No. (comma separated)"
+            oninput="this.value = this.value.replace(/[^0-9, ]/g, '')">
         <input type="email" id="newEmail" placeholder="Email ID">
         <div style="display:flex; align-items:center;">
             <input type="text" id="newGSTIN" placeholder="GSTIN" oninput="this.value = this.value.toUpperCase()"
@@ -416,9 +476,10 @@
                 accept="image/*,.pdf" style="padding: 4px;">
             <div id="supplierAttachmentPreviews" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
         </div>
-        
+
         <!-- Dynamic Fields Container -->
-        <div class="form-group" style="flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 15px;" id="dynamicFieldsContainer"></div>
+        <div class="form-group" style="flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 15px;"
+            id="dynamicFieldsContainer"></div>
 
         <button class="action" id="saveBtn" onclick="saveSupplier()">Save</button>
         <button class="clear" id="clearBtn" onclick="confirmClearForm()">Clear</button>
@@ -441,6 +502,7 @@
         <button class="action" id="btnImportCsv" onclick="document.getElementById('importCsvFile').click()"
             style="background:#20c997;" data-permission-id="perm_restore_data">Import CSV</button>
         <input type="file" id="importCsvFile" style="display:none" onchange="importSuppliersCSV(this)" accept=".csv">
+
         <button class="action" onclick="openSettingsModal()" style="background:#607d8b;">⚙️ Table Settings</button>
         <button class="action" onclick="deleteSelectedSuppliers()" style="background:#dc3545;"
             data-permission-id="perm_delete_action">Delete Selected</button>
@@ -450,7 +512,8 @@
     <datalist id="stateList"></datalist>
 
     <!-- 🔹 Supplier Table -->
-    <div class="table-responsive" style="max-height: 600px; overflow-y: auto; margin-top: 15px;">
+    <div class="table-responsive"
+        style="max-height: 600px; overflow-x: auto; overflow-y: auto; margin-top: 15px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); border-radius: 8px;">
         <table id="mainSupplierTable">
             <thead>
                 <tr id="supplierTableHeadRow"></tr>
@@ -483,9 +546,11 @@
     <!-- Pincode Selection Modal -->
     <div id="pincodeModal" class="modal">
         <div class="modal-content" style="width: 400px; max-height: 80vh; display: flex; flex-direction: column;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">
                 <h3 style="margin:0; color: #2c3e50;">Select Post Office</h3>
-                <button class="close-btn" onclick="document.getElementById('pincodeModal').style.display='none'" style="padding: 2px 8px;">&times;</button>
+                <button class="close-btn" onclick="document.getElementById('pincodeModal').style.display='none'"
+                    style="padding: 2px 8px;">&times;</button>
             </div>
             <div id="pincodeList" style="flex: 1; overflow-y: auto; text-align: left;">
                 <!-- List of post offices -->
@@ -548,6 +613,7 @@
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 15px;">
                     <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
                 </label>
+
             </div>
             <p style="font-size:14px; color:#666; margin-bottom:10px; text-align: center;">Select columns to
                 display:</p>
@@ -557,7 +623,8 @@
                 <button onclick="toggleAllColumns(false)" class="action"
                     style="background:#6c757d; font-size: 12px;">Deselect All</button>
             </div>
-            <div id="columnToggles" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div id="columnToggles"
+                style="display:grid; grid-template-columns: 1fr; gap:10px; max-height:300px; overflow-y:auto;">
                 <!-- Checkboxes generated by JS -->
             </div>
             <div class="modal-buttons">
@@ -873,6 +940,7 @@
 
         // Column visibility state (14 standard columns total including checkbox and actions)
         let columnVisibility = JSON.parse(localStorage.getItem("supplierColumnVisibility")) || [];
+        let columnOrder = JSON.parse(localStorage.getItem("supplierColumnOrder")) || [];
         function initColumnVisibility() {
             const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
             const customFieldsCount = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive && f.showInGrid !== false).length;
@@ -885,9 +953,94 @@
                 columnVisibility = newVis;
                 localStorage.setItem("supplierColumnVisibility", JSON.stringify(columnVisibility));
             }
+            if (columnOrder.length !== totalExpectedCols) {
+                columnOrder = Array.from({ length: totalExpectedCols }, (_, i) => i);
+                localStorage.setItem("supplierColumnOrder", JSON.stringify(columnOrder));
+            }
         }
         initColumnVisibility();
         let isGreyButtons = localStorage.getItem("supplierGreyButtons") === "true";
+        let isFreezePanes = localStorage.getItem("supplierFreezePanes") === "true";
+        let numFreezeCols = parseInt(localStorage.getItem("supplierFreezeCols")) || 3;
+
+        function toggleFreezePanesAction() {
+            isFreezePanes = !isFreezePanes;
+            localStorage.setItem("supplierFreezePanes", isFreezePanes);
+            const toggle = document.getElementById("freezePanesToggle");
+            if (toggle) toggle.checked = isFreezePanes;
+            applyFreezePanes();
+        }
+
+        function toggleFreezePanes() {
+            isFreezePanes = document.getElementById("freezePanesToggle").checked;
+            localStorage.setItem("supplierFreezePanes", isFreezePanes);
+            applyFreezePanes();
+        }
+
+        function updateFreezePanesCount() {
+            numFreezeCols = parseInt(document.getElementById("freezePanesCount").value) || 3;
+            localStorage.setItem("supplierFreezeCols", numFreezeCols);
+            if (isFreezePanes) {
+                updateFreezePanesPositions();
+            }
+        }
+
+        function applyFreezePanes() {
+            const table = document.getElementById("mainSupplierTable");
+            const btn = document.getElementById("btnFreezePanes");
+            if (!table) return;
+            if (isFreezePanes) {
+                table.classList.add("freeze-panes");
+                if (btn) btn.style.background = "#0d6efd";
+            } else {
+                table.classList.remove("freeze-panes");
+                if (btn) btn.style.background = "#6c757d";
+            }
+            updateFreezePanesPositions();
+        }
+
+        function updateFreezePanesPositions() {
+            const table = document.getElementById("mainSupplierTable");
+            if (!table) return;
+            if (!table.classList.contains("freeze-panes")) {
+                table.querySelectorAll('.frozen').forEach(el => {
+                    el.classList.remove('frozen');
+                    el.style.left = '';
+                });
+                return;
+            }
+            const numColsToFreeze = numFreezeCols;
+            const headerRow = table.querySelector('thead tr');
+            if (!headerRow) return;
+            let currentLeft = 0;
+            let freezeIndices = [];
+            const ths = headerRow.children;
+            for (let i = 0; i < ths.length && freezeIndices.length < numColsToFreeze; i++) {
+                const th = ths[i];
+                const style = window.getComputedStyle(th);
+                if (style.display !== 'none') {
+                    freezeIndices.push({ index: i, left: currentLeft });
+                    currentLeft += th.getBoundingClientRect().width;
+                }
+            }
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                if (row.closest('tfoot') || row.classList.contains('print-only')) return;
+                row.querySelectorAll('.frozen').forEach(el => {
+                    if (!freezeIndices.some(fi => row.children[fi.index] === el)) {
+                        el.classList.remove('frozen');
+                        el.style.left = '';
+                    }
+                });
+                freezeIndices.forEach(fi => {
+                    const cell = row.children[fi.index];
+                    if (cell) {
+                        cell.classList.add('frozen');
+                        cell.style.left = fi.left + 'px';
+                    }
+                });
+            });
+        }
 
         // Action Button Visibility
         let actionButtonVisibility = JSON.parse(localStorage.getItem("supplierActionButtons")) || {
@@ -1103,6 +1256,12 @@
             const greyToggle = document.getElementById("greyButtonsToggle");
             if (greyToggle) greyToggle.checked = isGreyButtons;
 
+            const freezeToggle = document.getElementById("freezePanesToggle");
+            if (freezeToggle) freezeToggle.checked = isFreezePanes;
+
+            const freezeCount = document.getElementById("freezePanesCount");
+            if (freezeCount) freezeCount.value = numFreezeCols;
+
             renderColumnToggles();
         }
 
@@ -1118,28 +1277,107 @@
             const items = headers.map((th, index) => {
                 let text = th.innerText.trim();
                 // Skip checkbox (0) and Actions (last)
-                if (index === 0 || index === headers.length - 1) return null;
-                return { index, text };
-            }).filter(item => item !== null);
+                if (index === 0 || index === columnVisibility.length - 1) return null;
+                return { index: columnOrder[index], text };
+            }).filter(item => item !== null && item.index !== 0 && item.index !== columnVisibility.length - 1);
 
-            items.forEach(item => {
+            columnOrder.forEach((logicalIdx, visualIdx) => {
+                if (logicalIdx === 0 || logicalIdx === columnVisibility.length - 1) return;
+
+                const th = headers[visualIdx];
+                let text = th ? th.innerText.trim() : `Column ${logicalIdx}`;
+
                 const label = document.createElement("label");
-                label.style.cursor = "pointer";
-                label.style.display = "flex";
-                label.style.alignItems = "center";
-                label.style.gap = "5px";
-                label.style.marginBottom = "5px";
+
+                const div = document.createElement("div");
+                div.draggable = true;
+                div.dataset.logicalIdx = logicalIdx;
+                div.style.padding = "8px";
+                div.style.margin = "4px 0";
+                div.style.background = "#f9f9f9";
+                div.style.border = "1px solid #ddd";
+                div.style.borderRadius = "4px";
+                div.style.cursor = "grab";
+                div.style.display = "flex";
+                div.style.alignItems = "center";
+                div.style.gap = "10px";
+
+                const dragHandle = document.createElement("span");
+                dragHandle.innerHTML = "☰";
+                dragHandle.style.color = "#999";
+                dragHandle.style.cursor = "grab";
 
                 const cb = document.createElement("input");
                 cb.type = "checkbox";
-                cb.checked = columnVisibility[item.index];
+                cb.checked = columnVisibility[logicalIdx];
                 cb.style.margin = "0";
-                cb.onchange = () => toggleColumn(item.index, cb.checked);
+                cb.onchange = () => toggleColumn(logicalIdx, cb.checked);
 
-                label.appendChild(cb);
-                label.appendChild(document.createTextNode(item.text));
-                container.appendChild(label);
+                div.appendChild(dragHandle);
+                div.appendChild(cb);
+                div.appendChild(document.createTextNode(text));
+
+                div.addEventListener('dragstart', handleDragStart);
+                div.addEventListener('dragover', handleDragOver);
+                div.addEventListener('drop', handleDrop);
+                div.addEventListener('dragend', handleDragEnd);
+
+                container.appendChild(div);
             });
+        }
+
+        let dragSrcEl = null;
+        function handleDragStart(e) {
+            dragSrcEl = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+            this.classList.add('dragging');
+        }
+        function handleDragOver(e) {
+            if (e.preventDefault) e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const container = document.getElementById("columnToggles");
+            const afterElement = getDragAfterElement(container, e.clientY);
+            const draggable = document.querySelector('.dragging');
+            if (draggable) {
+                if (afterElement == null) {
+                    container.appendChild(draggable);
+                } else {
+                    container.insertBefore(draggable, afterElement);
+                }
+            }
+            return false;
+        }
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('div:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child }
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+        function handleDrop(e) {
+            if (e.stopPropagation) e.stopPropagation();
+            saveColumnOrder();
+            return false;
+        }
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+        }
+        function saveColumnOrder() {
+            const container = document.getElementById("columnToggles");
+            const newOrder = [0]; // Checkbox is always first
+            Array.from(container.children).forEach(div => {
+                newOrder.push(parseInt(div.dataset.logicalIdx));
+            });
+            newOrder.push(columnVisibility.length - 1); // Actions at the end
+            columnOrder = newOrder;
+            localStorage.setItem("supplierColumnOrder", JSON.stringify(columnOrder));
+            applyFilters();
         }
 
         function toggleAllColumns(isVisible) {
@@ -1165,12 +1403,15 @@
                 document.head.appendChild(style);
             }
             let css = '';
-            columnVisibility.forEach((visible, i) => {
-                if (!visible) {
-                    css += `#mainSupplierTable th:nth-child(${i + 1}), #mainSupplierTable td:nth-child(${i + 1}) { display: none; }\n`;
+            columnOrder.forEach((logicalIdx, visualIdx) => {
+                if (!columnVisibility[logicalIdx]) {
+                    css += `#mainSupplierTable th:nth-child(${visualIdx + 1}), #mainSupplierTable td:nth-child(${visualIdx + 1}) { display: none; }\n`;
                 }
             });
             style.textContent = css;
+            requestAnimationFrame(() => {
+                if (typeof updateFreezePanesPositions === 'function') updateFreezePanesPositions();
+            });
         }
 
         function toggleActionButton(type, isVisible) {
@@ -1310,91 +1551,112 @@
             const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
             const customFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive && f.showInGrid !== false).sort((a, b) => a.order - b.order);
 
-            let thHtml = `<th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
-                <th style="width: 50px;">Sl No</th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('name')">Name <span id="sort-icon-name"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('contact')">Contact No. <span id="sort-icon-contact"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('email')">Email <span id="sort-icon-email"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('gstin')">GSTIN <span id="sort-icon-gstin"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('address')">Address <span id="sort-icon-address"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('pin')">PIN <span id="sort-icon-pin"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('district')">District <span id="sort-icon-district"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('state')">State <span id="sort-icon-state"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('supplierType')">Type <span id="sort-icon-supplierType"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('description')">Description <span id="sort-icon-description"></span></th>
-                <th style="cursor:pointer;" onclick="handleHeaderClick('totalDue')">Total Due <span id="sort-icon-totalDue"></span></th>`;
+            const colDefinitions = [];
+            colDefinitions[0] = { th: `<th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>`, td: (s) => `<td><input type="checkbox" class="supplier-checkbox" value="${s.id}"></td>` };
+            colDefinitions[1] = { th: `<th style="width: 50px;">Sl No</th>`, td: (s, i, start) => `<td>${start + i + 1}</td>` };
+            colDefinitions[2] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('name')">Name <span id="sort-icon-name"></span></th>`, td: (s) => `<td>${highlightMatch(s.name, searchTerm)}</td>` };
+            colDefinitions[3] = {
+                th: `<th style="cursor:pointer;" onclick="handleHeaderClick('contact')">Contact No. <span id="sort-icon-contact"></span></th>`, td: (s) => {
+                    const content = s.contact ? String(s.contact).split(/[, ]+/).filter(n => n).map(num => {
+                        const cleanNo = String(num).replace(/\D/g, '');
+                        const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone"></i></a>` : '';
+                        const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(String(num))}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
+                        return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(String(num), searchTerm)}${waLink}</div>`;
+                    }).join('') : '-';
+                    return `<td>${content}</td>`;
+                }
+            };
+            colDefinitions[4] = {
+                th: `<th style="cursor:pointer;" onclick="handleHeaderClick('email')">Email <span id="sort-icon-email"></span></th>`, td: (s) => {
+                    const content = s.email ? String(s.email).split(/[, ]+/).filter(e => e).map(em => {
+                        const mailLink = `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(em)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(String(em), searchTerm)}</a>`;
+                        const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); showToast('Email copied to clipboard', 'success');" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy"></i></a>`;
+                        return `<div style="white-space:nowrap; margin-bottom:2px;">${mailLink}${copyLink}</div>`;
+                    }).join('') : '-';
+                    return `<td>${content}</td>`;
+                }
+            };
+            colDefinitions[5] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('gstin')">GSTIN <span id="sort-icon-gstin"></span></th>`, td: (s) => `<td>${highlightMatch(s.gstin, searchTerm)}</td>` };
+            colDefinitions[6] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('address')">Address <span id="sort-icon-address"></span></th>`, td: (s) => `<td>${highlightMatch(s.address, searchTerm)}</td>` };
+            colDefinitions[7] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('pin')">PIN <span id="sort-icon-pin"></span></th>`, td: (s) => `<td>${highlightMatch(s.pin, searchTerm)}</td>` };
+            colDefinitions[8] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('district')">District <span id="sort-icon-district"></span></th>`, td: (s) => `<td>${highlightMatch(s.district, searchTerm)}</td>` };
+            colDefinitions[9] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('state')">State <span id="sort-icon-state"></span></th>`, td: (s) => `<td>${highlightMatch(s.state, searchTerm)}</td>` };
+            colDefinitions[10] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('supplierType')">Type <span id="sort-icon-supplierType"></span></th>`, td: (s) => `<td>${highlightMatch(s.supplierType, searchTerm)}</td>` };
+            colDefinitions[11] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('description')">Description <span id="sort-icon-description"></span></th>`, td: (s) => `<td>${highlightMatch(s.description, searchTerm)}</td>` };
+            colDefinitions[12] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('totalDue')">Total Due <span id="sort-icon-totalDue"></span></th>`, td: (s) => `<td style="font-weight:bold; color:${(s.totalDue || 0) > 0 ? '#dc3545' : '#28a745'}">₹${(s.totalDue || 0).toFixed(2)}</td>` };
+
+            let curIdx = 13;
             customFields.forEach(cf => {
-                thHtml += `<th style="cursor:pointer;" onclick="handleHeaderClick('${cf.fieldName}')">${cf.fieldLabel} <span id="sort-icon-${cf.fieldName}"></span></th>`;
+                colDefinitions[curIdx] = {
+                    th: `<th style="cursor:pointer;" onclick="handleHeaderClick('${cf.fieldName}')">${cf.fieldLabel} <span id="sort-icon-${cf.fieldName}"></span></th>`,
+                    td: (s) => {
+                        let val = s[cf.fieldName];
+                        if (val === undefined || val === null || val === '') {
+                            val = '-';
+                        } else if (cf.fieldType === 'boolean') {
+                            val = (val === true || val === 'true') ? 'Yes' : 'No';
+                        } else if (cf.fieldType === 'date') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                        } else if (cf.fieldType === 'currency' || cf.fieldType === 'number') {
+                            let num = parseFloat(val);
+                            if (!isNaN(num)) {
+                                val = num.toLocaleString('en-IN', { minimumFractionDigits: cf.currencyDecimals ?? 2, maximumFractionDigits: cf.currencyDecimals ?? 2 });
+                                if (cf.prefix || cf.currencySymbol) val = (cf.prefix || cf.currencySymbol) + ' ' + val;
+                                if (cf.suffix) val = val + ' ' + cf.suffix;
+                            }
+                        }
+                        return `<td>${highlightMatch(val, searchTerm)}</td>`;
+                    }
+                };
+                curIdx++;
             });
-            thHtml += `<th style="width: 120px;">Actions</th>`;
+
+            colDefinitions[curIdx] = {
+                th: `<th style="width: 120px;">Actions</th>`,
+                td: (s) => `<td>
+                    <div class="action-dropdown" id="actionDropdown-${s.id}">
+                        <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
+                        <div class="action-dropdown-content">
+                            <button class="btn-action-view" onclick="viewSupplier('${s.id}')">👁️ View</button>
+                            <button class="btn-action-edit" id="editBtn-${s.id}" onclick="editSupplier('${s.id}')" data-permission-id="perm_supplier_manager">✏️ Edit</button>
+                            <button class="btn-action-ledger" onclick="openLedger('${escapeHtml(s.name)}')">📒 Ledger</button>
+                            <button class="btn-action-attach" onclick="openManageAttachments('${s.id}')">📎 Attach</button>
+                            <button class="btn-action-delete" onclick="deleteSupplier('${s.id}')" data-permission-id="perm_delete_action" style="color: #dc3545 !important;">🗑️ Delete</button>
+                        </div>
+                    </div>
+                </td>`
+            };
+
+            let thHtml = '';
+            columnOrder.forEach(idx => {
+                if (colDefinitions[idx]) {
+                    thHtml += colDefinitions[idx].th;
+                }
+            });
             if (theadTr) theadTr.innerHTML = thHtml;
 
+            let tbodyHtml = '';
             list.forEach((s, i) => {
-                let customTds = '';
-                customFields.forEach(cf => {
-                    let val = s[cf.fieldName];
-                    if (val === undefined || val === null || val === '') {
-                        val = '-';
-                    } else if (cf.fieldType === 'boolean') {
-                        val = (val === true || val === 'true') ? 'Yes' : 'No';
-                    } else if (cf.fieldType === 'date') {
-                        const d = new Date(val);
-                        if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
-                    } else if (cf.fieldType === 'currency' || cf.fieldType === 'number') {
-                        let num = parseFloat(val);
-                        if (!isNaN(num)) {
-                            val = num.toLocaleString('en-IN', { minimumFractionDigits: cf.currencyDecimals ?? 2, maximumFractionDigits: cf.currencyDecimals ?? 2 });
-                            if (cf.prefix || cf.currencySymbol) val = (cf.prefix || cf.currencySymbol) + ' ' + val;
-                            if (cf.suffix) val = val + ' ' + cf.suffix;
-                        }
+                let trHtml = '';
+                columnOrder.forEach(idx => {
+                    if (colDefinitions[idx]) {
+                        trHtml += colDefinitions[idx].td(s, i, startIndex);
                     }
-                    customTds += `<td>${highlightMatch(val, searchTerm)}</td>`;
                 });
-
-                table.innerHTML += `
-          <tr>
-            <td><input type="checkbox" class="supplier-checkbox" value="${s.id}"></td>
-            <td>${startIndex + i + 1}</td>
-            <td>${highlightMatch(s.name, searchTerm)}</td>
-            <td>${s.contact ? String(s.contact).split(/[, ]+/).filter(n => n).map(num => {
-                const cleanNo = String(num).replace(/\D/g, '');
-                const callLink = cleanNo ? `<a href="tel:${cleanNo}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone"></i></a>` : '';
-                const waLink = cleanNo ? `<a href="javascript:void(0)" onclick="openWhatsApp('${escapeHtml(String(num))}')" style="color:#27ae60; text-decoration:none; margin-left:6px;" title="Message on WhatsApp"><i class="fab fa-whatsapp"></i></a>` : '';
-                return `<div style="white-space:nowrap; margin-bottom:2px;">${callLink}${highlightMatch(String(num), searchTerm)}${waLink}</div>`;
-            }).join('') : '-'}</td>
-            <td>${s.email ? String(s.email).split(/[, ]+/).filter(e => e).map(em => {
-                const mailLink = `<a href="javascript:void(0)" onclick="openWindow('email_sender.html?to=${encodeURIComponent(em)}', 1000, 800)" style="color:#0d6efd; text-decoration:none;" title="Send Email in App"><i class="fas fa-envelope"></i> ${highlightMatch(String(em), searchTerm)}</a>`;
-                const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); showToast('Email copied to clipboard', 'success');" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy"></i></a>`;
-                return `<div style="white-space:nowrap; margin-bottom:2px;">${mailLink}${copyLink}</div>`;
-            }).join('') : '-'}</td>
-            <td>${highlightMatch(s.gstin, searchTerm)}</td>
-            <td>${highlightMatch(s.address, searchTerm)}</td>
-            <td>${highlightMatch(s.pin, searchTerm)}</td>
-            <td>${highlightMatch(s.district, searchTerm)}</td>
-            <td>${highlightMatch(s.state, searchTerm)}</td>
-            <td>${highlightMatch(s.supplierType, searchTerm)}</td>
-            <td>${highlightMatch(s.description, searchTerm)}</td>
-            <td style="font-weight:bold; color:${(s.totalDue || 0) > 0 ? '#dc3545' : '#28a745'}">₹${(s.totalDue || 0).toFixed(2)}</td>
-            ${customTds}
-            <td>
-                <div class="action-dropdown" id="actionDropdown-${s.id}">
-                    <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
-                    <div class="action-dropdown-content">
-                        <button class="btn-action-view" onclick="viewSupplier('${s.id}')">👁️ View</button>
-                        <button class="btn-action-edit" id="editBtn-${s.id}" onclick="editSupplier('${s.id}')" data-permission-id="perm_supplier_manager">✏️ Edit</button>
-                        <button class="btn-action-ledger" onclick="openLedger('${escapeHtml(s.name)}')">📒 Ledger</button>
-                        <button class="btn-action-attach" onclick="openManageAttachments('${s.id}')">📎 Attach</button>
-                        <button class="btn-action-delete" onclick="deleteSupplier('${s.id}')" data-permission-id="perm_delete_action" style="color: #dc3545 !important;">🗑️ Delete</button>
-                    </div>
-                </div>
-            </td>
-          </tr>
-        `;
+                tbodyHtml += `<tr>${trHtml}</tr>`;
             });
+            table.innerHTML = tbodyHtml;
             const selectAll = document.getElementById("selectAll");
             if (selectAll) selectAll.checked = false;
             updateColumnStyles();
             applyUIPermissions();
+
+            requestAnimationFrame(() => {
+                loadColumnWidths();
+                enableColumnResizing();
+                updateFreezePanesPositions();
+            });
         }
 
         function openLedger(name) {
@@ -1426,10 +1688,10 @@
             const description = document.getElementById("newDescription").value.trim();
 
             if (!name) return openWarningModal("Supplier name cannot be empty");
-        
-        if (name.toUpperCase() === "ANONYMOUS" && (!id || (id && suppliers.find(s => String(s.id) === String(id))?.name !== "ANONYMOUS"))) {
-            return openWarningModal("ANONYMOUS is a reserved system record and cannot be duplicated.");
-        }
+
+            if (name.toUpperCase() === "ANONYMOUS" && (!id || (id && suppliers.find(s => String(s.id) === String(id))?.name !== "ANONYMOUS"))) {
+                return openWarningModal("ANONYMOUS is a reserved system record and cannot be duplicated.");
+            }
 
             if (contact) {
                 const numbers = contact.split(/[, ]+/).filter(n => n);
@@ -1771,11 +2033,11 @@
                     s.supplierType || "",
                     s.description || ""
                 ];
-                
+
                 customFields.forEach(cf => searchVals.push(s[cf.fieldName]));
                 const rowText = searchVals.map(val => String(val || '').toLowerCase()).join(' ');
                 const matchSearch = search ? rowText.includes(search) : true;
-                
+
                 return matchSearch &&
                     (stateFilter ? s.state === stateFilter : true) &&
                     (distFilter ? s.district === distFilter : true);
@@ -1925,7 +2187,7 @@
             const rows = suppliers.map(s => {
                 const due = supplierDues[(s.name || "").trim().toLowerCase()] || 0;
                 const escape = (t) => `"${String(t || "").replace(/"/g, '""')}"`;
-                 const rowArr = [
+                const rowArr = [
                     escape(s.name),
                     escape(s.contact),
                     escape(s.email),
@@ -2201,6 +2463,9 @@
         updateColumnStyles();
         applyButtonVisibility();
         updateActionButtonsVisibility();
+        applyFreezePanes();
+
+        window.addEventListener('resize', updateFreezePanesPositions);
 
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
             if (currentTheme === "system") {
@@ -2243,6 +2508,84 @@
 
         document.addEventListener('click', function (e) { if (!e.target.matches('.action-btn-main')) { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); } });
         window.addEventListener('scroll', function () { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); }, true);
+
+        // --- Column Resizing Logic ---
+        function enableColumnResizing() {
+            const table = document.getElementById('mainSupplierTable');
+            if (!table) return;
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+
+                resizer.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+
+                let startX, startWidth;
+
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation(); // prevent sort when resizing
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) {
+                        th.style.width = newWidth + 'px';
+                        th.style.minWidth = newWidth + 'px';
+                        if (typeof isFreezePanes !== 'undefined' && isFreezePanes) {
+                            updateFreezePanesPositions();
+                        }
+                    }
+                }
+
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+
+        function saveColumnWidths() {
+            const widths = {};
+            document.querySelectorAll('#mainSupplierTable th').forEach((th, index) => {
+                const logicalIdx = columnOrder[index];
+                if (logicalIdx !== undefined) {
+                    widths[logicalIdx] = th.style.width;
+                }
+            });
+            localStorage.setItem('supplierColumnWidths', JSON.stringify(widths));
+        }
+
+        function loadColumnWidths() {
+            const savedWidths = JSON.parse(localStorage.getItem('supplierColumnWidths'));
+            if (savedWidths && typeof savedWidths === 'object' && !Array.isArray(savedWidths)) {
+                document.querySelectorAll('#mainSupplierTable th').forEach((th, index) => {
+                    const logicalIdx = columnOrder[index];
+                    if (logicalIdx !== undefined && savedWidths[logicalIdx]) {
+                        th.style.width = savedWidths[logicalIdx];
+                        th.style.minWidth = savedWidths[logicalIdx];
+                    }
+                });
+            } else if (Array.isArray(savedWidths)) {
+                document.querySelectorAll('#mainSupplierTable th').forEach((th, index) => {
+                    if (savedWidths[index]) { th.style.width = savedWidths[index]; th.style.minWidth = savedWidths[index]; }
+                });
+            }
+        }
 
     </script>
 </body>
