@@ -1278,7 +1278,11 @@
             const idx = suppliers.findIndex(s => s.id === currentManageSupplierId);
             if (idx > -1) {
                 suppliers[idx].attachments = currentManageAttachments;
+            try {
                 localStorage.setItem("suppliers", JSON.stringify(suppliers));
+            } catch (err) {
+                console.warn("LocalStorage quota exceeded for attachments. Syncing to remote only.", err);
+            }
 
                 if (typeof db !== 'undefined' && db) {
                     try { await db.collection('suppliers').doc(currentManageSupplierId).update({attachments: currentManageAttachments}); } catch (e) { console.error("Firestore update error", e); }
@@ -1853,7 +1857,11 @@
                     const idx = suppliers.findIndex(s => s.id === id);
                     if (idx > -1) {
                         suppliers[idx] = { ...suppliers[idx], name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments, ...dynamicData };
+                    try {
                         localStorage.setItem("suppliers", JSON.stringify(suppliers));
+                    } catch (err) {
+                        console.warn("LocalStorage quota exceeded. Local save bypassed.", err);
+                    }
 
                         if (db) {
                             try { await db.collection('suppliers').doc(id).update(suppliers[idx]); } catch (e) { console.error("Firestore update error", e); }
@@ -1871,7 +1879,11 @@
                     const newSupplier = { id: newId, name, contact, email, gstin, address, pin, district, state, stateCode, supplierType, description, attachments: currentSupplierAttachments, createdAt: new Date().toISOString(), ...dynamicData };
 
                     suppliers.push(newSupplier);
+                try {
                     localStorage.setItem("suppliers", JSON.stringify(suppliers));
+                } catch (err) {
+                    console.warn("LocalStorage quota exceeded. Local save bypassed.", err);
+                }
 
                     if (db) {
                         try { await db.collection('suppliers').doc(newId).set(newSupplier); } catch (e) { console.error("Firestore save error", e); }

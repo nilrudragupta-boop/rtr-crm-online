@@ -2690,16 +2690,17 @@
                 for (const col of collections) {
                     const data = JSON.parse(localStorage.getItem(col.key)) || [];
                     if (data.length > 0 && typeof apiClient !== 'undefined' && apiClient[col.method]) {
-                        data.forEach(record => {
-                            promises.push(apiClient[col.method](record).catch(e => console.warn("Sync warning:", e)));
-                        });
+                        for (const record of data) {
+                            // Process sequentially to avoid large payload bottlenecks
+                            await apiClient[col.method](record).catch(e => console.warn("Sync warning:", e));
+                        }
                     }
                 }
 
                 // Production records
                 const prods = JSON.parse(localStorage.getItem("production")) || [];
                 if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
-                    prods.forEach(p => promises.push(apiClient._saveCollection('production', p).catch(e => console.warn(e))));
+                    for (const p of prods) { await apiClient._saveCollection('production', p).catch(e => console.warn(e)); }
                 }
 
                 // Custom Module Records
@@ -2714,17 +2715,15 @@
 
                 for (const mod of customModules) {
                     const localRecords = JSON.parse(localStorage.getItem(`CUSTOM_RECORDS_${mod}`)) || [];
-                    localRecords.forEach(record => {
+                    for (const record of localRecords) {
                         if (!record.createdBy) record.createdBy = currentUser; // Enforce Ownership
-                        promises.push(
-                            fetch(`${baseUrl}/custom-records${authQuery}`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                keepalive: true,
-                                body: JSON.stringify(record)
-                            }).catch(e => console.warn("Custom record sync warning:", e))
-                        );
-                    });
+                        await fetch(`${baseUrl}/custom-records${authQuery}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            keepalive: true,
+                            body: JSON.stringify(record)
+                        }).catch(e => console.warn("Custom record sync warning:", e));
+                    }
                 }
 
                 await Promise.all(promises);
