@@ -367,6 +367,7 @@
                     <td colspan="10" style="text-align: center; padding: 20px;">Loading contacts...</td>
                 </tr>
             </tbody>
+            <tfoot id="contactsFootRow"></tfoot>
         </table>
     </div>
 
@@ -847,7 +848,7 @@
 
             dynamicFieldsList.forEach(f => {
                 if (f.showInGrid !== false) {
-                    baseCols.push({ id: f.fieldName, label: f.fieldLabel });
+                    baseCols.push({ id: f.fieldName, label: f.fieldLabel, isCustom: true, fieldDef: f });
                 }
             });
             return baseCols;
@@ -1178,6 +1179,8 @@
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${orderedCols.length + 2}" style="text-align: center; padding: 20px; color: #666;">No contacts found.</td></tr>`;
                 renderPagination(0, 0, 0, 1);
+                const tfoot = document.getElementById('contactsFootRow');
+                if (tfoot) tfoot.innerHTML = '';
                 requestAnimationFrame(() => { loadColumnWidths(); enableColumnResizing(); });
                 return;
             }
@@ -1266,6 +1269,57 @@
             });
 
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+
+            let hasGrandTotals = false;
+            let grandTotals = {};
+            dynamicFieldsList.forEach(cf => {
+                if (cf.showGrandTotal) {
+                    hasGrandTotals = true;
+                    grandTotals[cf.fieldName] = 0;
+                }
+            });
+
+            if (hasGrandTotals && filtered.length > 0) {
+                filtered.forEach(c => {
+                    dynamicFieldsList.forEach(cf => {
+                        if (cf.showGrandTotal && grandTotals[cf.fieldName] !== undefined) {
+                            let rawVal = c[cf.fieldName];
+                            let clean = String(rawVal || '').replace(/[^0-9.-]/g, '');
+                            grandTotals[cf.fieldName] += parseFloat(clean) || 0;
+                        }
+                    });
+                });
+            }
+
+            const tfoot = document.getElementById('contactsFootRow');
+            if (tfoot) {
+                if (hasGrandTotals && filtered.length > 0) {
+                    let tfootHtml = `<tr style="font-weight: bold; background: #f8f9fa;">`;
+                    tfootHtml += `<td></td>`;
+                    let labelPlaced = false;
+                    orderedCols.forEach((c) => {
+                        if (c.isCustom && c.fieldDef && c.fieldDef.showGrandTotal) {
+                            let val = grandTotals[c.id] || 0;
+                            let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: c.fieldDef.currencyDecimals ?? 2, maximumFractionDigits: c.fieldDef.currencyDecimals ?? 2 });
+                            if (c.fieldDef.prefix || c.fieldDef.currencySymbol) formattedVal = (c.fieldDef.prefix || c.fieldDef.currencySymbol) + ' ' + formattedVal;
+                            if (c.fieldDef.suffix) formattedVal = formattedVal + ' ' + c.fieldDef.suffix;
+                            tfootHtml += `<td>${formattedVal}</td>`;
+                        } else {
+                            if (!labelPlaced && !c.isCustom) {
+                                tfootHtml += `<td style="text-align: right; color: #2c3e50;">Grand Total:</td>`;
+                                labelPlaced = true;
+                            } else {
+                                tfootHtml += `<td></td>`;
+                            }
+                        }
+                    });
+                    tfootHtml += `<td></td></tr>`;
+                    tfoot.innerHTML = tfootHtml;
+                } else {
+                    tfoot.innerHTML = '';
+                }
+            }
+
             requestAnimationFrame(() => { loadColumnWidths(); enableColumnResizing(); });
         }
 

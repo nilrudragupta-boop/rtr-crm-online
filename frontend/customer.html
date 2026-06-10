@@ -2123,7 +2123,7 @@
             renderTable(paginatedItems, startIndex);
             renderPagination(totalItems, startIndex + 1, Math.min(endIndex, totalItems), totalPages);
             updateHeaderIcons();
-            renderFooter(totalOpBal, totalOutstanding);
+            renderFooter(totalOpBal, totalOutstanding, filtered);
         }
 
         function handleHeaderClick(column) {
@@ -2144,7 +2144,7 @@
             });
         }
 
-        function renderFooter(totalOp, totalOut) {
+        function renderFooter(totalOp, totalOut, filteredList = []) {
             const tfoot = document.getElementById('customerTableFooter');
             tfoot.innerHTML = '';
 
@@ -2154,7 +2154,24 @@
             tr.style.fontWeight = 'bold';
             tr.style.backgroundColor = '#f0f0f0';
 
-            let firstTotalColIdx = orderedCols.findIndex(c => c.id === 'openingBalance' || c.id === 'outstanding');
+            let grandTotals = {};
+            dynamicFieldsList.forEach(cf => {
+                if (cf.showGrandTotal) grandTotals[cf.fieldName] = 0;
+            });
+            
+            if (filteredList.length > 0) {
+                filteredList.forEach(c => {
+                    dynamicFieldsList.forEach(cf => {
+                        if (cf.showGrandTotal && grandTotals[cf.fieldName] !== undefined) {
+                            let rawVal = c[cf.fieldName];
+                            let clean = String(rawVal || '').replace(/[^0-9.-]/g, '');
+                            grandTotals[cf.fieldName] += parseFloat(clean) || 0;
+                        }
+                    });
+                });
+            }
+
+            let firstTotalColIdx = orderedCols.findIndex(c => c.id === 'openingBalance' || c.id === 'outstanding' || (c.isDynamic && c.fieldDef && c.fieldDef.showGrandTotal));
             if (firstTotalColIdx === -1) firstTotalColIdx = orderedCols.length;
 
             let startCols = 2 + firstTotalColIdx; // Checkbox + Sl No
@@ -2163,7 +2180,7 @@
                 const tdLabel = document.createElement('td');
                 tdLabel.colSpan = startCols;
                 tdLabel.style.textAlign = 'right';
-                tdLabel.innerText = 'Totals:';
+                tdLabel.innerText = 'Grand Totals:';
                 tr.appendChild(tdLabel);
             }
 
@@ -2177,6 +2194,12 @@
                     td.style.fontWeight = 'bold';
                     td.style.color = totalOut > 0.01 ? '#dc3545' : '#28a745';
                     td.innerText = totalOut.toFixed(2);
+                } else if (col.isDynamic && col.fieldDef && col.fieldDef.showGrandTotal) {
+                    let val = grandTotals[col.id] || 0;
+                    let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: col.fieldDef.currencyDecimals ?? 2, maximumFractionDigits: col.fieldDef.currencyDecimals ?? 2 });
+                    if (col.fieldDef.prefix || col.fieldDef.currencySymbol) formattedVal = (col.fieldDef.prefix || col.fieldDef.currencySymbol) + ' ' + formattedVal;
+                    if (col.fieldDef.suffix) formattedVal = formattedVal + ' ' + col.fieldDef.suffix;
+                    td.innerText = formattedVal;
                 }
                 tr.appendChild(td);
             }

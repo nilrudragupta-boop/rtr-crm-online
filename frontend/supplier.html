@@ -525,6 +525,7 @@
                 <tr id="supplierTableHeadRow"></tr>
             </thead>
             <tbody id="supplierTable"></tbody>
+            <tfoot id="supplierTableFoot"></tfoot>
         </table>
     </div>
 
@@ -1668,7 +1669,7 @@
             });
         }
 
-        function renderSuppliers(list, startIndex = 0) {
+        function renderSuppliers(list, startIndex = 0, fullFilteredList = []) {
             const table = document.getElementById("supplierTable");
             table.innerHTML = "";
             const theadTr = document.getElementById("supplierTableHeadRow");
@@ -1714,6 +1715,8 @@
             let curIdx = 13;
             customFields.forEach(cf => {
                 colDefinitions[curIdx] = {
+                    isCustom: true,
+                    fieldDef: cf,
                     th: `<th style="cursor:pointer;" onclick="handleHeaderClick('${cf.fieldName}')">${cf.fieldLabel} <span id="sort-icon-${cf.fieldName}"></span></th>`,
                     td: (s) => {
                         let val = s[cf.fieldName];
@@ -1739,6 +1742,7 @@
             });
 
             colDefinitions[curIdx] = {
+                isAction: true,
                 th: `<th style="width: 120px;">Actions</th>`,
                 td: (s) => `<td>
                     <div class="action-dropdown" id="actionDropdown-${s.id}">
@@ -1775,6 +1779,69 @@
             table.innerHTML = tbodyHtml;
             const selectAll = document.getElementById("selectAll");
             if (selectAll) selectAll.checked = false;
+
+            let hasGrandTotals = false;
+            let grandTotals = {};
+            let totalDueSum = 0;
+            customFields.forEach(cf => {
+                if (cf.showGrandTotal) {
+                    hasGrandTotals = true;
+                    grandTotals[cf.fieldName] = 0;
+                }
+            });
+
+            if (fullFilteredList.length > 0) {
+                fullFilteredList.forEach(s => {
+                    totalDueSum += (s.totalDue || 0);
+                    if (hasGrandTotals) {
+                        customFields.forEach(cf => {
+                            if (cf.showGrandTotal && grandTotals[cf.fieldName] !== undefined) {
+                                let rawVal = s[cf.fieldName];
+                                let clean = String(rawVal || '').replace(/[^0-9.-]/g, '');
+                                grandTotals[cf.fieldName] += parseFloat(clean) || 0;
+                            }
+                        });
+                    }
+                });
+            }
+
+            const tfoot = document.getElementById('supplierTableFoot');
+            if (tfoot) {
+                if (fullFilteredList.length > 0) {
+                    let tfootHtml = `<tr style="font-weight: bold; background: #f8f9fa;">`;
+                    
+                    let firstTotalColIdx = columnOrder.findIndex(idx => idx === 12 || (colDefinitions[idx] && colDefinitions[idx].isCustom && colDefinitions[idx].fieldDef && colDefinitions[idx].fieldDef.showGrandTotal));
+                    if (firstTotalColIdx === -1) firstTotalColIdx = columnOrder.length;
+                    
+                    let startCols = firstTotalColIdx;
+                    if (startCols > 0) {
+                        tfootHtml += `<td colspan="${startCols}" style="text-align: right; color: #2c3e50;">Grand Totals:</td>`;
+                    }
+                    
+                    for (let i = firstTotalColIdx; i < columnOrder.length; i++) {
+                        let idx = columnOrder[i];
+                        if (colDefinitions[idx]) {
+                            const colDef = colDefinitions[idx];
+                            if (colDef.isCustom && colDef.fieldDef && colDef.fieldDef.showGrandTotal) {
+                                let val = grandTotals[colDef.fieldDef.fieldName] || 0;
+                                let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: colDef.fieldDef.currencyDecimals ?? 2, maximumFractionDigits: colDef.fieldDef.currencyDecimals ?? 2 });
+                                if (colDef.fieldDef.prefix || colDef.fieldDef.currencySymbol) formattedVal = (colDef.fieldDef.prefix || colDef.fieldDef.currencySymbol) + ' ' + formattedVal;
+                                if (colDef.fieldDef.suffix) formattedVal = formattedVal + ' ' + colDef.fieldDef.suffix;
+                                tfootHtml += `<td>${formattedVal}</td>`;
+                            } else if (idx === 12) {
+                                tfootHtml += `<td style="font-weight:bold; color:${totalDueSum > 0 ? '#dc3545' : '#28a745'}">₹${totalDueSum.toFixed(2)}</td>`;
+                            } else if (!colDef.isAction) {
+                                tfootHtml += `<td></td>`;
+                            }
+                        }
+                    }
+                    tfootHtml += `<td></td></tr>`;
+                    tfoot.innerHTML = tfootHtml;
+                } else {
+                    tfoot.innerHTML = '';
+                }
+            }
+
             updateColumnStyles();
             applyUIPermissions();
 
@@ -2214,7 +2281,7 @@
             const endIndex = startIndex + rowsPerPage;
             const paginatedItems = filtered.slice(startIndex, endIndex);
 
-            renderSuppliers(paginatedItems, startIndex);
+            renderSuppliers(paginatedItems, startIndex, filtered);
             renderPagination(totalItems, startIndex + 1, Math.min(endIndex, totalItems), totalPages);
             updateHeaderIcons();
         }
