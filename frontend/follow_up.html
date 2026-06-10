@@ -476,6 +476,7 @@
                 <tr id="followUpHeadRow"></tr>
             </thead>
             <tbody id="followUpBody"></tbody>
+            <tfoot id="followUpFootRow"></tfoot>
         </table>
     </div>
 
@@ -1235,6 +1236,15 @@
                 return matchSearch && matchStatus && matchDate && matchPartyType;
             });
 
+            let hasGrandTotals = false;
+            let grandTotals = {};
+            customFields.forEach(cf => {
+                if (cf.showGrandTotal) {
+                    hasGrandTotals = true;
+                    grandTotals[cf.fieldName] = 0;
+                }
+            });
+
             filtered.sort((a, b) => {
                 let valA = a[currentSortColumn] || '';
                 let valB = b[currentSortColumn] || '';
@@ -1339,6 +1349,11 @@
                     } else {
                         let val = f[c.id];
                         const cf = c.fieldDef;
+                        if (cf.showGrandTotal) {
+                            let rawVal = f[c.id];
+                            let clean = String(rawVal || '').replace(/[^0-9.-]/g, '');
+                            grandTotals[c.id] += parseFloat(clean) || 0;
+                        }
                         if (val === undefined || val === null || val === '') {
                             val = '-';
                         } else if (cf.fieldType === 'boolean') {
@@ -1362,6 +1377,36 @@
                 tr.innerHTML = trHtml;
                 tbody.appendChild(tr);
             });
+
+            const tfoot = document.getElementById('followUpFootRow');
+            if (tfoot) {
+                if (hasGrandTotals && filtered.length > 0) {
+                    let tfootHtml = `<tr style="font-weight: bold; background: #f8f9fa;">`;
+                    tfootHtml += `<td></td>`;
+                    
+                    let labelPlaced = false;
+                    orderedCols.forEach((c) => {
+                        if (c.isCustom && c.fieldDef && c.fieldDef.showGrandTotal) {
+                            let val = grandTotals[c.id] || 0;
+                            let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: c.fieldDef.currencyDecimals ?? 2, maximumFractionDigits: c.fieldDef.currencyDecimals ?? 2 });
+                            if (c.fieldDef.prefix || c.fieldDef.currencySymbol) formattedVal = (c.fieldDef.prefix || c.fieldDef.currencySymbol) + ' ' + formattedVal;
+                            if (c.fieldDef.suffix) formattedVal = formattedVal + ' ' + c.fieldDef.suffix;
+                            tfootHtml += `<td>${formattedVal}</td>`;
+                        } else {
+                            if (!labelPlaced && !c.isCustom) {
+                                tfootHtml += `<td style="text-align: right; color: #2c3e50;">Grand Total:</td>`;
+                                labelPlaced = true;
+                            } else {
+                                tfootHtml += `<td></td>`;
+                            }
+                        }
+                    });
+                    tfootHtml += `<td></td></tr>`;
+                    tfoot.innerHTML = tfootHtml;
+                } else {
+                    tfoot.innerHTML = '';
+                }
+            }
 
             requestAnimationFrame(() => {
                 loadColumnWidths();
