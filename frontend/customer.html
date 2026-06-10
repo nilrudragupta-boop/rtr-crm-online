@@ -326,6 +326,27 @@
             color: #fff !important;
         }
 
+        /* Resizable Columns */
+        #customerTable th {
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+        }
+
+        .resizer:hover,
+        .resizing {
+            background-color: #0d6efd;
+            opacity: 0.5;
+        }
+
         #columnToggles li {
             padding: 8px 12px;
             border: 1px solid #eee;
@@ -438,6 +459,71 @@
         }
     </script>
     <script>
+        function enableColumnResizing() {
+            const table = document.getElementById('customerTable');
+            if (!table) return;
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+
+                resizer.addEventListener('click', e => e.stopPropagation());
+
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+
+                    function onMouseMove(moveEvent) {
+                        const newWidth = startWidth + (moveEvent.pageX - startX);
+                        if (newWidth > 40) {
+                            th.style.width = newWidth + 'px';
+                            th.style.minWidth = newWidth + 'px';
+                        }
+                    }
+
+                    function onMouseUp() {
+                        resizer.classList.remove('resizing');
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                        saveColumnWidths();
+                    }
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+            });
+        }
+
+        function saveColumnWidths() {
+            const widthMap = {};
+            document.querySelectorAll('#customerTable thead th[data-id]').forEach(th => {
+                if (th.style.width) {
+                    widthMap[th.dataset.id] = th.style.width;
+                }
+            });
+            localStorage.setItem('customerColumnWidths', JSON.stringify(widthMap));
+        }
+
+        function loadColumnWidths() {
+            const savedWidths = JSON.parse(localStorage.getItem('customerColumnWidths'));
+            if (!savedWidths) return;
+            document.querySelectorAll('#customerTable thead th[data-id]').forEach(th => {
+                const width = savedWidths[th.dataset.id];
+                if (width) {
+                    th.style.width = width;
+                    th.style.minWidth = width;
+                }
+            });
+        }
+
         // --- Receipt Modal Logic ---
         let pendingReceiptCallback = null;
         function openReceiptDescModal(defaultDesc, defaultAmount, callback) {
@@ -781,67 +867,70 @@
 
     <!-- Add / Update form -->
     <div class="controls" style="display: block;">
-        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 10px;" onclick="toggleCustomerForm()">
+        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 10px;"
+            onclick="toggleCustomerForm()">
             <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: inherit;">Add / Edit Customer</h3>
-            <button id="toggleFormBtn" type="button" style="background:none; border:none; font-size:1.2em; padding:0; margin:0; cursor:pointer; color:inherit; box-shadow:none;">&#9650;</button>
+            <button id="toggleFormBtn" type="button"
+                style="background:none; border:none; font-size:1.2em; padding:0; margin:0; cursor:pointer; color:inherit; box-shadow:none;">&#9650;</button>
         </div>
         <div id="customerFormContainer" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-        <input type="hidden" id="custId">
-        <input type="text" id="custName" placeholder="Name">
-        <input type="text" id="custAddress" placeholder="Address">
-        <input type="text" id="custContact" placeholder="Contact (comma separated)"
-            oninput="this.value = this.value.replace(/[^0-9, ]/g, '')">
-        <input type="email" id="custEmail" placeholder="Email ID">
-        <div style="display:flex; align-items:center;">
-            <input type="text" id="custPin" placeholder="PIN No" oninput="this.value = this.value.replace(/\D/g, '')"
-                maxlength="6" style="border-top-right-radius:0; border-bottom-right-radius:0; flex:1;">
-            <button class="action" onclick="lookupPincode('custPin', 'custDistrict', 'custState')"
-                title="Lookup Pincode"
-                style="border-top-left-radius:0; border-bottom-left-radius:0; background: #6c757d; margin-left:-1px; padding: 6px 10px;">🔍</button>
-        </div>
-        <select id="custDistrict">
-            <option value="">Select District</option>
-            <option>Purba Bardhaman</option>
-            <option>Paschim Bardhaman</option>
-            <option>Hooghly</option>
-            <option>Howrah</option>
-            <option>Bankura</option>
-            <option>Birbhum</option>
-            <option>North 24 Parganas</option>
-            <option>South 24 Parganas</option>
-            <option>Purulia</option>
-            <option>Nadia</option>
-            <option>Malda</option>
-        </select>
-        <select id="custState" style="width:150px;"></select>
-        <input type="text" id="custStateCode" placeholder="Code" readonly
-            style="width: 60px; background-color: #e9ecef;">
-        <div style="display:flex; align-items:center;">
-            <input type="text" id="custGST" placeholder="GST No" oninput="this.value = this.value.toUpperCase()"
-                style="border-top-right-radius:0; border-bottom-right-radius:0; flex:1;">
-            <button class="action" onclick="verifyCustGST()" title="Verify GSTIN"
-                style="border-top-left-radius:0; border-bottom-left-radius:0; background: #6c757d; margin-left:-1px; padding: 6px 10px;">🔍</button>
-        </div>
-        <input type="number" id="custCreditLimit" placeholder="Credit Limit (₹)" step="0.01">
-        <input type="number" id="custOpeningBalance" placeholder="Opening Bal (₹)" step="0.01">
-        <select id="custOpeningBalanceType" style="width: 60px;">
-            <option value="Dr">Dr</option>
-            <option value="Cr">Cr</option>
-        </select>
+            <input type="hidden" id="custId">
+            <input type="text" id="custName" placeholder="Name">
+            <input type="text" id="custAddress" placeholder="Address">
+            <input type="text" id="custContact" placeholder="Contact (comma separated)"
+                oninput="this.value = this.value.replace(/[^0-9, ]/g, '')">
+            <input type="email" id="custEmail" placeholder="Email ID">
+            <div style="display:flex; align-items:center;">
+                <input type="text" id="custPin" placeholder="PIN No"
+                    oninput="this.value = this.value.replace(/\D/g, '')" maxlength="6"
+                    style="border-top-right-radius:0; border-bottom-right-radius:0; flex:1;">
+                <button class="action" onclick="lookupPincode('custPin', 'custDistrict', 'custState')"
+                    title="Lookup Pincode"
+                    style="border-top-left-radius:0; border-bottom-left-radius:0; background: #6c757d; margin-left:-1px; padding: 6px 10px;">🔍</button>
+            </div>
+            <select id="custDistrict">
+                <option value="">Select District</option>
+                <option>Purba Bardhaman</option>
+                <option>Paschim Bardhaman</option>
+                <option>Hooghly</option>
+                <option>Howrah</option>
+                <option>Bankura</option>
+                <option>Birbhum</option>
+                <option>North 24 Parganas</option>
+                <option>South 24 Parganas</option>
+                <option>Purulia</option>
+                <option>Nadia</option>
+                <option>Malda</option>
+            </select>
+            <select id="custState" style="width:150px;"></select>
+            <input type="text" id="custStateCode" placeholder="Code" readonly
+                style="width: 60px; background-color: #e9ecef;">
+            <div style="display:flex; align-items:center;">
+                <input type="text" id="custGST" placeholder="GST No" oninput="this.value = this.value.toUpperCase()"
+                    style="border-top-right-radius:0; border-bottom-right-radius:0; flex:1;">
+                <button class="action" onclick="verifyCustGST()" title="Verify GSTIN"
+                    style="border-top-left-radius:0; border-bottom-left-radius:0; background: #6c757d; margin-left:-1px; padding: 6px 10px;">🔍</button>
+            </div>
+            <input type="number" id="custCreditLimit" placeholder="Credit Limit (₹)" step="0.01">
+            <input type="number" id="custOpeningBalance" placeholder="Opening Bal (₹)" step="0.01">
+            <select id="custOpeningBalanceType" style="width: 60px;">
+                <option value="Dr">Dr</option>
+                <option value="Cr">Cr</option>
+            </select>
 
-        <!-- Add Attachments -->
-        <div style="flex-basis: 100%; display: flex; flex-direction: column; gap: 5px; margin-top: 10px;">
-            <label style="font-size: 13px; font-weight: bold; color: #555;">Attachments (Max 500KB each)</label>
-            <input type="file" id="custAttachments" multiple onchange="handleCustomerAttachments(this)"
-                accept="image/*,.pdf" style="padding: 4px;">
-            <div id="custAttachmentPreviews" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
-        </div>
+            <!-- Add Attachments -->
+            <div style="flex-basis: 100%; display: flex; flex-direction: column; gap: 5px; margin-top: 10px;">
+                <label style="font-size: 13px; font-weight: bold; color: #555;">Attachments (Max 500KB each)</label>
+                <input type="file" id="custAttachments" multiple onchange="handleCustomerAttachments(this)"
+                    accept="image/*,.pdf" style="padding: 4px;">
+                <div id="custAttachmentPreviews" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
+            </div>
 
-        <div id="dynamicFieldsContainer"
-            style="display: none; flex-basis: 100%; flex-wrap: wrap; gap: 8px; margin-top: 10px;"></div>
+            <div id="dynamicFieldsContainer"
+                style="display: none; flex-basis: 100%; flex-wrap: wrap; gap: 8px; margin-top: 10px;"></div>
 
-        <button class="action" id="saveBtn" onclick="saveCustomer()">Save</button>
-        <button class="clear" onclick="confirmClearForm()">Clear</button>
+            <button class="action" id="saveBtn" onclick="saveCustomer()">Save</button>
+            <button class="clear" onclick="confirmClearForm()">Clear</button>
         </div>
     </div>
 
@@ -1256,7 +1345,8 @@
                           <th>Sl. No</th>`;
 
             orderedCols.forEach(c => {
-                thHtml += `<th style="cursor:pointer;" onclick="handleHeaderClick('${c.id}')">${c.label} <span id="sort-icon-${c.id}"></span></th>`;
+                const icon = currentSortColumn === c.id ? (currentSortDirection === 'asc' ? '▲' : '▼') : '';
+                thHtml += `<th data-id="${c.id}" style="cursor:pointer;" onclick="handleHeaderClick('${c.id}')">${c.label} <span id="sort-icon-${c.id}">${icon}</span></th>`
             });
 
             thHtml += `<th style="width: 120px;">Actions</th>`;
@@ -1828,11 +1918,11 @@
             currentCustomerAttachments = cust.attachments || [];
             renderCustomerAttachments();
             renderDynamicFields(cust);
-            
+
             if (!isCustomerFormVisible) {
                 toggleCustomerForm();
             }
-            
+
             document.getElementById("custName").focus();
         }
 
@@ -2160,7 +2250,7 @@
             dynamicFieldsList.forEach(cf => {
                 if (cf.showGrandTotal) grandTotals[cf.fieldName] = 0;
             });
-            
+
             if (filteredList.length > 0) {
                 filteredList.forEach(c => {
                     dynamicFieldsList.forEach(cf => {
@@ -2678,9 +2768,11 @@
             applyGreyButtons();
             populateStateDropdown();
             updateColumnStyles();
+            loadColumnWidths();
+            enableColumnResizing();
             applyButtonVisibility();
             updateActionButtonsVisibility();
-        applyCustomerFormVisibility();
+            applyCustomerFormVisibility();
 
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 if (currentTheme === "system") {
