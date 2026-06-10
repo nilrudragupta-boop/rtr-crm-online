@@ -1810,32 +1810,36 @@
                 if (fullFilteredList.length > 0) {
                     let tfootHtml = `<tr style="font-weight: bold; background: #f8f9fa;">`;
                     
-                    let firstTotalColIdx = columnOrder.findIndex(idx => idx === 12 || (colDefinitions[idx] && colDefinitions[idx].isCustom && colDefinitions[idx].fieldDef && colDefinitions[idx].fieldDef.showGrandTotal));
-                    if (firstTotalColIdx === -1) firstTotalColIdx = columnOrder.length;
+                    let firstTotalLogical = columnOrder.find(idx => (idx === 12 || (colDefinitions[idx] && colDefinitions[idx].isCustom && colDefinitions[idx].fieldDef && colDefinitions[idx].fieldDef.showGrandTotal)) && columnVisibility[idx]);
+                    let lastVisibleBeforeTotal = -1;
                     
-                    let startCols = firstTotalColIdx;
-                    if (startCols > 0) {
-                        tfootHtml += `<td colspan="${startCols}" style="text-align: right; color: #2c3e50;">Grand Totals:</td>`;
-                    }
-                    
-                    for (let i = firstTotalColIdx; i < columnOrder.length; i++) {
-                        let idx = columnOrder[i];
-                        if (colDefinitions[idx]) {
-                            const colDef = colDefinitions[idx];
-                            if (colDef.isCustom && colDef.fieldDef && colDef.fieldDef.showGrandTotal) {
-                                let val = grandTotals[colDef.fieldDef.fieldName] || 0;
-                                let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: colDef.fieldDef.currencyDecimals ?? 2, maximumFractionDigits: colDef.fieldDef.currencyDecimals ?? 2 });
-                                if (colDef.fieldDef.prefix || colDef.fieldDef.currencySymbol) formattedVal = (colDef.fieldDef.prefix || colDef.fieldDef.currencySymbol) + ' ' + formattedVal;
-                                if (colDef.fieldDef.suffix) formattedVal = formattedVal + ' ' + colDef.fieldDef.suffix;
-                                tfootHtml += `<td>${formattedVal}</td>`;
-                            } else if (idx === 12) {
-                                tfootHtml += `<td style="font-weight:bold; color:${totalDueSum > 0 ? '#dc3545' : '#28a745'}">₹${totalDueSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-                            } else if (!colDef.isAction) {
-                                tfootHtml += `<td></td>`;
+                    if (firstTotalLogical !== undefined) {
+                        const firstTotalVisIdx = columnOrder.indexOf(firstTotalLogical);
+                        for (let i = firstTotalVisIdx - 1; i >= 0; i--) {
+                            if (columnVisibility[columnOrder[i]]) {
+                                lastVisibleBeforeTotal = columnOrder[i];
+                                break;
                             }
                         }
                     }
-                    tfootHtml += `<td></td></tr>`;
+
+                    columnOrder.forEach(idx => {
+                        if (idx === 12) {
+                            tfootHtml += `<td style="font-weight:bold; color:${totalDueSum > 0 ? '#dc3545' : '#28a745'}">₹${totalDueSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                        } else if (colDefinitions[idx] && colDefinitions[idx].isCustom && colDefinitions[idx].fieldDef && colDefinitions[idx].fieldDef.showGrandTotal) {
+                            let val = grandTotals[colDefinitions[idx].fieldDef.fieldName] || 0;
+                            let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: colDefinitions[idx].fieldDef.currencyDecimals ?? 2, maximumFractionDigits: colDefinitions[idx].fieldDef.currencyDecimals ?? 2 });
+                            if (colDefinitions[idx].fieldDef.prefix || colDefinitions[idx].fieldDef.currencySymbol) formattedVal = (colDefinitions[idx].fieldDef.prefix || colDefinitions[idx].fieldDef.currencySymbol) + ' ' + formattedVal;
+                            if (colDefinitions[idx].fieldDef.suffix) formattedVal = formattedVal + ' ' + colDefinitions[idx].fieldDef.suffix;
+                            tfootHtml += `<td>${formattedVal}</td>`;
+                        } else if (idx === lastVisibleBeforeTotal) {
+                            tfootHtml += `<td style="text-align: right; color: #2c3e50;">Grand Totals:</td>`;
+                        } else {
+                            tfootHtml += `<td></td>`;
+                        }
+                    });
+
+                    tfootHtml += `</tr>`;
                     tfoot.innerHTML = tfootHtml;
                 } else {
                     tfoot.innerHTML = '';
