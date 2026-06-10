@@ -292,6 +292,84 @@
             color: #666;
         }
 
+        /* Action Dropdown Menu */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .action-btn-main {
+            background-color: #607d8b;
+            color: white;
+            padding: 6px 12px;
+            font-size: 13px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .action-dropdown-content {
+            display: none;
+            position: fixed;
+            background-color: #fff;
+            min-width: 140px;
+            box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 0;
+            text-align: left;
+        }
+
+        .action-dropdown-content button {
+            color: #333 !important;
+            background: none !important;
+            padding: 8px 16px !important;
+            text-decoration: none !important;
+            display: block !important;
+            width: 100% !important;
+            text-align: left !important;
+            border: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            font-weight: normal !important;
+            font-size: 13px !important;
+        }
+
+        .action-dropdown-content button:hover {
+            background-color: #f1f1f1 !important;
+            color: #000 !important;
+        }
+
+        .action-dropdown.active .action-dropdown-content {
+            display: block;
+        }
+
+        body.dark-mode .action-dropdown-content {
+            background-color: #2c2c2c;
+            border-color: #444;
+        }
+
+        body.dark-mode .action-dropdown-content button {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode .action-dropdown-content button:hover {
+            background-color: #3a3a3a !important;
+            color: #fff !important;
+        }
+
+        body.dark-mode #viewModal table th {
+            background: #1f1f1f !important;
+            color: #fff;
+        }
+
+        body.dark-mode #viewModal table td {
+            color: #e0e0e0;
+        }
+
         /* Resizable Columns */
         #contactsTable th {
             position: relative;
@@ -468,6 +546,24 @@
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn-secondary" onclick="closeContactModal()">Cancel</button>
                 <button class="btn-success" onclick="saveContact()">Save Contact</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Contact Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content" style="width: 600px; max-width: 90%;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin: 0; color: #2c3e50;">👁️ Contact Details</h3>
+                <span class="close-modal" onclick="closeViewModal()">&times;</span>
+            </div>
+            <div id="viewContent" style="max-height: 60vh; overflow-y: auto; text-align: left;">
+                <!-- Details injected here -->
+            </div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button class="btn-primary" id="btnEditFromView" style="margin-right: 5px;">Edit</button>
+                <button class="btn-secondary" onclick="closeViewModal()">Close</button>
             </div>
         </div>
     </div>
@@ -1258,11 +1354,18 @@
                     }
                 });
 
-                trHtml += `<td style="text-align: center; white-space: nowrap;">
-                    <button class="btn-info" style="padding: 4px 8px; font-size: 12px;" onclick="openAttachmentsModal('${c._id}')" title="Attachments"><i class="fas fa-paperclip"></i>${attachBadge}</button>
-                    <button class="btn-warning" style="padding: 4px 8px; font-size: 12px; margin: 0 4px;" onclick="editContact('${c._id}')" title="Edit"><i class="fas fa-pen"></i></button>
-                    <button class="btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteContact('${c._id}')" title="Delete"><i class="fas fa-trash"></i></button>
-                </td>`;
+                let actionsHtml = `
+                    <div class="action-dropdown" id="actionDropdown-${c._id}">
+                        <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
+                        <div class="action-dropdown-content">
+                            <button onclick="viewContact('${c._id}')">👁️ View</button>
+                            <button onclick="openAttachmentsModal('${c._id}')">📎 Attachments${attachCount > 0 ? ` (${attachCount})` : ''}</button>
+                            <button onclick="editContact('${c._id}')">✏️ Edit</button>
+                            <button onclick="deleteContact('${c._id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
+                        </div>
+                    </div>`;
+
+                trHtml += `<td style="text-align: center; white-space: nowrap;">${actionsHtml}</td>`;
 
                 htmlBuffer += `<tr>${trHtml}</tr>`;
             });
@@ -1467,6 +1570,74 @@
         function closeContactModal() {
             document.getElementById('contactModal').style.display = 'none';
         }
+
+        function viewContact(id) {
+            const c = contactsData.find(x => x._id === id);
+            if (!c) return;
+
+            let html = `
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;">
+                    <tr><th style="width:40%; padding:8px; background:#f8f9fa;">Prefix</th><td style="padding:8px;">${escapeHtml(c.prefix || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Name</th><td style="padding:8px;">${escapeHtml(c.name)}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Company</th><td style="padding:8px;">${escapeHtml(c.company || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Type</th><td style="padding:8px;">${escapeHtml(c.contactType || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Designation</th><td style="padding:8px;">${escapeHtml(c.designation || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Department</th><td style="padding:8px;">${escapeHtml(c.department || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Mobile(s)</th><td style="padding:8px;">${escapeHtml(c.mobile || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Email</th><td style="padding:8px;">${escapeHtml(c.email || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Remarks</th><td style="padding:8px;">${escapeHtml(c.remarks || '-')}</td></tr>
+                </table>
+            `;
+
+            if (dynamicFieldsList && dynamicFieldsList.length > 0) {
+                html += `<h4 style="margin-top:20px; margin-bottom:10px; color:#2c3e50; border-bottom:1px solid #eee; padding-bottom:5px;">Extra Fields</h4>
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;">`;
+                dynamicFieldsList.forEach(f => {
+                    let val = c[f.fieldName];
+                    if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                    html += `<tr><th style="width:40%; padding:8px; background:#f8f9fa;">${escapeHtml(f.fieldLabel)}</th><td style="padding:8px;">${val !== undefined && val !== null && val !== '' ? escapeHtml(String(val)) : '-'}</td></tr>`;
+                });
+                html += `</table>`;
+            }
+
+            document.getElementById('viewContent').innerHTML = html;
+            document.getElementById('btnEditFromView').onclick = () => { closeViewModal(); editContact(id); };
+            document.getElementById('viewModal').style.display = 'flex';
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
+        }
+
+        function toggleActionMenu(btn) {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => {
+                if (d !== btn.parentElement) d.classList.remove('active');
+            });
+            const dropdown = btn.parentElement;
+            dropdown.classList.toggle('active');
+            if (dropdown.classList.contains('active')) {
+                const content = dropdown.querySelector('.action-dropdown-content');
+                content.style.display = 'block';
+                const rect = btn.getBoundingClientRect();
+                let top = rect.bottom;
+                let left = rect.right - content.offsetWidth;
+                if (top + content.offsetHeight > window.innerHeight) { top = rect.top - content.offsetHeight; }
+                content.style.top = top + 'px';
+                content.style.left = left + 'px';
+                content.style.display = '';
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.matches('.action-btn-main')) {
+                document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
+            }
+        });
+
+        window.addEventListener('scroll', function () {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
+        }, true);
+
 
         // --- Attachments Logic ---
         function openAttachmentsModal(id) {
