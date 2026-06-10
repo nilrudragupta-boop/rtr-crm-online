@@ -1083,6 +1083,25 @@
         </div>
     </div>
 
+    <!-- View Customer Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content" style="max-width: 600px; text-align: left;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin:0; color: #2c3e50;">👁️ Customer Details</h3>
+                <button class="close-btn" onclick="closeViewModal()"
+                    style="padding: 2px 8px; font-size: 16px; background: #dc3545; border: none; color: white; border-radius: 4px; cursor: pointer;">&times;</button>
+            </div>
+            <div id="viewContent" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Details injected here -->
+            </div>
+            <div class="modal-buttons" style="margin-top: 15px; display: block; text-align: right;">
+                <button class="action" id="btnEditFromView" style="margin-right: 5px;">Edit</button>
+                <button class="clear" onclick="closeViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Table Settings Modal -->
     <div id="settingsModal" class="modal">
         <div class="modal-content" style="width: 400px; max-height: 85vh; overflow-y: auto;">
@@ -1109,6 +1128,10 @@
                 <h5 style="font-size: 1rem; margin-top: 15px;" class="text-secondary">Action Buttons</h5>
                 <div
                     style="margin-left: 15px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
+                        <input type="checkbox" id="showActionView"
+                            onchange="toggleActionButton('view', this.checked)"> View
+                    </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
                         <input type="checkbox" id="showActionInvoice"
                             onchange="toggleActionButton('invoice', this.checked)"> Invoice
@@ -1273,6 +1296,7 @@
 
         // Action Button Visibility
         let actionButtonVisibility = JSON.parse(localStorage.getItem("customerActionButtons")) || {
+            view: true,
             invoice: true,
             ledger: true,
             edit: true,
@@ -1283,6 +1307,10 @@
 
         if (actionButtonVisibility.receipt === undefined) {
             actionButtonVisibility.receipt = true;
+            localStorage.setItem("customerActionButtons", JSON.stringify(actionButtonVisibility));
+        }
+        if (actionButtonVisibility.view === undefined) {
+            actionButtonVisibility.view = true;
             localStorage.setItem("customerActionButtons", JSON.stringify(actionButtonVisibility));
         }
 
@@ -1778,6 +1806,7 @@
             <div class="action-dropdown" id="actionDropdown-${c.id}">
                 <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
                 <div class="action-dropdown-content">
+                    <button class="btn-action-view" data-action="view" data-id="${c.id}">👁️ View</button>
                     <button class="btn-action-invoice" data-name="${escapeHtml(c.name)}" onclick="openInvoice(this.getAttribute('data-name'))">📄 Invoice</button>
                     <button class="btn-action-ledger" data-name="${escapeHtml(c.name)}" onclick="openLedger(this.getAttribute('data-name'))">📒 Ledger</button>
                     <button class="edit-btn btn-action-edit" data-action="edit" data-id="${c.id}" data-permission-id="perm_manage_customers">✏️ Edit</button>
@@ -1815,10 +1844,54 @@
                 pendingEditId = id;
                 openEditModal();
             }
+            else if (action === "view") {
+                viewCustomer(id);
+            }
             else if (action === "delete") deleteCustomer(id);
             else if (action === "attach") openManageAttachments(id);
             else if (action === "receipt") handleCustomerReceipt(id);
         });
+
+        function viewCustomer(id) {
+            const cust = customers.find(c => String(c.id) === String(id));
+            if (!cust) return showToast("Customer not found", "toast-warning");
+
+            let html = `
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;">
+                    <tr><th style="width:40%; padding:8px; background:#f8f9fa;">Name</th><td style="padding:8px;">${escapeHtml(cust.name)}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Address</th><td style="padding:8px;">${escapeHtml(cust.address || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Contact</th><td style="padding:8px;">${escapeHtml(cust.contact || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Email</th><td style="padding:8px;">${escapeHtml(cust.email || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">PIN Code</th><td style="padding:8px;">${escapeHtml(cust.pin || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">District</th><td style="padding:8px;">${escapeHtml(cust.district || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">State</th><td style="padding:8px;">${escapeHtml(cust.state || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">State Code</th><td style="padding:8px;">${escapeHtml(cust.stateCode || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">GSTIN</th><td style="padding:8px;">${escapeHtml(cust.gst || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Credit Limit</th><td style="padding:8px;">${cust.creditLimit ? '₹ ' + parseFloat(cust.creditLimit).toFixed(2) : 'Unlimited'}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Opening Balance</th><td style="padding:8px;">${cust.openingBalance ? ('₹ ' + cust.openingBalance + ' ' + (cust.openingBalanceType || 'Dr')) : '-'}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Total Outstanding</th><td style="padding:8px; font-weight:bold; color:${(cust.outstanding || calculateOutstanding(cust) || 0) > 0.01 ? '#dc3545' : '#28a745'};">₹ ${(cust.outstanding || calculateOutstanding(cust) || 0).toFixed(2)}</td></tr>
+                </table>
+            `;
+
+            if (dynamicFieldsList && dynamicFieldsList.length > 0) {
+                html += `<h4 style="margin-top:20px; margin-bottom:10px; color:#2c3e50; border-bottom:1px solid #eee; padding-bottom:5px;">Extra Fields</h4>
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;">`;
+                dynamicFieldsList.forEach(f => {
+                    let val = cust[f.fieldName];
+                    if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                    html += `<tr><th style="width:40%; padding:8px; background:#f8f9fa;">${escapeHtml(f.fieldLabel)}</th><td style="padding:8px;">${val !== undefined && val !== null && val !== '' ? escapeHtml(String(val)) : '-'}</td></tr>`;
+                });
+                html += `</table>`;
+            }
+
+            document.getElementById('viewContent').innerHTML = html;
+            document.getElementById('btnEditFromView').onclick = () => { closeViewModal(); pendingEditId = id; openEditModal(); };
+            document.getElementById('viewModal').style.display = 'flex';
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
+        }
 
         function renderDynamicFields(existingData = {}) {
             const container = document.getElementById('dynamicFieldsContainer');
@@ -2647,6 +2720,7 @@
                 }
             }
 
+            document.getElementById("showActionView").checked = actionButtonVisibility.view;
             document.getElementById("showActionInvoice").checked = actionButtonVisibility.invoice;
             document.getElementById("showActionLedger").checked = actionButtonVisibility.ledger;
             document.getElementById("showActionEdit").checked = actionButtonVisibility.edit;
@@ -2736,6 +2810,7 @@
                 document.head.appendChild(style);
             }
             let css = '';
+            if (!actionButtonVisibility.view) css += `.btn-action-view, .action-dropdown-content .btn-action-view { display: none !important; }\n`;
             if (!actionButtonVisibility.invoice) css += `.btn-action-invoice, .action-dropdown-content .btn-action-invoice { display: none !important; }\n`;
             if (!actionButtonVisibility.ledger) css += `.btn-action-ledger, .action-dropdown-content .btn-action-ledger { display: none !important; }\n`;
             if (!actionButtonVisibility.edit) css += `.btn-action-edit, .action-dropdown-content .btn-action-edit { display: none !important; }\n`;
