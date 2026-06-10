@@ -431,6 +431,7 @@
             <table id="customTable">
                 <thead id="customTableHead"></thead>
                 <tbody id="customTableBody"></tbody>
+                <tfoot id="customTableFoot"></tfoot>
             </table>
         </div>
 
@@ -1032,6 +1033,80 @@
 
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
             updateBulkDeleteBtn();
+
+            const tfoot = document.getElementById('customTableFoot');
+            if (tfoot) {
+                let hasTotals = false;
+                const totals = {};
+                
+                visibleFields.forEach(f => {
+                    if (['number', 'currency', 'calculated'].includes(f.fieldType) && f.showGrandTotal) {
+                        hasTotals = true;
+                        totals[f.fieldName] = 0;
+                    }
+                });
+
+                if (hasTotals && currentFilteredData.length > 0) {
+                    currentFilteredData.forEach(row => {
+                        visibleFields.forEach(f => {
+                            if (totals[f.fieldName] !== undefined) {
+                                let val = 0;
+                                if (f.fieldType === 'calculated' && f.calculationFormula) {
+                                    try {
+                                        let formula = f.calculationFormula.toString();
+                                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+
+                                        const currentState = {};
+                                        currentCustomFields.forEach(cf => {
+                                            let v = row[cf.fieldName];
+                                            if (v === undefined || v === null) v = '';
+                                            if (['number', 'currency', 'calculated'].includes(cf.fieldType)) {
+                                                let clean = String(v).replace(/[^0-9.-]/g, '');
+                                                const num = Number(clean);
+                                                currentState[cf.fieldName] = (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                            } else {
+                                                const num = Number(v);
+                                                currentState[cf.fieldName] = (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                            }
+                                        });
+                                        
+                                        const keys = Object.keys(currentState);
+                                        const vals = Object.values(currentState);
+
+                                        let calcRes = new Function(...keys, `return ${formula};`)(...vals);
+                                        if (typeof calcRes === 'number' && isFinite(calcRes)) val = calcRes;
+                                    } catch (e) { console.error("Calculation error for field", f.fieldName, e); }
+                                } else {
+                                    let rawVal = row[f.fieldName];
+                                    let clean = String(rawVal).replace(/[^0-9.-]/g, '');
+                                    val = parseFloat(clean) || 0;
+                                }
+                                totals[f.fieldName] += val;
+                            }
+                        });
+                    });
+
+                    let tfootHTML = `<tr style="font-weight: 600; background: #f8f9fa; border-top: 2px solid var(--slds-border); color: var(--slds-text);">
+                        <td colspan="2" style="text-align: right; padding: 12px;">Grand Total:</td>`;
+                    
+                    visibleFields.forEach(f => {
+                        if (totals[f.fieldName] !== undefined) {
+                            let val = totals[f.fieldName];
+                            let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                            if (f.prefix || f.currencySymbol) formattedVal = (f.prefix || f.currencySymbol) + ' ' + formattedVal;
+                            if (f.suffix) formattedVal = formattedVal + ' ' + f.suffix;
+                            tfootHTML += `<td style="padding: 12px; font-weight: bold;">${formattedVal}</td>`;
+                        } else {
+                            tfootHTML += `<td></td>`;
+                        }
+                    });
+                    tfootHTML += `<td></td></tr>`;
+                    tfoot.innerHTML = tfootHTML;
+                } else {
+                    tfoot.innerHTML = '';
+                }
+            }
 
             requestAnimationFrame(() => {
                 loadColumnWidths();
