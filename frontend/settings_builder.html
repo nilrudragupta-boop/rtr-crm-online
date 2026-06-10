@@ -1700,9 +1700,10 @@
                 return;
             }
 
+            let htmlBuffer = '';
             fields.forEach(field => {
-                const tr = document.createElement('tr');
-                if (!search) { tr.draggable = true; tr.dataset.fieldId = field._id; }
+                let trAttrs = '';
+                if (!search) { trAttrs = `draggable="true" data-field-id="${field._id}"`; }
 
                 const typeDef = CF_TYPES.find(t => t.value === field.fieldType) || { icon: 'fas fa-question', label: field.fieldType };
                 const badgeClass = TYPE_BADGE_CLASS[field.fieldType] || 'tb-text';
@@ -1718,7 +1719,7 @@
                     lookupDisplayStr = ` <span style="opacity:0.8; font-weight:normal; margin-left:3px;">→ ${lModDisplay}</span>`;
                 }
 
-                tr.innerHTML = `
+                let trHtml = `
                     <td style="text-align:center">
                         ${!search ? `<i class="fas fa-grip-vertical cfm-grip"></i>` : ''}
                     </td>
@@ -1755,8 +1756,9 @@
                             <i class="fas fa-trash-alt"></i>
                         </button>
                     </td>`;
-                tbody.appendChild(tr);
+                htmlBuffer += `<tr ${trAttrs}>${trHtml}</tr>`;
             });
+            tbody.innerHTML = htmlBuffer;
 
             if (!search) addDragAndDropListeners(tbody);
         }

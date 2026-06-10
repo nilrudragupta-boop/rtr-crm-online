@@ -853,6 +853,28 @@
             const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
             const paginatedData = currentFilteredData.slice(startIndex, endIndex);
 
+            // Precompile calculated formulas
+            const compiledFormulas = {};
+            const fieldTypeMap = {};
+            currentCustomFields.forEach(cf => {
+                fieldTypeMap[cf.fieldName] = cf.fieldType;
+                if (cf.fieldType === 'calculated' && cf.calculationFormula) {
+                    try {
+                        let formula = cf.calculationFormula.toString();
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+                        const keys = currentCustomFields.map(c => c.fieldName);
+                        compiledFormulas[cf.fieldName] = {
+                            keys: keys,
+                            fn: new Function(...keys, `return ${formula};`)
+                        };
+                    } catch (e) {
+                        console.error("Formula compilation error", e);
+                    }
+                }
+            });
+
+            let htmlBuffer = '';
             if (paginatedData.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${visibleFields.length + 3}" style="text-align:center; padding: 30px;">No records found.</td></tr>`;
             } else {
@@ -862,31 +884,26 @@
                         let val;
                         if (f.fieldType === 'calculated' && f.calculationFormula) {
                             try {
-                                let formula = f.calculationFormula.toString();
-                                // Auto-correct missing braces around field keys for backwards compatibility
-                                formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
-                                formula = formula.replace(/\{(\w+)\}/g, '$1');
-
-                                const currentState = {};
-                                currentCustomFields.forEach(cf => {
-                                    let v = row[cf.fieldName];
+                                 if (compiledFormulas[f.fieldName]) {
+                                const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                    let v = row[key];
                                     if (v === undefined || v === null) v = '';
-                                    if (['number', 'currency', 'calculated'].includes(cf.fieldType)) {
+                                    const fType = fieldTypeMap[key];
+                                    if (['number', 'currency', 'calculated'].includes(fType)) {
                                         let clean = String(v).replace(/[^0-9.-]/g, '');
                                         const num = Number(clean);
-                                        currentState[cf.fieldName] = (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                        return (!isNaN(num) && clean.trim() !== '') ? num : v;
                                     } else {
                                         const num = Number(v);
-                                        currentState[cf.fieldName] = (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                        return (!isNaN(num) && String(v).trim() !== '') ? num : v;
                                     }
                                 });
-                                
-                                const keys = Object.keys(currentState);
-                                const vals = Object.values(currentState);
-
-                                val = new Function(...keys, `return ${formula};`)(...vals);
+                                val = compiledFormulas[f.fieldName].fn(...vals);
                                 if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
                                 if (val === undefined || val === null) val = '';
+                            } else {
+                                val = '#CALC!';
+                            }
                             } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
                         } else if (f.fieldType === 'url') {
                             const rawVal = row[f.fieldName];
@@ -1027,8 +1044,9 @@
                             </div>
                         </div>
                     </td></tr>`;
-                    tbody.innerHTML += tr;
+                    htmlBuffer += tr;
                 });
+                tbody.innerHTML = htmlBuffer;
             }
 
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
@@ -1053,29 +1071,23 @@
                                 let val = 0;
                                 if (f.fieldType === 'calculated' && f.calculationFormula) {
                                     try {
-                                        let formula = f.calculationFormula.toString();
-                                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
-                                        formula = formula.replace(/\{(\w+)\}/g, '$1');
-
-                                        const currentState = {};
-                                        currentCustomFields.forEach(cf => {
-                                            let v = row[cf.fieldName];
-                                            if (v === undefined || v === null) v = '';
-                                            if (['number', 'currency', 'calculated'].includes(cf.fieldType)) {
-                                                let clean = String(v).replace(/[^0-9.-]/g, '');
-                                                const num = Number(clean);
-                                                currentState[cf.fieldName] = (!isNaN(num) && clean.trim() !== '') ? num : v;
-                                            } else {
-                                                const num = Number(v);
-                                                currentState[cf.fieldName] = (!isNaN(num) && String(v).trim() !== '') ? num : v;
-                                            }
-                                        });
-                                        
-                                        const keys = Object.keys(currentState);
-                                        const vals = Object.values(currentState);
-
-                                        let calcRes = new Function(...keys, `return ${formula};`)(...vals);
-                                        if (typeof calcRes === 'number' && isFinite(calcRes)) val = calcRes;
+                                        if (compiledFormulas[f.fieldName]) {
+                                            const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                                let v = row[key];
+                                                if (v === undefined || v === null) v = '';
+                                                const fType = fieldTypeMap[key];
+                                                if (['number', 'currency', 'calculated'].includes(fType)) {
+                                                    let clean = String(v).replace(/[^0-9.-]/g, '');
+                                                    const num = Number(clean);
+                                                    return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                                } else {
+                                                    const num = Number(v);
+                                                    return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                                }
+                                            });
+                                            let calcRes = compiledFormulas[f.fieldName].fn(...vals);
+                                            if (typeof calcRes === 'number' && isFinite(calcRes)) val = calcRes;
+                                        }
                                     } catch (e) { console.error("Calculation error for field", f.fieldName, e); }
                                 } else {
                                     let rawVal = row[f.fieldName];
@@ -1549,37 +1561,53 @@
             const data = allData.filter(r => r.createdBy === currentUser);
             if (data.length === 0) return alert("No data to export.");
 
+            // Precompile calculated formulas
+            const compiledFormulas = {};
+            const fieldTypeMap = {};
+            currentCustomFields.forEach(cf => {
+                fieldTypeMap[cf.fieldName] = cf.fieldType;
+                if (cf.fieldType === 'calculated' && cf.calculationFormula) {
+                    try {
+                        let formula = cf.calculationFormula.toString();
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+                        const keys = currentCustomFields.map(c => c.fieldName);
+                        compiledFormulas[cf.fieldName] = {
+                            keys: keys,
+                            fn: new Function(...keys, `return ${formula};`)
+                        };
+                    } catch (e) {
+                        console.error("Formula compilation error", e);
+                    }
+                }
+            });
+
             const exportData = data.map(row => {
                 const obj = { 'Record ID': row.id || row._id };
                 currentCustomFields.forEach(f => {
                     let val;
                     if (f.fieldType === 'calculated' && f.calculationFormula) {
                         try {
-                            let formula = f.calculationFormula.toString();
-                            // Auto-correct missing braces around field keys
-                            formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
-                            formula = formula.replace(/\{(\w+)\}/g, '$1');
-
-                            const currentState = {};
-                            currentCustomFields.forEach(cf => {
-                                let v = row[cf.fieldName];
-                                if (v === undefined || v === null) v = '';
-                                if (['number', 'currency', 'calculated'].includes(cf.fieldType)) {
-                                    let clean = String(v).replace(/[^0-9.-]/g, '');
-                                    const num = Number(clean);
-                                    currentState[cf.fieldName] = (!isNaN(num) && clean.trim() !== '') ? num : v;
-                                } else {
-                                    const num = Number(v);
-                                    currentState[cf.fieldName] = (!isNaN(num) && String(v).trim() !== '') ? num : v;
-                                }
-                            });
-                            
-                            const keys = Object.keys(currentState);
-                            const vals = Object.values(currentState);
-
-                            val = new Function(...keys, `return ${formula};`)(...vals);
-                            if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
-                            if (val === undefined || val === null) val = '';
+                            if (compiledFormulas[f.fieldName]) {
+                                const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                    let v = row[key];
+                                    if (v === undefined || v === null) v = '';
+                                    const fType = fieldTypeMap[key];
+                                    if (['number', 'currency', 'calculated'].includes(fType)) {
+                                        let clean = String(v).replace(/[^0-9.-]/g, '');
+                                        const num = Number(clean);
+                                        return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                    } else {
+                                        const num = Number(v);
+                                        return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                    }
+                                });
+                                val = compiledFormulas[f.fieldName].fn(...vals);
+                                if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
+                                if (val === undefined || val === null) val = '';
+                            } else {
+                                val = '#CALC!';
+                            }
                         } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
                         } else if (f.fieldType === 'richtext') {
                             const tempDiv = document.createElement('div');
