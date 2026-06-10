@@ -401,6 +401,8 @@
         <h2><i class="fas fa-address-book"></i> Contacts Directory</h2>
         <div>
             <button class="btn-primary" onclick="openContactModal()"><i class="fas fa-plus"></i> New Contact</button>
+            <button class="btn-danger" id="bulkDeleteBtn" onclick="deleteSelectedContacts()" style="display:none;"><i
+                    class="fas fa-trash"></i> Delete Selected</button>
             <button class="btn-warning" id="btnExportPdf" onclick="exportContactsPDF()"><i class="fas fa-file-pdf"></i>
                 Export
                 PDF</button>
@@ -649,6 +651,19 @@
         </div>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h3 style="color: #c0392b;">🗑️ Confirm Deletion</h3>
+            <p id="modalMessage">Are you sure you want to delete?</p>
+            <div class="modal-buttons" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+                <button class="btn-danger" onclick="confirmDelete()">Yes, Delete</button>
+                <button class="btn-secondary" onclick="closeConfirmationModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
     <script>
         const MODULE_NAME = "Contacts";
         let contactsData = [];
@@ -659,6 +674,8 @@
         let currentSortDirection = 'asc';
         let columnVisibility = JSON.parse(localStorage.getItem('contactsColumnVis')) || {};
         let dynamicFieldsList = [];
+        let idsToDelete = [];
+
 
         let savedButtonVisibility = JSON.parse(localStorage.getItem("contactsButtonVisibility")) || {};
         let buttonVisibility = {
@@ -1235,7 +1252,7 @@
             const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
 
             const theadTr = document.getElementById('contactsHeadRow');
-            let thHtml = `<th style="width: 50px; text-align: center;">SL</th>`;
+            let thHtml = `<th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th><th style="width: 50px; text-align: center;">SL</th>`;
             orderedCols.forEach(c => {
                 let widthStyle = '';
                 if (c.id === 'mobile' || c.id === 'company') widthStyle = 'width: 140px;';
@@ -1273,7 +1290,7 @@
             });
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${orderedCols.length + 2}" style="text-align: center; padding: 20px; color: #666;">No contacts found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${orderedCols.length + 3}" style="text-align: center; padding: 20px; color: #666;">No contacts found.</td></tr>`;
                 renderPagination(0, 0, 0, 1);
                 const tfoot = document.getElementById('contactsFootRow');
                 if (tfoot) tfoot.innerHTML = '';
@@ -1298,7 +1315,7 @@
 
                 const fullName = c.prefix ? `${c.prefix} ${c.name}` : c.name;
 
-                let trHtml = `<td style="text-align: center;">${startIndex + index + 1}</td>`;
+                let trHtml = `<td style="text-align: center;"><input type="checkbox" class="contact-checkbox" value="${c._id}" onchange="toggleRowSelection()"></td><td style="text-align: center;">${startIndex + index + 1}</td>`;
 
                 orderedCols.forEach(col => {
                     if (col.id === 'name') {
@@ -1370,6 +1387,11 @@
                 htmlBuffer += `<tr>${trHtml}</tr>`;
             });
             tbody.innerHTML = htmlBuffer;
+
+            const selectAll = document.getElementById("selectAll");
+            if (selectAll) selectAll.checked = false;
+            updateBulkDeleteBtn();
+
 
             renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
 
@@ -1794,6 +1816,72 @@
                     saveColumnWidths();
                 }
             });
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById("selectAll");
+            const checkboxes = document.querySelectorAll(".contact-checkbox");
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateBulkDeleteBtn();
+        }
+
+        function toggleRowSelection() {
+            const selectAll = document.getElementById("selectAll");
+            const checkboxes = document.querySelectorAll(".contact-checkbox");
+            if (checkboxes.length > 0) {
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+                if (selectAll) {
+                    selectAll.checked = allChecked;
+                    selectAll.indeterminate = !allChecked && someChecked;
+                }
+            }
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const checkedCount = document.querySelectorAll(".contact-checkbox:checked").length;
+            const btn = document.getElementById("bulkDeleteBtn");
+            if (btn) {
+                btn.style.display = checkedCount > 0 ? "inline-block" : "none";
+                btn.innerHTML = `<i class="fas fa-trash"></i> Delete Selected (${checkedCount})`;
+            }
+        }
+
+        function deleteSelectedContacts() {
+            const checkboxes = document.querySelectorAll(".contact-checkbox:checked");
+            if (checkboxes.length === 0) return alert("Please select contacts to delete.");
+
+            idsToDelete = Array.from(checkboxes).map(cb => cb.value);
+            document.getElementById("modalMessage").innerText = `Are you sure you want to delete ${idsToDelete.length} selected contact(s)?`;
+            document.getElementById("confirmationModal").style.display = "flex";
+        }
+
+        function closeConfirmationModal() {
+            document.getElementById("confirmationModal").style.display = "none";
+            idsToDelete = [];
+        }
+
+        async function confirmDelete() {
+            if (idsToDelete.length === 0) return;
+
+            for (let id of idsToDelete) {
+                try {
+                    if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
+                        await apiClient.deleteCustomRecord(id);
+                    } else {
+                        await fetch(`/api/custom-records/${id}`, { method: 'DELETE' });
+                    }
+                } catch (e) {
+                    console.warn("Deleted locally (API Offline)");
+                }
+            }
+
+            contactsData = contactsData.filter(c => !idsToDelete.includes(c._id));
+            localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+
+            closeConfirmationModal();
+            applySearch();
         }
 
         function saveColumnWidths() {
