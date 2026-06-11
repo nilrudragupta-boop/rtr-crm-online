@@ -469,6 +469,24 @@
         </div>
     </div>
 
+    <!-- View Record Modal -->
+    <div id="viewRecordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">View Record</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeViewRecordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;" id="viewRecordContent">
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeViewRecordModal()">Close</button>
+                <button class="primary" id="btnEditFromView">Edit</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Table Settings Modal -->
     <div id="tableSettingsModal" class="modal">
         <div class="modal-content">
@@ -1038,6 +1056,7 @@
                         <div class="action-dropdown" id="actionDropdown-${row.id}">
                             <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
                             <div class="action-dropdown-content">
+                                <button onclick="viewCustomRecord('${row.id}')">👁️ View</button>
                                 <button onclick="editCustomRecord('${row.id}')">✏️ Edit</button>
                                 <button onclick="duplicateCustomRecord('${row.id}')">📋 Duplicate</button>
                                 <button onclick="deleteCustomRecord('${row.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
@@ -1394,6 +1413,146 @@
         function closeCustomRecordModal() {
             editCustomRecordId = null;
             document.getElementById('customRecordModal').style.display = 'none';
+        }
+
+        function closeViewRecordModal() {
+            document.getElementById('viewRecordModal').style.display = 'none';
+        }
+
+        function viewCustomRecord(id) {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = data.find(r => r.id === id || r._id === id);
+            if (!record) return;
+
+            const content = document.getElementById('viewRecordContent');
+            let html = '';
+
+            const compiledFormulas = {};
+            const fieldTypeMap = {};
+            currentCustomFields.forEach(cf => {
+                fieldTypeMap[cf.fieldName] = cf.fieldType;
+                if (cf.fieldType === 'calculated' && cf.calculationFormula) {
+                    try {
+                        let formula = cf.calculationFormula.toString();
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+                        const keys = currentCustomFields.map(c => c.fieldName);
+                        compiledFormulas[cf.fieldName] = {
+                            keys: keys,
+                            fn: new Function(...keys, `return ${formula};`)
+                        };
+                    } catch (e) {}
+                }
+            });
+
+            currentCustomFields.forEach(f => {
+                let val;
+                if (f.fieldType === 'calculated' && f.calculationFormula) {
+                    try {
+                        if (compiledFormulas[f.fieldName]) {
+                            const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                let v = record[key];
+                                if (v === undefined || v === null) v = '';
+                                const fType = fieldTypeMap[key];
+                                if (['number', 'currency', 'calculated'].includes(fType)) {
+                                    let clean = String(v).replace(/[^0-9.-]/g, '');
+                                    const num = Number(clean);
+                                    return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                } else {
+                                    const num = Number(v);
+                                    return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                }
+                            });
+                            val = compiledFormulas[f.fieldName].fn(...vals);
+                            if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
+                            if (val === undefined || val === null) val = '';
+                        } else {
+                            val = '#CALC!';
+                        }
+                    } catch (e) { val = '#CALC!'; }
+                } else {
+                    val = record[f.fieldName];
+                }
+
+                let displayVal = val;
+                if (val !== undefined && val !== null && val !== '') {
+                    if (f.fieldType === 'boolean') {
+                        displayVal = (val === true || val === 'true') ? 'Yes' : 'No';
+                    } else if (f.fieldType === 'multiselect') {
+                        displayVal = Array.isArray(val) ? val.join(', ') : String(val);
+                    } else if (f.fieldType === 'richtext') {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = val;
+                        displayVal = tempDiv.textContent || tempDiv.innerText || '';
+                    } else if (f.fieldType === 'file') {
+                        try {
+                            const fileObj = JSON.parse(val);
+                            displayVal = fileObj.name || 'Attachment';
+                            if(fileObj.type && fileObj.type.startsWith('image/')) {
+                                displayVal = `<img src="${fileObj.data}" style="max-height: 60px; max-width: 100%; border-radius: 4px; border: 1px solid var(--slds-border); cursor:pointer;" onclick="previewCustomAttachment('${record.id}', '${f.fieldName}')">`;
+                            } else {
+                                displayVal = `<a href="javascript:void(0)" onclick="previewCustomAttachment('${record.id}', '${f.fieldName}')" style="color: var(--slds-blue); text-decoration: underline;">${fileObj.name}</a>`;
+                            }
+                        } catch(e) { displayVal = 'Attachment'; }
+                    } else if (['currency', 'number', 'calculated'].includes(f.fieldType) && !isNaN(parseFloat(val))) {
+                        displayVal = parseFloat(val).toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                        if (f.prefix || f.currencySymbol) displayVal = (f.prefix || f.currencySymbol) + ' ' + displayVal;
+                        if (f.suffix) displayVal = displayVal + ' ' + f.suffix;
+                    } else if (f.fieldType === 'date') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) displayVal = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                    } else if (f.fieldType === 'datetime') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) displayVal = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                    } else if (f.fieldType === 'url') {
+                        const url = String(val).startsWith('http') ? val : 'http://' + val;
+                        const linkLabel = f.urlLabel || val;
+                        displayVal = `<a href="${url}" target="_blank" style="color: var(--slds-blue); text-decoration: underline;">${linkLabel}</a>`;
+                    } else if (f.fieldType === 'lookup') {
+                        try {
+                            const targetModule = f.lookupModule;
+                            const displayField = f.lookupDisplay;
+                            if (targetModule) {
+                                let sourceData = [];
+                                const targetModuleLower = targetModule.toLowerCase();
+                                if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                    sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                    sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                    sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                    sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                } else if (targetModuleLower === 'follow-up' || targetModuleLower === 'follow-ups') {
+                                    sourceData = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                                } else {
+                                    sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                }
+                                
+                                const match = sourceData.find(x => (x.id || x._id || x.invoice_no || x.invoiceNo) === val);
+                                if (match) {
+                                    displayVal = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.invoice_no || match.invoiceNo || match.partyName || match.id);
+                                }
+                            }
+                        } catch(e) {}
+                    } else {
+                        if (f.prefix) displayVal = f.prefix + ' ' + displayVal;
+                        if (f.suffix) displayVal = displayVal + ' ' + f.suffix;
+                    }
+                } else {
+                    displayVal = '-';
+                }
+
+                html += `<tr><th style="width:40%; padding:10px; background:#f8f9fa; border:1px solid var(--slds-border); color: #444;">${f.fieldLabel}</th><td style="padding:10px; border:1px solid var(--slds-border);">${displayVal}</td></tr>`;
+            });
+
+            content.innerHTML = html;
+            document.getElementById('btnEditFromView').onclick = function() {
+                closeViewRecordModal();
+                editCustomRecord(id);
+            };
+
+            document.getElementById('viewRecordModal').style.display = 'block';
         }
 
         function editCustomRecord(id) {
