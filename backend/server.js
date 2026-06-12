@@ -100,16 +100,6 @@ const MedPayment = mongoose.model('MedPayment', medPaymentSchema);
 const medPurchaseInvoiceSchema = new mongoose.Schema({ id: { type: String, required: true, unique: true } }, { strict: false, timestamps: true });
 const MedPurchaseInvoice = mongoose.model('MedPurchaseInvoice', medPurchaseInvoiceSchema);
 
-// --- Chatter Models ---
-const messageSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true },
-    sender: { type: String, required: true },
-    text: { type: String, default: '' },
-    attachment: { type: String, default: null },
-    attachmentName: { type: String, default: null }
-}, { strict: false, timestamps: true });
-const Message = mongoose.model('Message', messageSchema);
-
 // --- API Routes ---
 app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });

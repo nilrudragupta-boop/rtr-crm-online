@@ -183,14 +183,14 @@ const customFieldSchema = new mongoose.Schema({
     order: { type: Number, default: 0 },
 }, { strict: false, timestamps: true });
 
-
-// Simple Message schema (was referenced later). Define minimal schema to avoid reference errors.
+// --- Chatter Message Schema ---
 const messageSchema = new mongoose.Schema({
-    from: String,
-    to: String,
-    body: String,
-}, { timestamps: true, strict: false });
-const Message = mongoose.model('Message', messageSchema);
+    id: { type: String, required: true, unique: true },
+    sender: { type: String, required: true },
+    text: { type: String, default: '' },
+    attachment: { type: String, default: null },
+    attachmentName: { type: String, default: null }
+}, { strict: false, timestamps: true });
 
 // --- Chatter Group Models ---
 const chatterGroupSchema = new mongoose.Schema({
@@ -199,7 +199,6 @@ const chatterGroupSchema = new mongoose.Schema({
     members: { type: Array, default: [] },
     createdBy: { type: String, default: 'System' }
 }, { strict: false, timestamps: true });
-const ChatterGroup = mongoose.model('ChatterGroup', chatterGroupSchema);
 
 
 // --- Generic Custom Record Schema (For entirely new UI Pages) ---
