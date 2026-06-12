@@ -832,6 +832,32 @@ const Chatter = {
             alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's inbox support chat!");
         }
 
+        // --- Route Developer's Reply back to the specific Admin's Tenant ---
+        if (this.tenantName === '7908040851' && replyToData && replyToData.sender && replyToData.sender.includes(' - ')) {
+            const targetTenant = replyToData.sender.substring(0, replyToData.sender.indexOf(' - '));
+            const targetUser = replyToData.sender.substring(replyToData.sender.indexOf(' - ') + 3);
+            
+            const adminMessage = {
+                id: 'MSG-DEVREPLY-' + Date.now() + Math.floor(Math.random() * 1000),
+                groupId: 'global',
+                sender: 'DEVELOPER', // Appears on the Left Side for the Admin!
+                text: text,
+                attachment: attachmentBase64,
+                attachmentName: attachmentName,
+                replyTo: {
+                    id: replyToData.id,
+                    sender: targetUser,
+                    text: replyToData.text
+                },
+                readBy: [],
+                tenant: targetTenant, // Pushes directly into the Admin's workspace
+                createdAt: new Date().toISOString()
+            };
+            if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
+                apiClient._saveCollection('chatter', adminMessage);
+            }
+        }
+
         sendBtn.innerHTML = ogText;
         sendBtn.disabled = false;
         textInput.disabled = false;
@@ -1029,7 +1055,7 @@ const Chatter = {
             }
 
             msgDiv.innerHTML = `
-                ${!isMe ? `<div class="message-sender">${escapeHtml(msg.sender)}</div>` : ''}
+                ${!isMe ? `<div class="message-sender">${escapeHtml(msg.sender)}${msg.sender === 'DEVELOPER' ? ' <i class="fas fa-check-circle text-primary" title="Verified Support" style="font-size: 0.75rem;"></i>' : ''}</div>` : ''}
                 <div class="message-content shadow-sm">
                     ${replyHtml}
                     ${msg.text ? `<div class="${isOnlyEmojis(msg.text) ? 'jumbo-emoji' : ''}">${linkify(highlightMentions(escapeHtml(msg.text))).replace(/\n/g, '<br>')}</div>` : ''}
