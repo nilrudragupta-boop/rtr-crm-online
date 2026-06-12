@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Expense, Employee, CustomField, CustomRecord } = require('./index');
+const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -99,6 +99,16 @@ const MedPayment = mongoose.model('MedPayment', medPaymentSchema);
 
 const medPurchaseInvoiceSchema = new mongoose.Schema({ id: { type: String, required: true, unique: true } }, { strict: false, timestamps: true });
 const MedPurchaseInvoice = mongoose.model('MedPurchaseInvoice', medPurchaseInvoiceSchema);
+
+// --- Chatter Models ---
+const messageSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    sender: { type: String, required: true },
+    text: { type: String, default: '' },
+    attachment: { type: String, default: null },
+    attachmentName: { type: String, default: null }
+}, { strict: false, timestamps: true });
+const Message = mongoose.model('Message', messageSchema);
 
 // --- API Routes ---
 app.get('/api/status', (req, res) => {
@@ -995,6 +1005,96 @@ app.post('/api/restore', async (req, res) => {
         }
 
         res.json({ success: true, message: 'Cloud database restored successfully!' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Chatter Routes ---
+let typingUsers = {};
+
+app.post('/api/chatter/typing', (req, res) => {
+    const { user, isTyping } = req.body;
+    if (user) {
+        if (isTyping) typingUsers[user] = Date.now();
+        else delete typingUsers[user];
+    }
+    res.json({ success: true });
+});
+
+app.get('/api/chatter/typing', (req, res) => {
+    const now = Date.now();
+    for (let u in typingUsers) {
+        if (now - typingUsers[u] > 10000) delete typingUsers[u]; // 10s expiry
+    }
+    res.json({ success: true, typing: Object.keys(typingUsers) });
+});
+
+app.get('/api/chatter', async (req, res) => {
+    try {
+        const messages = await Message.find().sort({ createdAt: 1 }); // Sort chronologically (Oldest first for chat history)
+        res.json({ success: true, data: messages });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/chatter', async (req, res) => {
+    try {
+        const payload = req.body;
+        const existing = await Message.findOne({ id: payload.id });
+        if (existing) {
+            const updated = await Message.findOneAndUpdate({ id: payload.id }, payload, { new: true });
+            res.status(200).json({ success: true, data: updated });
+        } else {
+            const newMessage = new Message(payload);
+            await newMessage.save();
+            res.status(201).json({ success: true, data: newMessage });
+        }
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/chatter/:id', async (req, res) => {
+    try {
+        await Message.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/chatter-groups', async (req, res) => {
+    try {
+        const groups = await ChatterGroup.find().sort({ createdAt: -1 });
+        res.json({ success: true, data: groups });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/chatter-groups', async (req, res) => {
+    try {
+        const payload = req.body;
+        const existing = await ChatterGroup.findOne({ id: payload.id });
+        if (existing) {
+            const updated = await ChatterGroup.findOneAndUpdate({ id: payload.id }, payload, { new: true });
+            res.status(200).json({ success: true, data: updated });
+        } else {
+            const newGroup = new ChatterGroup(payload);
+            await newGroup.save();
+            res.status(201).json({ success: true, data: newGroup });
+        }
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/chatter-groups/:id', async (req, res) => {
+    try {
+        await ChatterGroup.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

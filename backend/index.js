@@ -180,8 +180,27 @@ const customFieldSchema = new mongoose.Schema({
     prefix: { type: String },
     suffix: { type: String },
     showTotal: { type: Boolean, default: false },
-    order: { type: Number, default: 0 }
-}, { timestamps: true });
+    order: { type: Number, default: 0 },
+}, { strict: false, timestamps: true });
+
+
+// Simple Message schema (was referenced later). Define minimal schema to avoid reference errors.
+const messageSchema = new mongoose.Schema({
+    from: String,
+    to: String,
+    body: String,
+}, { timestamps: true, strict: false });
+const Message = mongoose.model('Message', messageSchema);
+
+// --- Chatter Group Models ---
+const chatterGroupSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    members: { type: Array, default: [] },
+    createdBy: { type: String, default: 'System' }
+}, { strict: false, timestamps: true });
+const ChatterGroup = mongoose.model('ChatterGroup', chatterGroupSchema);
+
 
 // --- Generic Custom Record Schema (For entirely new UI Pages) ---
 const customRecordSchema = new mongoose.Schema({
@@ -204,5 +223,7 @@ module.exports = {
     Expense: mongoose.model('Expense', expenseSchema),
     Employee: mongoose.model('Employee', employeeSchema),
     CustomField: mongoose.model('CustomField', customFieldSchema),
-    CustomRecord: mongoose.model('CustomRecord', customRecordSchema)
+    CustomRecord: mongoose.model('CustomRecord', customRecordSchema),
+    Message: mongoose.model('Message', messageSchema),
+    ChatterGroup: mongoose.model('ChatterGroup', chatterGroupSchema)
 };
