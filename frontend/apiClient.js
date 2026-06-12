@@ -360,6 +360,9 @@ const apiClient = {
     getMessages: () => apiClient._getCollection('chatter'),
     saveMessage: (data) => apiClient._saveCollection('chatter', data),
     deleteMessage: (id) => apiClient._deleteCollection('chatter', id),
+    getChatterGroups: () => apiClient._getCollection('chatter-groups'),
+    saveChatterGroup: (data) => apiClient._saveCollection('chatter-groups', data),
+    deleteChatterGroup: (id) => apiClient._deleteCollection('chatter-groups', id),
     getTypingStatus: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/chatter/typing`);

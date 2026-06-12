@@ -662,14 +662,29 @@ async function checkChatterNotifications() {
 
     if (typeof apiClient !== 'undefined' && apiClient.getMessages) {
         const messages = await apiClient.getMessages();
+        let groups = [];
+        if (apiClient.getChatterGroups) {
+            groups = await apiClient.getChatterGroups() || [];
+        }
+        
         if (messages && messages.length > 0) {
-            const lastMsg = messages[messages.length - 1];
+            const currUsr = getCurrentUser();
+            const myGroupIds = groups.filter(g => g.members && g.members.includes(currUsr)).map(g => g.id);
+            myGroupIds.push('global');
+            
+            const allowedMessages = messages.filter(m => myGroupIds.includes(m.groupId || 'global'));
+            
+            if (allowedMessages.length > 0) {
+                const lastMsg = allowedMessages[allowedMessages.length - 1];
             const lastCheck = parseInt(localStorage.getItem('lastChatterCheck') || '0', 10);
             const msgTime = new Date(lastMsg.createdAt || lastMsg.created_at).getTime();
 
-            if (msgTime > lastCheck && lastMsg.sender !== getCurrentUser()) {
+            if (msgTime > lastCheck && lastMsg.sender !== currUsr) {
                 if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                    new Notification(`New message from ${lastMsg.sender}`, {
+                    const groupInfo = lastMsg.groupId && lastMsg.groupId !== 'global' ? 
+                        ` (Group: ${groups.find(g => g.id === lastMsg.groupId)?.name || 'Private'})` : '';
+                    
+                    new Notification(`New message from ${lastMsg.sender}${groupInfo}`, {
                         body: lastMsg.text || 'Sent an attachment',
                         icon: 'logo.png'
                     });
@@ -682,6 +697,7 @@ async function checkChatterNotifications() {
 
                 localStorage.setItem('lastChatterCheck', msgTime);
             }
+        }
         }
     }
 }
