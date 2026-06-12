@@ -829,7 +829,7 @@ const Chatter = {
             if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
                 apiClient._saveCollection('chatter', devMessage);
             }
-            alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been routed directly to the developer's inbox support chat!");
+            alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's inbox support chat!");
         }
 
         sendBtn.innerHTML = ogText;
