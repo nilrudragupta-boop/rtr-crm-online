@@ -108,6 +108,12 @@ const Chatter = {
 
         document.getElementById('file-input').addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                if (file.size > 2 * 1024 * 1024) { // 2MB Limit
+                    alert("File is too large! Please attach a file smaller than 2MB.");
+                    e.target.value = '';
+                    return;
+                }
                 this.selectedFile = e.target.files[0];
                 document.getElementById('file-name-text').innerText = this.selectedFile.name;
                 document.getElementById('attachment-name').style.display = 'block';
@@ -393,6 +399,11 @@ const Chatter = {
 
             this.mediaRecorder.addEventListener("stop", () => {
                 const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                if (audioBlob.size > 2 * 1024 * 1024) { // 2MB limit
+                    alert("Voice message is too long (exceeds 2MB). Please record a shorter message.");
+                    this.clearAttachment();
+                    return;
+                }
                 this.selectedFile = new File([audioBlob], "voice_message.webm", { type: "audio/webm" });
                 document.getElementById('file-name-text').innerHTML = '<i class="fas fa-microphone text-danger"></i> Voice Message Recorded';
                 document.getElementById('attachment-name').style.display = 'block';

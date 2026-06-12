@@ -183,7 +183,14 @@ const apiClient = {
                 keepalive: true,
                 body: JSON.stringify(data)
             });
-            return await response.json();
+            
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                return await response.json();
+            } else {
+                if (response.status === 413) throw new Error("Payload Too Large: The file exceeds network size limits.");
+                throw new Error(`Server returned HTML instead of JSON (${response.status}). The attachment might be too large for the proxy.`);
+            }
         } catch (error) {
             console.error(`Error saving ${collectionName}:`, error);
             return { success: false, message: error.message };
