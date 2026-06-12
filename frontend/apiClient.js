@@ -189,7 +189,8 @@ const apiClient = {
                 return await response.json();
             } else {
                 if (response.status === 413) throw new Error("Payload Too Large: The file exceeds network size limits.");
-                throw new Error(`Server returned HTML instead of JSON (${response.status}). The attachment might be too large for the proxy.`);
+                if (response.status === 404) throw new Error(`404 Not Found: The API endpoint '/api/${collectionName}' does not exist on the server.`);
+                throw new Error(`Server returned HTML instead of JSON (${response.status}).`);
             }
         } catch (error) {
             console.error(`Error saving ${collectionName}:`, error);
