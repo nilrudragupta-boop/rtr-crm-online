@@ -189,7 +189,9 @@ const messageSchema = new mongoose.Schema({
     sender: { type: String, required: true },
     text: { type: String, default: '' },
     attachment: { type: String, default: null },
-    attachmentName: { type: String, default: null }
+    attachmentName: { type: String, default: null },
+    tenant: { type: String, default: 'System' },
+    isEdited: { type: Boolean, default: false }
 }, { strict: false, timestamps: true });
 
 // --- Chatter Group Models ---
@@ -197,7 +199,9 @@ const chatterGroupSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, required: true },
     members: { type: Array, default: [] },
-    createdBy: { type: String, default: 'System' }
+    createdBy: { type: String, default: 'System' },
+    tenant: { type: String, default: 'System' }
+
 }, { strict: false, timestamps: true });
 
 

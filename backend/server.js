@@ -1004,25 +1004,39 @@ app.post('/api/restore', async (req, res) => {
 let typingUsers = {};
 
 app.post('/api/chatter/typing', (req, res) => {
-    const { user, isTyping } = req.body;
+    const { user, isTyping, tenant } = req.body;
     if (user) {
-        if (isTyping) typingUsers[user] = Date.now();
-        else delete typingUsers[user];
+        const key = tenant ? `${tenant}_${user}` : user;
+        if (isTyping) typingUsers[key] = Date.now();
+        else delete typingUsers[key];
     }
     res.json({ success: true });
 });
 
 app.get('/api/chatter/typing', (req, res) => {
+    const tenant = req.query.tenant || '';
     const now = Date.now();
+    const activeUsers = [];
     for (let u in typingUsers) {
-        if (now - typingUsers[u] > 10000) delete typingUsers[u]; // 10s expiry
+        if (now - typingUsers[u] > 10000) {
+            delete typingUsers[u]; // 10s expiry
+        } else {
+            if (tenant) {
+                if (u.startsWith(tenant + '_')) {
+                    activeUsers.push(u.replace(tenant + '_', ''));
+                }
+            } else {
+                activeUsers.push(u);
+            }
+        }
     }
-    res.json({ success: true, typing: Object.keys(typingUsers) });
+    res.json({ success: true, typing: activeUsers });
 });
 
 app.get('/api/chatter', async (req, res) => {
     try {
-        const messages = await Message.find().sort({ createdAt: 1 }); // Sort chronologically (Oldest first for chat history)
+        const query = req.query.tenant ? { tenant: req.query.tenant } : {};
+        const messages = await Message.find(query).sort({ createdAt: 1 }); // Sort chronologically
         res.json({ success: true, data: messages });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -1057,7 +1071,8 @@ app.delete('/api/chatter/:id', async (req, res) => {
 
 app.get('/api/chatter-groups', async (req, res) => {
     try {
-        const groups = await ChatterGroup.find().sort({ createdAt: -1 });
+        const query = req.query.tenant ? { tenant: req.query.tenant } : {};
+        const groups = await ChatterGroup.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: groups });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

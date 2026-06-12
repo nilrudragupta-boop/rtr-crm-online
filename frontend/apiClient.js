@@ -364,26 +364,76 @@ const apiClient = {
         }
     },
 
+    // --- Tenant Identifier Helper ---
+    getTenantId: async () => {
+        let tenant = 'System';
+        if (window.electronAPI && window.electronAPI.getAppSettings) {
+            try {
+                const settings = await window.electronAPI.getAppSettings();
+                if (settings && settings.companyName) {
+                    tenant = settings.companyName;
+                }
+            } catch (e) {}
+        } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
+            tenant = APP_SETTINGS.COMPANY_NAME;
+        } else {
+            try {
+                const adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
+                const admin = adminUsers.find(u => u.role === 'Admin') || adminUsers[0];
+                if (admin && admin.username) tenant = admin.username;
+            } catch (e) {}
+        }
+        return tenant.replace(/[^a-zA-Z0-9 ]/gi, '_');
+    },
+
     // --- Chatter ---
-    getMessages: () => apiClient._getCollection('chatter'),
-    saveMessage: (data) => apiClient._saveCollection('chatter', data),
+    getMessages: async () => {
+        const tenant = await apiClient.getTenantId();
+        const auth = apiClient._getAuthQuery();
+        const sep = auth.includes('?') ? '&' : '?';
+        try {
+            const response = await fetch(`${API_BASE_URL}/chatter${auth}${sep}tenant=${encodeURIComponent(tenant)}`);
+            if (!response.ok) return null;
+            const result = await response.json();
+            return result.success ? result.data : result;
+        } catch (e) { return null; }
+    },
+    saveMessage: async (data) => {
+        data.tenant = await apiClient.getTenantId();
+        return apiClient._saveCollection('chatter', data);
+    },
     deleteMessage: (id) => apiClient._deleteCollection('chatter', id),
-    getChatterGroups: () => apiClient._getCollection('chatter-groups'),
-    saveChatterGroup: (data) => apiClient._saveCollection('chatter-groups', data),
+    getChatterGroups: async () => {
+        const tenant = await apiClient.getTenantId();
+        const auth = apiClient._getAuthQuery();
+        const sep = auth.includes('?') ? '&' : '?';
+        try {
+            const response = await fetch(`${API_BASE_URL}/chatter-groups${auth}${sep}tenant=${encodeURIComponent(tenant)}`);
+            if (!response.ok) return null;
+            const result = await response.json();
+            return result.success ? result.data : result;
+        } catch (e) { return null; }
+    },
+    saveChatterGroup: async (data) => {
+        data.tenant = await apiClient.getTenantId();
+        return apiClient._saveCollection('chatter-groups', data);
+    },
     deleteChatterGroup: (id) => apiClient._deleteCollection('chatter-groups', id),
     getTypingStatus: async () => {
+        const tenant = await apiClient.getTenantId();
         try {
-            const response = await fetch(`${API_BASE_URL}/chatter/typing`);
+            const response = await fetch(`${API_BASE_URL}/chatter/typing?tenant=${encodeURIComponent(tenant)}`);
             if (!response.ok) return null;
             return await response.json();
         } catch (error) { return null; }
     },
     setTypingStatus: async (user, isTyping) => {
+        const tenant = await apiClient.getTenantId();
         try {
             await fetch(`${API_BASE_URL}/chatter/typing`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user, isTyping })
+                body: JSON.stringify({ user, isTyping, tenant })
             });
         } catch (error) {}
     },

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,58 +8,376 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #f4f6f9; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .chat-wrapper { flex: 1; display: flex; overflow: hidden; }
-        .sidebar-groups { width: 250px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow-y: auto; }
-        .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; }
-        .group-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; transition: 0.2s; }
-        .group-item:hover { background: #f8f9fa; }
-        .group-item.active { background: #e9ecef; font-weight: bold; border-left: 4px solid #0dcaf0; }
-        .chat-container { flex: 1; overflow-y: auto; padding: 20px; background: white; margin: 0; }
-        .message-box { margin-bottom: 15px; max-width: 75%; clear: both; }
-        .message-me { float: right; text-align: right; }
-        .message-other { float: left; text-align: left; }
-        .message-content { padding: 10px 15px; border-radius: 15px; display: inline-block; word-wrap: break-word; text-align: left; }
-        .message-me .message-content { background-color: #0d6efd; color: white; border-bottom-right-radius: 0; }
-        .message-other .message-content { background-color: #e9ecef; color: black; border-bottom-left-radius: 0; }
-        .message-sender { font-size: 0.8rem; color: #6c757d; margin-bottom: 2px; }
-        .message-time { font-size: 0.7rem; color: rgba(255,255,255,0.8); display: block; margin-top: 5px; text-align: right; }
-        .message-other .message-time { color: #6c757d; }
-        .read-receipt { margin-left: 5px; font-size: 0.75rem; }
-        .message-me .read-receipt { color: rgba(255,255,255,0.6); }
-        .message-me .read-receipt.read { color: #4dd0e1; } /* Bright cyan for visibility on blue */
-        .chat-input-area { padding: 15px 20px; background: white; border-top: 1px solid #ddd; position: relative; }
-        .attachment-preview { max-width: 200px; max-height: 200px; margin-top: 10px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.3); }
-        .clearfix::after { content: ""; clear: both; display: table; }
-        .message-actions { display: none; margin-top: 5px; text-align: right; }
-        .message-box:hover .message-actions { display: block; }
-        .message-actions button { font-size: 0.7rem; margin-left: 5px; padding: 2px 6px; border-radius: 4px; border: none; background: rgba(0,0,0,0.1); color: inherit; transition: 0.2s; }
-        .message-actions button:hover { background: rgba(0,0,0,0.2); }
-        .message-me .message-actions button { background: rgba(255,255,255,0.2); color: white; }
-        .message-me .message-actions button:hover { background: rgba(255,255,255,0.4); }
-        .message-other .message-actions { text-align: left; }
-        .message-other .message-actions button { margin-left: 0; margin-right: 5px; }
-        .message-me a { color: #fff; text-decoration: underline; font-weight: 500; }
-        .message-other a { color: #0d6efd; text-decoration: underline; font-weight: 500; }
-        .scroll-bottom-btn { position: fixed; bottom: 90px; right: 25px; border-radius: 50%; width: 45px; height: 45px; display: none; align-items: center; justify-content: center; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .mention-highlight { color: #ffc107; font-weight: bold; background: rgba(0,0,0,0.15); padding: 1px 4px; border-radius: 4px; }
-        .message-me .mention-highlight { color: #ffe69c; background: rgba(255,255,255,0.2); }
-        .reply-quote { font-size: 0.8rem; background: rgba(0,0,0,0.05); padding: 6px 10px; border-left: 3px solid rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 8px; cursor: pointer; opacity: 0.9; }
-        .message-me .reply-quote { background: rgba(255,255,255,0.15); border-left: 3px solid rgba(255,255,255,0.5); }
-        .reaction-picker { display: none; position: fixed; background: white; border: 1px solid #ddd; border-radius: 20px; padding: 5px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1100; gap: 8px; }
-        .reaction-picker span { cursor: pointer; font-size: 1.2rem; transition: transform 0.1s; display: inline-block; }
-        .reaction-picker span:hover { transform: scale(1.3); }
-        .reaction-badge { display: inline-block; background: rgba(255,255,255,0.8); border: 1px solid #ddd; border-radius: 12px; padding: 2px 6px; font-size: 0.8rem; cursor: pointer; color: #333; margin-right: 4px; margin-top: 5px; }
-        .message-me .reaction-badge { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.4); color: white; }
-        .reaction-badge.active { background: #e0f2fe; border-color: #93c5fd; }
-        .message-me .reaction-badge.active { background: rgba(255,255,255,0.4); border-color: white; }
-        .recording-pulse { animation: pulse 1.5s infinite; color: #dc3545; }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+        body {
+            background-color: #f4f6f9;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar-groups {
+            width: 250px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .main-chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 0;
+        }
+
+        .group-item {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+
+        .group-item:hover {
+            background: #f8f9fa;
+        }
+
+        .group-item.active {
+            background: #e9ecef;
+            font-weight: bold;
+            border-left: 4px solid #0dcaf0;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: white;
+            margin: 0;
+        }
+
+        .message-box {
+            margin-bottom: 15px;
+            max-width: 75%;
+            clear: both;
+        }
+
+        .message-me {
+            float: right;
+            text-align: right;
+        }
+
+        .message-other {
+            float: left;
+            text-align: left;
+        }
+
+        .message-content {
+            padding: 10px 15px;
+            border-radius: 15px;
+            display: inline-block;
+            word-wrap: break-word;
+            text-align: left;
+        }
+
+        .message-me .message-content {
+            background-color: #0d6efd;
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+
+        .message-other .message-content {
+            background-color: #e9ecef;
+            color: black;
+            border-bottom-left-radius: 0;
+        }
+
+        .message-sender {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 2px;
+        }
+
+        .message-time {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.8);
+            display: block;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        .message-other .message-time {
+            color: #6c757d;
+        }
+
+        .read-receipt {
+            margin-left: 5px;
+            font-size: 0.75rem;
+        }
+
+        .message-me .read-receipt {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .message-me .read-receipt.read {
+            color: #4dd0e1;
+        }
+
+        /* Bright cyan for visibility on blue */
+        .chat-input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #ddd;
+            position: relative;
+        }
+
+        .attachment-preview {
+            max-width: 200px;
+            max-height: 200px;
+            margin-top: 10px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+
+        .message-actions {
+            display: none;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        .message-box:hover .message-actions {
+            display: block;
+        }
+
+        .message-actions button {
+            font-size: 0.7rem;
+            margin-left: 5px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: none;
+            background: rgba(0, 0, 0, 0.1);
+            color: inherit;
+            transition: 0.2s;
+        }
+
+        .message-actions button:hover {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .message-me .message-actions button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .message-me .message-actions button:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .message-other .message-actions {
+            text-align: left;
+        }
+
+        .message-other .message-actions button {
+            margin-left: 0;
+            margin-right: 5px;
+        }
+
+        .message-me a {
+            color: #fff;
+            text-decoration: underline;
+            font-weight: 500;
+        }
+
+        .message-other a {
+            color: #0d6efd;
+            text-decoration: underline;
+            font-weight: 500;
+        }
+
+        .scroll-bottom-btn {
+            position: fixed;
+            bottom: 90px;
+            right: 25px;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .mention-highlight {
+            color: #ffc107;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.15);
+            padding: 1px 4px;
+            border-radius: 4px;
+        }
+
+        .message-me .mention-highlight {
+            color: #ffe69c;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .reply-quote {
+            font-size: 0.8rem;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 6px 10px;
+            border-left: 3px solid rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            opacity: 0.9;
+        }
+
+        .message-me .reply-quote {
+            background: rgba(255, 255, 255, 0.15);
+            border-left: 3px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .reaction-picker {
+            display: none;
+            position: fixed;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 5px 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1100;
+            gap: 8px;
+        }
+
+        .reaction-picker span {
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: transform 0.1s;
+            display: inline-block;
+        }
+
+        .reaction-picker span:hover {
+            transform: scale(1.3);
+        }
+
+        .reaction-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: #333;
+            margin-right: 4px;
+            margin-top: 5px;
+        }
+
+        .message-me .reaction-badge {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+            color: white;
+        }
+
+        .reaction-badge.active {
+            background: #e0f2fe;
+            border-color: #93c5fd;
+        }
+
+        .message-me .reaction-badge.active {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: white;
+        }
+
+        .recording-pulse {
+            animation: pulse 1.5s infinite;
+            color: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 0.5;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .jumbo-emoji {
+            font-size: 3rem;
+            line-height: 1.2;
+            padding: 5px 0;
+        }
+
+        @keyframes highlightPulse {
+            0% {
+                transform: scale(1.02);
+                box-shadow: 0 0 15px rgba(13, 202, 240, 0.8) !important;
+            }
+
+            50% {
+                transform: scale(1.02);
+                box-shadow: 0 0 15px rgba(13, 202, 240, 0.8) !important;
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: none;
+            }
+        }
+
+        .highlight-message .message-content {
+            animation: highlightPulse 1.5s ease-out;
+        }
+
+        .drag-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(13, 110, 253, 0.1);
+            border: 3px dashed #0d6efd;
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: #0d6efd;
+            pointer-events: none;
+        }
     </style>
 </head>
+
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3 shadow-sm">
-        <a class="navbar-brand" href="dashboard.html"><i class="fas fa-arrow-left me-2"></i> Chatter / Team Coordination</a>
+        <a class="navbar-brand" href="dashboard.html"><i class="fas fa-arrow-left me-2"></i> Chatter / Team
+            Coordination</a>
         <span class="navbar-text ms-auto text-white" id="current-user-display"></span>
     </nav>
 
@@ -67,7 +386,8 @@
         <div class="sidebar-groups">
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
                 <h6 class="m-0 fw-bold">Channels</h6>
-                <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="Chatter.openCreateGroupModal()" title="Create Group"><i class="fas fa-plus"></i></button>
+                <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="Chatter.openCreateGroupModal()"
+                    title="Create Group"><i class="fas fa-plus"></i></button>
             </div>
             <div id="group-list" style="flex: 1; overflow-y: auto;">
                 <div class="text-center text-muted my-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
@@ -76,69 +396,114 @@
 
         <!-- Main Chat Area -->
         <div class="main-chat-area">
-            <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center shadow-sm" style="z-index: 10;">
+            <div id="drag-overlay" class="drag-overlay">
+                <div class="text-center bg-white p-4 rounded shadow">
+                    <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
+                    <h4>Drop file to attach</h4>
+                </div>
+            </div>
+            <div class="px-3 py-2 bg-light border-bottom d-flex justify-content-between align-items-center shadow-sm"
+                style="z-index: 10;">
                 <div>
-                    <span id="active-group-title" class="fw-bold text-primary"><i class="fas fa-globe me-1"></i> Global Coordination</span>
-                    <button id="btn-edit-group" class="btn btn-sm btn-outline-secondary ms-2" style="display: none;" onclick="Chatter.openEditGroupModal()" title="Manage Members"><i class="fas fa-users-cog"></i> Manage</button>
-                    <button id="btn-leave-group" class="btn btn-sm btn-outline-danger ms-2" style="display: none;" onclick="Chatter.leaveCurrentGroup()" title="Leave Group"><i class="fas fa-sign-out-alt"></i> Leave</button>
+                    <span id="active-group-title" class="fw-bold text-primary"><i class="fas fa-globe me-1"></i> Global
+                        Coordination</span>
+                    <button id="btn-edit-group" class="btn btn-sm btn-outline-secondary ms-2" style="display: none;"
+                        onclick="Chatter.openEditGroupModal()" title="Manage Members"><i class="fas fa-users-cog"></i>
+                        Manage</button>
+                    <button id="btn-leave-group" class="btn btn-sm btn-outline-danger ms-2" style="display: none;"
+                        onclick="Chatter.leaveCurrentGroup()" title="Leave Group"><i class="fas fa-sign-out-alt"></i>
+                        Leave</button>
+                    <button id="btn-view-members" class="btn btn-sm btn-outline-secondary ms-2" style="display: none;"
+                        onclick="Chatter.openViewMembersModal()" title="View Members"><i class="fas fa-users"></i>
+                        Members</button>
+                    <button id="btn-view-media" class="btn btn-sm btn-outline-info ms-2"
+                        onclick="Chatter.openMediaModal()" title="View Shared Media"><i class="fas fa-photo-video"></i>
+                        Media</button>
+                    <button id="btn-dev-support" class="btn btn-sm btn-outline-warning ms-2"
+                        onclick="alert('💡 Need Developer Support?\\n\\nSimply mention @DEVELOPER in any message to route your query directly to the software development team\\'s chat!')" title="Developer Support"><i class="fas fa-life-ring"></i>
+                        Help</button>
                 </div>
                 <div class="input-group" style="max-width: 250px;">
                     <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" class="form-control border-start-0" id="chat-search" placeholder="Search history...">
+                    <input type="text" class="form-control border-start-0" id="chat-search"
+                        placeholder="Search history...">
                 </div>
             </div>
 
             <!-- Pinned Message Banner -->
-            <div id="pinned-message-banner" class="px-3 py-2 border-bottom align-items-center bg-white shadow-sm" style="display: none; cursor: pointer; border-left: 4px solid #ffc107; z-index: 9;">
+            <div id="pinned-message-banner" class="px-3 py-2 border-bottom align-items-center bg-white shadow-sm"
+                style="display: none; cursor: pointer; border-left: 4px solid #ffc107; z-index: 9;">
                 <div class="flex-grow-1 overflow-hidden text-truncate">
-                    <small class="text-muted fw-bold"><i class="fas fa-thumbtack text-warning me-1"></i> Pinned message</small><br>
-                    <span id="pinned-message-text" class="text-dark small d-inline-block text-truncate" style="max-width: 100%;"></span>
+                    <small class="text-muted fw-bold"><i class="fas fa-thumbtack text-warning me-1"></i> Pinned
+                        message</small><br>
+                    <span id="pinned-message-text" class="text-dark small d-inline-block text-truncate"
+                        style="max-width: 100%;"></span>
                 </div>
-                <button class="btn btn-sm text-secondary p-1 ms-2" onclick="event.stopPropagation(); Chatter.unpinCurrentMessage()" title="Unpin"><i class="fas fa-times"></i></button>
+                <button class="btn btn-sm text-secondary p-1 ms-2"
+                    onclick="event.stopPropagation(); Chatter.unpinCurrentMessage()" title="Unpin"><i
+                        class="fas fa-times"></i></button>
             </div>
 
             <div class="chat-container clearfix" id="chat-messages">
-                <div class="text-center text-muted my-3"><i class="fas fa-spinner fa-spin"></i> Loading messages...</div>
+                <div class="text-center text-muted my-3"><i class="fas fa-spinner fa-spin"></i> Loading messages...
+                </div>
             </div>
 
-            <button id="scroll-bottom-btn" class="btn btn-primary scroll-bottom-btn" title="Scroll to bottom"><i class="fas fa-chevron-down"></i></button>
+            <button id="scroll-bottom-btn" class="btn btn-primary scroll-bottom-btn" title="Scroll to bottom"><i
+                    class="fas fa-chevron-down"></i></button>
 
-            <div id="typing-indicator" class="text-muted fst-italic px-3 py-1" style="display: none; font-size: 0.8rem; background: white;"></div>
+            <div id="typing-indicator" class="text-muted fst-italic px-3 py-1"
+                style="display: none; font-size: 0.8rem; background: white;"></div>
 
             <div class="chat-input-area">
-                <div id="mention-dropdown" class="list-group position-absolute shadow-sm" style="display: none; bottom: 100%; left: 15px; margin-bottom: 5px; z-index: 1000; max-height: 150px; overflow-y: auto; min-width: 200px; border-radius: 5px; border: 1px solid #ddd; background: white;"></div>
-                <div id="reply-mode-banner" class="mb-2 text-info fw-bold" style="display: none; font-size: 0.85rem; background: #f8f9fa; padding: 8px 12px; border-radius: 5px; border-left: 4px solid #0dcaf0;">
+                <div id="mention-dropdown" class="list-group position-absolute shadow-sm"
+                    style="display: none; bottom: 100%; left: 15px; margin-bottom: 5px; z-index: 1000; max-height: 150px; overflow-y: auto; min-width: 200px; border-radius: 5px; border: 1px solid #ddd; background: white;">
+                </div>
+                <div id="reply-mode-banner" class="mb-2 text-info fw-bold"
+                    style="display: none; font-size: 0.85rem; background: #f8f9fa; padding: 8px 12px; border-radius: 5px; border-left: 4px solid #0dcaf0;">
                     <div class="d-flex justify-content-between align-items-center">
                         <span><i class="fas fa-reply"></i> Replying to <span id="reply-to-user"></span></span>
-                        <button class="btn btn-sm text-danger p-0" id="btn-cancel-reply" title="Cancel Reply"><i class="fas fa-times-circle"></i></button>
+                        <button class="btn btn-sm text-danger p-0" id="btn-cancel-reply" title="Cancel Reply"><i
+                                class="fas fa-times-circle"></i></button>
                     </div>
-                    <div id="reply-to-text" class="text-muted fw-normal text-truncate mt-1" style="max-width: 100%;"></div>
+                    <div id="reply-to-text" class="text-muted fw-normal text-truncate mt-1" style="max-width: 100%;">
+                    </div>
                 </div>
                 <div id="edit-mode-banner" class="mb-2 text-warning fw-bold" style="display: none;">
                     <i class="fas fa-edit"></i> Editing Message
-                    <button class="btn btn-sm text-danger p-0 ms-3" id="btn-cancel-edit" title="Cancel Edit"><i class="fas fa-times-circle"></i></button>
+                    <button class="btn btn-sm text-danger p-0 ms-3" id="btn-cancel-edit" title="Cancel Edit"><i
+                            class="fas fa-times-circle"></i></button>
                 </div>
-                <div id="attachment-name" class="mb-2 text-muted" style="display: none; background: #f8f9fa; padding: 5px 10px; border-radius: 5px; border: 1px solid #dee2e6; width: fit-content;">
+                <div id="attachment-name" class="mb-2 text-muted"
+                    style="display: none; background: #f8f9fa; padding: 5px 10px; border-radius: 5px; border: 1px solid #dee2e6; width: fit-content;">
                     <i class="fas fa-file-alt text-primary"></i> <span id="file-name-text" class="ms-1 fw-bold"></span>
-                    <button class="btn btn-sm text-danger p-0 ms-3" id="btn-remove-file" title="Remove Attachment"><i class="fas fa-times-circle"></i></button>
+                    <button class="btn btn-sm text-danger p-0 ms-3" id="btn-remove-file" title="Remove Attachment"><i
+                            class="fas fa-times-circle"></i></button>
                 </div>
                 <div class="input-group">
                     <input type="file" id="file-input" style="display: none;">
-                    <button class="btn btn-outline-secondary" type="button" id="btn-attach" title="Attach File"><i class="fas fa-paperclip"></i></button>
-                    <button class="btn btn-outline-danger" type="button" id="btn-record" title="Record Voice Message"><i class="fas fa-microphone"></i></button>
-                    <input type="text" class="form-control" id="chat-input" placeholder="Type a message to coordinate with the team..." autocomplete="off">
-                    <button class="btn btn-primary px-4" type="button" id="btn-send"><i class="fas fa-paper-plane me-1"></i> Send</button>
+                    <button class="btn btn-outline-secondary" type="button" id="btn-attach" title="Attach File"><i
+                            class="fas fa-paperclip"></i></button>
+                    <button class="btn btn-outline-danger" type="button" id="btn-record" title="Record Voice Message"><i
+                            class="fas fa-microphone"></i></button>
+                    <input type="text" class="form-control" id="chat-input"
+                        placeholder="Type a message to coordinate with the team..." autocomplete="off">
+                    <button class="btn btn-primary px-4" type="button" id="btn-send"><i
+                            class="fas fa-paper-plane me-1"></i> Send</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Create Group Modal -->
-    <div id="createGroupModal" class="modal" tabindex="-1" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1050; align-items:center; justify-content:center;">
+    <div id="createGroupModal" class="modal" tabindex="-1"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1050; align-items:center; justify-content:center;">
         <div class="modal-content bg-white p-4 rounded shadow" style="width:400px; max-width:90%;">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="m-0" id="createGroupModalTitle"><i class="fas fa-users-cog text-primary me-2"></i>Create New Group</h5>
-                <button class="btn-close" onclick="document.getElementById('createGroupModal').style.display='none'"></button>
+                <h5 class="m-0" id="createGroupModalTitle"><i class="fas fa-users-cog text-primary me-2"></i>Create New
+                    Group</h5>
+                <button class="btn-close"
+                    onclick="document.getElementById('createGroupModal').style.display='none'"></button>
             </div>
             <div class="mb-3">
                 <label class="form-label fw-bold">Group Name</label>
@@ -146,30 +511,76 @@
             </div>
             <div class="mb-3">
                 <label class="form-label fw-bold">Select Members</label>
-                <input type="text" id="memberSearch" class="form-control mb-2 form-control-sm" placeholder="Search users..." oninput="Chatter.filterMembers()">
-                <div id="groupMembersList" style="max-height: 180px; overflow-y: auto; border: 1px solid #dee2e6; padding: 10px; border-radius: 5px;">
+                <input type="text" id="memberSearch" class="form-control mb-2 form-control-sm"
+                    placeholder="Search users..." oninput="Chatter.filterMembers()">
+                <div id="groupMembersList"
+                    style="max-height: 180px; overflow-y: auto; border: 1px solid #dee2e6; padding: 10px; border-radius: 5px;">
                     <!-- Checkboxes injected by JS -->
                 </div>
             </div>
             <div class="text-end">
-                <button class="btn btn-secondary" onclick="document.getElementById('createGroupModal').style.display='none'">Cancel</button>
-                <button class="btn btn-primary" id="createGroupBtn" onclick="Chatter.createGroup()">Create Group</button>
+                <button class="btn btn-secondary"
+                    onclick="document.getElementById('createGroupModal').style.display='none'">Cancel</button>
+                <button class="btn btn-primary" id="createGroupBtn" onclick="Chatter.createGroup()">Create
+                    Group</button>
             </div>
         </div>
     </div>
 
     <!-- Read Receipts Modal -->
-    <div id="readReceiptsModal" class="modal" tabindex="-1" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1050; align-items:center; justify-content:center;">
+    <div id="readReceiptsModal" class="modal" tabindex="-1"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1050; align-items:center; justify-content:center;">
         <div class="modal-content bg-white p-4 rounded shadow" style="width:300px; max-width:90%;">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="m-0"><i class="fas fa-check-double text-info me-2"></i>Read By</h5>
-                <button class="btn-close" onclick="document.getElementById('readReceiptsModal').style.display='none'"></button>
+                <button class="btn-close"
+                    onclick="document.getElementById('readReceiptsModal').style.display='none'"></button>
             </div>
             <div id="readReceiptsList" style="max-height: 200px; overflow-y: auto;">
                 <!-- List injected by JS -->
             </div>
             <div class="text-end mt-3">
-                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('readReceiptsModal').style.display='none'">Close</button>
+                <button class="btn btn-secondary btn-sm"
+                    onclick="document.getElementById('readReceiptsModal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared Media Modal -->
+    <div id="mediaModal" class="modal" tabindex="-1"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1050; align-items:center; justify-content:center;">
+        <div class="modal-content bg-white p-4 rounded shadow"
+            style="width:500px; max-width:90%; max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="m-0"><i class="fas fa-photo-video text-info me-2"></i>Shared Media</h5>
+                <button class="btn-close" onclick="document.getElementById('mediaModal').style.display='none'"></button>
+            </div>
+            <div id="mediaModalList"
+                style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                <!-- Media injected by JS -->
+            </div>
+            <div class="text-end mt-3">
+                <button class="btn btn-secondary btn-sm"
+                    onclick="document.getElementById('mediaModal').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Members Modal -->
+    <div id="viewMembersModal" class="modal" tabindex="-1"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1050; align-items:center; justify-content:center;">
+        <div class="modal-content bg-white p-4 rounded shadow" style="width:300px; max-width:90%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="m-0"><i class="fas fa-users text-primary me-2"></i>Members</h5>
+                <button class="btn-close"
+                    onclick="document.getElementById('viewMembersModal').style.display='none'"></button>
+            </div>
+            <div id="viewMembersList" style="max-height: 250px; overflow-y: auto;">
+                <!-- List injected by JS -->
+            </div>
+            <div class="text-end mt-3">
+                <button class="btn btn-secondary btn-sm"
+                    onclick="document.getElementById('viewMembersModal').style.display='none'">Close</button>
             </div>
         </div>
     </div>
@@ -184,7 +595,11 @@
         <span onclick="Chatter.addReaction('🙏')">🙏</span>
     </div>
 
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
     <script src="apiClient.js"></script>
     <script src="chatter.js"></script>
 </body>
+
 </html>
