@@ -814,7 +814,7 @@ const Chatter = {
             }
         }
 
-        if (text.includes('@DEVELOPER')) {
+        if (text.toUpperCase().includes('@DEVELOPER')) {
             const devMessage = {
                 id: 'MSG-DEV-' + Date.now() + Math.floor(Math.random() * 1000),
                 groupId: 'global',
@@ -822,14 +822,15 @@ const Chatter = {
                 text: text,
                 attachment: attachmentBase64,
                 attachmentName: attachmentName,
+                replyTo: replyToData,
                 readBy: [],
                 tenant: '7908040851', // Route directly to developer's account chat
                 createdAt: new Date().toISOString()
             };
             if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
-                apiClient._saveCollection('chatter', devMessage);
+                await apiClient._saveCollection('chatter', devMessage);
             }
-            alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's inbox support chat!");
+            alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's support chat!");
         }
 
         // --- Route Developer's Reply back to the specific Admin's Tenant ---
@@ -854,7 +855,7 @@ const Chatter = {
                 createdAt: new Date().toISOString()
             };
             if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
-                apiClient._saveCollection('chatter', adminMessage);
+                await apiClient._saveCollection('chatter', adminMessage);
             }
         }
 
