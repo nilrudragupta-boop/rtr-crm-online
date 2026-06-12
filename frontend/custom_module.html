@@ -984,6 +984,15 @@
         let formVisible = true;
         let columnVisibility = {};
 
+        function openWindow(url, width, height) {
+            if (window.parent && window.parent !== window && typeof window.parent.openWindow === 'function') {
+                window.parent.openWindow(url, width, height);
+            } else {
+                const windowName = url.split('?')[0].split('/').pop().replace('.html', '').replace(/[^a-zA-Z0-9]/g, '_');
+                window.open(url, windowName, `width=${width},height=${height},resizable=yes,scrollbars=yes`).focus();
+            }
+        }
+
         function getDependentOptions(optionsRaw, parentVal) {
             if (!parentVal || !optionsRaw) return [];
             const parts = String(optionsRaw).split('|');
@@ -1728,7 +1737,7 @@
                     } else if (field.fieldType === 'url') {
                         const url = String(val).startsWith('http') ? val : 'http://' + val;
                         const linkLabel = field.urlLabel || val;
-                        html += `<td title="${val}"><a href="${url}" target="_blank" style="color: var(--primary); text-decoration: underline;" onclick="event.stopPropagation()">${linkLabel}</a></td>`;
+                        html += `<td title="${val}"><a href="javascript:void(0)" onclick="openWindow('${url}', 1200, 800); event.stopPropagation();" style="color: var(--primary); text-decoration: underline;">${linkLabel}</a></td>`;
                     } else if (field.fieldType === 'richtext') {
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = val || '';
@@ -1737,6 +1746,8 @@
                         html += `<td title="${textContent.replace(/"/g, '&quot;')}">${display}</td>`;
                     } else if (field.fieldType === 'lookup') {
                         let displayText = val;
+                        let linkUrl = '#';
+                        let linkTitle = 'View record';
                         try {
                             const targetModule = field.lookupModule;
                             const displayField = field.lookupDisplay;
@@ -1746,27 +1757,60 @@
                                 if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
                                     sourceData = JSON.parse(localStorage.getItem('customers')) || [];
                                     const match = sourceData.find(x => x.id === val);
-                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                    if (match) {
+                                        displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                        linkUrl = `customer.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                        linkTitle = `View customer: ${displayText}`;
+                                    }
                                 } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
                                     sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
                                     const match = sourceData.find(x => x.id === val);
-                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                    if (match) {
+                                        displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                        linkUrl = `supplier.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                        linkTitle = `View supplier: ${displayText}`;
+                                    }
                                 } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
                                     sourceData = JSON.parse(localStorage.getItem('items')) || [];
                                     const match = sourceData.find(x => x.id === val);
-                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                    if (match) {
+                                        displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                        linkUrl = `item.html?search=${encodeURIComponent(match.name || match.itemCode || match.id)}`;
+                                        linkTitle = `View item: ${displayText}`;
+                                    }
                                 } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
                                     sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
                                     const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === val);
-                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.invoice_no || match.invoiceNo || match.id);
+                                    if (match) {
+                                        const invNo = match.invoice_no || match.invoiceNo || match.id;
+                                        displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : invNo;
+                                        linkUrl = `invoiceB.html?invoiceNo=${encodeURIComponent(invNo)}`;
+                                        linkTitle = `View invoice: ${displayText}`;
+                                    }
+                                } else if (targetModuleLower === 'follow-up' || targetModuleLower === 'follow-ups') {
+                                    sourceData = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                                    const match = sourceData.find(x => x.id === val);
+                                    if (match) {
+                                        displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.partyName || match.id);
+                                        linkUrl = `follow_up.html?id=${encodeURIComponent(match.id)}`;
+                                        linkTitle = `View follow-up: ${displayText}`;
+                                    }
                                 } else {
                                     sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
                                     const match = sourceData.find(x => (x.id || x._id) === val);
-                                    if (match) displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || val);
+                                    if (match) {
+                                        displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || val);
+                                        linkUrl = `custom_module.html?module=${encodeURIComponent(targetModule)}&search=${encodeURIComponent(val)}`;
+                                        linkTitle = `View records in ${targetModule}`;
+                                    }
                                 }
                             }
                         } catch(e) {}
-                        html += `<td title="${displayText}">${displayText}</td>`;
+                        if (linkUrl !== '#') {
+                            html += `<td title="${linkTitle}"><a href="javascript:void(0)" onclick="openWindow('${linkUrl}', 1200, 800); event.stopPropagation();" style="color: var(--primary); text-decoration: none;">${displayText}</a></td>`;
+                        } else {
+                            html += `<td title="${displayText}">${displayText}</td>`;
+                        }
                     } else {
                         let display = String(val);
                         if (field.prefix) display = `${field.prefix} ${display}`;
