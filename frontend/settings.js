@@ -422,7 +422,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_custom_fields', label: 'Custom Field Settings' },
     { id: 'perm_follow_up', label: 'Follow-ups' },
     { id: 'perm_custom_sheet', label: 'Custom Sheet' },
-    { id: 'perm_cheque_print', label: 'Cheque Print' }
+    { id: 'perm_cheque_print', label: 'Cheque Print' },
+    { id: 'perm_chatter', label: 'Chatter' }
 ];
 
 function getCurrentUser() {
@@ -501,6 +502,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     await fetchGeneralAppSettings();
     renderAppModeControl(); // --- STEP 1: Inject UI ---
     FeatureManager.init(); // Initialize Industry Mode
+
+    // Global Chatter Notifications Tracker
+    if (!window.location.pathname.includes('login.html')) {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+        setInterval(checkChatterNotifications, 15000); // Check every 15 seconds
+    }
 });
 window.addEventListener('storage', (e) => {
     const user = getCurrentUser();
@@ -641,6 +650,40 @@ function renderAppModeControl() {
     document.getElementById('appModeSelect').addEventListener('change', (e) => {
         confirmAndChangeAppMode(e.target.value);
     });
+}
+
+// --- Global Chatter Notifications ---
+async function checkChatterNotifications() {
+    // Disable alert if currently reading chatter
+    if (window.location.pathname.includes('chatter.html')) {
+        localStorage.setItem('lastChatterCheck', Date.now());
+        return;
+    }
+
+    if (typeof apiClient !== 'undefined' && apiClient.getMessages) {
+        const messages = await apiClient.getMessages();
+        if (messages && messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            const lastCheck = parseInt(localStorage.getItem('lastChatterCheck') || '0', 10);
+            const msgTime = new Date(lastMsg.createdAt || lastMsg.created_at).getTime();
+
+            if (msgTime > lastCheck && lastMsg.sender !== getCurrentUser()) {
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                    new Notification(`New message from ${lastMsg.sender}`, {
+                        body: lastMsg.text || 'Sent an attachment',
+                        icon: 'logo.png'
+                    });
+                }
+                
+                const chatterNav = document.querySelector('a[href*="chatter.html"]');
+                if (chatterNav && !chatterNav.querySelector('.chatter-badge')) {
+                    chatterNav.innerHTML += ' <span class="chatter-badge badge bg-danger rounded-circle p-1 ms-1"><span class="visually-hidden">New</span></span>';
+                }
+
+                localStorage.setItem('lastChatterCheck', msgTime);
+            }
+        }
+    }
 }
 
 // --- STEP 4: Safety Logic ---

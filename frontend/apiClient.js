@@ -356,6 +356,27 @@ const apiClient = {
         }
     },
 
+    // --- Chatter ---
+    getMessages: () => apiClient._getCollection('chatter'),
+    saveMessage: (data) => apiClient._saveCollection('chatter', data),
+    deleteMessage: (id) => apiClient._deleteCollection('chatter', id),
+    getTypingStatus: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/chatter/typing`);
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (error) { return null; }
+    },
+    setTypingStatus: async (user, isTyping) => {
+        try {
+            await fetch(`${API_BASE_URL}/chatter/typing`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user, isTyping })
+            });
+        } catch (error) {}
+    },
+
 
     // --- Maintenance ---
     cleanupAnonymousRecords: async (firestoreDb) => {
