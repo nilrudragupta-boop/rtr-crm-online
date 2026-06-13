@@ -6655,15 +6655,14 @@
                 try {
                     const messages = await apiClient.getMessages();
                     if (messages && messages.length > 0) {
-                        const lastCheck = parseInt(localStorage.getItem('lastChatterCheck') || '0', 10);
                         const currentUser = localStorage.getItem('currentUser') || 'Admin';
                         let unreadCount = 0;
                         let latestUnreadTime = 0;
                         
                         messages.forEach(msg => {
-                            const msgTime = new Date(msg.createdAt || msg.created_at).getTime();
-                            if (msgTime > lastCheck && msg.sender !== currentUser) {
+                            if (msg.sender !== currentUser && (!msg.readBy || !msg.readBy.includes(currentUser))) {
                                 unreadCount++;
+                                const msgTime = new Date(msg.createdAt || msg.created_at).getTime();
                                 if (msgTime > latestUnreadTime) latestUnreadTime = msgTime;
                             }
                         });

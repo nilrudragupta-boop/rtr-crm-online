@@ -656,7 +656,7 @@ function renderAppModeControl() {
 async function checkChatterNotifications() {
     // Disable alert if currently reading chatter
     if (window.location.pathname.includes('chatter.html')) {
-        localStorage.setItem('lastChatterCheck', Date.now());
+        // Notifications suppressed automatically because messages are marked as read in chatter.html
         return;
     }
 
@@ -674,33 +674,29 @@ async function checkChatterNotifications() {
             
             const allowedMessages = messages.filter(m => myGroupIds.includes(m.groupId || 'global'));
             
-            if (allowedMessages.length > 0) {
-                const lastMsg = allowedMessages[allowedMessages.length - 1];
-            const lastCheck = parseInt(localStorage.getItem('lastChatterCheck') || '0', 10);
-            const msgTime = new Date(lastMsg.createdAt || lastMsg.created_at).getTime();
+            const unreadMsgs = allowedMessages.filter(m => m.sender !== currUsr && (!m.readBy || !m.readBy.includes(currUsr)));
+            if (unreadMsgs.length > 0) {
+                const lastMsg = unreadMsgs[unreadMsgs.length - 1];
+                const lastNotifiedId = localStorage.getItem('lastNotifiedMsgId');
 
-            if (msgTime > lastCheck && lastMsg.sender !== currUsr) {
-                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                    const groupInfo = lastMsg.groupId && lastMsg.groupId !== 'global' ? 
-                        ` (Group: ${groups.find(g => g.id === lastMsg.groupId)?.name || 'Private'})` : '';
+                if (lastMsg.id !== lastNotifiedId) {
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                        const groupInfo = lastMsg.groupId && lastMsg.groupId !== 'global' ? 
+                            ` (Group: ${groups.find(g => g.id === lastMsg.groupId)?.name || 'Private'})` : '';
+                        
+                        new Notification(`New message from ${lastMsg.sender}${groupInfo}`, {
+                            body: lastMsg.text || 'Sent an attachment',
+                            icon: 'logo.png'
+                        });
+                    }
                     
-                    new Notification(`New message from ${lastMsg.sender}${groupInfo}`, {
-                        body: lastMsg.text || 'Sent an attachment',
-                        icon: 'logo.png'
-                    });
+                    localStorage.setItem('lastNotifiedMsgId', lastMsg.id);
                 }
-                
-                const chatterNav = document.querySelector('a[href*="chatter.html"]');
-                if (chatterNav && !chatterNav.querySelector('.chatter-badge')) {
-                    chatterNav.innerHTML += ' <span class="chatter-badge badge bg-danger rounded-circle p-1 ms-1"><span class="visually-hidden">New</span></span>';
-                }
-
-                localStorage.setItem('lastChatterCheck', msgTime);
             }
         }
         }
     }
-}
+
 
 // --- STEP 4: Safety Logic ---
 async function confirmAndChangeAppMode(newMode) {

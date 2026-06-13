@@ -383,7 +383,7 @@ const apiClient = {
                 if (admin && admin.username) tenant = admin.username;
             } catch (e) {}
         }
-        return tenant.replace(/[^a-zA-Z0-9 ]/gi, '_');
+        return tenant.replace(/[^a-zA-Z0-9 ]/gi, '_').trim();
     },
 
     // --- Chatter ---

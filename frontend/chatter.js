@@ -464,7 +464,7 @@ const Chatter = {
         const list = document.getElementById('viewMembersList');
         if (!list) return;
         list.innerHTML = '';
-        
+
         let membersToDisplay = [];
         if (this.activeGroupId === 'global') {
             membersToDisplay = this.allUsers;
@@ -474,7 +474,7 @@ const Chatter = {
                 membersToDisplay = group.members;
             }
         }
-        
+
         if (membersToDisplay.length === 0) {
             list.innerHTML = '<div class="text-center text-muted my-3">No members found.</div>';
         } else {
@@ -482,16 +482,16 @@ const Chatter = {
                 list.innerHTML += `<div class="mb-2 border-bottom pb-1"><i class="fas fa-user-circle text-muted me-2"></i> ${escapeHtml(u)}</div>`;
             });
         }
-        
+
         document.getElementById('viewMembersModal').style.display = 'flex';
     },
 
     openMediaModal: function () {
         const list = document.getElementById('mediaModalList');
         list.innerHTML = '';
-        
+
         const mediaMessages = this.messages.filter(m => m.attachment).reverse(); // Newest first
-        
+
         if (mediaMessages.length === 0) {
             list.innerHTML = '<div class="text-center text-muted my-4">No media or attachments shared in this group yet.</div>';
         } else {
@@ -499,7 +499,7 @@ const Chatter = {
                 let d = new Date(msg.createdAt || msg.created_at);
                 if (isNaN(d.getTime())) d = new Date();
                 const timeString = d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-                
+
                 let previewHtml = '';
                 if (msg.attachment.startsWith('data:audio')) {
                     previewHtml = `<audio controls src="${msg.attachment}" style="width: 100%; height: 35px; outline: none; margin-top: 5px;"></audio>`;
@@ -699,9 +699,6 @@ const Chatter = {
                 if (!isPolling || (this.messages.length > oldLength && isNearBottom)) {
                     this.scrollToBottom();
                 }
-
-                // Mark messages as read for OS notifications
-                localStorage.setItem('lastChatterCheck', Date.now());
             } else if (!isPolling) {
                 document.getElementById('chat-messages').innerHTML = '<div class="text-center text-muted my-3">No messages yet. Be the first to start the coordination!</div>';
             }
@@ -814,7 +811,7 @@ const Chatter = {
             }
         }
 
-        if (text.includes('@DEVELOPER')) {
+        if (text.toUpperCase().includes('@DEVELOPER')) {
             const devMessage = {
                 id: 'MSG-DEV-' + Date.now() + Math.floor(Math.random() * 1000),
                 groupId: 'global',
@@ -822,14 +819,41 @@ const Chatter = {
                 text: text,
                 attachment: attachmentBase64,
                 attachmentName: attachmentName,
+                replyTo: replyToData,
                 readBy: [],
                 tenant: '7908040851', // Route directly to developer's account chat
                 createdAt: new Date().toISOString()
             };
             if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
-                apiClient._saveCollection('chatter', devMessage);
+                await apiClient._saveCollection('chatter', devMessage);
             }
-            alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been routed directly to the developer's 7908040851 support chat!");
+            alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's support chat!");
+        }
+
+        // --- Route Developer's Reply back to the specific Admin's Tenant ---
+        if (this.tenantName && this.tenantName.trim() === '7908040851' && replyToData && replyToData.sender && replyToData.sender.includes(' - ')) {
+            const targetTenant = replyToData.sender.substring(0, replyToData.sender.indexOf(' - '));
+            const targetUser = replyToData.sender.substring(replyToData.sender.indexOf(' - ') + 3);
+            
+            const adminMessage = {
+                id: 'MSG-DEVREPLY-' + Date.now() + Math.floor(Math.random() * 1000),
+                groupId: 'global',
+                sender: 'DEVELOPER', // Appears on the Left Side for the Admin!
+                text: text,
+                attachment: attachmentBase64,
+                attachmentName: attachmentName,
+                replyTo: {
+                    id: replyToData.id,
+                    sender: targetUser,
+                    text: replyToData.text
+                },
+                readBy: [],
+                tenant: targetTenant, // Pushes directly into the Admin's workspace
+                createdAt: new Date().toISOString()
+            };
+            if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
+                await apiClient._saveCollection('chatter', adminMessage);
+            }
         }
 
         sendBtn.innerHTML = ogText;
@@ -1029,7 +1053,7 @@ const Chatter = {
             }
 
             msgDiv.innerHTML = `
-                ${!isMe ? `<div class="message-sender">${escapeHtml(msg.sender)}</div>` : ''}
+                ${!isMe ? `<div class="message-sender">${escapeHtml(msg.sender)}${msg.sender === 'DEVELOPER' ? ' <i class="fas fa-check-circle text-primary" title="Verified Support" style="font-size: 0.75rem;"></i>' : ''}</div>` : ''}
                 <div class="message-content shadow-sm">
                     ${replyHtml}
                     ${msg.text ? `<div class="${isOnlyEmojis(msg.text) ? 'jumbo-emoji' : ''}">${linkify(highlightMentions(escapeHtml(msg.text))).replace(/\n/g, '<br>')}</div>` : ''}
