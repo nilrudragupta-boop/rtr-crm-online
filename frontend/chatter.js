@@ -811,12 +811,14 @@ const Chatter = {
             }
         }
 
-        if (text.toUpperCase().includes('@DEVELOPER')) {
+        const isTaggingDev = text.toUpperCase().includes('@DEVELOPER') || (replyToData && replyToData.sender === 'DEVELOPER');
+
+        if (isTaggingDev) {
             const devMessage = {
                 id: 'MSG-DEV-' + Date.now() + Math.floor(Math.random() * 1000),
                 groupId: 'global',
                 sender: `${this.tenantName} - ${this.currentUser}`,
-                text: text,
+                text: text || (attachmentName ? `📁 Shared an attachment` : ''),
                 attachment: attachmentBase64,
                 attachmentName: attachmentName,
                 replyTo: replyToData,
@@ -827,7 +829,9 @@ const Chatter = {
             if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
                 await apiClient._saveCollection('chatter', devMessage);
             }
-            alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's support chat!");
+            if (text.toUpperCase().includes('@DEVELOPER')) {
+                alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's support chat!");
+            }
         }
 
         // --- Route Developer's Reply back to the specific Admin's Tenant ---
@@ -839,7 +843,7 @@ const Chatter = {
                 id: 'MSG-DEVREPLY-' + Date.now() + Math.floor(Math.random() * 1000),
                 groupId: 'global',
                 sender: 'DEVELOPER', // Appears on the Left Side for the Admin!
-                text: text,
+                text: text || (attachmentName ? `📁 Shared an attachment` : ''),
                 attachment: attachmentBase64,
                 attachmentName: attachmentName,
                 replyTo: {

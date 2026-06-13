@@ -39,7 +39,7 @@ const apiClient = {
     // --- Settings ---
     getSettings: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/settings${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/settings${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             const result = await response.json();
             return result.success ? result.data : null;
         } catch (error) {
@@ -65,7 +65,7 @@ const apiClient = {
 
     getAdminCreds: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             const result = await response.json();
             return result;
         } catch (error) {
@@ -76,7 +76,7 @@ const apiClient = {
 
     getLoginHistory: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/login-history${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/login-history${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             return result.success ? result.data : null;
@@ -89,7 +89,7 @@ const apiClient = {
     // --- Customers ---
     getCustomers: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/customers${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/customers${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             if (Array.isArray(result)) return result;
@@ -126,7 +126,7 @@ const apiClient = {
     // --- Invoices ---
     getInvoices: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/invoices${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/invoices${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             if (Array.isArray(result)) return result;
@@ -163,7 +163,7 @@ const apiClient = {
     // --- Generic Fetch / Save for other collections ---
     _getCollection: async (collectionName) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/${collectionName}${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/${collectionName}${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             if (Array.isArray(result)) return result;
@@ -275,7 +275,7 @@ const apiClient = {
         if (startDate) qs += `&startDate=${encodeURIComponent(startDate)}`;
         if (endDate) qs += `&endDate=${encodeURIComponent(endDate)}`;
         try {
-            const response = await fetch(`${API_BASE_URL}/marketing-visits${qs}`);
+            const response = await fetch(`${API_BASE_URL}/marketing-visits${qs}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             return result.success ? result.data : null;
@@ -325,7 +325,7 @@ const apiClient = {
     },
     getCustomRecords: async (moduleName) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/custom-records/${moduleName}${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/custom-records/${moduleName}${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             return result.success ? result.data : null;
@@ -340,7 +340,7 @@ const apiClient = {
     // --- Shadow Ledger / Vault ---
     getShadowLedger: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/shadow_ledger${apiClient._getAuthQuery()}`);
+            const response = await fetch(`${API_BASE_URL}/shadow_ledger${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             return result.success ? result.data : null;
@@ -392,7 +392,7 @@ const apiClient = {
         const auth = apiClient._getAuthQuery();
         const sep = auth.includes('?') ? '&' : '?';
         try {
-            const response = await fetch(`${API_BASE_URL}/chatter${auth}${sep}tenant=${encodeURIComponent(tenant)}`);
+            const response = await fetch(`${API_BASE_URL}/chatter${auth}${sep}tenant=${encodeURIComponent(tenant)}&_t=${Date.now()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             return result.success ? result.data : result;
@@ -408,7 +408,7 @@ const apiClient = {
         const auth = apiClient._getAuthQuery();
         const sep = auth.includes('?') ? '&' : '?';
         try {
-            const response = await fetch(`${API_BASE_URL}/chatter-groups${auth}${sep}tenant=${encodeURIComponent(tenant)}`);
+            const response = await fetch(`${API_BASE_URL}/chatter-groups${auth}${sep}tenant=${encodeURIComponent(tenant)}&_t=${Date.now()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             return result.success ? result.data : result;
@@ -422,7 +422,7 @@ const apiClient = {
     getTypingStatus: async () => {
         const tenant = await apiClient.getTenantId();
         try {
-            const response = await fetch(`${API_BASE_URL}/chatter/typing?tenant=${encodeURIComponent(tenant)}`);
+            const response = await fetch(`${API_BASE_URL}/chatter/typing?tenant=${encodeURIComponent(tenant)}&_t=${Date.now()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             return await response.json();
         } catch (error) { return null; }
@@ -481,7 +481,7 @@ const apiClient = {
     // --- Email Inbox & IMAP ---
     getInboxEmails: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/emails/inbox`);
+            const response = await fetch(`${API_BASE_URL}/emails/inbox`, { cache: 'no-store' });
             return await response.json();
         } catch (error) {
             return { success: false, error: error.message };
@@ -490,7 +490,7 @@ const apiClient = {
 
     checkNewEmails: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/emails/unread-count`);
+            const response = await fetch(`${API_BASE_URL}/emails/unread-count`, { cache: 'no-store' });
             return await response.json();
         } catch (error) {
             return { success: false, error: error.message };
