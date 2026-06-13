@@ -183,7 +183,7 @@ const apiClient = {
                 keepalive: true,
                 body: JSON.stringify(data)
             });
-            
+
             const contentType = response.headers.get("content-type");
             if (contentType && contentType.includes("application/json")) {
                 return await response.json();
@@ -373,7 +373,7 @@ const apiClient = {
                 if (settings && settings.companyName) {
                     tenant = settings.companyName;
                 }
-            } catch (e) {}
+            } catch (e) { }
         } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
             tenant = APP_SETTINGS.COMPANY_NAME;
         } else {
@@ -381,7 +381,7 @@ const apiClient = {
                 const adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
                 const admin = adminUsers.find(u => u.role === 'Admin') || adminUsers[0];
                 if (admin && admin.username) tenant = admin.username;
-            } catch (e) {}
+            } catch (e) { }
         }
         return tenant.replace(/[^a-zA-Z0-9 ]/gi, '_').trim();
     },
@@ -403,7 +403,33 @@ const apiClient = {
         if (!data.tenant) {
             data.tenant = await apiClient.getTenantId();
         }
-        return apiClient._saveCollection('chatter', data);
+
+        // Pass explicit tenant via query string to bypass backend tenant overwrite middlewares
+        const auth = apiClient._getAuthQuery();
+        const sep = auth.includes('?') ? '&' : '?';
+        const url = `${API_BASE_URL}/chatter${auth}${sep}tenant=${encodeURIComponent(data.tenant)}`;
+
+        try {
+            if (!data.createdBy) data.createdBy = localStorage.getItem('currentUser') || 'System';
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
+                body: JSON.stringify(data)
+            });
+
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                return await response.json();
+            } else {
+                if (response.status === 413) throw new Error("Payload Too Large: The file exceeds network size limits.");
+                if (response.status === 404) throw new Error(`404 Not Found: The API endpoint '/api/chatter' does not exist on the server.`);
+                throw new Error(`Server returned HTML instead of JSON (${response.status}).`);
+            }
+        } catch (error) {
+            console.error('Error saving chatter:', error);
+            return { success: false, message: error.message };
+        }
     },
     deleteMessage: (id) => apiClient._deleteCollection('chatter', id),
     getChatterGroups: async () => {
@@ -433,12 +459,12 @@ const apiClient = {
     setTypingStatus: async (user, isTyping) => {
         const tenant = await apiClient.getTenantId();
         try {
-            await fetch(`${API_BASE_URL}/chatter/typing`, {
+            await fetch(`${API_BASE_URL}/chatter/typing?tenant=${encodeURIComponent(tenant)}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user, isTyping, tenant })
             });
-        } catch (error) {}
+        } catch (error) { }
     },
     getOnlineUsers: async () => {
         const tenant = await apiClient.getTenantId();
@@ -451,12 +477,12 @@ const apiClient = {
     setOnlineStatus: async (user) => {
         const tenant = await apiClient.getTenantId();
         try {
-            await fetch(`${API_BASE_URL}/chatter/online`, {
+            await fetch(`${API_BASE_URL}/chatter/online?tenant=${encodeURIComponent(tenant)}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user, tenant })
             });
-        } catch (error) {}
+        } catch (error) { }
     },
 
 
