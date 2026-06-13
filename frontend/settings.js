@@ -697,7 +697,7 @@ async function checkChatterNotifications() {
         }
         }
     }
-}
+
 
 // --- STEP 4: Safety Logic ---
 async function confirmAndChangeAppMode(newMode) {
