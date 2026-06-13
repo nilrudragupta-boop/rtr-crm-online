@@ -9,6 +9,8 @@ const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
 
 const app = express();
+
+
 // Render will supply process.env.PORT, otherwise it falls back to 5000 locally
 const PORT = process.env.PORT || 5000;
 
@@ -1001,6 +1003,74 @@ app.post('/api/restore', async (req, res) => {
 });
 
 // --- Chatter Routes ---
+
+// In-memory store for online heartbeats, separated by tenant
+const activeChatterUsers = {};
+
+// 1. Handle Online Heartbeat (Accepts Cross-Tenant)
+app.post('/api/chatter/online', (req, res) => {
+    const { user, tenant } = req.body;
+    const actualTenant = req.query.tenant || tenant; // Allow explicit query override
+
+    if (!activeChatterUsers[actualTenant]) activeChatterUsers[actualTenant] = {};
+    activeChatterUsers[actualTenant][user] = Date.now();
+
+    res.json({ success: true });
+});
+
+// 2. Retrieve Online Users (Merges the Developer globally)
+app.get('/api/chatter/online', (req, res) => {
+    const reqTenant = req.query.tenant;
+    const now = Date.now();
+    const online = [];
+
+    // 1. Check local admins in their own workspace
+    if (activeChatterUsers[reqTenant]) {
+        for (const [user, lastSeen] of Object.entries(activeChatterUsers[reqTenant])) {
+            if (now - lastSeen < 25000) online.push(user); // Active in last 25 seconds
+        }
+    }
+
+    // 2. ALWAYS push 'DEVELOPER' to the Admins if the Developer is active in their workspace
+    if (reqTenant !== '7908040851' && activeChatterUsers['7908040851']) {
+        const devWorkspaceUsers = Object.values(activeChatterUsers['7908040851']);
+        const isDevOnline = devWorkspaceUsers.some(lastSeen => (now - lastSeen) < 25000);
+
+        if (isDevOnline && !online.includes('DEVELOPER')) {
+            online.push('DEVELOPER');
+        }
+    }
+
+    res.json({ success: true, online });
+});
+
+// 3. Handle Cross-Tenant Messages explicitly
+app.post('/api/chatter', async (req, res, next) => {
+    // Check if this is a cross-tenant push (Admin -> Developer OR Developer -> Admin)
+    // Ensure req.body exists because body-parser might fail on malformed payloads
+    const isCrossTenant = req.query.tenant === '7908040851' || (req.body && req.body.sender === 'DEVELOPER');
+
+    if (isCrossTenant) {
+        try {
+            const Message = mongoose.model('Message');
+
+            // Force the tenant to match the intended destination workspace
+            const dataToSave = { ...req.body, tenant: req.query.tenant || req.body.tenant };
+
+            const newMsg = new Message(dataToSave);
+            await newMsg.save();
+
+            return res.json({ success: true, data: newMsg });
+        } catch (error) {
+            console.error('Cross-tenant save error:', error);
+            return res.status(500).json({ success: false, message: error.message });
+        }
+    }
+
+    // If it's just a normal internal team message, pass it to your generic CRUD middleware
+    next();
+});
+
 let typingUsers = {};
 
 app.post('/api/chatter/typing', (req, res) => {
