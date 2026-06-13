@@ -1266,8 +1266,14 @@ const Chatter = {
         const el = document.getElementById('msg-' + id);
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Clear any existing timeout and force a CSS reflow to restart the animation
+            if (el.highlightTimeout) clearTimeout(el.highlightTimeout);
+            el.classList.remove('highlight-message');
+            void el.offsetWidth;
+            
             el.classList.add('highlight-message');
-            setTimeout(() => {
+            el.highlightTimeout = setTimeout(() => {
                 el.classList.remove('highlight-message');
             }, 2000);
         }
