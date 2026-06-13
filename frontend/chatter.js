@@ -135,16 +135,8 @@ const Chatter = {
 
         document.getElementById('file-input').addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                const file = e.target.files[0];
-                if (file.size > 2 * 1024 * 1024) { // 2MB Limit
-                    alert("File is too large! Please attach a file smaller than 2MB.");
-                    e.target.value = '';
-                    return;
-                }
-                this.selectedFile = e.target.files[0];
-                document.getElementById('file-name-text').innerText = this.selectedFile.name;
-                document.getElementById('attachment-name').style.display = 'block';
-                document.getElementById('chat-input').focus();
+                this.handleFileSelection(e.target.files[0]);
+                e.target.value = '';
             }
         });
 
@@ -192,15 +184,7 @@ const Chatter = {
                 dragOverlay.style.display = 'none';
 
                 if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    const file = e.dataTransfer.files[0];
-                    if (file.size > 2 * 1024 * 1024) { // 2MB Limit
-                        alert("File is too large! Please attach a file smaller than 2MB.");
-                        return;
-                    }
-                    this.selectedFile = file;
-                    document.getElementById('file-name-text').innerText = file.name;
-                    document.getElementById('attachment-name').style.display = 'block';
-                    document.getElementById('chat-input').focus();
+                    this.handleFileSelection(e.dataTransfer.files[0]);
                 }
             });
         }
@@ -236,6 +220,29 @@ const Chatter = {
         // Online status heartbeat & polling
         this.updateOnlineStatus();
         this.onlinePollInterval = setInterval(() => this.updateOnlineStatus(), 15000);
+    },
+
+    handleFileSelection: function (file) {
+        const isImage = file.type.startsWith('image/');
+        const compressWrapper = document.getElementById('compress-image-wrapper');
+        
+        if (compressWrapper) {
+            if (isImage) {
+                compressWrapper.style.setProperty('display', 'inline-block', 'important');
+            } else {
+                compressWrapper.style.setProperty('display', 'none', 'important');
+            }
+        }
+
+        if (!isImage && file.size > 2 * 1024 * 1024) {
+            alert("File is too large! Please attach a non-image file smaller than 2MB.");
+            return;
+        }
+
+        this.selectedFile = file;
+        document.getElementById('file-name-text').innerText = file.name;
+        document.getElementById('attachment-name').style.display = 'block';
+        document.getElementById('chat-input').focus();
     },
 
     updateOnlineStatus: async function () {
@@ -800,10 +807,25 @@ const Chatter = {
 
         if (this.selectedFile) {
             try {
-                attachmentBase64 = await this.toBase64(this.selectedFile);
+                const isImage = this.selectedFile.type.startsWith('image/');
+                const compressCb = document.getElementById('compress-image-cb');
+                const shouldCompress = isImage && compressCb && compressCb.checked;
+
+                if (shouldCompress) {
+                    attachmentBase64 = await this.compressImage(this.selectedFile);
+                } else {
+                    if (this.selectedFile.size > 2 * 1024 * 1024) {
+                        alert("File is too large! Please attach a file smaller than 2MB, or enable compression.");
+                        sendBtn.innerHTML = ogText;
+                        sendBtn.disabled = false;
+                        textInput.disabled = false;
+                        return;
+                    }
+                    attachmentBase64 = await this.toBase64(this.selectedFile);
+                }
                 attachmentName = this.selectedFile.name;
             } catch (e) {
-                alert("Error reading file: " + e.message);
+                alert("Error processing file: " + e.message);
                 sendBtn.innerHTML = ogText;
                 sendBtn.disabled = false;
                 textInput.disabled = false;
@@ -966,6 +988,43 @@ const Chatter = {
             const reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    },
+
+    compressImage: function (file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1280;
+                    const MAX_HEIGHT = 1280;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.6)); // 60% quality compression
+                };
+                img.onerror = error => reject(error);
+            };
             reader.onerror = error => reject(error);
         });
     },
