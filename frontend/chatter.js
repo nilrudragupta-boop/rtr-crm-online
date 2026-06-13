@@ -48,6 +48,9 @@ const Chatter = {
     mediaRecorder: null,
     audioChunks: [],
     activeReactionMsgId: null,
+    messageToForward: null,
+    isSelectMode: false,
+    selectedMessages: [],
 
     init: async function () {
         document.getElementById('current-user-display').innerHTML = `<i class="fas fa-user-circle me-1"></i> ${this.currentUser}`;
@@ -511,7 +514,7 @@ const Chatter = {
                 const statusColor = isOnline ? 'text-success' : 'text-secondary';
                 const statusText = isOnline ? 'Online' : 'Offline';
                 const statusIcon = `<i class="fas fa-circle ${statusColor}" style="font-size: 0.6rem; vertical-align: middle;" title="${statusText}"></i>`;
-                
+
                 list.innerHTML += `
                     <div class="mb-2 border-bottom pb-1 d-flex justify-content-between align-items-center">
                         <div><i class="fas fa-user-circle text-muted me-2"></i> ${escapeHtml(u)}</div>
@@ -809,9 +812,11 @@ const Chatter = {
         }
 
         let replyToData = null;
+        let crossTenantReplyId = null;
         if (this.replyingToMessageId) {
             const replyMsg = this.messages.find(m => m.id === this.replyingToMessageId);
             if (replyMsg) {
+                crossTenantReplyId = replyMsg.linkedId || replyMsg.id;
                 replyToData = {
                     id: replyMsg.id,
                     sender: replyMsg.sender,
@@ -868,7 +873,11 @@ const Chatter = {
                 text: text || (attachmentName ? `📁 Shared an attachment` : ''),
                 attachment: attachmentBase64,
                 attachmentName: attachmentName,
-                replyTo: replyToData,
+                replyTo: replyToData ? {
+                    id: crossTenantReplyId,
+                    sender: replyToData.sender,
+                    text: replyToData.text
+                } : null,
                 readBy: [],
                 tenant: '7908040851', // Route directly to developer's account chat
                 createdAt: new Date().toISOString()
@@ -885,7 +894,7 @@ const Chatter = {
         if (isDevReplying) {
             const targetTenant = replyToData.sender.substring(0, replyToData.sender.indexOf(' - '));
             const targetUser = replyToData.sender.substring(replyToData.sender.indexOf(' - ') + 3);
-            
+
             const adminMessage = {
                 id: linkedId,
                 linkedId: newMessage.id,
@@ -895,7 +904,7 @@ const Chatter = {
                 attachment: attachmentBase64,
                 attachmentName: attachmentName,
                 replyTo: {
-                    id: replyToData.id,
+                    id: crossTenantReplyId,
                     sender: targetUser,
                     text: replyToData.text
                 },
@@ -1012,6 +1021,118 @@ const Chatter = {
         this.renderMessages();
     },
 
+    openForwardModal: function (msgId) {
+        const msg = this.messages.find(m => m.id === msgId);
+        if (!msg || !msg.attachment) return;
+
+        this.messageToForward = msg;
+
+        const select = document.getElementById('forwardGroupSelect');
+        select.innerHTML = '';
+
+        // Add Global
+        if (this.activeGroupId !== 'global') {
+            select.innerHTML += `<option value="global">${this.tenantName || 'Global'} Coordination</option>`;
+        }
+
+        // Add Groups
+        this.groups.forEach(g => {
+            if (g.members && g.members.includes(this.currentUser) && g.id !== this.activeGroupId) {
+                select.innerHTML += `<option value="${g.id}">${escapeHtml(g.name)}</option>`;
+            }
+        });
+
+        if (select.options.length === 0) {
+            alert('No other groups available to forward to.');
+            return;
+        }
+
+        document.getElementById('btn-forward-confirm').onclick = () => this.forwardMessage();
+        document.getElementById('forwardModal').style.display = 'flex';
+    },
+
+    forwardMessage: async function () {
+        const targetGroupId = document.getElementById('forwardGroupSelect').value;
+        if (!targetGroupId || !this.messageToForward) return;
+
+        const btn = document.getElementById('btn-forward-confirm');
+        const ogText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+
+        const msg = this.messageToForward;
+
+        const newMessage = {
+            id: 'MSG-' + Date.now(),
+            groupId: targetGroupId,
+            sender: this.currentUser,
+            text: `Forwarded attachment from ${msg.sender}`,
+            attachment: msg.attachment,
+            attachmentName: msg.attachmentName,
+            readBy: [],
+            createdAt: new Date().toISOString()
+        };
+
+        if (typeof apiClient !== 'undefined' && apiClient.saveMessage) {
+            const result = await apiClient.saveMessage(newMessage);
+            if (result && result.success === false) {
+                alert("Failed to forward attachment: " + (result.message || "Server Error"));
+            } else {
+                alert("Attachment forwarded successfully!");
+            }
+        }
+
+        document.getElementById('forwardModal').style.display = 'none';
+        btn.innerHTML = ogText;
+        btn.disabled = false;
+        this.messageToForward = null;
+    },
+
+    toggleSelectMode: function () {
+        this.isSelectMode = !this.isSelectMode;
+        this.selectedMessages = [];
+        
+        const selectBtn = document.getElementById('btn-select-mode');
+        if (this.isSelectMode) {
+            selectBtn.classList.replace('btn-outline-secondary', 'btn-primary');
+            document.getElementById('bulk-action-banner').style.display = 'flex';
+            document.querySelector('.chat-input-area').style.display = 'none';
+        } else {
+            selectBtn.classList.replace('btn-primary', 'btn-outline-secondary');
+            document.getElementById('bulk-action-banner').style.display = 'none';
+            document.querySelector('.chat-input-area').style.display = 'block';
+        }
+        this.renderMessages();
+        document.getElementById('bulk-selected-count').innerText = '0';
+    },
+
+    toggleMessageSelection: function (msgId, isSelected) {
+        if (isSelected) {
+            if (!this.selectedMessages.includes(msgId)) {
+                this.selectedMessages.push(msgId);
+            }
+        } else {
+            this.selectedMessages = this.selectedMessages.filter(id => id !== msgId);
+        }
+        document.getElementById('bulk-selected-count').innerText = this.selectedMessages.length;
+    },
+
+    deleteSelectedMessages: async function () {
+        if (this.selectedMessages.length === 0) return;
+        if (!confirm(`Are you sure you want to delete ${this.selectedMessages.length} messages for everyone?`)) return;
+
+        const idsToDelete = [...this.selectedMessages];
+        this.toggleSelectMode(); // Exit select mode immediately
+
+        for (const id of idsToDelete) {
+            this.messages = this.messages.filter(m => m.id !== id);
+            if (typeof apiClient !== 'undefined' && apiClient.deleteMessage) {
+                await apiClient.deleteMessage(id);
+            }
+        }
+        this.renderMessages();
+    },
+
     renderMessages: function () {
         this.renderPinnedMessage();
 
@@ -1041,6 +1162,20 @@ const Chatter = {
             const msgDiv = document.createElement('div');
             msgDiv.className = `message-box ${isMe ? 'message-me' : 'message-other'}`;
             msgDiv.id = 'msg-' + msg.id; // Assign ID to smoothly scroll to it if clicked from a reply
+
+            let selectHtml = '';
+            if (this.isSelectMode) {
+                const isChecked = this.selectedMessages.includes(msg.id) ? 'checked' : '';
+                selectHtml = `
+                <div style="position: absolute; right: 100%; padding-right: 8px; top: ${!isMe && msg.sender ? '20px' : '5px'};">
+                    <input type="checkbox" class="form-check-input m-0 shadow-sm border-secondary" style="width: 18px; height: 18px; cursor: pointer;" 
+                        onclick="event.stopPropagation()" onchange="Chatter.toggleMessageSelection('${msg.id}', this.checked)" ${isChecked}>
+                </div>
+                `;
+                if (!isMe) {
+                    msgDiv.style.marginLeft = '25px';
+                }
+            }
 
             let attachmentHtml = '';
             if (msg.attachment) {
@@ -1084,6 +1219,7 @@ const Chatter = {
                 <div class="message-actions">
                     <button class="btn-react" onclick="event.stopPropagation(); Chatter.showReactionPicker('${msg.id}', event)" title="React"><i class="fas fa-smile"></i></button>
                     <button onclick="Chatter.replyToMessage('${msg.id}')" title="Reply"><i class="fas fa-reply"></i></button>
+                    ${msg.attachment ? `<button onclick="Chatter.openForwardModal('${msg.id}')" title="Forward Attachment"><i class="fas fa-share"></i></button>` : ''}
                     <button onclick="Chatter.pinMessage('${msg.id}')" title="${msg.isPinned ? 'Unpin' : 'Pin Message'}"><i class="fas fa-thumbtack ${msg.isPinned ? 'text-warning' : ''}"></i></button>
                     ${isMe ? (!isPast24h ? `
                     <button onclick="Chatter.editMessage('${msg.id}')" title="Edit"><i class="fas fa-edit"></i></button>
@@ -1105,6 +1241,7 @@ const Chatter = {
             }
 
             msgDiv.innerHTML = `
+                ${selectHtml}
                 ${!isMe ? `<div class="message-sender">${escapeHtml(msg.sender)}${msg.sender === 'DEVELOPER' ? ' <i class="fas fa-check-circle text-primary" title="Verified Support" style="font-size: 0.75rem;"></i>' : ''}</div>` : ''}
                 <div class="message-content shadow-sm">
                     ${replyHtml}
