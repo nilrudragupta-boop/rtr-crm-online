@@ -34,6 +34,7 @@ const Chatter = {
     activeGroupId: 'global',
     groups: [],
     allUsers: [],
+    onlineUsers: [],
     messages: [],
     unreadCounts: {},
     selectedFile: null,
@@ -228,6 +229,24 @@ const Chatter = {
 
         // Poll every 5 seconds to get updates continuously
         this.pollInterval = setInterval(() => this.loadMessages(true), 5000);
+
+        // Online status heartbeat & polling
+        this.updateOnlineStatus();
+        this.onlinePollInterval = setInterval(() => this.updateOnlineStatus(), 15000);
+    },
+
+    updateOnlineStatus: async function () {
+        if (typeof apiClient !== 'undefined') {
+            if (apiClient.setOnlineStatus) {
+                apiClient.setOnlineStatus(this.currentUser);
+            }
+            if (apiClient.getOnlineUsers) {
+                const res = await apiClient.getOnlineUsers();
+                if (res && res.success) {
+                    this.onlineUsers = res.online || [];
+                }
+            }
+        }
     },
 
     loadGroups: async function () {
@@ -478,8 +497,26 @@ const Chatter = {
         if (membersToDisplay.length === 0) {
             list.innerHTML = '<div class="text-center text-muted my-3">No members found.</div>';
         } else {
+            // Sort members: online first, then offline, then alphabetically
+            membersToDisplay.sort((a, b) => {
+                const aOnline = this.onlineUsers.includes(a) || a === this.currentUser;
+                const bOnline = this.onlineUsers.includes(b) || b === this.currentUser;
+                if (aOnline && !bOnline) return -1;
+                if (!aOnline && bOnline) return 1;
+                return a.localeCompare(b);
+            });
+
             membersToDisplay.forEach(u => {
-                list.innerHTML += `<div class="mb-2 border-bottom pb-1"><i class="fas fa-user-circle text-muted me-2"></i> ${escapeHtml(u)}</div>`;
+                const isOnline = this.onlineUsers.includes(u) || u === this.currentUser;
+                const statusColor = isOnline ? 'text-success' : 'text-secondary';
+                const statusText = isOnline ? 'Online' : 'Offline';
+                const statusIcon = `<i class="fas fa-circle ${statusColor}" style="font-size: 0.6rem; vertical-align: middle;" title="${statusText}"></i>`;
+                
+                list.innerHTML += `
+                    <div class="mb-2 border-bottom pb-1 d-flex justify-content-between align-items-center">
+                        <div><i class="fas fa-user-circle text-muted me-2"></i> ${escapeHtml(u)}</div>
+                        <div class="small">${statusIcon}</div>
+                    </div>`;
             });
         }
 

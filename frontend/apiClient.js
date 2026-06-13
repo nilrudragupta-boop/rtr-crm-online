@@ -440,6 +440,24 @@ const apiClient = {
             });
         } catch (error) {}
     },
+    getOnlineUsers: async () => {
+        const tenant = await apiClient.getTenantId();
+        try {
+            const response = await fetch(`${API_BASE_URL}/chatter/online?tenant=${encodeURIComponent(tenant)}&_t=${Date.now()}`, { cache: 'no-store' });
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (error) { return null; }
+    },
+    setOnlineStatus: async (user) => {
+        const tenant = await apiClient.getTenantId();
+        try {
+            await fetch(`${API_BASE_URL}/chatter/online`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user, tenant })
+            });
+        } catch (error) {}
+    },
 
 
     // --- Maintenance ---
