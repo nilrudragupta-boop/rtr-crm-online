@@ -815,7 +815,7 @@ const Chatter = {
 
         if (isTaggingDev) {
             const devMessage = {
-                id: 'MSG-DEV-' + Date.now() + Math.floor(Math.random() * 1000),
+                id: newMessage.id + '-DEV',
                 groupId: 'global',
                 sender: `${this.tenantName} - ${this.currentUser}`,
                 text: text || (attachmentName ? `📁 Shared an attachment` : ''),
@@ -840,7 +840,7 @@ const Chatter = {
             const targetUser = replyToData.sender.substring(replyToData.sender.indexOf(' - ') + 3);
             
             const adminMessage = {
-                id: 'MSG-DEVREPLY-' + Date.now() + Math.floor(Math.random() * 1000),
+                id: newMessage.id + '-DEVREPLY',
                 groupId: 'global',
                 sender: 'DEVELOPER', // Appears on the Left Side for the Admin!
                 text: text || (attachmentName ? `📁 Shared an attachment` : ''),
@@ -1078,7 +1078,11 @@ const Chatter = {
     },
 
     scrollToMessage: function (id) {
-        const el = document.getElementById('msg-' + id);
+        let el = document.getElementById('msg-' + id);
+        // Fallback for cross-tenant developer replies
+        if (!el && id.endsWith('-DEV')) el = document.getElementById('msg-' + id.replace('-DEV', ''));
+        if (!el && id.endsWith('-DEVREPLY')) el = document.getElementById('msg-' + id.replace('-DEVREPLY', ''));
+        
         if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             el.classList.add('highlight-message');
