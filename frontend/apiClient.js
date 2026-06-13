@@ -366,6 +366,11 @@ const apiClient = {
 
     // --- Tenant Identifier Helper ---
     getTenantId: async () => {
+        const currentUser = localStorage.getItem('currentUser');
+        if (currentUser === 'DEVELOPER' || currentUser === '7908040851') {
+            return '7908040851'; // Force developer into the correct support tenant
+        }
+
         let tenant = 'System';
         if (window.electronAPI && window.electronAPI.getAppSettings) {
             try {
