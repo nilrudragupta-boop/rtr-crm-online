@@ -826,8 +826,8 @@ const Chatter = {
                 tenant: '7908040851', // Route directly to developer's account chat
                 createdAt: new Date().toISOString()
             };
-            if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
-                await apiClient._saveCollection('chatter', devMessage);
+            if (typeof apiClient !== 'undefined' && apiClient.saveMessage) {
+                await apiClient.saveMessage(devMessage);
             }
             if (text.toUpperCase().includes('@DEVELOPER')) {
                 alert("💡 Help Tip: You tagged @DEVELOPER. A copy of your message has been sent directly to the developer's support chat!");
@@ -855,8 +855,8 @@ const Chatter = {
                 tenant: targetTenant, // Pushes directly into the Admin's workspace
                 createdAt: new Date().toISOString()
             };
-            if (typeof apiClient !== 'undefined' && apiClient._saveCollection) {
-                await apiClient._saveCollection('chatter', adminMessage);
+            if (typeof apiClient !== 'undefined' && apiClient.saveMessage) {
+                await apiClient.saveMessage(adminMessage);
             }
         }
 

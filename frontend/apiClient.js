@@ -399,7 +399,10 @@ const apiClient = {
         } catch (e) { return null; }
     },
     saveMessage: async (data) => {
-        data.tenant = await apiClient.getTenantId();
+        // Do not overwrite tenant if it's already set (for cross-tenant messages)
+        if (!data.tenant) {
+            data.tenant = await apiClient.getTenantId();
+        }
         return apiClient._saveCollection('chatter', data);
     },
     deleteMessage: (id) => apiClient._deleteCollection('chatter', id),
