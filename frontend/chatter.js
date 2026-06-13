@@ -702,6 +702,7 @@ const Chatter = {
 
                 // Mark messages as read for OS notifications
                 localStorage.setItem('lastChatterCheck', Date.now());
+                localStorage.setItem('lastNotifiedChatter', Date.now());
             } else if (!isPolling) {
                 document.getElementById('chat-messages').innerHTML = '<div class="text-center text-muted my-3">No messages yet. Be the first to start the coordination!</div>';
             }
@@ -834,7 +835,7 @@ const Chatter = {
         }
 
         // --- Route Developer's Reply back to the specific Admin's Tenant ---
-        if (this.tenantName === '7908040851' && replyToData && replyToData.sender && replyToData.sender.includes(' - ')) {
+        if (this.tenantName && this.tenantName.trim() === '7908040851' && replyToData && replyToData.sender && replyToData.sender.includes(' - ')) {
             const targetTenant = replyToData.sender.substring(0, replyToData.sender.indexOf(' - '));
             const targetUser = replyToData.sender.substring(replyToData.sender.indexOf(' - ') + 3);
             
