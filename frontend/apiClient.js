@@ -374,8 +374,6 @@ const apiClient = {
                     tenant = settings.companyName;
                 }
             } catch (e) {}
-        } else if (localStorage.getItem('companyName')) {
-            tenant = localStorage.getItem('companyName');
         } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
             tenant = APP_SETTINGS.COMPANY_NAME;
         } else {
