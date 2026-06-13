@@ -820,8 +820,19 @@ const Chatter = {
             }
         }
 
+        const isTaggingDev = text.toUpperCase().includes('@DEVELOPER') || (replyToData && replyToData.sender === 'DEVELOPER');
+        const isDevReplying = this.tenantName && this.tenantName.trim() === '7908040851' && replyToData && replyToData.sender && replyToData.sender.includes(' - ');
+
+        let linkedId = null;
+        if (isTaggingDev) {
+            linkedId = 'MSG-DEV-' + Date.now() + Math.floor(Math.random() * 1000);
+        } else if (isDevReplying) {
+            linkedId = 'MSG-DEVREPLY-' + Date.now() + Math.floor(Math.random() * 1000);
+        }
+
         const newMessage = {
             id: 'MSG-' + Date.now(),
+            linkedId: linkedId,
             groupId: this.activeGroupId,
             sender: this.currentUser,
             text: text,
@@ -848,11 +859,10 @@ const Chatter = {
             }
         }
 
-        const isTaggingDev = text.toUpperCase().includes('@DEVELOPER') || (replyToData && replyToData.sender === 'DEVELOPER');
-
         if (isTaggingDev) {
             const devMessage = {
-                id: 'MSG-DEV-' + Date.now() + Math.floor(Math.random() * 1000),
+                id: linkedId,
+                linkedId: newMessage.id,
                 groupId: 'global',
                 sender: `${this.tenantName} - ${this.currentUser}`,
                 text: text || (attachmentName ? `📁 Shared an attachment` : ''),
@@ -872,12 +882,13 @@ const Chatter = {
         }
 
         // --- Route Developer's Reply back to the specific Admin's Tenant ---
-        if (this.tenantName && this.tenantName.trim() === '7908040851' && replyToData && replyToData.sender && replyToData.sender.includes(' - ')) {
+        if (isDevReplying) {
             const targetTenant = replyToData.sender.substring(0, replyToData.sender.indexOf(' - '));
             const targetUser = replyToData.sender.substring(replyToData.sender.indexOf(' - ') + 3);
             
             const adminMessage = {
-                id: 'MSG-DEVREPLY-' + Date.now() + Math.floor(Math.random() * 1000),
+                id: linkedId,
+                linkedId: newMessage.id,
                 groupId: 'global',
                 sender: 'DEVELOPER', // Appears on the Left Side for the Admin!
                 text: text || (attachmentName ? `📁 Shared an attachment` : ''),

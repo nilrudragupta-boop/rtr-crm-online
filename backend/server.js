@@ -1044,32 +1044,6 @@ app.get('/api/chatter/online', (req, res) => {
     res.json({ success: true, online });
 });
 
-// 3. Handle Cross-Tenant Messages explicitly
-app.post('/api/chatter', async (req, res, next) => {
-    // Check if this is a cross-tenant push (Admin -> Developer OR Developer -> Admin)
-    // Ensure req.body exists because body-parser might fail on malformed payloads
-    const isCrossTenant = req.query.tenant === '7908040851' || (req.body && req.body.sender === 'DEVELOPER');
-
-    if (isCrossTenant) {
-        try {
-            const Message = mongoose.model('Message');
-
-            // Force the tenant to match the intended destination workspace
-            const dataToSave = { ...req.body, tenant: req.query.tenant || req.body.tenant };
-
-            const newMsg = new Message(dataToSave);
-            await newMsg.save();
-
-            return res.json({ success: true, data: newMsg });
-        } catch (error) {
-            console.error('Cross-tenant save error:', error);
-            return res.status(500).json({ success: false, message: error.message });
-        }
-    }
-
-    // If it's just a normal internal team message, pass it to your generic CRUD middleware
-    next();
-});
 
 let typingUsers = {};
 
@@ -1115,16 +1089,32 @@ app.get('/api/chatter', async (req, res) => {
 
 app.post('/api/chatter', async (req, res) => {
     try {
+        const Message = mongoose.model('Message');
         const payload = req.body;
-        const existing = await Message.findOne({ id: payload.id });
-        if (existing) {
-            const updated = await Message.findOneAndUpdate({ id: payload.id }, payload, { new: true });
-            res.status(200).json({ success: true, data: updated });
-        } else {
-            const newMessage = new Message(payload);
-            await newMessage.save();
-            res.status(201).json({ success: true, data: newMessage });
+        
+        // 1. Force target tenant if crossing environments
+        const isCrossTenant = req.query.tenant === '7908040851' || (payload && payload.sender === 'DEVELOPER');
+        if (isCrossTenant && req.query.tenant) {
+            payload.tenant = req.query.tenant;
         }
+
+        const existing = await Message.findOne({ id: payload.id });
+        let savedMsg;
+        if (existing) {
+            savedMsg = await Message.findOneAndUpdate({ id: payload.id }, payload, { new: true });
+        } else {
+            const newMsg = new Message(payload);
+            await newMsg.save();
+            savedMsg = newMsg;
+        }
+
+        // 2. Auto-Sync Linked Messages (For Edits and Read Receipts across cross-tenant clones)
+        if (payload.linkedId) {
+            const syncData = { text: payload.text, isEdited: payload.isEdited, readBy: payload.readBy, reactions: payload.reactions, attachment: payload.attachment, attachmentName: payload.attachmentName };
+            await Message.findOneAndUpdate({ id: payload.linkedId }, { $set: syncData });
+        }
+
+        res.status(existing ? 200 : 201).json({ success: true, data: savedMsg });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
     }
@@ -1132,7 +1122,11 @@ app.post('/api/chatter', async (req, res) => {
 
 app.delete('/api/chatter/:id', async (req, res) => {
     try {
-        await Message.findOneAndDelete({ id: req.params.id });
+        const deleted = await Message.findOneAndDelete({ id: req.params.id });
+        // Auto-delete linked message across tenants
+        if (deleted && deleted.linkedId) {
+            await Message.findOneAndDelete({ id: deleted.linkedId });
+        }
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
