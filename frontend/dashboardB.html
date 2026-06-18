@@ -5794,6 +5794,13 @@
             if (!file) return;
             if (!confirm("This will ERASE all current data and replace it with the backup. Proceed?")) return;
             const isDbBackup = file.name.startsWith("DB_Backup");
+
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                overlay.querySelector('p').innerText = "Reading backup file...";
+            }
+
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
@@ -5801,20 +5808,25 @@
 
                     if (isDbBackup) {
                         if (window.electronAPI && window.electronAPI.restoreDatabase) {
+                            if (overlay) overlay.querySelector('p').innerText = "Restoring Database...";
                             const res = await window.electronAPI.restoreDatabase(fileContent);
                             if (res.success) {
+                                if (overlay) overlay.style.display = 'none';
                                 alert("Database restored successfully! Reloading...");
                                 setTimeout(() => location.reload(), 1000);
                             } else {
+                                if (overlay) overlay.style.display = 'none';
                                 alert("Database restore failed: " + res.message);
                             }
                         } else {
+                            if (overlay) overlay.style.display = 'none';
                             alert("Database restore is only supported in the desktop app.");
                         }
                         return;
                     }
 
                     let backupData = null;
+                    if (overlay) overlay.querySelector('p').innerText = "Decrypting & Parsing Data...";
                     try {
                         const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
                         const decrypted = bytes.toString(CryptoJS.enc.Utf8);
@@ -5824,6 +5836,7 @@
 
                     if (typeof API_BASE_URL !== 'undefined') {
                         try {
+                            if (overlay) overlay.querySelector('p').innerText = "Syncing restored data to backend...";
                             await fetch(`${API_BASE_URL}/restore`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -5834,15 +5847,21 @@
                         }
                     }
 
+                    if (overlay) overlay.querySelector('p').innerText = "Saving to Local Storage...";
                     localStorage.clear();
                     for (const key in backupData) {
                         if (Object.prototype.hasOwnProperty.call(backupData, key)) {
                             localStorage.setItem(key, backupData[key]);
                         }
                     }
+                    if (overlay) overlay.style.display = 'none';
                     alert("Local Storage Data restored successfully! Reloading...");
                     setTimeout(() => location.reload(), 1000);
-                } catch (error) { console.error(error); alert("Restore failed. Invalid file."); }
+                } catch (error) { 
+                    if (overlay) overlay.style.display = 'none';
+                    console.error(error); 
+                    alert("Restore failed. Invalid file."); 
+                }
             };
             reader.readAsText(file);
             input.value = "";
@@ -6012,6 +6031,7 @@
                     
                     if (typeof API_BASE_URL !== 'undefined') {
                         try {
+                            if (overlay) overlay.querySelector('p').innerText = "Syncing restored data to backend...";
                             await fetch(`${API_BASE_URL}/restore`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -6022,6 +6042,7 @@
                         }
                     }
 
+                    if (overlay) overlay.querySelector('p').innerText = "Saving to Local Storage...";
                     localStorage.clear();
                     for (const key in backupData) {
                         if (Object.prototype.hasOwnProperty.call(backupData, key)) {
