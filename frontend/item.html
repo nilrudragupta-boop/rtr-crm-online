@@ -2392,10 +2392,15 @@
         async function confirmDelete() {
             if (idsToDelete.length === 0) return;
 
+            // Delete Local
+            items = items.filter(item => !idsToDelete.includes(String(item.id)));
+            localStorage.setItem("items", JSON.stringify(items));
+
             for (let id of idsToDelete) {
-                await apiClient.deleteItem(id);
+                if (typeof apiClient !== 'undefined' && apiClient.deleteItem) {
+                    await apiClient.deleteItem(id).catch(e => console.warn(e));
+                }
             }
-            await fetchItemsData();
 
             // Delete Firestore
             if (db) {
@@ -2403,6 +2408,7 @@
             }
             openSuccessModal(`Deleted ${idsToDelete.length} items.`);
             closeConfirmModal();
+            applyFilters();
         }
 
         function closeConfirmModal() {
