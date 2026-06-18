@@ -5822,6 +5822,18 @@
                     } catch (err) { console.log("Not encrypted, trying plain JSON..."); }
                     if (!backupData) backupData = JSON.parse(fileContent);
 
+                    if (typeof API_BASE_URL !== 'undefined') {
+                        try {
+                            await fetch(`${API_BASE_URL}/restore`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(backupData)
+                            });
+                        } catch (e) {
+                            console.warn("Failed to push restored data to backend", e);
+                        }
+                    }
+
                     localStorage.clear();
                     for (const key in backupData) {
                         if (Object.prototype.hasOwnProperty.call(backupData, key)) {
@@ -5997,6 +6009,19 @@
                 const backupData = await response.json();
 
                 if (backupData && !backupData.error) {
+                    
+                    if (typeof API_BASE_URL !== 'undefined') {
+                        try {
+                            await fetch(`${API_BASE_URL}/restore`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(backupData)
+                            });
+                        } catch (e) {
+                            console.warn("Failed to push cloud restore to backend", e);
+                        }
+                    }
+
                     localStorage.clear();
                     for (const key in backupData) {
                         if (Object.prototype.hasOwnProperty.call(backupData, key)) {
