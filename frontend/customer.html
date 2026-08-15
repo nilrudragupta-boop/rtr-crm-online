@@ -1129,8 +1129,8 @@
                 <div
                     style="margin-left: 15px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showActionView"
-                            onchange="toggleActionButton('view', this.checked)"> View
+                        <input type="checkbox" id="showActionView" onchange="toggleActionButton('view', this.checked)">
+                        View
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
                         <input type="checkbox" id="showActionInvoice"
@@ -1368,18 +1368,24 @@
             if (!tr) return;
 
             const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
+            const theadTr = document.getElementById('contactsHeadRow');
+            if (theadTr) theadTr.remove();
 
-            let thHtml = `<th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
-                          <th>Sl. No</th>`;
+            let thHtml = `<th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>`;
+            thHtml += `<th style="width: 50px; text-align: center; cursor:pointer;" onclick="handleSort('sl_no')">SL <span id="sort-icon-sl_no" style="font-size: 11px;"></span></th>`;
 
             orderedCols.forEach(c => {
+                let widthStyle = '';
+                if (c.id === 'mobile' || c.id === 'company') widthStyle = 'width: 140px;';
                 const icon = currentSortColumn === c.id ? (currentSortDirection === 'asc' ? '▲' : '▼') : '';
-                thHtml += `<th data-id="${c.id}" style="cursor:pointer;" onclick="handleHeaderClick('${c.id}')">${c.label} <span id="sort-icon-${c.id}">${icon}</span></th>`
+                thHtml += `<th data-id="${c.id}" style="${widthStyle} cursor:pointer;" onclick="handleHeaderClick('${c.id}')">${c.label} <span id="sort-icon-${c.id}">${icon}</span></th>`;
             });
 
             thHtml += `<th style="width: 120px;">Actions</th>`;
             tr.innerHTML = thHtml;
             updateHeaderIcons();
+            // Apply saved alignment/styles after headers are rendered
+            updateColumnStyles();
         }
 
 
@@ -1611,6 +1617,7 @@
         let rowsPerPage = 20;
         let currentSortColumn = 'name';
         let currentSortDirection = 'asc';
+        let columnAlignment = JSON.parse(localStorage.getItem('customerColumnAlignment')) || {};
 
         // Dark Mode Logic
         let currentTheme = localStorage.getItem("appThemeMode") || "system";
@@ -1753,9 +1760,9 @@
 
                 orderedCols.forEach(col => {
                     if (col.id === 'name') {
-                        trHtml += `<td>${highlightMatch(c.name, searchTerm)}</td>`;
+                        trHtml += `<td data-col="${col.id}">${highlightMatch(c.name, searchTerm)}</td>`;
                     } else if (col.id === 'address') {
-                        trHtml += `<td>${highlightMatch(c.address, searchTerm)}</td>`;
+                        trHtml += `<td data-col="${col.id}">${highlightMatch(c.address, searchTerm)}</td>`;
                     } else if (col.id === 'contact') {
                         let contactHtml = '-';
                         if (c.contact) {
@@ -1766,7 +1773,7 @@
                                 return '<div style="white-space:nowrap; margin-bottom:2px;">' + callLink + highlightMatch(num, [searchTerm, searchContact]) + waLink + '</div>';
                             }).join('');
                         }
-                        trHtml += '<td>' + contactHtml + '</td>';
+                        trHtml += '<td data-col="' + col.id + '">' + contactHtml + '</td>';
                     } else if (col.id === 'email') {
                         let emailHtml = '-';
                         if (c.email) {
@@ -1776,28 +1783,28 @@
                                 return '<div style="white-space:nowrap; margin-bottom:2px;">' + mailLink + copyLink + '</div>';
                             }).join('');
                         }
-                        trHtml += '<td>' + emailHtml + '</td>';
+                        trHtml += '<td data-col="' + col.id + '">' + emailHtml + '</td>';
                     } else if (col.id === 'pin') {
-                        trHtml += `<td>${highlightMatch(c.pin || '', searchTerm)}</td>`;
+                        trHtml += `<td data-col="${col.id}">${highlightMatch(c.pin || '', searchTerm)}</td>`;
                     } else if (col.id === 'district') {
-                        trHtml += `<td>${highlightMatch(c.district || '', searchTerm)}</td>`;
+                        trHtml += `<td data-col="${col.id}">${highlightMatch(c.district || '', searchTerm)}</td>`;
                     } else if (col.id === 'state') {
-                        trHtml += `<td>${highlightMatch(c.state || '', searchTerm)}</td>`;
+                        trHtml += `<td data-col="${col.id}">${highlightMatch(c.state || '', searchTerm)}</td>`;
                     } else if (col.id === 'gst') {
-                        trHtml += `<td>${highlightMatch(c.gst || '', searchTerm)}</td>`;
+                        trHtml += `<td data-col="${col.id}">${highlightMatch(c.gst || '', searchTerm)}</td>`;
                     } else if (col.id === 'creditLimit') {
-                        trHtml += `<td>${c.creditLimit ? parseFloat(c.creditLimit).toFixed(2) : 'Unlimited'}</td>`;
+                        trHtml += `<td data-col="${col.id}">${c.creditLimit ? parseFloat(c.creditLimit).toFixed(2) : 'Unlimited'}</td>`;
                     } else if (col.id === 'openingBalance') {
-                        trHtml += `<td>${c.openingBalance ? (c.openingBalance + ' ' + (c.openingBalanceType || 'Dr')) : '-'}</td>`;
+                        trHtml += `<td data-col="${col.id}">${c.openingBalance ? (c.openingBalance + ' ' + (c.openingBalanceType || 'Dr')) : '-'}</td>`;
                     } else if (col.id === 'outstanding') {
-                        trHtml += `<td style="font-weight:bold; color:${(c.outstanding || 0) > 0.01 ? '#dc3545' : '#28a745'}; white-space: nowrap;">
+                        trHtml += `<td data-col="${col.id}" style="font-weight:bold; color:${(c.outstanding || 0) > 0.01 ? '#dc3545' : '#28a745'}; white-space: nowrap;">
                             ${(c.outstanding || 0).toFixed(2)}
                             <button class="action-btn btn-action-receipt" data-action="receipt" data-id="${c.id}" title="Download Payment Receipt Against Total Outstanding Balance" style="background:none; color:#27ae60; padding:0; border:none; cursor:pointer; font-size:16px; vertical-align:middle; margin-left:8px;"><i class="fas fa-print"></i></button>
                         </td>`;
                     } else if (col.isDynamic) {
                         let val = c[col.id];
                         if (col.fieldDef.fieldType === 'boolean') val = val ? 'Yes' : 'No';
-                        trHtml += `<td>${val !== undefined && val !== null && val !== '' ? highlightMatch(String(val), searchTerm) : '-'}</td>`;
+                        trHtml += `<td data-col="${col.id}">${val !== undefined && val !== null && val !== '' ? highlightMatch(String(val), searchTerm) : '-'}</td>`;
                     }
                 });
 
@@ -1887,6 +1894,18 @@
             document.getElementById('viewContent').innerHTML = html;
             document.getElementById('btnEditFromView').onclick = () => { closeViewModal(); pendingEditId = id; openEditModal(); };
             document.getElementById('viewModal').style.display = 'flex';
+        }
+
+        function handleTableAction(action, id) {
+            if (action === 'view') {
+                viewCustomer(id);
+            } else if (action === 'edit') {
+                pendingEditId = id; openEditModal();
+            } else if (action === 'delete') {
+                deleteCustomer(id);
+            } else if (action === 'receipt') {
+                handleCustomerReceipt(id);
+            }
         }
 
         function closeViewModal() {
@@ -2747,6 +2766,7 @@
             cols.forEach(col => {
                 let isChecked = columnVisibility[col.id];
                 if (isChecked === undefined) isChecked = true;
+                const alignment = columnAlignment[col.id] || 'left';
 
                 const label = document.createElement("label");
                 const li = document.createElement("li");
@@ -2755,6 +2775,11 @@
                     <i class="fas fa-grip-vertical" style="color: #aaa; cursor: grab;"></i>
                     <input type="checkbox" id="col_${col.id}" ${isChecked ? 'checked' : ''} style="margin: 0; cursor: pointer;">
                     <label for="col_${col.id}" style="margin: 0; cursor: pointer; flex: 1; font-size: 13px;">${col.label}</label>
+                    <select id="align_${col.id}" class="form-select form-select-sm" style="width: 90px; font-size: 12px;">
+                        <option value="left" ${alignment === 'left' ? 'selected' : ''}>Left</option>
+                        <option value="center" ${alignment === 'center' ? 'selected' : ''}>Center</option>
+                        <option value="right" ${alignment === 'right' ? 'selected' : ''}>Right</option>
+                    </select>
                 `;
                 container.appendChild(li);
             });
@@ -2781,19 +2806,46 @@
                 const id = li.dataset.id;
                 newOrder.push(id);
                 const cb = li.querySelector('input[type="checkbox"]');
+                const alignSelect = li.querySelector('select');
                 if (cb) columnVisibility[id] = cb.checked;
+                if (alignSelect) columnAlignment[id] = alignSelect.value;
             });
 
             localStorage.setItem("customerColumnOrder", JSON.stringify(newOrder));
             localStorage.setItem("customerColumnVisibilityObj", JSON.stringify(columnVisibility));
+            localStorage.setItem('customerColumnAlignment', JSON.stringify(columnAlignment));
 
             renderTableHeaders();
             applyFilters();
             closeSettingsModal();
+            applySearch();
         }
 
         function updateColumnStyles() {
-            // Handled dynamically now
+            try {
+                const orderedCols = getOrderedColumns();
+                orderedCols.forEach(col => {
+                    const align = (columnAlignment && columnAlignment[col.id]) ? columnAlignment[col.id] : 'left';
+                    const th = document.querySelector(`#customerTable thead th[data-id="${col.id}"]`);
+                    if (th) th.style.textAlign = align;
+                    document.querySelectorAll(`#customerTable tbody td[data-col="${col.id}"]`).forEach(td => {
+                        td.style.textAlign = align;
+                    });
+                    const sel = document.getElementById(`align_${col.id}`);
+                    if (sel) sel.value = align;
+                });
+            } catch (e) {
+                console.warn('updateColumnStyles error', e);
+            }
+        }
+
+        function loadColumnAlignment() {
+            try {
+                columnAlignment = JSON.parse(localStorage.getItem('customerColumnAlignment')) || columnAlignment || {};
+            } catch (e) {
+                columnAlignment = columnAlignment || {};
+            }
+            updateColumnStyles();
         }
 
         function toggleActionButton(type, isVisible) {
@@ -2844,6 +2896,7 @@
             populateStateDropdown();
             updateColumnStyles();
             loadColumnWidths();
+            loadColumnAlignment();
             enableColumnResizing();
             applyButtonVisibility();
             updateActionButtonsVisibility();
