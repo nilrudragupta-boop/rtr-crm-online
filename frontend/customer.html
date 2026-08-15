@@ -514,7 +514,7 @@
 
         function loadColumnWidths() {
             const savedWidths = JSON.parse(localStorage.getItem('customerColumnWidths'));
-            if (!savedWidths || typeof savedWidths !== 'object') return;
+            if (!savedWidths) return;
             document.querySelectorAll('#customerTable thead th[data-id]').forEach(th => {
                 const width = savedWidths[th.dataset.id];
                 if (width) {
@@ -523,10 +523,6 @@
                 }
             });
         }
-
-        enableColumnResizing();
-        loadColumnWidths();
-
 
         // --- Receipt Modal Logic ---
         let pendingReceiptCallback = null;
@@ -1133,8 +1129,8 @@
                 <div
                     style="margin-left: 15px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showActionView" onchange="toggleActionButton('view', this.checked)">
-                        View
+                        <input type="checkbox" id="showActionView"
+                            onchange="toggleActionButton('view', this.checked)"> View
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
                         <input type="checkbox" id="showActionInvoice"
@@ -1293,14 +1289,8 @@
         let columnVisibility = JSON.parse(localStorage.getItem("customerColumnVisibilityObj")) || {
             'name': true, 'address': true, 'contact': true, 'email': true, 'pin': true,
             'district': true, 'state': true, 'gst': true, 'creditLimit': true,
-            'openingBalance': true,
-            'outstanding': true
-            // Default visibilities for dynamic fields can be managed here if needed
+            'openingBalance': true, 'outstanding': true
         };
-
-        // New: Store column alignments
-        let columnAlignments = JSON.parse(localStorage.getItem("customerColumnAlignments")) || {};
-
 
         let isGreyButtons = localStorage.getItem("customerGreyButtons") === "true";
 
@@ -2349,14 +2339,14 @@
             let firstTotalColIdx = orderedCols.findIndex(c => c.id === 'openingBalance' || c.id === 'outstanding' || (c.isDynamic && c.fieldDef && c.fieldDef.showGrandTotal));
             if (firstTotalColIdx === -1) firstTotalColIdx = orderedCols.length;
 
-            let startCols = 2 + firstTotalColIdx; // Checkbox + Sl No. This is the number of visible columns before the first total.
+            let startCols = 2 + firstTotalColIdx; // Checkbox + Sl No
 
             if (startCols > 0) {
                 const tdLabel = document.createElement('td');
                 tdLabel.colSpan = startCols;
                 tdLabel.style.textAlign = 'right';
                 tdLabel.innerText = 'Grand Totals:';
-                tr.appendChild(tdLabel); // This td will span across all non-total columns.
+                tr.appendChild(tdLabel);
             }
 
             for (let i = firstTotalColIdx; i < orderedCols.length; i++) {
@@ -2380,10 +2370,8 @@
             }
 
             const tdAction = document.createElement('td');
-            // Only add the empty action cell if the action column is visible
-            if (columnVisibility['actions'] !== false) {
-                tr.appendChild(tdAction);
-            }
+            tr.appendChild(tdAction);
+
             tfoot.appendChild(tr);
         }
 
@@ -2744,7 +2732,6 @@
             if (greyToggle) greyToggle.checked = isGreyButtons;
 
             renderColumnToggles();
-            updateColumnStyles();
         }
 
         function closeSettingsModal() {
@@ -2755,12 +2742,11 @@
             const container = document.getElementById("columnToggles");
             container.innerHTML = "";
 
-            getOrderedColumns().forEach(col => {
+            const cols = getOrderedColumns();
+
+            cols.forEach(col => {
                 let isChecked = columnVisibility[col.id];
                 if (isChecked === undefined) isChecked = true;
-
-                const currentAlign = columnAlignments[col.id] || 'left';
-
 
                 const label = document.createElement("label");
                 const li = document.createElement("li");
@@ -2769,11 +2755,6 @@
                     <i class="fas fa-grip-vertical" style="color: #aaa; cursor: grab;"></i>
                     <input type="checkbox" id="col_${col.id}" ${isChecked ? 'checked' : ''} style="margin: 0; cursor: pointer;">
                     <label for="col_${col.id}" style="margin: 0; cursor: pointer; flex: 1; font-size: 13px;">${col.label}</label>
-                    <select onchange="event.stopPropagation();" style="margin-left: auto; padding: 2px 4px; font-size: 11px; border-radius: 3px;">
-                        <option value="left" ${currentAlign === 'left' ? 'selected' : ''}>Left</option>
-                        <option value="center" ${currentAlign === 'center' ? 'selected' : ''}>Center</option>
-                        <option value="right" ${currentAlign === 'right' ? 'selected' : ''}>Right</option>
-                    </select>
                 `;
                 container.appendChild(li);
             });
@@ -2794,80 +2775,26 @@
         function saveColumnSettings() {
             const container = document.getElementById("columnToggles");
             const items = container.querySelectorAll("li");
-            const newOrder = [], newVisibility = {}, newAlignments = {};
+            const newOrder = [];
 
             items.forEach(li => {
                 const id = li.dataset.id;
                 newOrder.push(id);
-
-                const alignSelect = li.querySelector(`select`);
-                if (alignSelect) newAlignments[id] = alignSelect.value;
-
                 const cb = li.querySelector('input[type="checkbox"]');
-                if (cb) newVisibility[id] = cb.checked;
+                if (cb) columnVisibility[id] = cb.checked;
             });
 
             localStorage.setItem("customerColumnOrder", JSON.stringify(newOrder));
-            columnVisibility = newVisibility;
-            localStorage.setItem("customerColumnVisibilityObj", JSON.stringify(newVisibility));
-            columnAlignments = newAlignments;
-            localStorage.setItem("customerColumnAlignments", JSON.stringify(newAlignments));
-            renderTableHeaders();
+            localStorage.setItem("customerColumnVisibilityObj", JSON.stringify(columnVisibility));
 
             renderTableHeaders();
-            updateColumnStyles(); // Re-apply visibility and alignment styles
+            applyFilters();
             closeSettingsModal();
         }
 
         function updateColumnStyles() {
-            let style = document.getElementById('dynamicColumnStyles');
-            if (!style) {
-                style = document.createElement('style');
-                style.id = 'dynamicColumnStyles';
-                document.head.appendChild(style);
-            }
-
-            let css = '';
-
-            // Visibility
-            const orderedCols = getOrderedColumns();
-            orderedCols.forEach((col, index) => {
-                if (columnVisibility[col.id] === false && col.id !== 'actions') {
-                    const colIndex = index + 3;
-                    css += `#customerTable th:nth-child(${colIndex}), #customerTable td:nth-child(${colIndex}) { display: none !important; }\n`;
-                }
-            });
-
-            for (const [colId, isVisible] of Object.entries(columnVisibility)) {
-                if (!isVisible) {
-                    const colIndex = getOrderedColumns().findIndex(c => c.id === colId) + 3;
-                    if (colIndex > 2) css += `#customerTable th:nth-child(${colIndex}), #customerTable td:nth-child(${colIndex}) { display: none !important; }\n`;
-                }
-            }
-
-            // Order
-            const order = getOrderedColumns().map(c => c.id);
-            order.forEach((colId, index) => {
-                const colIndex = index + 3;
-                css += `#customerTable th:nth-child(${colIndex}), #customerTable td:nth-child(${colIndex}) { order: ${index}; }\n`;
-            });
-
-            // Alignment
-            for (const [colId, align] of Object.entries(columnAlignments)) {
-                const colIndex = getOrderedColumns().findIndex(c => c.id === colId) + 3;
-                if (colIndex > 2) css += `#customerTable th:nth-child(${colIndex}), #customerTable td:nth-child(${colIndex}) { text-align: ${align} !important; }\n`;
-            }
-
-            style.textContent = css;
+            // Handled dynamically now
         }
-
-        function resetTableSettings() {
-            // Reset visibility to default (all true)
-            columnVisibility = {};
-            localStorage.removeItem("customerColumnVisibilityObj");
-            localStorage.removeItem("customerColumnOrder");
-        }
-
 
         function toggleActionButton(type, isVisible) {
             actionButtonVisibility[type] = isVisible;
@@ -2917,12 +2844,10 @@
             populateStateDropdown();
             updateColumnStyles();
             loadColumnWidths();
-            loadColumnWidths();
             enableColumnResizing();
             applyButtonVisibility();
             updateActionButtonsVisibility();
             applyCustomerFormVisibility();
-            updateColumnStyles();
 
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                 if (currentTheme === "system") {
