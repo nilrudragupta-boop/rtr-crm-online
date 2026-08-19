@@ -62,6 +62,48 @@
             border-color: var(--slds-blue);
         }
 
+        .search-results {
+            position: absolute;
+            top: 56px;
+            right: 24px;
+            width: 420px;
+            max-height: 50vh;
+            overflow: auto;
+            background: #fff;
+            border: 1px solid var(--slds-border);
+            border-radius: 6px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+            z-index: 110;
+        }
+
+        .search-result-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f1f1;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .search-result-item:hover {
+            background: #f6f9ff;
+        }
+
+        .search-result-title {
+            font-weight: 600;
+            color: var(--slds-blue);
+            display: block;
+        }
+
+        .search-result-sub {
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .search-match {
+            background: rgba(1, 118, 211, 0.12);
+            border-radius: 2px;
+        }
+
         .navbar {
             background: #fff;
             padding: 0 24px;
@@ -365,10 +407,17 @@
             height: 40px;
             animation: spin 1s linear infinite;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
+
         .progress-container {
             width: 80%;
             max-width: 400px;
@@ -378,12 +427,14 @@
             overflow: hidden;
             border: 1px solid var(--slds-border);
         }
+
         .progress-bar {
             height: 20px;
             background-color: var(--slds-blue);
             width: 0%;
             transition: width 0.1s ease-in-out;
         }
+
         .progress-text {
             margin-top: 10px;
             font-weight: 600;
@@ -397,8 +448,9 @@
 
     <header class="topbar">
         <div class="logo">RISE TECH REVOLUTION</div>
-        <div class="search-container">
-            <input type="text" id="searchInput" onkeyup="handleSearch()" placeholder="Search...">
+        <div class="search-container" style="position:relative;">
+            <input type="text" id="searchInput" placeholder="Search...">
+            <div id="globalSearchResults" class="search-results" style="display:none;"></div>
         </div>
         <div class="profile" style="font-weight:600; color:#555;">Admin User</div>
     </header>
@@ -477,7 +529,8 @@
                 <span style="font-size:24px; cursor:pointer;" onclick="closeViewRecordModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;" id="viewRecordContent">
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;"
+                    id="viewRecordContent">
                 </table>
             </div>
             <div class="modal-footer">
@@ -535,8 +588,10 @@
                 <span style="font-size:24px; cursor:pointer;" onclick="closeImportMappingModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <p style="margin-top:0; font-size:13px; color:#555;">Select which Excel columns correspond to your fields. Uncheck fields you do not wish to update.</p>
-                <div id="importMappingContainer" style="display: grid; gap: 10px; max-height: 50vh; overflow-y: auto; padding-right: 5px;"></div>
+                <p style="margin-top:0; font-size:13px; color:#555;">Select which Excel columns correspond to your
+                    fields. Uncheck fields you do not wish to update.</p>
+                <div id="importMappingContainer"
+                    style="display: grid; gap: 10px; max-height: 50vh; overflow-y: auto; padding-right: 5px;"></div>
             </div>
             <div class="modal-footer">
                 <button onclick="closeImportMappingModal()">Cancel</button>
@@ -554,8 +609,11 @@
             </div>
             <div class="modal-body">
                 <div style="margin-bottom: 15px;">
-                    <label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">Select Field to Edit</label>
-                    <select id="bulkEditFieldSelect" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" onchange="renderBulkEditInput()">
+                    <label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">Select
+                        Field to Edit</label>
+                    <select id="bulkEditFieldSelect"
+                        style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"
+                        onchange="renderBulkEditInput()">
                         <option value="">-- Select Field --</option>
                     </select>
                 </div>
@@ -569,7 +627,8 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:9999; flex-direction:column; justify-content:center; align-items:center;">
+    <div id="loadingOverlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:9999; flex-direction:column; justify-content:center; align-items:center;">
         <div class="spinner"></div>
         <div class="progress-container" id="importProgressContainer" style="display: none;">
             <div class="progress-bar" id="importProgressBar"></div>
@@ -581,10 +640,13 @@
     <div id="attachmentPreviewModal" class="modal" style="z-index: 2000;">
         <div class="modal-content" style="max-width: 800px; width: 90%; display: flex; flex-direction: column;">
             <div class="modal-header">
-                <h3 style="margin:0; font-size: 1.1rem; color: var(--slds-blue);" id="previewAttachmentTitle">Attachment Preview</h3>
-                <span style="font-size:24px; cursor:pointer;" onclick="document.getElementById('attachmentPreviewModal').style.display='none'">&times;</span>
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--slds-blue);" id="previewAttachmentTitle">Attachment
+                    Preview</h3>
+                <span style="font-size:24px; cursor:pointer;"
+                    onclick="document.getElementById('attachmentPreviewModal').style.display='none'">&times;</span>
             </div>
-            <div id="previewAttachmentContent" style="flex: 1; overflow: auto; text-align: center; background: #eee; border-radius: 4px; padding: 10px; min-height: 200px; margin: 20px;">
+            <div id="previewAttachmentContent"
+                style="flex: 1; overflow: auto; text-align: center; background: #eee; border-radius: 4px; padding: 10px; min-height: 200px; margin: 20px;">
             </div>
             <div class="modal-footer">
                 <button class="primary" id="downloadAttachmentBtn"><i class="fas fa-download"></i> Download</button>
@@ -593,10 +655,161 @@
     </div>
 
     <script>
-        function handleSearch() {
+        // Wire up debounced input handler for global search (anchors + records)
+        let __searchDebounce = null;
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('searchInput');
+            const resultsEl = document.getElementById('globalSearchResults');
+            if (input) {
+                input.addEventListener('input', (e) => {
+                    clearTimeout(__searchDebounce);
+                    __searchDebounce = setTimeout(() => {
+                        currentPage = 1;
+                        renderCustomTable();
+                        performGlobalSearch(input.value || '');
+                    }, 220);
+                });
+
+                // hide results on escape
+                input.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Escape') {
+                        if (resultsEl) { resultsEl.style.display = 'none'; }
+                    }
+                });
+            }
+
+            document.addEventListener('click', (ev) => {
+                const tgt = ev.target;
+                if (!tgt.closest || !document.getElementById('globalSearchResults')) return;
+                const container = document.getElementById('globalSearchResults');
+                if (!container.contains(tgt) && tgt !== input) container.style.display = 'none';
+            });
+        });
+
+        function handleSearch() { // backward-compat
+            const input = document.getElementById('searchInput');
+            const q = input ? input.value : '';
             currentPage = 1;
             renderCustomTable();
+            performGlobalSearch(q);
         }
+
+        function performGlobalSearch(q) {
+            const resultsEl = document.getElementById('globalSearchResults');
+            if (!resultsEl) return;
+            // clear previous highlights
+            document.querySelectorAll('.search-match').forEach(el => el.classList.remove('search-match'));
+
+            const term = String(q || '').trim().toLowerCase();
+            if (!term) {
+                resultsEl.style.display = 'none';
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            const results = [];
+
+            // 1) Search anchors in the document
+            try {
+                const anchors = Array.from(document.querySelectorAll('a'));
+                for (const a of anchors) {
+                    const txt = (a.textContent || '').trim();
+                    const href = (a.getAttribute && a.getAttribute('href')) ? a.getAttribute('href') : '';
+                    if ((txt && txt.toLowerCase().includes(term)) || (href && href.toLowerCase().includes(term))) {
+                        results.push({ type: 'anchor', text: txt || href, href: href || '', el: a });
+                        if (results.length >= 60) break;
+                    }
+                }
+            } catch (e) { console.warn('Anchor search failed', e); }
+
+            // 2) Search current table records (already filtered by renderCustomTable)
+            try {
+                const rows = currentFilteredData || [];
+                for (const row of rows) {
+                    const serialized = JSON.stringify(row || {}).toLowerCase();
+                    if (serialized.includes(term)) {
+                        const title = row.name || row.title || row.label || row.id || 'Record';
+                        const snippet = getSnippetFromRow(row, term);
+                        results.push({ type: 'record', id: row.id, title, snippet });
+                        if (results.length >= 120) break;
+                    }
+                }
+            } catch (e) { console.warn('Record search failed', e); }
+
+            renderGlobalResults(results);
+        }
+
+        function getSnippetFromRow(row, term) {
+            const low = String(term).toLowerCase();
+            for (const k in row) {
+                try {
+                    const v = row[k];
+                    if (!v) continue;
+                    const s = String(v).replace(/<[^>]+>/g, ' ');
+                    const idx = s.toLowerCase().indexOf(low);
+                    if (idx > -1) {
+                        const start = Math.max(0, idx - 24);
+                        return s.substring(start, Math.min(start + 90, s.length)).trim();
+                    }
+                } catch (e) { }
+            }
+            return '';
+        }
+
+        function renderGlobalResults(results) {
+            const el = document.getElementById('globalSearchResults');
+            if (!el) return;
+            if (!results || results.length === 0) {
+                el.style.display = 'none'; el.innerHTML = '';
+                return;
+            }
+
+            el.innerHTML = results.map(r => {
+                if (r.type === 'anchor') {
+                    const title = escapeHtml(r.text || r.href);
+                    const sub = escapeHtml(r.href || '');
+                    return `<div class="search-result-item" data-type="anchor"><span class="search-result-title">${title}</span><span class="search-result-sub">${sub}</span></div>`;
+                } else {
+                    const t = escapeHtml(r.title || 'Record');
+                    const s = escapeHtml(r.snippet || '');
+                    return `<div class="search-result-item" data-type="record" data-id="${escapeAttr(r.id)}"><span class="search-result-title">${t}</span><span class="search-result-sub">${s}</span></div>`;
+                }
+            }).join('');
+
+            el.style.display = 'block';
+
+            // attach click handlers
+            el.querySelectorAll('.search-result-item').forEach((item, idx) => {
+                item.addEventListener('click', (ev) => {
+                    const type = item.dataset.type;
+                    if (type === 'anchor') {
+                        const corresponding = results.find(r => r.type === 'anchor' && (r.text || r.href));
+                        if (corresponding) {
+                            const href = String(corresponding.href || '');
+                            if (href.startsWith('http')) window.open(href, '_blank');
+                            else if (href.startsWith('#')) {
+                                const target = document.querySelector(href);
+                                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } else if (href && !href.startsWith('javascript:')) {
+                                window.location.href = href;
+                            } else if (corresponding.el && corresponding.el.onclick) {
+                                try { corresponding.el.click(); } catch (e) { }
+                            }
+                        }
+                    } else if (type === 'record') {
+                        const id = item.dataset.id;
+                        if (id) viewCustomRecord(id);
+                    }
+                    el.style.display = 'none';
+                });
+                // highlight anchors in DOM
+                const r = results[idx];
+                if (r && r.type === 'anchor' && r.el) r.el.classList.add('search-match');
+            });
+        }
+
+        function escapeHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function escapeAttr(s) { return String(s || '').replace(/\"/g, '&quot;').replace(/'/g, '&#39;'); }
 
         // Initialize
         window.onload = async () => {
@@ -708,7 +921,7 @@
             const parentInput = document.getElementById(parentFieldName);
             if (!parentInput) return;
             const parentVal = parentInput.value;
-            
+
             currentCustomFields.forEach(f => {
                 if (f.dependsOn === parentFieldName && f.fieldType === 'select') {
                     const childSelect = document.getElementById(f.fieldName);
@@ -911,26 +1124,26 @@
                         let val;
                         if (f.fieldType === 'calculated' && f.calculationFormula) {
                             try {
-                                 if (compiledFormulas[f.fieldName]) {
-                                const vals = compiledFormulas[f.fieldName].keys.map(key => {
-                                    let v = row[key];
-                                    if (v === undefined || v === null) v = '';
-                                    const fType = fieldTypeMap[key];
-                                    if (['number', 'currency', 'calculated'].includes(fType)) {
-                                        let clean = String(v).replace(/[^0-9.-]/g, '');
-                                        const num = Number(clean);
-                                        return (!isNaN(num) && clean.trim() !== '') ? num : v;
-                                    } else {
-                                        const num = Number(v);
-                                        return (!isNaN(num) && String(v).trim() !== '') ? num : v;
-                                    }
-                                });
-                                val = compiledFormulas[f.fieldName].fn(...vals);
-                                if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
-                                if (val === undefined || val === null) val = '';
-                            } else {
-                                val = '#CALC!';
-                            }
+                                if (compiledFormulas[f.fieldName]) {
+                                    const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                        let v = row[key];
+                                        if (v === undefined || v === null) v = '';
+                                        const fType = fieldTypeMap[key];
+                                        if (['number', 'currency', 'calculated'].includes(fType)) {
+                                            let clean = String(v).replace(/[^0-9.-]/g, '');
+                                            const num = Number(clean);
+                                            return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                        } else {
+                                            const num = Number(v);
+                                            return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                        }
+                                    });
+                                    val = compiledFormulas[f.fieldName].fn(...vals);
+                                    if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
+                                    if (val === undefined || val === null) val = '';
+                                } else {
+                                    val = '#CALC!';
+                                }
                             } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
                         } else if (f.fieldType === 'url') {
                             const rawVal = row[f.fieldName];
@@ -1028,7 +1241,7 @@
                                             }
                                         }
                                     }
-                                } catch(e) { console.warn("Error resolving lookup value", e); }
+                                } catch (e) { console.warn("Error resolving lookup value", e); }
                             }
                             if (linkUrl !== '#') {
                                 val = `<a href="javascript:void(0)" onclick="openWindow('${linkUrl}', 1200, 800); event.stopPropagation();" title="${linkTitle}" style="color: var(--slds-blue); text-decoration: none; font-weight: 500;">${displayText || rawVal}</a>`;
@@ -1084,7 +1297,7 @@
             if (tfoot) {
                 let hasTotals = false;
                 const totals = {};
-                
+
                 visibleFields.forEach(f => {
                     if (['number', 'currency', 'calculated'].includes(f.fieldType) && f.showGrandTotal) {
                         hasTotals = true;
@@ -1129,7 +1342,7 @@
 
                     let tfootHTML = `<tr style="font-weight: 600; background: #f8f9fa; border-top: 2px solid var(--slds-border); color: var(--slds-text);">
                         <td colspan="2" style="text-align: right; padding: 12px;">Grand Total:</td>`;
-                    
+
                     visibleFields.forEach(f => {
                         if (totals[f.fieldName] !== undefined) {
                             let val = totals[f.fieldName];
@@ -1191,7 +1404,7 @@
                         const parentVal = recordData ? recordData[f.dependsOn] : '';
                         optionsToRender = getDependentOptions(f.optionsRaw, parentVal);
                     } else {
-                        optionsToRender = f.optionsRaw && f.optionsRaw.includes(',') && !f.optionsRaw.includes(':') ? f.optionsRaw.split(',').map(s=>s.trim()) : (f.options || []);
+                        optionsToRender = f.optionsRaw && f.optionsRaw.includes(',') && !f.optionsRaw.includes(':') ? f.optionsRaw.split(',').map(s => s.trim()) : (f.options || []);
                     }
                     optionsToRender.forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}" ${o === val ? 'selected' : ''}>${o}</option>`);
                     inputHtml += `</select>`;
@@ -1214,7 +1427,7 @@
                             } else {
                                 previewHtml = `<a href="javascript:void(0)" onclick="previewFileObj('${f.fieldName}')">${fileObj.name}</a> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
                             }
-                        } catch (e) {}
+                        } catch (e) { }
                     }
                     inputHtml = `<input type="file" id="${f.fieldName}_file" onchange="handleFileSelect(event, '${f.fieldName}')" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />
                                  <input type="hidden" id="${f.fieldName}" value="${val ? String(val).replace(/"/g, '&quot;') : ''}" />
@@ -1224,11 +1437,11 @@
                     try {
                         const targetModule = f.lookupModule;
                         const displayField = f.lookupDisplay;
-                        
+
                         if (targetModule) {
                             if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
                                 const customers = JSON.parse(localStorage.getItem('customers')) || [];
-                                 lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
+                                lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
                             } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
                                 const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
                                 lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
@@ -1247,9 +1460,9 @@
                             }
                         }
                         lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
-                    } catch(e) { console.warn("Error loading lookup options", e); }
-                    
-                     const uniqueOps = [];
+                    } catch (e) { console.warn("Error loading lookup options", e); }
+
+                    const uniqueOps = [];
                     const seen = new Set();
                     lookupOptions.forEach(o => {
                         if (o && o.id && !seen.has(o.id)) {
@@ -1309,21 +1522,21 @@
                         // Auto-correct missing braces around field keys
                         formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
                         formula = formula.replace(/\{(\w+)\}/g, '$1');
-                        
+
                         const calcEl = document.getElementById(f.fieldName);
                         if (calcEl) {
                             const keys = Object.keys(currentState);
                             const vals = Object.values(currentState);
-                            
+
                             let res = new Function(...keys, `return ${formula};`)(...vals);
                             if (typeof res === 'number' && (!isFinite(res) || isNaN(res))) res = '';
-                            
+
                             calcEl.value = res !== undefined && res !== null ? res : '';
                         }
-                    } catch (e) { 
-                        console.error("Calculation error for field", f.fieldName, e); 
+                    } catch (e) {
+                        console.error("Calculation error for field", f.fieldName, e);
                         const calcEl = document.getElementById(f.fieldName);
-                        if (calcEl) calcEl.value = '#CALC!'; 
+                        if (calcEl) calcEl.value = '#CALC!';
                     }
                 }
             });
@@ -1380,7 +1593,7 @@
                 try {
                     const fileObj = JSON.parse(record[fieldName]);
                     showPreviewModal(fileObj);
-                } catch(e) { console.error("Error parsing file object", e); }
+                } catch (e) { console.error("Error parsing file object", e); }
             }
         }
 
@@ -1390,7 +1603,7 @@
                 try {
                     const fileObj = JSON.parse(hiddenInput.value);
                     showPreviewModal(fileObj);
-                } catch(e) { console.error("Error parsing file object", e); }
+                } catch (e) { console.error("Error parsing file object", e); }
             }
         }
 
@@ -1450,7 +1663,7 @@
                             keys: keys,
                             fn: new Function(...keys, `return ${formula};`)
                         };
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             });
 
@@ -1497,12 +1710,12 @@
                         try {
                             const fileObj = JSON.parse(val);
                             displayVal = fileObj.name || 'Attachment';
-                            if(fileObj.type && fileObj.type.startsWith('image/')) {
+                            if (fileObj.type && fileObj.type.startsWith('image/')) {
                                 displayVal = `<img src="${fileObj.data}" style="max-height: 60px; max-width: 100%; border-radius: 4px; border: 1px solid var(--slds-border); cursor:pointer;" onclick="previewCustomAttachment('${record.id}', '${f.fieldName}')">`;
                             } else {
                                 displayVal = `<a href="javascript:void(0)" onclick="previewCustomAttachment('${record.id}', '${f.fieldName}')" style="color: var(--slds-blue); text-decoration: underline;">${fileObj.name}</a>`;
                             }
-                        } catch(e) { displayVal = 'Attachment'; }
+                        } catch (e) { displayVal = 'Attachment'; }
                     } else if (['currency', 'number', 'calculated'].includes(f.fieldType) && !isNaN(parseFloat(val))) {
                         displayVal = parseFloat(val).toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
                         if (f.prefix || f.currencySymbol) displayVal = (f.prefix || f.currencySymbol) + ' ' + displayVal;
@@ -1537,13 +1750,13 @@
                                 } else {
                                     sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
                                 }
-                                
+
                                 const match = sourceData.find(x => (x.id || x._id || x.invoice_no || x.invoiceNo) === val);
                                 if (match) {
                                     displayVal = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.invoice_no || match.invoiceNo || match.partyName || match.id);
                                 }
                             }
-                        } catch(e) {}
+                        } catch (e) { }
                     } else {
                         if (f.prefix) displayVal = f.prefix + ' ' + displayVal;
                         if (f.suffix) displayVal = displayVal + ' ' + f.suffix;
@@ -1556,7 +1769,7 @@
             });
 
             content.innerHTML = html;
-            document.getElementById('btnEditFromView').onclick = function() {
+            document.getElementById('btnEditFromView').onclick = function () {
                 closeViewRecordModal();
                 editCustomRecord(id);
             };
@@ -1702,7 +1915,7 @@
                 progressText.style.display = 'block';
                 progressText.innerText = `Deleting 0 of ${total}...`;
             }
-            
+
             await new Promise(resolve => setTimeout(resolve, 50));
 
             try {
@@ -1777,94 +1990,94 @@
                                 val = '#CALC!';
                             }
                         } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
-                        } else if (f.fieldType === 'richtext') {
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = row[f.fieldName] || '';
-                            val = tempDiv.textContent || tempDiv.innerText || '';
-                        } else if (f.fieldType === 'multiselect') {
-                            const rawVal = row[f.fieldName];
-                            val = Array.isArray(rawVal) ? rawVal.join(', ') : (rawVal || '');
-                        } else if (f.fieldType === 'file') {
-                            const rawVal = row[f.fieldName];
-                            if (rawVal) {
-                                try {
-                                    const fileObj = JSON.parse(rawVal);
-                                    val = fileObj.name || 'Attachment';
-                                } catch(e) { val = 'Attachment'; }
-                            } else {
-                                val = '';
-                            }
-                        } else if (f.fieldType === 'lookup') {
-                            const rawVal = row[f.fieldName];
-                            let displayText = rawVal;
-                            let linkUrl = '#';
-                            let linkTitle = 'View record';
-                            if (rawVal) {
-                                try {
-                                    const targetModule = f.lookupModule;
-                                    const displayField = f.lookupDisplay;
-                                    if (targetModule) {
-                                        let sourceData = [];
-                                        const targetModuleLower = targetModule.toLowerCase();
-                                        if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
-                                            sourceData = JSON.parse(localStorage.getItem('customers')) || [];
-                                            const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) {
-                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
-                                                linkUrl = `customer.html?search=${encodeURIComponent(match.name || match.id)}`;
-                                                linkTitle = `View customer: ${displayText}`;
-                                            }
-                                        } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
-                                            sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
-                                            const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) {
-                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
-                                                linkUrl = `supplier.html?search=${encodeURIComponent(match.name || match.id)}`;
-                                                linkTitle = `View supplier: ${displayText}`;
-                                            }
-                                        } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
-                                            sourceData = JSON.parse(localStorage.getItem('items')) || [];
-                                            const match = sourceData.find(x => x.id === rawVal);
-                                            if (match) {
-                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
-                                                linkUrl = `item.html?search=${encodeURIComponent(match.name || match.itemCode || match.id)}`;
-                                                linkTitle = `View item: ${displayText}`;
-                                            }
-                                        } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
-                                            sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
-                                            const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
-                                            if (match) {
-                                                const invNo = match.invoice_no || match.invoiceNo || match.id;
-                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : invNo;
-                                                linkUrl = `invoiceB.html?invoiceNo=${encodeURIComponent(invNo)}`;
-                                                linkTitle = `View invoice: ${displayText}`;
-                                            }
-                        } else if (targetModuleLower === 'follow-up' || targetModuleLower === 'follow-ups') {
-                            sourceData = JSON.parse(localStorage.getItem('follow_ups')) || [];
-                            const match = sourceData.find(x => x.id === rawVal);
-                            if (match) {
-                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.partyName || match.id);
-                                linkUrl = `follow_up.html?id=${encodeURIComponent(match.id)}`;
-                                linkTitle = `View follow-up: ${displayText}`;
-                            }
-                                        } else {
-                                            sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
-                                            const match = sourceData.find(x => (x.id || x._id) === rawVal);
-                                            if (match) {
-                                                const potentialDisplay = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || rawVal);
-                                                displayText = potentialDisplay;
-                                                linkUrl = `custom_dash.html?pageId=${encodeURIComponent(targetModule)}&search=${encodeURIComponent(rawVal)}`;
-                                                linkTitle = `View records in ${targetModule}`;
-                                            }
+                    } else if (f.fieldType === 'richtext') {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = row[f.fieldName] || '';
+                        val = tempDiv.textContent || tempDiv.innerText || '';
+                    } else if (f.fieldType === 'multiselect') {
+                        const rawVal = row[f.fieldName];
+                        val = Array.isArray(rawVal) ? rawVal.join(', ') : (rawVal || '');
+                    } else if (f.fieldType === 'file') {
+                        const rawVal = row[f.fieldName];
+                        if (rawVal) {
+                            try {
+                                const fileObj = JSON.parse(rawVal);
+                                val = fileObj.name || 'Attachment';
+                            } catch (e) { val = 'Attachment'; }
+                        } else {
+                            val = '';
+                        }
+                    } else if (f.fieldType === 'lookup') {
+                        const rawVal = row[f.fieldName];
+                        let displayText = rawVal;
+                        let linkUrl = '#';
+                        let linkTitle = 'View record';
+                        if (rawVal) {
+                            try {
+                                const targetModule = f.lookupModule;
+                                const displayField = f.lookupDisplay;
+                                if (targetModule) {
+                                    let sourceData = [];
+                                    const targetModuleLower = targetModule.toLowerCase();
+                                    if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                        sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                            linkUrl = `customer.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                            linkTitle = `View customer: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                        sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                            linkUrl = `supplier.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                            linkTitle = `View supplier: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                        sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                            linkUrl = `item.html?search=${encodeURIComponent(match.name || match.itemCode || match.id)}`;
+                                            linkTitle = `View item: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                        sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                        const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
+                                        if (match) {
+                                            const invNo = match.invoice_no || match.invoiceNo || match.id;
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : invNo;
+                                            linkUrl = `invoiceB.html?invoiceNo=${encodeURIComponent(invNo)}`;
+                                            linkTitle = `View invoice: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'follow-up' || targetModuleLower === 'follow-ups') {
+                                        sourceData = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.partyName || match.id);
+                                            linkUrl = `follow_up.html?id=${encodeURIComponent(match.id)}`;
+                                            linkTitle = `View follow-up: ${displayText}`;
+                                        }
+                                    } else {
+                                        sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                        const match = sourceData.find(x => (x.id || x._id) === rawVal);
+                                        if (match) {
+                                            const potentialDisplay = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || rawVal);
+                                            displayText = potentialDisplay;
+                                            linkUrl = `custom_dash.html?pageId=${encodeURIComponent(targetModule)}&search=${encodeURIComponent(rawVal)}`;
+                                            linkTitle = `View records in ${targetModule}`;
                                         }
                                     }
-                                } catch(e) {}
-                            }
-                            if (linkUrl !== '#') {
-                                val = `<a href="javascript:void(0)" onclick="openWindow('${linkUrl}', 1200, 800); event.stopPropagation();" title="${linkTitle}" style="color: var(--slds-blue); text-decoration: none; font-weight: 500;">${displayText || rawVal}</a>`;
-                            } else {
-                                val = displayText || rawVal;
-                            }
+                                }
+                            } catch (e) { }
+                        }
+                        if (linkUrl !== '#') {
+                            val = `<a href="javascript:void(0)" onclick="openWindow('${linkUrl}', 1200, 800); event.stopPropagation();" title="${linkTitle}" style="color: var(--slds-blue); text-decoration: none; font-weight: 500;">${displayText || rawVal}</a>`;
+                        } else {
+                            val = displayText || rawVal;
+                        }
                     } else {
                         val = row[f.fieldName];
                     }
@@ -1938,7 +2151,7 @@
                     <div style="text-align:center;">Update?</div>
                 </div>
             `;
-            
+
             // Auto-detect the Record ID column
             const matchedIdHeader = pendingImportHeaders.find(h => ['record id', 'id', '_id'].includes(h.trim().toLowerCase())) || '';
             let idSelectHtml = `<select id="map_record_id" style="width:100%; padding:6px; border:1px solid var(--slds-border); border-radius:4px;">
@@ -1955,11 +2168,11 @@
                     <div style="text-align:center; color: #888;" title="Used to find and update existing records">🔑</div>
                 </div>
             `;
-            
+
             currentCustomFields.forEach(f => {
                 // Attempt to auto-map by matching strings
                 const matchedHeader = pendingImportHeaders.find(h => h.toLowerCase() === f.fieldLabel.toLowerCase()) || '';
-                
+
                 let selectHtml = `<select id="map_${f.fieldName}" style="width:100%; padding:6px; border:1px solid var(--slds-border); border-radius:4px;">
                     <option value="">-- Ignore --</option>`;
                 pendingImportHeaders.forEach(h => {
@@ -1975,7 +2188,7 @@
                     </div>
                 `;
             });
-            
+
             container.innerHTML = html;
             document.getElementById('importMappingModal').style.display = 'block';
         }
@@ -1994,7 +2207,7 @@
             let added = 0;
             let updated = 0;
 
-             const totalRows = pendingImportData.length;
+            const totalRows = pendingImportData.length;
             let processedRows = 0;
 
             const overlay = document.getElementById('loadingOverlay');
@@ -2065,7 +2278,7 @@
 
                     currentCustomFields.forEach(f => {
                         const mappedHeader = fieldMapping[f.fieldName];
-                        
+
                         if (mappedHeader) {
                             let val = row[mappedHeader];
                             if (val !== undefined) {
@@ -2110,7 +2323,7 @@
                     processedRows++;
                     if (progressBar) progressBar.style.width = Math.round((processedRows / totalRows) * 100) + '%';
                     if (progressText) progressText.innerText = `Processing ${processedRows} of ${totalRows}...`;
-                    
+
                     // 4. Yield briefly so the UI can draw the updated progress bar
                     if (processedRows % 10 === 0) {
                         await new Promise(resolve => setTimeout(resolve, 0));
@@ -2179,7 +2392,7 @@
                     if (targetModule) {
                         if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
                             const customers = JSON.parse(localStorage.getItem('customers')) || [];
-                             lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
+                            lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
                         } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
                             const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
                             lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
@@ -2198,8 +2411,8 @@
                         }
                     }
                     lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
-                } catch(e) { console.warn("Error loading lookup options", e); }
-                
+                } catch (e) { console.warn("Error loading lookup options", e); }
+
                 const uniqueOps = [];
                 const seen = new Set();
                 lookupOptions.forEach(o => {
@@ -2216,31 +2429,31 @@
                 });
                 inputHtml += `</select>`;
             } else {
-                 let inpType = 'text';
-                 if (f.fieldType === 'number') inpType = 'number';
-                 else if (f.fieldType === 'date') inpType = 'date';
-                 else if (f.fieldType === 'url') inpType = 'url';
-                 inputHtml = `<input type="${inpType}" id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                let inpType = 'text';
+                if (f.fieldType === 'number') inpType = 'number';
+                else if (f.fieldType === 'date') inpType = 'date';
+                else if (f.fieldType === 'url') inpType = 'url';
+                inputHtml = `<input type="${inpType}" id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
             }
-            
+
             container.innerHTML = `<label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">New Value for ${f.fieldLabel}</label>${inputHtml}`;
         }
 
         async function applyBulkEdit() {
             const fieldName = document.getElementById('bulkEditFieldSelect').value;
             const valInput = document.getElementById('bulkEditValue');
-            
+
             if (!fieldName) {
                 alert("Please select a field to edit.");
                 return;
             }
-            
+
             const f = currentCustomFields.find(x => x.fieldName === fieldName);
             if (f && (f.fieldType === 'file' || f.fieldType === 'autonumber')) {
                 alert("This field type cannot be updated via bulk edit.");
                 return;
             }
-            
+
             let newValue;
             if (f && f.fieldType === 'multiselect' && valInput && valInput.multiple) {
                 newValue = Array.from(valInput.selectedOptions).map(o => o.value);
@@ -2254,11 +2467,11 @@
 
             const idsToEdit = Array.from(checkboxes).map(cb => cb.value);
             let currentUser = localStorage.getItem('currentUser') || 'System';
-            
+
             const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
             let data = allData.filter(r => r.createdBy === currentUser);
             const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
-            
+
             const overlay = document.getElementById('loadingOverlay');
             const progressContainer = document.getElementById('importProgressContainer');
             const progressBar = document.getElementById('importProgressBar');
@@ -2272,7 +2485,7 @@
                 progressText.style.display = 'block';
                 progressText.innerText = `Processing 0 of ${total}...`;
             }
-            
+
             await new Promise(resolve => setTimeout(resolve, 50));
 
             try {
@@ -2282,7 +2495,7 @@
                         let existingRecord = data[index];
                         let newRow = { ...existingRecord, updatedAt: new Date().toISOString() };
                         newRow[fieldName] = newValue;
-                        
+
                         if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
                             try {
                                 await apiClient.saveCustomRecord(newRow);
