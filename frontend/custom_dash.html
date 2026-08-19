@@ -728,9 +728,9 @@
                 for (const row of rows) {
                     const serialized = JSON.stringify(row || {}).toLowerCase();
                     if (serialized.includes(term)) {
-                        const title = row.name || row.title || row.label || row.id || 'Record';
+                        const title = getRecordTitle(row);
                         const snippet = getSnippetFromRow(row, term);
-                        results.push({ type: 'record', id: row.id, title, snippet });
+                        results.push({ type: 'record', id: row.id || row._id, title, snippet });
                         if (results.length >= 120) break;
                     }
                 }
@@ -754,6 +754,29 @@
                 } catch (e) { }
             }
             return '';
+        }
+
+        function getRecordTitle(row) {
+            if (!row || typeof row !== 'object') return 'Record';
+            // preferred keys
+            const pref = ['name', 'title', 'label', 'displayName', 'subject'];
+            for (const k of pref) {
+                if (row[k] && String(row[k]).trim()) return String(row[k]);
+            }
+            // prefer first non-empty text field from currentCustomFields
+            if (Array.isArray(currentCustomFields)) {
+                for (const f of currentCustomFields) {
+                    try {
+                        const v = row[f.fieldName];
+                        if (v !== undefined && v !== null) {
+                            const s = String(v).trim();
+                            if (s.length > 0) return s;
+                        }
+                    } catch (e) { }
+                }
+            }
+            // fallback to id/_id
+            return row.id || row._id || 'Record';
         }
 
         function renderGlobalResults(results) {
