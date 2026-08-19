@@ -726,8 +726,20 @@
             try {
                 const rows = currentFilteredData || [];
                 for (const row of rows) {
-                    const serialized = JSON.stringify(row || {}).toLowerCase();
-                    if (serialized.includes(term)) {
+                    let searchable = JSON.stringify(row || {}).toLowerCase();
+                    // include resolved lookup display values in searchable text
+                    try {
+                        if (Array.isArray(currentCustomFields)) {
+                            for (const f of currentCustomFields) {
+                                if (f && f.fieldType === 'lookup') {
+                                    const disp = resolveLookupDisplay(row, f);
+                                    if (disp) searchable += ' ' + String(disp).toLowerCase();
+                                }
+                            }
+                        }
+                    } catch (e) { /* ignore lookup resolution errors */ }
+
+                    if (searchable.includes(term)) {
                         const title = getRecordTitle(row);
                         const snippet = getSnippetFromRow(row, term);
                         results.push({ type: 'record', id: row.id || row._id, title, snippet });
@@ -777,6 +789,48 @@
             }
             // fallback to id/_id
             return row.id || row._id || 'Record';
+        }
+
+        function resolveLookupDisplay(row, f) {
+            try {
+                if (!f || !f.lookupModule) return '';
+                const rawVal = row[f.fieldName];
+                if (!rawVal) return '';
+                const displayField = f.lookupDisplay;
+                const targetModule = f.lookupModule;
+                const lm = String(targetModule).toLowerCase();
+                let sourceData = [];
+
+                if (lm === 'customer' || lm === 'customers') {
+                    sourceData = JSON.parse(localStorage.getItem('customers') || '[]');
+                } else if (lm === 'supplier' || lm === 'suppliers') {
+                    sourceData = JSON.parse(localStorage.getItem('suppliers') || '[]');
+                } else if (lm === 'item' || lm === 'items') {
+                    sourceData = JSON.parse(localStorage.getItem('items') || '[]');
+                } else if (lm === 'invoice' || lm === 'invoices') {
+                    sourceData = JSON.parse(localStorage.getItem('invoices') || '[]');
+                } else if (lm === 'follow-up' || lm === 'follow-ups') {
+                    sourceData = JSON.parse(localStorage.getItem('follow_ups') || '[]');
+                } else {
+                    sourceData = JSON.parse(localStorage.getItem('data_' + targetModule) || '[]');
+                }
+
+                if (!Array.isArray(sourceData)) return '';
+                for (const m of sourceData) {
+                    if (!m) continue;
+                    // match by common id fields
+                    if ((m.id && String(m.id) === String(rawVal)) || (m._id && String(m._id) === String(rawVal))) {
+                        if (displayField && m[displayField]) return String(m[displayField]);
+                        return m.name || m.title || m.label || m.invoice_no || m.invoiceNo || m.partyName || m.id || m._id || '';
+                    }
+                    // invoice matching by invoice number
+                    if ((m.invoice_no && String(m.invoice_no) === String(rawVal)) || (m.invoiceNo && String(m.invoiceNo) === String(rawVal))) {
+                        if (displayField && m[displayField]) return String(m[displayField]);
+                        return m.invoice_no || m.invoiceNo || m.id || '';
+                    }
+                }
+            } catch (e) { /* ignore */ }
+            return '';
         }
 
         function renderGlobalResults(results) {
