@@ -423,6 +423,16 @@ const apiClient = {
             return null;
         }
     },
+    // --- BOMs (Bill of Materials) ---
+    getBOMs: async () => {
+        return apiClient._getCollection('boms');
+    },
+    saveBOM: async (data) => {
+        return apiClient._saveCollection('boms', data);
+    },
+    deleteBOM: async (id) => {
+        return apiClient._deleteCollection('boms', id);
+    },
     saveShadowLedger: async (data) => {
         try {
             const currentUser = localStorage.getItem('currentUser') || 'System';
@@ -636,3 +646,11 @@ const apiClient = {
         }
     }
 };
+
+// --- Compatibility aliases for older frontend code ---
+// Some pages expect `saveBom`, `getBoms`, `deleteBom` naming
+apiClient.saveBom = apiClient.saveBOM;
+apiClient.getBoms = apiClient.getBOMs;
+apiClient.deleteBom = apiClient.deleteBOM;
+
+window.apiClient = apiClient;
