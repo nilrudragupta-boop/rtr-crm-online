@@ -198,6 +198,40 @@
         let filteredSales = [];
         let detailModal = null;
 
+        function normalizeSaleRecord(sale = {}) {
+            const customer = sale.customer || {};
+            const customerName = sale.customerName || sale.customer_name || customer.name || 'Walk-in Customer';
+            const customerPhone = sale.customerPhone || sale.customer_phone || sale.contact || customer.phone || customer.contact || customer.mobile || '';
+            const customerGST = sale.customerGST || sale.customer_gst || sale.gstin || sale.gst || customer.gstin || customer.gst || '';
+            const customerAddress = sale.customerAddress || sale.address || customer.address || customer.billingAddress || '';
+
+            return {
+                ...sale,
+                id: sale.id || sale._id || sale.invoiceNo || sale.invoice_no || Date.now().toString(),
+                invoiceNo: sale.invoiceNo || sale.invoice_no || sale.id || '',
+                invoice_no: sale.invoice_no || sale.invoiceNo || sale.id || '',
+                invoiceDate: sale.invoiceDate || sale.invoice_date || sale.date || '',
+                invoice_date: sale.invoice_date || sale.invoiceDate || sale.date || '',
+                customer: customer,
+                customerName,
+                customer_name: customerName,
+                customerPhone,
+                customer_phone: customerPhone,
+                customerGST,
+                customer_gst: customerGST,
+                customerAddress,
+                address: customerAddress,
+                contact: customerPhone,
+                gstin: customerGST,
+                paymentMode: sale.paymentMode || sale.payment_mode || 'Cash',
+                subTotal: Number(sale.subTotal ?? sale.taxableValue ?? sale.invoice_total ?? 0),
+                taxTotal: Number(sale.taxTotal ?? sale.gstTotal ?? sale.tax_amount ?? 0),
+                grandTotal: Number(sale.grandTotal ?? sale.invoice_total ?? sale.total ?? sale.invoiceTotal ?? 0),
+                items: Array.isArray(sale.items) ? sale.items : [],
+                remarks: sale.remarks || sale.note || ''
+            };
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
             detailModal = new bootstrap.Modal(document.getElementById('invoiceDetailModal'));
             await loadSalesData();
@@ -210,19 +244,27 @@
         });
 
         async function loadSalesData() {
+            const storedSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
+            const localSales = Array.isArray(storedSales) ? storedSales.map(normalizeSaleRecord) : [];
+
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getSales) {
                     const remoteSales = await apiClient.getSales();
-                    if (Array.isArray(remoteSales)) {
-                        rawSales = remoteSales;
-                        localStorage.setItem('sales_records', JSON.stringify(remoteSales));
+                    if (Array.isArray(remoteSales) && remoteSales.length > 0) {
+                        rawSales = remoteSales.map(normalizeSaleRecord);
+                        localStorage.setItem('sales_records', JSON.stringify(rawSales));
+                        return;
+                    }
+                    if (localSales.length > 0) {
+                        rawSales = localSales;
                         return;
                     }
                 }
             } catch (error) {
                 console.warn('Failed to load remote sales:', error);
             }
-            rawSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
+
+            rawSales = localSales;
         }
 
         function setDefaultDateRange() {
@@ -344,16 +386,27 @@
             const sale = filteredSales[index];
             if (!sale) return;
 
+            const customerName = sale.customerName || sale.customer_name || 'Walk-in Customer';
+            const customerPhone = sale.customerPhone || sale.customer_phone || sale.contact || '';
+            const customerGST = sale.customerGST || sale.customer_gst || sale.gstin || sale.gst || '';
+            const customerAddress = sale.customerAddress || sale.address || '';
+
             let itemsHtml = '';
             (sale.items || []).forEach((item, i) => {
+                const itemName = item.itemName || item.name || item.item || 'Item';
+                const qty = item.qty || item.quantity || 0;
+                const rate = item.rate || item.unitPrice || 0;
+                const gstPercent = item.gstPercent || item.gst || 0;
+                const total = item.total || item.lineTotal || ((qty * rate) + ((qty * rate * gstPercent) / 100));
+
                 itemsHtml += `
         <tr>
           <td>${i + 1}</td>
-          <td>${item.itemName}</td>
-          <td class="text-center">${item.qty}</td>
-          <td class="text-end">₹${parseFloat(item.rate).toFixed(2)}</td>
-          <td class="text-center">${item.gstPercent}%</td>
-          <td class="text-end fw-semibold">₹${parseFloat(item.total).toFixed(2)}</td>
+          <td>${itemName}</td>
+          <td class="text-center">${qty}</td>
+          <td class="text-end">₹${parseFloat(rate).toFixed(2)}</td>
+          <td class="text-center">${gstPercent}%</td>
+          <td class="text-end fw-semibold">₹${parseFloat(total).toFixed(2)}</td>
         </tr>
       `;
             });
@@ -365,9 +418,14 @@
           <small class="text-muted">Date: ${sale.invoiceDate} | Mode: ${sale.paymentMode}</small>
         </div>
         <div class="text-end">
-          <div class="fw-semibold">${sale.customerName}</div>
-          <small class="text-muted">${sale.customerPhone || ''}</small>
+          <div class="fw-semibold">${customerName}</div>
+          <small class="text-muted">${customerPhone || 'No phone'} </small>
         </div>
+      </div>
+
+      <div class="small mb-3 p-2 bg-light rounded">
+        <div><strong>GSTIN:</strong> ${customerGST || 'N/A'}</div>
+        <div><strong>Address:</strong> ${customerAddress || 'N/A'}</div>
       </div>
 
       <div class="table-responsive">

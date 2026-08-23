@@ -142,24 +142,39 @@ const apiClient = {
         try {
             const invoices = await apiClient.getInvoices();
             if (!Array.isArray(invoices)) return [];
-            return invoices.map(invoice => ({
-                ...invoice,
-                id: invoice.id || invoice._id || invoice.invoiceNo || invoice.invoice_no || Date.now().toString(),
-                invoiceNo: invoice.invoiceNo || invoice.invoice_no || invoice.invoiceNo || invoice.id || '',
-                invoice_no: invoice.invoice_no || invoice.invoiceNo || invoice.id || '',
-                invoiceDate: invoice.invoiceDate || invoice.invoice_date || invoice.date || '',
-                invoice_date: invoice.invoice_date || invoice.invoiceDate || invoice.date || '',
-                customerName: invoice.customerName || invoice.customer_name || 'Walk-in Customer',
-                customer_name: invoice.customer_name || invoice.customerName || 'Walk-in Customer',
-                customerPhone: invoice.customerPhone || invoice.customer_phone || invoice.contact || invoice.customerContact || '',
-                customerGST: invoice.customerGST || invoice.customer_gst || invoice.gst_no || invoice.gst || '',
-                paymentMode: invoice.paymentMode || invoice.payment_mode || 'Cash',
-                subTotal: Number(invoice.subTotal ?? invoice.taxableValue ?? invoice.invoice_total ?? 0),
-                taxTotal: Number(invoice.taxTotal ?? invoice.gstTotal ?? invoice.tax_amount ?? 0),
-                grandTotal: Number(invoice.grandTotal ?? invoice.invoice_total ?? invoice.total ?? invoice.invoiceTotal ?? 0),
-                items: Array.isArray(invoice.items) ? invoice.items : [],
-                remarks: invoice.remarks || invoice.note || ''
-            }));
+            return invoices.map(invoice => {
+                const customer = invoice.customer || {};
+                const customerName = invoice.customerName || invoice.customer_name || customer.name || 'Walk-in Customer';
+                const customerPhone = invoice.customerPhone || invoice.customer_phone || invoice.contact || customer.phone || customer.contact || customer.mobile || '';
+                const customerGST = invoice.customerGST || invoice.customer_gst || invoice.gstin || invoice.gst_no || customer.gstin || customer.gst || '';
+                const customerAddress = invoice.customerAddress || invoice.address || customer.address || customer.billingAddress || '';
+
+                return {
+                    ...invoice,
+                    id: invoice.id || invoice._id || invoice.invoiceNo || invoice.invoice_no || Date.now().toString(),
+                    invoiceNo: invoice.invoiceNo || invoice.invoice_no || invoice.id || '',
+                    invoice_no: invoice.invoice_no || invoice.invoiceNo || invoice.id || '',
+                    invoiceDate: invoice.invoiceDate || invoice.invoice_date || invoice.date || '',
+                    invoice_date: invoice.invoice_date || invoice.invoiceDate || invoice.date || '',
+                    customer: customer,
+                    customerName,
+                    customer_name: customerName,
+                    customerPhone,
+                    customer_phone: customerPhone,
+                    customerGST,
+                    customer_gst: customerGST,
+                    customerAddress,
+                    address: customerAddress,
+                    contact: customerPhone,
+                    gstin: customerGST,
+                    paymentMode: invoice.paymentMode || invoice.payment_mode || 'Cash',
+                    subTotal: Number(invoice.subTotal ?? invoice.taxableValue ?? invoice.invoice_total ?? 0),
+                    taxTotal: Number(invoice.taxTotal ?? invoice.gstTotal ?? invoice.tax_amount ?? 0),
+                    grandTotal: Number(invoice.grandTotal ?? invoice.invoice_total ?? invoice.total ?? invoice.invoiceTotal ?? 0),
+                    items: Array.isArray(invoice.items) ? invoice.items : [],
+                    remarks: invoice.remarks || invoice.note || ''
+                };
+            });
         } catch (error) {
             console.error('Error fetching sales:', error);
             return [];
