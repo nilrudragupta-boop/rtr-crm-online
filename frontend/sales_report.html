@@ -191,6 +191,8 @@
                             onclick="toggleIncludeSignature(this.checked)">
                         <label class="form-check-label small" for="includeSignatureCheckbox">Include signature</label>
                     </div>
+                    <button type="button" class="btn btn-link btn-sm no-print" style="text-decoration:underline;"
+                        onclick="openSignatureModal()">Manage Signature</button>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="printInvoice()"><i
                             class="bi bi-printer me-1"></i>Print</button>
@@ -601,12 +603,17 @@
                 content = headerHtml + content;
             }
 
-            // Append signature if requested
+            // Append signature preview if requested (for print)
             const includeSig = !!window.includeSignature;
             const sigPath = brand.signaturePath || localStorage.getItem('signaturePath') || null;
-            if (includeSig && sigPath) {
-                const signatureHtml = `<div style="margin-top:12px;text-align:right;"><img src="${sigPath}" style="max-width:220px;max-height:80px;display:block;margin-left:auto"><div class="small">Authorised Signatory</div></div>`;
-                content = content + signatureHtml;
+            if (includeSig) {
+                if (sigPath) {
+                    const signatureHtml = `<div class="signature-preview" style="margin-top:12px;text-align:right;"><img src="${sigPath}" style="max-width:220px;max-height:80px;display:block;margin-left:auto"><div class="small">${escapeHtml(brand.companyName || 'Authorised Signatory')}</div></div>`;
+                    content = content + signatureHtml;
+                } else {
+                    const signatureHtml = `<div class="signature-preview" style="margin-top:28px;text-align:right;"><div style="display:inline-block;border-top:1px solid #000;padding-top:6px">${escapeHtml(brand.companyName || 'Authorised Signatory')}</div></div>`;
+                    content = content + signatureHtml;
+                }
             }
 
             const printWindow = window.open('', '_blank');
@@ -698,6 +705,34 @@
                     pdf.addImage(imgData, 'PNG', (pageWidth - imgWidth) / 2, 20, imgWidth, imgHeight);
                 }
 
+                // If signature is requested and available, append signature to PDF
+                const includeSig = !!window.includeSignature;
+                const sigPath = brand.signaturePath || localStorage.getItem('signaturePath') || null;
+                if (includeSig) {
+                    if (sigPath) {
+                        // try to add signature image at bottom-right
+                        try {
+                            // load signature image
+                            const sigImg = await fetch(sigPath).then(r => r.blob()).then(b => new Promise((res) => {
+                                const reader = new FileReader(); reader.onload = () => res(reader.result); reader.readAsDataURL(b);
+                            }));
+                            const sigW = 120; const sigH = 50; const x = pageWidth - sigW - 40; const y = pageHeight - sigH - 40;
+                            pdf.addImage(sigImg, 'PNG', x, y, sigW, sigH);
+                            pdf.setFontSize(10);
+                            pdf.text(String(brand.companyName || 'Authorised Signatory'), x + sigW / 2, y + sigH + 12, { align: 'center' });
+                        } catch (e) {
+                            console.warn('Failed to embed signature image into PDF', e);
+                        }
+                    } else {
+                        // draw signature line and brand name
+                        const lineX = pageWidth - 220; const lineY = pageHeight - 80;
+                        pdf.setLineWidth(0.5);
+                        pdf.line(lineX, lineY, lineX + 160, lineY);
+                        pdf.setFontSize(10);
+                        pdf.text(String(brand.companyName || 'Authorised Signatory'), lineX + 80, lineY + 14, { align: 'center' });
+                    }
+                }
+
                 const filename = `invoice_${invoiceNo}_${new Date().toISOString().split('T')[0]}.pdf`;
                 pdf.save(filename);
 
@@ -734,6 +769,33 @@
         window.includeSignature = false;
         function toggleIncludeSignature(checked) {
             window.includeSignature = !!checked;
+            try {
+                const el = document.getElementById('modalContent');
+                if (!el) return;
+                // remove any existing preview
+                const existing = el.querySelector('.signature-preview');
+                if (existing) existing.remove();
+
+                if (!window.includeSignature) return;
+
+                const brand = (window.getBrandSettings && window.getBrandSettings()) || {};
+                const sigPath = brand.signaturePath || localStorage.getItem('signaturePath') || null;
+
+                let sigHtml = '';
+                if (sigPath) {
+                    sigHtml = `<div class="signature-preview" style="margin-top:12px;text-align:right;"><img src="${sigPath}" style="max-width:220px;max-height:80px;display:block;margin-left:auto"><div class="small">${escapeHtml(brand.companyName || 'Authorised Signatory')}</div></div>`;
+                } else {
+                    const displayName = escapeHtml(brand.companyName || 'Authorised Signatory');
+                    sigHtml = `<div class="signature-preview" style="margin-top:28px;text-align:right;"><div style="display:inline-block;border-top:1px solid #000;padding-top:6px">${displayName}</div></div>`;
+                }
+
+                // append preview to modal content
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = sigHtml;
+                el.appendChild(wrapper.firstElementChild);
+            } catch (e) {
+                console.warn('toggleIncludeSignature error', e);
+            }
         }
 
         // Helper: get seller state from brand settings/localStorage
@@ -901,6 +963,100 @@
             if (hundredPart) result += threeDigits(hundredPart) + ' ';
 
             return result.trim();
+        }
+    </script>
+
+    <!-- Signature Management Modal -->
+    <div class="modal fade" id="signatureModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">Manage Signature</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2 text-center">
+                        <img id="sigPreview" src="" alt="Signature preview"
+                            style="max-width:100%; max-height:120px; display:none; border:1px solid #eef; padding:6px;" />
+                    </div>
+                    <div class="mb-2">
+                        <input type="file" id="sigFileInput" accept="image/*" class="form-control form-control-sm"
+                            onchange="onSigFileChange(this)">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary btn-sm" onclick="saveSignature()">Save</button>
+                        <button class="btn btn-outline-danger btn-sm ms-auto"
+                            onclick="removeSignature()">Remove</button>
+                    </div>
+                    <div class="mt-2 small text-muted">Uploading stores signature locally (in browser). Use the
+                        signature when printing or exporting invoices.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Signature modal helpers
+        let _pendingSignatureData = null;
+        function openSignatureModal() {
+            const brand = (window.getBrandSettings && window.getBrandSettings()) || {};
+            const existing = brand.signaturePath || localStorage.getItem('signaturePath') || null;
+            const preview = document.getElementById('sigPreview');
+            const input = document.getElementById('sigFileInput');
+            _pendingSignatureData = null;
+            input.value = '';
+            if (existing) {
+                preview.src = existing;
+                preview.style.display = '';
+            } else {
+                preview.src = '';
+                preview.style.display = 'none';
+            }
+            const modal = new bootstrap.Modal(document.getElementById('signatureModal'));
+            modal.show();
+        }
+
+        function onSigFileChange(input) {
+            if (!input.files || !input.files[0]) return;
+            const f = input.files[0];
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                _pendingSignatureData = e.target.result; // dataURL
+                const preview = document.getElementById('sigPreview');
+                preview.src = _pendingSignatureData;
+                preview.style.display = '';
+            };
+            reader.readAsDataURL(f);
+        }
+
+        function saveSignature() {
+            if (!_pendingSignatureData) {
+                alert('Please choose an image file first.');
+                return;
+            }
+            try {
+                localStorage.setItem('signaturePath', _pendingSignatureData);
+                // reflect immediately in modal content if open
+                try { toggleIncludeSignature(true); document.getElementById('includeSignatureCheckbox').checked = true; } catch (e) { }
+                alert('Signature saved locally. It will be used for print/export.');
+                const modalEl = document.getElementById('signatureModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            } catch (e) {
+                console.error(e);
+                alert('Failed to save signature.');
+            }
+        }
+
+        function removeSignature() {
+            if (!confirm('Remove saved signature?')) return;
+            localStorage.removeItem('signaturePath');
+            _pendingSignatureData = null;
+            try { document.getElementById('sigPreview').style.display = 'none'; } catch (e) { }
+            try { toggleIncludeSignature(false); document.getElementById('includeSignatureCheckbox').checked = false; } catch (e) { }
+            const modalEl = document.getElementById('signatureModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
         }
     </script>
 </body>

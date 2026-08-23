@@ -14,6 +14,7 @@
         if (settings.district) localStorage.setItem('district', settings.district);
         if (settings.sellerState) localStorage.setItem('sellerState', settings.sellerState);
         if (settings.logoPath) localStorage.setItem('logoPath', settings.logoPath);
+        if (settings.signaturePath) localStorage.setItem('signaturePath', settings.signaturePath);
 
 
         // 1. Update Company Name
@@ -70,6 +71,17 @@
                 el.style.display = 'none';
             }
         });
+        // 5. Signature (optional)
+        const sigElements = document.querySelectorAll('[data-brand="signature"]');
+        sigElements.forEach(el => {
+            const s = settings.signaturePath || localStorage.getItem('signaturePath');
+            if (s) {
+                el.src = s;
+                el.style.display = '';
+            } else {
+                el.style.display = 'none';
+            }
+        });
     }
 
     function loadFromStorage() {
@@ -83,7 +95,8 @@
             companyGstin: localStorage.getItem('companyGstin'),
             district: localStorage.getItem('district'),
             sellerState: localStorage.getItem('sellerState'),
-            logoPath: localStorage.getItem('logoPath')
+            logoPath: localStorage.getItem('logoPath'),
+            signaturePath: localStorage.getItem('signaturePath')
         };
     }
 
