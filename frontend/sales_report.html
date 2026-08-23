@@ -606,7 +606,10 @@
             // Append signature preview if requested (for print)
             const includeSig = !!window.includeSignature;
             const sigPath = brand.signaturePath || localStorage.getItem('signaturePath') || null;
-            if (includeSig) {
+            // If modal already contains a signature-preview, avoid adding it again
+            const modalEl = document.getElementById('modalContent');
+            const modalHasSig = modalEl && modalEl.querySelector('.signature-preview');
+            if (includeSig && !modalHasSig) {
                 if (sigPath) {
                     const signatureHtml = `<div class="signature-preview" style="margin-top:12px;text-align:right;"><img src="${sigPath}" style="max-width:220px;max-height:80px;display:block;margin-left:auto"><div class="small">${escapeHtml(brand.companyName || 'Authorised Signatory')}</div></div>`;
                     content = content + signatureHtml;
@@ -708,7 +711,9 @@
                 // If signature is requested and available, append signature to PDF
                 const includeSig = !!window.includeSignature;
                 const sigPath = brand.signaturePath || localStorage.getItem('signaturePath') || null;
-                if (includeSig) {
+                // If modal already contains signature-preview (captured in canvas), skip adding again
+                const modalHasSig = el && el.querySelector('.signature-preview');
+                if (includeSig && !modalHasSig) {
                     if (sigPath) {
                         // try to add signature image at bottom-right
                         try {
