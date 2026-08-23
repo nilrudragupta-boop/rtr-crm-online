@@ -138,6 +138,34 @@ const apiClient = {
         }
     },
 
+    getSales: async () => {
+        try {
+            const invoices = await apiClient.getInvoices();
+            if (!Array.isArray(invoices)) return [];
+            return invoices.map(invoice => ({
+                ...invoice,
+                id: invoice.id || invoice._id || invoice.invoiceNo || invoice.invoice_no || Date.now().toString(),
+                invoiceNo: invoice.invoiceNo || invoice.invoice_no || invoice.invoiceNo || invoice.id || '',
+                invoice_no: invoice.invoice_no || invoice.invoiceNo || invoice.id || '',
+                invoiceDate: invoice.invoiceDate || invoice.invoice_date || invoice.date || '',
+                invoice_date: invoice.invoice_date || invoice.invoiceDate || invoice.date || '',
+                customerName: invoice.customerName || invoice.customer_name || 'Walk-in Customer',
+                customer_name: invoice.customer_name || invoice.customerName || 'Walk-in Customer',
+                customerPhone: invoice.customerPhone || invoice.customer_phone || invoice.contact || invoice.customerContact || '',
+                customerGST: invoice.customerGST || invoice.customer_gst || invoice.gst_no || invoice.gst || '',
+                paymentMode: invoice.paymentMode || invoice.payment_mode || 'Cash',
+                subTotal: Number(invoice.subTotal ?? invoice.taxableValue ?? invoice.invoice_total ?? 0),
+                taxTotal: Number(invoice.taxTotal ?? invoice.gstTotal ?? invoice.tax_amount ?? 0),
+                grandTotal: Number(invoice.grandTotal ?? invoice.invoice_total ?? invoice.total ?? invoice.invoiceTotal ?? 0),
+                items: Array.isArray(invoice.items) ? invoice.items : [],
+                remarks: invoice.remarks || invoice.note || ''
+            }));
+        } catch (error) {
+            console.error('Error fetching sales:', error);
+            return [];
+        }
+    },
+
     saveInvoice: async (invoiceData) => {
         try {
             if (!invoiceData.createdBy) invoiceData.createdBy = localStorage.getItem('currentUser') || 'System';
@@ -153,7 +181,38 @@ const apiClient = {
             return { success: false, message: error.message };
         }
     },
+
+    saveSale: async (saleData) => {
+        try {
+            const normalized = {
+                ...saleData,
+                id: saleData.id || saleData._id || saleData.invoiceNo || saleData.invoice_no || Date.now().toString(),
+                invoiceNo: saleData.invoiceNo || saleData.invoice_no || saleData.id || '',
+                invoice_no: saleData.invoice_no || saleData.invoiceNo || saleData.id || '',
+                invoiceDate: saleData.invoiceDate || saleData.invoice_date || saleData.date || '',
+                invoice_date: saleData.invoice_date || saleData.invoiceDate || saleData.date || '',
+                customerName: saleData.customerName || saleData.customer_name || 'Walk-in Customer',
+                customer_name: saleData.customer_name || saleData.customerName || 'Walk-in Customer',
+                customerPhone: saleData.customerPhone || saleData.customer_phone || saleData.contact || '',
+                customerGST: saleData.customerGST || saleData.customer_gst || saleData.gst_no || '',
+                paymentMode: saleData.paymentMode || saleData.payment_mode || 'Cash',
+                subTotal: Number(saleData.subTotal ?? saleData.taxableValue ?? 0),
+                taxTotal: Number(saleData.taxTotal ?? saleData.gstTax ?? 0),
+                grandTotal: Number(saleData.grandTotal ?? saleData.invoice_total ?? saleData.total ?? 0),
+                invoice_total: Number(saleData.grandTotal ?? saleData.invoice_total ?? saleData.total ?? 0),
+                total_paid: Number(saleData.grandTotal ?? saleData.invoice_total ?? saleData.total ?? 0),
+                total_due: 0,
+                remarks: saleData.remarks || saleData.note || '',
+                items: Array.isArray(saleData.items) ? saleData.items : []
+            };
+            return await apiClient.saveInvoice(normalized);
+        } catch (error) {
+            console.error('Error saving sale:', error);
+            return { success: false, message: error.message };
+        }
+    },
     deleteInvoice: (id) => apiClient._deleteCollection('invoices', id),
+    deleteSale: async (id) => apiClient.deleteInvoice(id),
 
     // --- Credit/Debit Notes ---
     getCreditDebitNotes: () => apiClient._getCollection('credit-debit-notes'),
