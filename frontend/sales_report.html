@@ -297,6 +297,25 @@
             renderReport();
         }
 
+        // Open the direct sale editor for the given invoice (in new tab)
+        function openEditorForInvoice(invoiceNo) {
+            if (!invoiceNo) return;
+            const target = `direct_sale.html?editInvoice=${encodeURIComponent(invoiceNo)}`;
+            window.open(target, '_blank');
+        }
+
+        // Set current invoice and trigger share/export flow for a single invoice
+        function openShareForInvoice(invoiceNo) {
+            const sale = rawSales.find(s => s.invoiceNo === invoiceNo) || {};
+            if (!sale || !sale.invoiceNo) {
+                alert('Invoice not found for export.');
+                return;
+            }
+            window.currentInvoice = sale;
+            // default to PDF export
+            shareInvoice('pdf');
+        }
+
         function renderReport() {
             const fromDate = document.getElementById('fromDate').value;
             const toDate = document.getElementById('toDate').value;
@@ -358,14 +377,19 @@
         <td class="text-end">₹${(sale.subTotal || 0).toFixed(2)}</td>
         <td class="text-end text-danger">₹${(sale.taxTotal || 0).toFixed(2)}</td>
         <td class="text-end fw-bold text-success">₹${(sale.grandTotal || 0).toFixed(2)}</td>
-        <td class="text-center no-print">
-          <button class="btn btn-outline-primary btn-sm py-0 px-2" onclick="openInvoiceModal(${index})" title="View Details">
-            <i class="bi bi-eye"></i>
-          </button>
-          <button class="btn btn-outline-danger btn-sm py-0 px-2" onclick="deleteSaleRecord('${sale.invoiceNo}')" title="Delete Sale">
-            <i class="bi bi-trash"></i>
-          </button>
-        </td>
+                <td class="text-center no-print">
+                    <div class="btn-group">
+                        <button class="btn btn-outline-primary btn-sm py-0 px-2" onclick="openInvoiceModal(${index})" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split py-0 px-2" data-bs-toggle="dropdown" aria-expanded="false"></button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="openEditorForInvoice('${sale.invoiceNo}'); return false;">Edit</a></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="if(confirm('Delete invoice ${sale.invoiceNo}?')){ deleteSaleRecord('${sale.invoiceNo}'); } return false;">Delete</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="openShareForInvoice('${sale.invoiceNo}'); return false;">Export / Share</a></li>
+                        </ul>
+                    </div>
+                </td>
       `;
                 tbody.appendChild(tr);
             });

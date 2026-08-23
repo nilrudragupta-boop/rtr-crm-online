@@ -240,7 +240,60 @@
             generateInvoiceNumber();
             populateCustomerDropdown();
             addNewRow();
+
+            // If opened with ?editInvoice=INV-..., populate form for editing
+            const params = new URLSearchParams(window.location.search);
+            const editInvoice = params.get('editInvoice');
+            if (editInvoice) {
+                const sales = JSON.parse(localStorage.getItem('sales_records') || '[]');
+                const sale = (sales || []).find(s => s.invoiceNo === editInvoice || s.id === editInvoice);
+                if (sale) {
+                    populateFormFromSale(sale);
+                } else {
+                    console.warn('Edit invoice not found:', editInvoice);
+                    alert('Invoice not found for editing: ' + editInvoice);
+                }
+            }
         });
+
+        function populateFormFromSale(sale) {
+            if (!sale) return;
+            document.getElementById('invoiceNo').value = sale.invoiceNo || sale.id || '';
+            document.getElementById('invoiceDate').value = sale.invoiceDate || new Date().toISOString().split('T')[0];
+            // try select customer by id, else by name
+            if (sale.customerId) {
+                document.getElementById('customerSelect').value = sale.customerId;
+            } else if (sale.customerName) {
+                const opt = Array.from(document.getElementById('customerSelect').options).find(o => o.textContent.includes(sale.customerName));
+                if (opt) document.getElementById('customerSelect').value = opt.value;
+            }
+            onCustomerChange();
+            document.getElementById('paymentMode').value = sale.paymentMode || 'Cash';
+            document.getElementById('salesRemarks').value = sale.remarks || sale.note || '';
+
+            // populate items
+            document.getElementById('invoiceRows').innerHTML = '';
+            (sale.items || []).forEach(itm => {
+                addNewRow();
+                const lastRow = document.querySelector('#invoiceRows tr:last-child');
+                const sel = lastRow.querySelector('.item-select');
+                if (itm.itemId) {
+                    const option = Array.from(sel.options).find(o => o.value == itm.itemId);
+                    if (option) sel.value = itm.itemId;
+                } else if (itm.itemName) {
+                    const option = Array.from(sel.options).find(o => o.textContent.trim() === itm.itemName.trim());
+                    if (option) sel.value = option.value;
+                }
+                lastRow.querySelector('.item-uom').value = itm.uom || '';
+                lastRow.querySelector('.item-qty').value = itm.qty || itm.quantity || 0;
+                lastRow.querySelector('.item-rate').value = itm.rate || itm.salePrice || 0;
+                lastRow.querySelector('.item-gst').value = itm.gstPercent || itm.gst || itm.gstRate || 0;
+                calculateRow(lastRow.querySelector('.item-qty'));
+            });
+            calculateTotals();
+            // mark editing id so save updates existing
+            window.editingInvoiceNo = sale.invoiceNo || sale.id || null;
+        }
 
         function generateInvoiceNumber() {
             const sales = JSON.parse(localStorage.getItem('sales_records') || '[]');
@@ -439,7 +492,18 @@
 
             const existingSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
             const saleRecord = { ...payload, id: payload.id || `${Date.now()}` };
-            existingSales.push(saleRecord);
+            if (window.editingInvoiceNo) {
+                const idx = existingSales.findIndex(s => s.invoiceNo === window.editingInvoiceNo || s.id === window.editingInvoiceNo);
+                if (idx !== -1) {
+                    existingSales[idx] = saleRecord;
+                } else {
+                    existingSales.push(saleRecord);
+                }
+                // clear edit flag
+                window.editingInvoiceNo = null;
+            } else {
+                existingSales.push(saleRecord);
+            }
             localStorage.setItem('sales_records', JSON.stringify(existingSales));
 
             try {
