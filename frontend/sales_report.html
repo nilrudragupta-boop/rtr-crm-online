@@ -580,12 +580,52 @@
                 const pageWidth = pdf.internal.pageSize.getWidth();
                 const pageHeight = pdf.internal.pageSize.getHeight();
 
-                // scale to fit within page
+                // Add company header from brand settings
+                const brand = (window.getBrandSettings && window.getBrandSettings()) || {};
+                let yOffset = 28;
+                pdf.setFontSize(14);
+                try { pdf.setFont('helvetica', 'bold'); } catch (e) { }
+                if (brand.companyName) {
+                    pdf.text(String(brand.companyName), pageWidth / 2, yOffset, { align: 'center' });
+                    yOffset += 16;
+                }
+                pdf.setFontSize(10);
+                try { pdf.setFont('helvetica', 'normal'); } catch (e) { }
+                const addrLines = [];
+                if (brand.addressLine1) addrLines.push(brand.addressLine1);
+                if (brand.addressLine2) addrLines.push(brand.addressLine2);
+                const distState = [];
+                if (brand.district) distState.push(brand.district);
+                if (brand.sellerState) distState.push(brand.sellerState);
+                if (distState.length) addrLines.push(distState.join(', '));
+                const contactParts = [];
+                if (brand.contactNumber) contactParts.push('Ph: ' + brand.contactNumber);
+                if (brand.companyEmail) contactParts.push('Email: ' + brand.companyEmail);
+                if (contactParts.length) addrLines.push(contactParts.join(' | '));
+                if (brand.companyGstin) addrLines.push('GSTIN: ' + brand.companyGstin);
+
+                addrLines.forEach(line => {
+                    pdf.text(String(line), pageWidth / 2, yOffset, { align: 'center' });
+                    yOffset += 12;
+                });
+
+                // leave a small gap before invoice image
+                yOffset += 8;
+
+                // scale image to fit remaining space on page
                 const imgProps = { width: canvas.width, height: canvas.height };
-                const scale = Math.min(pageWidth / imgProps.width, pageHeight / imgProps.height);
+                const availHeight = pageHeight - yOffset - 20;
+                const scale = Math.min(pageWidth / imgProps.width, availHeight / imgProps.height);
                 const imgWidth = imgProps.width * scale;
                 const imgHeight = imgProps.height * scale;
-                pdf.addImage(imgData, 'PNG', (pageWidth - imgWidth) / 2, 20, imgWidth, imgHeight);
+
+                if (imgHeight <= availHeight) {
+                    pdf.addImage(imgData, 'PNG', (pageWidth - imgWidth) / 2, yOffset, imgWidth, imgHeight);
+                } else {
+                    // if doesn't fit, add on new page
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', (pageWidth - imgWidth) / 2, 20, imgWidth, imgHeight);
+                }
 
                 const filename = `invoice_${invoiceNo}_${new Date().toISOString().split('T')[0]}.pdf`;
                 pdf.save(filename);
