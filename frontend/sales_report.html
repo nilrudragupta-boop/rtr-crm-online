@@ -421,6 +421,10 @@
       `;
             });
 
+            // compute GST breakdown and amount in words
+            const gstBreakdownHtml = getGSTBreakdownHtml(sale);
+            const totalInWords = amountToWords(sale.grandTotal || 0);
+
             const content = `
       <div class="d-flex justify-content-between border-bottom pb-2 mb-3">
         <div>
@@ -468,6 +472,12 @@
           <div class="fs-6 text-success"><small>Grand Total:</small> <strong>₹${(sale.grandTotal || 0).toFixed(2)}</strong></div>
         </div>
       </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <div class="small mt-2"><strong>GST Breakdown:</strong> ${gstBreakdownHtml}</div>
+                    <div class="small mt-1"><strong>Amount (in words):</strong> ${totalInWords}</div>
+                </div>
+            </div>
     `;
 
             document.getElementById('modalContent').innerHTML = content;
@@ -597,6 +607,95 @@
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
+        }
+
+        // Helper: get seller state from brand settings/localStorage
+        function getSellerState() {
+            try {
+                const settings = (window.getBrandSettings && window.getBrandSettings()) || {};
+                return (settings.sellerState || localStorage.getItem('sellerState') || '').toString();
+            } catch (e) {
+                return (localStorage.getItem('sellerState') || '').toString();
+            }
+        }
+
+        // Helper: get customer state from sale object
+        function getCustomerState(sale) {
+            if (!sale) return '';
+            const c = sale.customer || {};
+            return (c.state || sale.customerState || sale.state || c.stateCode || '').toString();
+        }
+
+        // Build GST breakdown HTML based on seller/customer state
+        function getGSTBreakdownHtml(sale) {
+            const totalTax = Number(sale.taxTotal || 0);
+            const sellerState = (getSellerState() || '').trim().toLowerCase();
+            const customerState = (getCustomerState(sale) || '').trim().toLowerCase();
+
+            if (!sellerState || !customerState) {
+                // Unknown states: show total GST only
+                return `<span>IGST: ₹${totalTax.toFixed(2)}</span>`;
+            }
+
+            if (sellerState === customerState) {
+                const half = (totalTax / 2) || 0;
+                return `<span>CGST: ₹${half.toFixed(2)}</span> &nbsp; <span>SGST: ₹${half.toFixed(2)}</span>`;
+            } else {
+                return `<span>IGST: ₹${totalTax.toFixed(2)}</span>`;
+            }
+        }
+
+        // Convert amount to words (Indian system)
+        function amountToWords(amount) {
+            amount = Number(amount) || 0;
+            const rupees = Math.floor(amount);
+            const paise = Math.round((amount - rupees) * 100);
+
+            const rupeesWords = numberToWords(rupees);
+            const paiseWords = paise > 0 ? numberToWords(paise) + ' Paise' : '';
+
+            if (paiseWords) return `Rupees ${rupeesWords} and ${paiseWords} Only`;
+            return `Rupees ${rupeesWords} Only`;
+        }
+
+        function numberToWords(num) {
+            if (num === 0) return 'Zero';
+            const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+            const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+            function twoDigits(n) {
+                if (n < 20) return a[n];
+                const tens = Math.floor(n / 10);
+                const rest = n % 10;
+                return b[tens] + (rest ? ' ' + a[rest] : '');
+            }
+
+            function threeDigits(n) {
+                let str = '';
+                if (n > 99) {
+                    str += a[Math.floor(n / 100)] + ' Hundred';
+                    if (n % 100) str += ' ' + twoDigits(n % 100);
+                } else {
+                    str += twoDigits(n);
+                }
+                return str;
+            }
+
+            let result = '';
+            const crore = Math.floor(num / 10000000);
+            num = num % 10000000;
+            const lakh = Math.floor(num / 100000);
+            num = num % 100000;
+            const thousand = Math.floor(num / 1000);
+            num = num % 1000;
+            const hundredPart = num; // below 1000
+
+            if (crore) result += threeDigits(crore) + ' Crore ';
+            if (lakh) result += threeDigits(lakh) + ' Lakh ';
+            if (thousand) result += threeDigits(thousand) + ' Thousand ';
+            if (hundredPart) result += threeDigits(hundredPart) + ' ';
+
+            return result.trim();
         }
     </script>
 </body>
