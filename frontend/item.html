@@ -233,6 +233,29 @@
             background-color: #3a3a3a !important;
             color: #fff !important;
         }
+
+        #itemSpaFrame {
+            display: none;
+            width: 100%;
+            height: calc(100vh - 60px);
+            min-height: 600px;
+            border: 0;
+            background: #f8f9fa;
+        }
+
+        #itemSpaToolbar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #fff;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        body.dark-mode #itemSpaToolbar {
+            background: #2c2c2c;
+            border-color: #444;
+        }
     </style>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -245,16 +268,59 @@
     <script src="brandLoader.js"></script>
     <script src="apiClient.js"></script>
     <script>
+        function isSpaModeEnabled() {
+            return localStorage.getItem("spaMode") !== "false";
+        }
+
         function openWindow(url, width, height, targetName) {
+            if (isSpaModeEnabled() && targetName === 'salesWindow') {
+                openItemSpaPage(url);
+                return;
+            }
+
             const windowName = targetName || url.split('?')[0].split('/').pop().replace('.html', '').replace(/[^a-zA-Z0-9]/g, '_');
-            window.open(url, windowName, `width=${width},height=${height},resizable=yes,scrollbars=yes`).focus();
+            const win = window.open(url, windowName, `width=${width},height=${height},resizable=yes,scrollbars=yes`);
+            if (win) win.focus();
+        }
+
+        function openItemSpaPage(url) {
+            const frame = document.getElementById('itemSpaFrame');
+            const toolbar = document.getElementById('itemSpaToolbar');
+            const shell = document.getElementById('itemPageShell');
+            if (!frame || !toolbar || !shell) return;
+
+            const embeddedUrl = new URL(url, window.location.href);
+            embeddedUrl.searchParams.set('embedded', '1');
+            shell.style.display = 'none';
+            toolbar.style.display = 'flex';
+            frame.style.display = 'block';
+            frame.src = embeddedUrl.toString();
+        }
+
+        function returnToItems() {
+            const frame = document.getElementById('itemSpaFrame');
+            const toolbar = document.getElementById('itemSpaToolbar');
+            const shell = document.getElementById('itemPageShell');
+            if (!frame || !toolbar || !shell) return;
+
+            frame.src = '';
+            frame.style.display = 'none';
+            toolbar.style.display = 'none';
+            shell.style.display = '';
         }
     </script>
 </head>
 
 <body>
 
-    <div class="modal-box">
+    <div id="itemSpaToolbar">
+        <span class="text-muted">Sales workspace</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="returnToItems()">Back to Items</button>
+    </div>
+
+    <iframe id="itemSpaFrame" title="Sales workspace"></iframe>
+
+    <div id="itemPageShell" class="modal-box">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
             <div>
                 <h5><span id="brandName" style="margin-top: 0; margin-bottom: 5px;" data-brand="name"></span> -Item
