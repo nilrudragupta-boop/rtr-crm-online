@@ -345,6 +345,82 @@
             background-color: #3498db;
             opacity: 0.5;
         }
+
+        .quote-action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .quote-action-btn {
+            padding: 4px 10px;
+            background: #607d8b;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .quote-action-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + 4px);
+            min-width: 120px;
+            padding: 4px 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 20;
+            text-align: left;
+        }
+
+        .quote-action-dropdown.open .quote-action-menu {
+            display: block;
+        }
+
+        .quote-action-menu button {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 7px 12px;
+            background: transparent;
+            color: #333;
+            border: none;
+            border-radius: 0;
+            font-size: 12px;
+            font-weight: normal;
+            text-align: left;
+        }
+
+        .quote-action-menu button:hover {
+            background: #f1f1f1;
+        }
+
+        .quote-view-body {
+            max-height: 65vh;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .quote-view-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .quote-view-table th,
+        .quote-view-table td {
+            padding: 7px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .quote-view-table th {
+            width: 35%;
+            background: #f8f9fa;
+            color: #333;
+        }
     </style>
 </head>
 
@@ -534,6 +610,20 @@
                 </div>
                 <div id="paginationInfo" style="color: #666; font-size:13px;"></div>
                 <div class="pagination" id="paginationControls" style="display: flex; gap: 5px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quotation View Modal -->
+    <div id="quotationViewModal" class="modal">
+        <div class="modal-content" style="width: 700px; max-width: 95%; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="quotationViewTitle" style="margin-top:0; color:#2c3e50;">Quotation Details</h3>
+                <button class="secondary" onclick="closeQuotationView()" style="padding:4px 10px;">&times;</button>
+            </div>
+            <div id="quotationViewBody" class="quote-view-body"></div>
+            <div class="modal-buttons">
+                <button class="secondary" onclick="closeQuotationView()">Close</button>
             </div>
         </div>
     </div>
@@ -1213,9 +1303,15 @@
                 });
                 
                 rowHtml += `<td style="text-align:center;" class="no-print">
-                    <button class="secondary" style="padding:4px 8px; font-size:12px; background:#607d8b;" onclick="printQuoteFromList('${escapeHtml(q.refNo)}')"><i class="fas fa-print"></i> Print</button>
-                    <button class="primary" style="padding:4px 8px; font-size:12px;" onclick="editQuote('${escapeHtml(q.refNo)}')"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="danger" style="padding:4px 8px; font-size:12px;" onclick="deleteQuote('${escapeHtml(q.refNo)}')"><i class="fas fa-trash"></i> Delete</button>
+                    <div class="quote-action-dropdown">
+                        <button class="quote-action-btn" type="button" onclick="toggleQuoteActions(this)">Actions &#9662;</button>
+                        <div class="quote-action-menu">
+                            <button type="button" onclick="viewQuotation('${escapeHtml(q.refNo)}')">View</button>
+                            <button type="button" onclick="printQuoteFromList('${escapeHtml(q.refNo)}')">Print</button>
+                            <button type="button" onclick="editQuote('${escapeHtml(q.refNo)}')">Edit</button>
+                            <button type="button" style="color:#dc3545;" onclick="deleteQuote('${escapeHtml(q.refNo)}')">Delete</button>
+                        </div>
+                    </div>
                 </td>
             `;
                 tr.innerHTML = rowHtml;
@@ -1310,6 +1406,71 @@
             document.getElementById("searchRefNo").value = refNo;
             loadQuotation();
             toggleView();
+        }
+
+        function toggleQuoteActions(button) {
+            const dropdown = button.closest('.quote-action-dropdown');
+            document.querySelectorAll('.quote-action-dropdown.open').forEach(item => {
+                if (item !== dropdown) item.classList.remove('open');
+            });
+            dropdown.classList.toggle('open');
+        }
+
+        document.addEventListener('click', event => {
+            if (!event.target.closest('.quote-action-dropdown')) {
+                document.querySelectorAll('.quote-action-dropdown.open').forEach(dropdown => dropdown.classList.remove('open'));
+            }
+        });
+
+        function viewQuotation(refNo) {
+            const quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+            const quotation = quotations.find(q => q.refNo === refNo);
+            if (!quotation) {
+                showInfo("Error", "Quotation not found.", true);
+                return;
+            }
+
+            const rows = (quotation.items || []).map((item, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(item.description || '-')}</td>
+                    <td>${escapeHtml(item.uom || '-')}</td>
+                    <td>${escapeHtml(item.qty || '-')}</td>
+                    <td>${escapeHtml(item.rate || '-')}</td>
+                    <td>${escapeHtml(item.gst || '0')}%</td>
+                    <td>${escapeHtml(item.total || '0.00')}</td>
+                </tr>
+            `).join('');
+
+            const dynamicRows = dynamicFieldsList.map(field => {
+                let value = quotation[field.fieldName];
+                if (field.fieldType === 'boolean') value = value ? 'Yes' : 'No';
+                return `<tr><th>${escapeHtml(field.fieldLabel)}</th><td colspan="6">${value !== undefined && value !== '' ? escapeHtml(String(value)) : '-'}</td></tr>`;
+            }).join('');
+
+            document.getElementById('quotationViewTitle').textContent = `Quotation ${quotation.refNo || ''}`;
+            document.getElementById('quotationViewBody').innerHTML = `
+                <table class="quote-view-table">
+                    <tr><th>Reference No.</th><td>${escapeHtml(quotation.refNo || '-')}</td></tr>
+                    <tr><th>Date</th><td>${escapeHtml(quotation.date || '-')}</td></tr>
+                    <tr><th>Customer</th><td>${escapeHtml(quotation.custName || '-')}</td></tr>
+                    <tr><th>Contact</th><td>${escapeHtml(quotation.custContact || '-')}</td></tr>
+                    <tr><th>Address</th><td>${escapeHtml(quotation.custAddress || '-')}</td></tr>
+                    <tr><th>Status</th><td>${escapeHtml(quotation.status || 'Draft')}</td></tr>
+                </table>
+                <table class="quote-view-table">
+                    <thead><tr><th>#</th><th>Description</th><th>UOM</th><th>Qty</th><th>Rate</th><th>GST</th><th>Total</th></tr></thead>
+                    <tbody>${rows || '<tr><td colspan="7">No items recorded.</td></tr>'}</tbody>
+                    <tfoot><tr><th colspan="6" style="text-align:right;">Grand Total</th><th>${escapeHtml(quotation.grandTotal || '0.00')}</th></tr></tfoot>
+                </table>
+                ${quotation.terms ? `<p><strong>Terms & Conditions:</strong><br>${escapeHtml(quotation.terms).replace(/\n/g, '<br>')}</p>` : ''}
+                ${dynamicRows ? `<table class="quote-view-table"><tbody>${dynamicRows}</tbody></table>` : ''}
+            `;
+            document.getElementById('quotationViewModal').style.display = 'flex';
+        }
+
+        function closeQuotationView() {
+            document.getElementById('quotationViewModal').style.display = 'none';
         }
 
         function deleteQuote(refNo) {
