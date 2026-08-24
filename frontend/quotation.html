@@ -421,6 +421,19 @@
             background: #f8f9fa;
             color: #333;
         }
+
+        .last-ref-display {
+            margin-left: 10px;
+            color: #2c3e50;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .last-ref-display:hover {
+            color: #0d6efd;
+            text-decoration: underline;
+        }
     </style>
 </head>
 
@@ -439,6 +452,7 @@
                     style="width: 150px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
                 <button class="secondary" onclick="confirmLoad()" style="padding: 6px 12px; font-size: 13px;">📂
                     Load</button>
+                <span id="lastRefDisplay" class="last-ref-display" title="Click to use the last reference number">Last Ref. No.: -</span>
             </div>
         </div>
 
@@ -684,8 +698,9 @@
             if (typeof apiClient !== 'undefined' && apiClient.getQuotations) {
                 try {
                     const remoteData = await apiClient.getQuotations();
-                    if (remoteData && remoteData.length > 0) {
+                    if (Array.isArray(remoteData)) {
                         localStorage.setItem("quotations", JSON.stringify(remoteData));
+                        updateLastReferenceDisplay();
                         if (currentMode === 'list') {
                             renderQuotationList();
                         }
@@ -693,6 +708,27 @@
                 } catch (e) {
                     console.warn("Failed to fetch quotations from backend", e);
                 }
+            }
+        }
+
+        async function fetchQuotationReferences() {
+            try {
+                const [remoteCustomers, remoteItems] = await Promise.all([
+                    typeof apiClient !== 'undefined' && apiClient.getCustomers ? apiClient.getCustomers() : null,
+                    typeof apiClient !== 'undefined' && apiClient.getItems ? apiClient.getItems() : null
+                ]);
+
+                if (Array.isArray(remoteCustomers)) {
+                    localStorage.setItem('customers', JSON.stringify(remoteCustomers));
+                    customers = remoteCustomers;
+                    refreshCustomerList(remoteCustomers);
+                }
+                if (Array.isArray(remoteItems)) {
+                    localStorage.setItem('items', JSON.stringify(remoteItems));
+                    refreshItemList(remoteItems);
+                }
+            } catch (error) {
+                console.warn("Failed to sync quotation references from backend:", error);
             }
         }
 
@@ -731,6 +767,8 @@
             }
             fetchCustomFieldsConfig().then(() => fetchQuotationsData());
             loadItems();
+            updateLastReferenceDisplay();
+            fetchQuotationReferences();
         });
 
         // 2. Load Customers
@@ -833,13 +871,18 @@
             });
         }
 
-        const customers = JSON.parse(localStorage.getItem("customers")) || [];
+        let customers = JSON.parse(localStorage.getItem("customers")) || [];
         const custList = document.getElementById("customerList");
-        customers.sort((a, b) => a.name.localeCompare(b.name)).forEach(c => {
+        function refreshCustomerList(customerData) {
+            if (!custList) return;
+            custList.innerHTML = '';
+            customerData.sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(c => {
             const opt = document.createElement("option");
-            opt.value = c.name;
+            opt.value = c.name || '';
             custList.appendChild(opt);
-        });
+            });
+        }
+        refreshCustomerList(customers);
 
         function fillCustomerDetails() {
             const name = document.getElementById("custName").value;
@@ -850,17 +893,20 @@
             }
         }
 
-        function loadItems() {
-            const items = JSON.parse(localStorage.getItem("items")) || [];
+        function refreshItemList(itemData) {
             const list = document.getElementById("itemList");
             if (list) {
                 list.innerHTML = "";
-                items.forEach(i => {
+                itemData.forEach(i => {
                     const opt = document.createElement("option");
                     opt.value = i.name;
                     list.appendChild(opt);
                 });
             }
+        }
+
+        function loadItems() {
+            refreshItemList(JSON.parse(localStorage.getItem("items")) || []);
         }
 
         function escapeHtml(text) {
@@ -1113,12 +1159,14 @@
                 askConfirm("Overwrite?", "Quotation with this Ref No already exists. Overwrite?", () => {
                     quotations[existingIndex] = quotationData;
                     localStorage.setItem("quotations", JSON.stringify(quotations));
+                    updateLastReferenceDisplay();
                     if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quotationData).catch(e => console.warn(e));
                     showInfo("Success", "Quotation saved successfully!");
                 });
             } else {
                 quotations.push(quotationData);
                 localStorage.setItem("quotations", JSON.stringify(quotations));
+                updateLastReferenceDisplay();
                 if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quotationData).catch(e => console.warn(e));
                 showInfo("Success", "Quotation saved successfully!");
             }
@@ -1211,6 +1259,25 @@
 
         function closeInfoModal() {
             document.getElementById('infoModal').style.display = 'none';
+        }
+
+        function updateLastReferenceDisplay() {
+            const display = document.getElementById('lastRefDisplay');
+            if (!display) return;
+
+            const quotations = JSON.parse(localStorage.getItem('quotations') || '[]');
+            const lastQuotation = Array.isArray(quotations) && quotations.length > 0
+                ? quotations[quotations.length - 1]
+                : null;
+            const lastRefNo = lastQuotation && (lastQuotation.refNo || lastQuotation.id);
+
+            display.textContent = `Last Ref. No.: ${lastRefNo || '-'}`;
+            display.title = lastRefNo
+                ? 'Click to use the last reference number'
+                : 'No saved quotation reference number';
+            display.onclick = lastRefNo
+                ? () => { document.getElementById('searchRefNo').value = lastRefNo; }
+                : null;
         }
 
         let currentMode = 'form';
@@ -1478,6 +1545,7 @@
                 let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
                 quotations = quotations.filter(q => q.refNo !== refNo);
                 localStorage.setItem("quotations", JSON.stringify(quotations));
+                updateLastReferenceDisplay();
                 if (typeof apiClient !== 'undefined' && apiClient.deleteQuotation) {
                     apiClient.deleteQuotation(refNo).catch(e => console.warn(e));
                 }

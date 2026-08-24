@@ -89,7 +89,7 @@ const quotationSchema = new mongoose.Schema({
     grandTotal: { type: String },
     terms: { type: String },
     createdBy: { type: String, default: 'System' }
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 const Quotation = mongoose.model('Quotation', quotationSchema);
 
 // --- Medicine Models ---
