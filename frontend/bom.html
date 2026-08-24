@@ -401,6 +401,22 @@
             <div id="bomList" style="max-height: 400px; overflow-y: auto;"></div>
         </div>
 
+        <!-- BOM View & Print Modal -->
+        <div id="bomViewModal" class="modal">
+            <div class="modal-content" style="width: 900px; max-width: 95%;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0;">BOM Preview</h3>
+                    <span style="cursor:pointer; font-size:24px;" onclick="closeBomViewModal()">&times;</span>
+                </div>
+                <div id="bomViewContent" style="text-align:left; max-height: 65vh; overflow-y:auto; border:1px solid #ddd; padding:15px; border-radius:4px; background:#fff;">
+                </div>
+                <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
+                    <button class="btn-primary" onclick="printBomFromView()"><i class="fas fa-print"></i> Print BOM</button>
+                    <button class="btn-danger" onclick="closeBomViewModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
         <!-- BOM Name Manager Modal -->
         <div id="bomNameManagerModal" class="modal">
             <div class="modal-content" style="width: 400px; text-align: center;">
@@ -679,6 +695,122 @@
                 renderManagedBomNames();
                 loadBOMNames();
             }
+        }
+
+        function viewAndPrintBom(bomId) {
+            const boms = JSON.parse(localStorage.getItem("boms")) || [];
+            const bom = boms.find(item => item.id === bomId);
+            if (!bom) return;
+
+            const rawRows = (bom.rawMaterials || []).map((rm, idx) => `
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${escapeHtml(rm.itemName || '')}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${parseFloat(rm.qty || 0).toFixed(2)}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${escapeHtml(rm.uom || '')}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${parseFloat(rm.rate || 0).toFixed(2)}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${parseFloat(rm.amount || 0).toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            const outputRows = (bom.additionalOutputs || []).map((out, idx) => `
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${idx + 1}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${escapeHtml(out.itemName || '')}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${parseFloat(out.qty || 0).toFixed(2)}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${escapeHtml(out.uom || '')}</td>
+                </tr>
+            `).join('');
+
+            const content = `
+                <div style="font-family: 'Segoe UI', sans-serif; color: #2c3e50;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        <div>
+                            <h3 style="margin: 0; color: #2c3e50;">BOM Details</h3>
+                            <div style="font-size: 13px; color: #666; margin-top: 4px;">${escapeHtml(bom.bomCode || 'N/A')}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 12px; color: #666;">Recipe / Version</div>
+                            <div style="font-weight: bold;">${escapeHtml(bom.bomName || 'Standard')}</div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; font-size: 14px;">
+                        <div><strong>Finished Good:</strong><br>${escapeHtml(bom.finishedGoodName || '')}</div>
+                        <div><strong>Output Qty:</strong><br>${parseFloat(bom.outputQty || 0).toFixed(2)} ${escapeHtml(bom.outputUom || '')}</div>
+                        <div><strong>Material Cost:</strong><br>₹${parseFloat(bom.materialCost || 0).toFixed(2)}</div>
+                        <div><strong>Labour Cost:</strong><br>₹${parseFloat(bom.labourCost || 0).toFixed(2)}</div>
+                        <div><strong>Overhead Cost:</strong><br>₹${parseFloat(bom.overheadCost || 0).toFixed(2)}</div>
+                        <div><strong>Total Estimated Cost:</strong><br><strong>₹${parseFloat(bom.totalEstimatedCost || 0).toFixed(2)}</strong></div>
+                    </div>
+
+                    <h4 style="margin: 0 0 10px;">Raw Materials</h4>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px;">
+                        <thead>
+                            <tr style="background: #f2f2f2;">
+                                <th style="border: 1px solid #ddd; padding: 8px;">Sl</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">Item Name</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Qty</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">UOM</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Avg Rate</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rawRows || '<tr><td colspan="6" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No raw materials added.</td></tr>'}
+                        </tbody>
+                    </table>
+
+                    <h4 style="margin: 0 0 10px;">Additional Outputs</h4>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="background: #f2f2f2;">
+                                <th style="border: 1px solid #ddd; padding: 8px;">Sl</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">Output Item</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Qty</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">UOM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${outputRows || '<tr><td colspan="4" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No additional outputs.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            document.getElementById('bomViewContent').innerHTML = content;
+            document.getElementById('bomViewModal').style.display = 'flex';
+        }
+
+        function printBomFromView() {
+            const printContent = document.getElementById('bomViewContent').innerHTML;
+            const printWindow = window.open('', '_blank', 'width=1000,height=800');
+            if (!printWindow) {
+                alert('Pop-up blocked. Please allow pop-ups to print the BOM.');
+                return;
+            }
+
+            printWindow.document.write(`<!DOCTYPE html>
+            <html>
+            <head>
+                <title>BOM Print</title>
+                <style>
+                    body { font-family: 'Segoe UI', sans-serif; padding: 24px; color: #2c3e50; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #ddd; padding: 8px; }
+                    th { background: #f2f2f2; }
+                    h3, h4 { margin: 0 0 10px; }
+                    @media print { body { padding: 0; } }
+                </style>
+            </head>
+            <body>${printContent}</body>
+            </html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); }, 300);
+        }
+
+        function closeBomViewModal() {
+            document.getElementById('bomViewModal').style.display = 'none';
         }
 
         function loadFinishedGoods() {
@@ -1185,6 +1317,7 @@
                         <div class="action-dropdown" id="actionDropdown-${bom.id}">
                             <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
                             <div class="action-dropdown-content">
+                                <button onclick="viewAndPrintBom('${bom.id}')">👁️ View & Print</button>
                                 <button onclick="editBOM('${bom.id}')">✏️ Edit</button>
                                 <button onclick="autoUpdateBOMRates('${bom.id}')" title="Auto-update raw material rates to match the latest average costs">🔄 Update Rates</button>
                                 <button onclick="deleteBOM('${bom.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
