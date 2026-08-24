@@ -885,12 +885,13 @@
 
     <!-- Barcode Modal -->
     <div id="barcodeModal" class="custom-modal">
-        <div class="custom-modal-content" style="width: 350px;">
+        <div class="custom-modal-content" style="width: 650px; max-width: 95%; max-height: 90vh; overflow-y: auto;">
             <h3 style="color: #0d6efd; margin-top: 0;">Item Barcode</h3>
             <div id="barcodeContainer"
                 style="padding: 20px; background: #fff; margin: 15px 0; border-radius: 8px; border: 1px solid #eee;">
                 <svg id="barcodeCanvas"></svg>
                 <div id="barcodeText" style="margin-top: 10px; font-weight: bold; color: #333; font-size: 14px;"></div>
+                <div id="barcodeItemDetails" style="margin-top: 20px; text-align: left;"></div>
             </div>
             <div class="modal-buttons">
                 <button class="btn btn-primary" onclick="printBarcode()">Print</button>
@@ -1482,6 +1483,43 @@
             const barcodeText = item.name;
 
             document.getElementById('barcodeText').innerText = barcodeText;
+            const detailRows = [
+                ['Item Name', item.name],
+                ['Item Code', item.itemCode],
+                ['Index No', item.indexNo],
+                ['Category', item.category],
+                ['HSN/SAC', item.hsn],
+                ['Item Type', item.itemType || 'Finished Good'],
+                ['UOM', item.uom],
+                ['IMEI', item.imei],
+                ['Batch', item.batch],
+                ['Lot', item.lot],
+                ['Serial', item.serial],
+                ['Description', item.description],
+                ['Sale Price', `₹ ${parseFloat(item.salePrice || 0).toFixed(2)}`],
+                ['GST %', `${item.gst || 0}%`]
+            ];
+
+            const conversionRows = item.conversions && Object.keys(item.conversions).length > 0
+                ? Object.entries(item.conversions).map(([uom, factor]) =>
+                    `<tr><th>Conversion (${escapeHtml(uom)})</th><td>1 ${escapeHtml(uom)} = ${escapeHtml(String(factor))} ${escapeHtml(item.uom || 'Base')}</td></tr>`
+                ).join('')
+                : '';
+            const dynamicRows = dynamicFieldsList.map(field => {
+                let value = item[field.fieldName];
+                if (field.fieldType === 'boolean') value = value ? 'Yes' : 'No';
+                return `<tr><th>${escapeHtml(field.fieldLabel)}</th><td>${value !== undefined && value !== null && value !== '' ? escapeHtml(String(value)) : '-'}</td></tr>`;
+            }).join('');
+
+            document.getElementById('barcodeItemDetails').innerHTML = `
+                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <tbody>
+                        ${detailRows.map(([label, value]) => `<tr><th style="width:32%; padding:6px; background:#f8f9fa; border:1px solid #ddd;">${label}</th><td style="padding:6px; border:1px solid #ddd;">${value !== undefined && value !== null && value !== '' ? escapeHtml(String(value)) : '-'}</td></tr>`).join('')}
+                        ${conversionRows}
+                        ${dynamicRows}
+                    </tbody>
+                </table>
+            `;
 
             try {
                 JsBarcode("#barcodeCanvas", barcodeValue, {
