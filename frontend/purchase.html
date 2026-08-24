@@ -3255,16 +3255,33 @@
                 </div>
             ` : '';
 
+            const grnRef = p.supplierInv || `GRN-${String(p.id || '').slice(-8)}`;
+
             return `
                 <div class="purchase-details-container" style="font-size:14px; line-height:1.5; color:#333;">
                     <div class="no-print" style="text-align:right; margin-bottom: 10px;">
                         <button class="btn-search" onclick="printPurchaseDetails('${p.id}')" style="padding: 6px 12px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🖨️ Print View</button>
                     </div>
-                    
+
+                    <div style="margin-bottom:15px; padding:12px 14px; border:1px solid #dfe3e8; border-radius:8px; background:#f8fbff;">
+                        <div style="text-align:center; margin-bottom:10px;">
+                            <h2 style="margin:0; color:#1f4e79; letter-spacing:0.5px;">Goods Received Note (GRN)</h2>
+                        </div>
+                        <div style="display:flex; gap:20px; flex-wrap:wrap; justify-content:space-between;">
+                            <div><strong>GRN No:</strong> ${escapeHtml(grnRef)}</div>
+                            <div><strong>Supplier Inv No:</strong> ${escapeHtml(p.supplierInv || '-')}</div>
+                            <div><strong>Receipt Date:</strong> ${formatDate(p.date) || '-'}</div>
+                        </div>
+                        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:8px;">
+                            <div><strong>Supplier Name:</strong> ${escapeHtml(p.supplierName || '-')}</div>
+                        </div>
+                    </div>
+
                     <!-- 1. General Details -->
                     <div style="margin-bottom:15px; border-bottom:2px solid #eee; padding-bottom:10px;">
-                        <h4 style="margin:0 0 8px 0; color:#2980b9;">1. Purchase Details:</h4>
+                        <h4 style="margin:0 0 8px 0; color:#2980b9;">1. Goods Received Details:</h4>
                         <div style="display:flex; gap:30px; flex-wrap:wrap;">
+                            <div><strong>GRN No:</strong> ${escapeHtml(grnRef)}</div>
                             <div><strong>Supplier Inv No:</strong> ${escapeHtml(p.supplierInv || '-')}</div>
                             <div><strong>Date:</strong> ${formatDate(p.date) || '-'}</div>
                             <div><strong>Supplier Name:</strong> ${escapeHtml(p.supplierName || '-')}</div>
@@ -3273,7 +3290,7 @@
 
                     <!-- 2. Item Details -->
                     <div style="margin-bottom:15px; border-bottom:2px solid #eee; padding-bottom:10px;">
-                        <h4 style="margin:0 0 8px 0; color:#2980b9;">2. Item Details (Grouped by Invoice):</h4>
+                        <h4 style="margin:0 0 8px 0; color:#2980b9;">2. Item Details:</h4>
                         ${itemsHtml}
                     </div>
 
@@ -3380,13 +3397,14 @@
             const purchaseContent = tempDiv.innerHTML;
 
             // 4. Open Print Window
+            const grnNo = p.supplierInv || `GRN-${String(p.id || '').slice(-8)}`;
             const printWindow = window.open('', '', 'height=800,width=900');
-            printWindow.document.write('<html><head><title>Purchase Report</title>');
-            printWindow.document.write('<style>body{font-family: "Segoe UI", sans-serif; padding: 20px; color: #333;} table{width:100%; border-collapse:collapse; font-size:13px; margin-top:10px;} th, td{border:1px solid #ddd; padding:5px; text-align:left;} th{background:#f9f9f9;} .no-print{display:none !important;} @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>');
+            printWindow.document.write('<html><head><title>Goods Received Note (GRN)</title>');
+            printWindow.document.write('<style>@page{margin:18mm;} body{font-family:"Segoe UI",sans-serif;padding:20px;color:#333;background:#fff;} table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;} th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;} th{background:#f5f7fa;} .no-print{display:none !important;} .grn-header{margin-bottom:20px;padding:12px;border:1px solid #dfe3e8;border-radius:8px;background:#f8fbff;} .grn-header h2{text-align:center;margin:0 0 10px 0;color:#1f4e79;} .grn-meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:13px;} @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>');
             printWindow.document.write('</head><body>');
             printWindow.document.write(companyHtml);
             printWindow.document.write(supplierHtml);
-            printWindow.document.write('<h2 style="text-align:center; color:#2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top:0;">Purchase Report</h2>');
+            printWindow.document.write(`<div class="grn-header"><h2>Goods Received Note (GRN)</h2><div class="grn-meta"><span><strong>GRN No:</strong> ${escapeHtml(grnNo)}</span><span><strong>Supplier Inv No:</strong> ${escapeHtml(p.supplierInv || '-')}</span><span><strong>Date:</strong> ${escapeHtml(formatDate(p.date) || '-')}</span></div></div>`);
             printWindow.document.write(purchaseContent);
             printWindow.document.write('</body></html>');
             printWindow.document.close();
