@@ -156,6 +156,23 @@ const productionSchema = new mongoose.Schema({
     materialsConsumed: Array,
 }, { timestamps: true, strict: false });
 
+// --- BOM Schema ---
+const bomSchema = new mongoose.Schema({
+    id: { type: String, unique: true, required: true },
+    bomCode: String,
+    finishedGoodName: String,
+    finishedGoodCode: String,
+    bomName: String,
+    outputQty: Number,
+    outputUom: String,
+    materialCost: Number,
+    labourCost: Number,
+    overheadCost: Number,
+    totalEstimatedCost: Number,
+    rawMaterials: { type: Array, default: [] },
+    additionalOutputs: { type: Array, default: [] },
+}, { timestamps: true, strict: false });
+
 // --- Expense Schema ---
 const expenseSchema = new mongoose.Schema({
     id: { type: String }
@@ -223,6 +240,7 @@ module.exports = {
     BankTransaction: mongoose.model('BankTransaction', bankTransactionSchema),
     Scrap: mongoose.model('Scrap', scrapSchema),
     Production: mongoose.model('Production', productionSchema),
+    Bom: mongoose.model('Bom', bomSchema),
     Expense: mongoose.model('Expense', expenseSchema),
     Employee: mongoose.model('Employee', employeeSchema),
     CustomField: mongoose.model('CustomField', customFieldSchema),

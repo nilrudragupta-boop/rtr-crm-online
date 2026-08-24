@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -703,6 +703,43 @@ app.post('/api/production', async (req, res) => {
 app.delete('/api/production/:id', async (req, res) => {
     try {
         await Production.findOneAndDelete({ id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- BOM Routes ---
+app.get('/api/boms', async (req, res) => {
+    try {
+        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const boms = await Bom.find(query).sort({ createdAt: -1 });
+        res.json({ success: true, data: boms });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/boms', async (req, res) => {
+    try {
+        const payload = req.body;
+        if (!payload.id) {
+            return res.status(400).json({ success: false, message: 'BOM id is required.' });
+        }
+        const updated = await Bom.findOneAndUpdate(
+            { id: payload.id },
+            payload,
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/boms/:id', async (req, res) => {
+    try {
+        await Bom.findOneAndDelete({ id: req.params.id });
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

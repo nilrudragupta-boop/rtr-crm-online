@@ -440,7 +440,8 @@
         let rowsPerPage = 10;
         let isBomFormVisible = localStorage.getItem("bomFormVisible") !== "false";
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await syncBomData();
             loadFinishedGoods();
             loadRawMaterialsDatalist();
             loadExistingBOMs();
@@ -450,6 +451,45 @@
             addRawMaterialRow(); // Start with one empty row
             applyBomFormVisibility();
         });
+
+        async function syncBomData() {
+            if (typeof apiClient === 'undefined') return;
+
+            try {
+                const [remoteBoms, remoteItems, remotePurchases, remoteInvoices, remoteScraps, remoteProductions] = await Promise.all([
+                    apiClient.getBOMs(),
+                    apiClient.getItems(),
+                    apiClient.getPurchases(),
+                    apiClient.getInvoices(),
+                    apiClient.getScraps(),
+                    apiClient.getProductions()
+                ]);
+
+                if (Array.isArray(remoteBoms)) {
+                    const localBoms = JSON.parse(localStorage.getItem('boms') || '[]');
+                    if (remoteBoms.length > 0) {
+                        localStorage.setItem('boms', JSON.stringify(remoteBoms));
+                    } else if (localBoms.length > 0 && apiClient.saveBOM) {
+                        await Promise.all(localBoms.map(bom => apiClient.saveBOM(bom)));
+                    }
+                }
+
+                const remoteData = [
+                    ['items', remoteItems],
+                    ['purchases', remotePurchases],
+                    ['invoices', remoteInvoices],
+                    ['scraps', remoteScraps],
+                    ['production', remoteProductions]
+                ];
+                remoteData.forEach(([key, value]) => {
+                    if (Array.isArray(value) && value.length > 0) {
+                        localStorage.setItem(key, JSON.stringify(value));
+                    }
+                });
+            } catch (error) {
+                console.warn('Failed to sync BOM data from backend:', error);
+            }
+        }
 
         function toggleBomForm() {
             isBomFormVisible = !isBomFormVisible;
@@ -980,7 +1020,7 @@
             calculateBOMCost();
         }
 
-        function saveBOM() {
+        async function saveBOM() {
             const fgSelect = document.getElementById('finishedGood');
             const finishedGoodName = fgSelect.value;
             if (!finishedGoodName) {
@@ -1089,7 +1129,11 @@
                 boms.push(bom);
             }
             localStorage.setItem("boms", JSON.stringify(boms));
-        if (typeof apiClient !== 'undefined' && apiClient.saveBom) apiClient.saveBom(bom).catch(console.warn);
+            let cloudSyncFailed = false;
+            if (typeof apiClient !== 'undefined' && apiClient.saveBOM) {
+                const result = await apiClient.saveBOM(bom);
+                cloudSyncFailed = !result || result.success === false;
+            }
 
             // Sync calculated unit cost to Finished Good's item master as salePrice
             let itemUpdated = false;
@@ -1110,7 +1154,9 @@
             }
             }
 
-            alert(editingId ? "BOM updated successfully!" : "BOM saved successfully!");
+            alert(cloudSyncFailed
+                ? "BOM saved locally, but cloud sync failed. Please check the backend connection."
+                : (editingId ? "BOM updated successfully!" : "BOM saved successfully!"));
             clearForm();
             loadExistingBOMs();
         }
@@ -1366,7 +1412,7 @@
             if (controls) controls.innerHTML = html;
         }
 
-        function autoUpdateBOMRates(bomId) {
+        async function autoUpdateBOMRates(bomId) {
             if (!confirm("Are you sure you want to update this recipe's raw material rates to match the current average market costs?")) return;
 
             const boms = JSON.parse(localStorage.getItem("boms")) || [];
@@ -1390,7 +1436,11 @@
 
             boms[bomIdx] = bom;
             localStorage.setItem("boms", JSON.stringify(boms));
-        if (typeof apiClient !== 'undefined' && apiClient.saveBom) apiClient.saveBom(bom).catch(console.warn);
+            let cloudSyncFailed = false;
+            if (typeof apiClient !== 'undefined' && apiClient.saveBOM) {
+                const result = await apiClient.saveBOM(bom);
+                cloudSyncFailed = !result || result.success === false;
+            }
 
             const items = JSON.parse(localStorage.getItem("items")) || [];
             let itemUpdated = false;
@@ -1407,17 +1457,26 @@
             if (itemUpdated) localStorage.setItem("items", JSON.stringify(items));
         if (itemUpdated && typeof apiClient !== 'undefined' && apiClient.saveItem) items.forEach(i => { if (i.name === bom.finishedGoodName && (!bom.finishedGoodCode || i.itemCode === bom.finishedGoodCode)) apiClient.saveItem(i).catch(console.warn); });
 
-            alert("BOM rates updated successfully!");
+            alert(cloudSyncFailed
+                ? "BOM rates updated locally, but cloud sync failed."
+                : "BOM rates updated successfully!");
             loadExistingBOMs();
         }
 
-        function deleteBOM(bomId) {
+        async function deleteBOM(bomId) {
             if (!confirm("Are you sure you want to delete this BOM?")) return;
 
             let boms = JSON.parse(localStorage.getItem("boms")) || [];
             boms = boms.filter(b => b.id !== bomId);
             localStorage.setItem("boms", JSON.stringify(boms));
-        if (typeof apiClient !== 'undefined' && apiClient.deleteBom) apiClient.deleteBom(bomId).catch(console.warn);
+            let cloudSyncFailed = false;
+            if (typeof apiClient !== 'undefined' && apiClient.deleteBOM) {
+                const result = await apiClient.deleteBOM(bomId);
+                cloudSyncFailed = !result || result.success === false;
+            }
+            if (cloudSyncFailed) {
+                alert('BOM deleted locally, but cloud sync failed.');
+            }
             loadExistingBOMs();
         }
 
