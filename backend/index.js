@@ -228,6 +228,15 @@ const customRecordSchema = new mongoose.Schema({
     moduleName: { type: String, required: true, index: true }
 }, { timestamps: true, strict: false });
 
+const documentTemplateSchema = new mongoose.Schema({
+    _id: { type: String },
+    templateName: { type: String, required: true },
+    documentType: { type: String, required: true, index: true },
+    fields: { type: Array, default: [] },
+    settings: { type: Object, default: {} },
+    createdBy: { type: String, default: 'System', index: true }
+}, { timestamps: true, strict: false });
+
 module.exports = {
     Customer: mongoose.model('Customer', customerSchema),
     Supplier: mongoose.model('Supplier', supplierSchema),
@@ -245,6 +254,7 @@ module.exports = {
     Employee: mongoose.model('Employee', employeeSchema),
     CustomField: mongoose.model('CustomField', customFieldSchema),
     CustomRecord: mongoose.model('CustomRecord', customRecordSchema),
+    DocumentTemplate: mongoose.model('DocumentTemplate', documentTemplateSchema),
     Message: mongoose.model('Message', messageSchema),
     ChatterGroup: mongoose.model('ChatterGroup', chatterGroupSchema)
 };

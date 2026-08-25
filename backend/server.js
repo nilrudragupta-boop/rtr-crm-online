@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, DocumentTemplate, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -1453,4 +1453,39 @@ app.post('/api/emails/mark-read', async (req, res) => {
 // --- Start Server ---
 app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
+});
+
+app.get('/api/document-templates', async (req, res) => {
+    try {
+        const query = {};
+        if (req.query.user) query.createdBy = req.query.user;
+        if (req.query.documentType) query.documentType = req.query.documentType;
+        const templates = await DocumentTemplate.find(query).sort({ documentType: 1, templateName: 1 });
+        res.json({ success: true, data: templates });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/document-templates', async (req, res) => {
+    try {
+        const payload = { ...req.body };
+        if (!payload.createdBy) payload.createdBy = req.query.user || 'System';
+        if (!payload._id) payload._id = `dt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const template = await DocumentTemplate.findByIdAndUpdate(payload._id, payload, {
+            new: true, upsert: true, setDefaultsOnInsert: true, strict: false
+        });
+        res.status(200).json({ success: true, data: template });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/document-templates/:id', async (req, res) => {
+    try {
+        await DocumentTemplate.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
