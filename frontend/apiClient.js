@@ -410,19 +410,6 @@ const apiClient = {
     },
     saveCustomRecord: (data) => apiClient._saveCollection('custom-records', data),
     deleteCustomRecord: (id) => apiClient._deleteCollection('custom-records', id),
-    getDocumentTemplates: async (documentType = '') => {
-        try {
-            const typeQuery = documentType ? `&documentType=${encodeURIComponent(documentType)}` : '';
-            const response = await fetch(`${API_BASE_URL}/document-templates${apiClient._getAuthQuery()}${typeQuery}`, { cache: 'no-store' });
-            const result = await response.json();
-            return result.success ? result.data : null;
-        } catch (error) {
-            console.error('Error fetching document templates:', error);
-            return null;
-        }
-    },
-    saveDocumentTemplate: (data) => apiClient._saveCollection('document-templates', data),
-    deleteDocumentTemplate: (id) => apiClient._deleteCollection('document-templates', id),
 
     // --- Shadow Ledger / Vault ---
     getShadowLedger: async () => {
