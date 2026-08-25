@@ -215,31 +215,20 @@
         let filteredSales = [];
         let detailModal = null;
 
-        function normalizeSaleDate(value) {
-            if (!value) return '';
-            const dateText = String(value);
-            const dateOnly = dateText.match(/^\d{4}-\d{2}-\d{2}/);
-            if (dateOnly) return dateOnly[0];
-
-            const parsedDate = new Date(value);
-            return Number.isNaN(parsedDate.getTime()) ? '' : parsedDate.toISOString().split('T')[0];
-        }
-
         function normalizeSaleRecord(sale = {}) {
             const customer = sale.customer || {};
             const customerName = sale.customerName || sale.customer_name || customer.name || 'Walk-in Customer';
             const customerPhone = sale.customerPhone || sale.customer_phone || sale.contact || customer.phone || customer.contact || customer.mobile || '';
             const customerGST = sale.customerGST || sale.customer_gst || sale.gstin || sale.gst || customer.gstin || customer.gst || '';
             const customerAddress = sale.customerAddress || sale.address || customer.address || customer.billingAddress || '';
-            const invoiceDate = normalizeSaleDate(sale.invoiceDate || sale.invoice_date || sale.date);
 
             return {
                 ...sale,
                 id: sale.id || sale._id || sale.invoiceNo || sale.invoice_no || Date.now().toString(),
                 invoiceNo: sale.invoiceNo || sale.invoice_no || sale.id || '',
                 invoice_no: sale.invoice_no || sale.invoiceNo || sale.id || '',
-                invoiceDate,
-                invoice_date: invoiceDate,
+                invoiceDate: sale.invoiceDate || sale.invoice_date || sale.date || '',
+                invoice_date: sale.invoice_date || sale.invoiceDate || sale.date || '',
                 customer: customer,
                 customerName,
                 customer_name: customerName,
@@ -289,12 +278,7 @@
                 if (typeof apiClient !== 'undefined' && apiClient.getSales) {
                     const remoteSales = await apiClient.getSales();
                     if (Array.isArray(remoteSales) && remoteSales.length > 0) {
-                        const mergedSales = new Map();
-                        [...localSales, ...remoteSales.map(normalizeSaleRecord)].forEach(sale => {
-                            const key = sale.invoiceNo || sale.id;
-                            if (key) mergedSales.set(String(key), sale);
-                        });
-                        rawSales = Array.from(mergedSales.values());
+                        rawSales = remoteSales.map(normalizeSaleRecord);
                         localStorage.setItem('sales_records', JSON.stringify(rawSales));
                         return;
                     }
@@ -311,8 +295,11 @@
         }
 
         function setDefaultDateRange() {
-            document.getElementById('fromDate').value = '';
-            document.getElementById('toDate').value = '';
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+            document.getElementById('fromDate').value = firstDayOfMonth.toISOString().split('T')[0];
+            document.getElementById('toDate').value = today.toISOString().split('T')[0];
         }
 
         function resetFilters() {
