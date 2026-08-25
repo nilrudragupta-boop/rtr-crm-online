@@ -1705,50 +1705,48 @@
         }
 
         // --- load invoices ---
-        async function loadInvoices() {
-            let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
-            if (!Array.isArray(localInvoices)) localInvoices = [];
+async function loadInvoices() {
+    let localInvoices = JSON.parse(localStorage.getItem("invoices")) || JSON.parse(localStorage.getItem("sales_records")) || [];
+    if (!Array.isArray(localInvoices)) localInvoices = [];
 
-            const tbody = document.querySelector("#reportTable tbody");
-            if (tbody && localInvoices.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="33" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
-            }
+    const tbody = document.querySelector("#reportTable tbody");
+    if (tbody && localInvoices.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="33" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
+    }
 
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay && localInvoices.length === 0) {
-                overlay.style.display = 'flex';
-                await new Promise(resolve => setTimeout(resolve, 15));
-            }
-            try {
-                const remoteData = await apiClient.getInvoices();
-                if (remoteData && remoteData.length > 0) {
-                    const localInvoiceMap = new Map();
-                    localInvoices.forEach((inv, index) => {
-                        localInvoiceMap.set(getInvoiceKey(inv), index);
-                    });
-                    remoteData.forEach(remoteInv => {
-                        const remoteKey = getInvoiceKey(remoteInv);
-                        if (localInvoiceMap.has(remoteKey)) {
-                            const localIdx = localInvoiceMap.get(remoteKey);
-                            localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
-                        } else {
-                            localInvoices.push(remoteInv);
-                            localInvoiceMap.set(remoteKey, localInvoices.length - 1);
-                        }
-                    });
-                    localStorage.setItem("invoices", JSON.stringify(localInvoices));
+    try {
+        const remoteData = await apiClient.getInvoices();
+        if (remoteData && remoteData.length > 0) {
+            const localInvoiceMap = new Map();
+            localInvoices.forEach((inv, index) => {
+                localInvoiceMap.set(getInvoiceKey(inv), index);
+            });
+            remoteData.forEach(remoteInv => {
+                const remoteKey = getInvoiceKey(remoteInv);
+                if (localInvoiceMap.has(remoteKey)) {
+                    const localIdx = localInvoiceMap.get(remoteKey);
+                    localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
+                } else {
+                    localInvoices.push(remoteInv);
+                    localInvoiceMap.set(remoteKey, localInvoices.length - 1);
                 }
-            } catch (e) { console.warn("Failed to fetch remote invoices, using local data."); }
-
-            invoices = localInvoices;
-            populateDistrictFilter();
-            populateInvoiceTypeFilter();
-            populateStateFilter();
-            populateSupplierFilter();
-            applySearch();
-
-            if (overlay) overlay.style.display = 'none';
+            });
         }
+    } catch (e) {
+        console.warn("Failed to fetch remote invoices, using local data.");
+    }
+
+    invoices = localInvoices;
+    // Save to both keys to maintain cross-page compatibility
+    localStorage.setItem("invoices", JSON.stringify(invoices));
+    localStorage.setItem("sales_records", JSON.stringify(invoices));
+
+    populateDistrictFilter();
+    populateInvoiceTypeFilter();
+    populateStateFilter();
+    populateSupplierFilter();
+    applySearch();
+}
 
         // --- render table ---
         function renderTable(data) {
@@ -2012,227 +2010,106 @@
 
         // --- attach events for rows (view/edit/delete/payment) ---
         function attachRowEvents() {
-            const tbody = document.querySelector("#reportTable tbody");
+    const tbody = document.querySelector("#reportTable tbody");
 
-            // preview PDF on invoice no click
-            tbody.querySelectorAll(".invoice-link").forEach(link => {
-                link.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation(); // Prevents the split-view row selection from triggering
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                    if (invoice) previewInvoicePDF(invoice).catch(err => console.error(err));
-                };
-            });
+    // Preview PDF on invoice number click
+    tbody.querySelectorAll(".invoice-link").forEach(link => {
+        link.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const tr = e.target.closest("tr");
+            const id = tr.dataset.invoiceId;
+            const invNo = tr.dataset.invoiceNo;
+            const invoice = invoices.find(x => 
+                String(x.id || '') === String(id) || 
+                String(x.invoice_no || x.invoiceNo || '') === String(invNo) ||
+                String(x.invoice_no || x.invoiceNo || '') === String(id)
+            );
+            if (invoice) {
+                previewInvoicePDF(invoice).catch(err => console.error(err));
+            } else {
+                showToast("Invoice details not found", "#c0392b");
+            }
+        };
+    });
 
-            // --- receipt buttons ---
-            const handleReceiptAction = async (tr, isPreview) => {
-                const id = tr.dataset.invoiceId;
-                const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                if (invoice) {
-                    const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid || 0);
-                    if (paid <= 0) return showToast("No payment received yet.", "#e67e22");
+    // Helper to find invoice for any action button
+    const getInvoiceFromElement = (el) => {
+        const tr = el.closest("tr");
+        const id = tr.dataset.invoiceId;
+        const invNo = tr.dataset.invoiceNo;
+        return invoices.find(x => 
+            String(x.id || '') === String(id) || 
+            String(x.invoice_no || x.invoiceNo || '') === String(invNo) ||
+            String(x.invoice_no || x.invoiceNo || '') === String(id)
+        );
+    };
 
-                    const customers = JSON.parse(localStorage.getItem('customers')) || [];
-                    const custName = invoice.customer_name || getCustomerNameFrom(invoice);
-                    const fullCust = customers.find(c => c.name === custName) || {};
+    // View button
+    tbody.querySelectorAll(".view-btn").forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            btn.closest('.action-dropdown')?.classList.remove('active');
+            const invoice = getInvoiceFromElement(btn);
+            if (!invoice) return showToast("Invoice not found", "#e67e22");
+            openViewModal(invoice);
+        };
+    });
 
-                    let address = invoice.address || getCustomerField(invoice, 'address') || fullCust.address || "";
-                    const dist = invoice.district || getCustomerField(invoice, 'district') || fullCust.district || "";
-                    const state = invoice.state || getCustomerField(invoice, 'state') || fullCust.state || "";
-                    const pin = invoice.pin || getCustomerField(invoice, 'pin') || fullCust.pin || "";
-                    const contact = invoice.contact || getCustomerField(invoice, 'contact') || fullCust.contact || "";
-                    const email = invoice.email || getCustomerField(invoice, 'email') || fullCust.email || "";
-                    const gst = invoice.gst_no || invoice.gst || getCustomerField(invoice, 'gst') || fullCust.gst || "";
+    // Edit button
+    tbody.querySelectorAll(".edit-btn").forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            btn.closest('.action-dropdown')?.classList.remove('active');
+            const invoice = getInvoiceFromElement(btn);
+            if (!invoice) return showToast("Invoice not found", "#e67e22");
+            pendingEditInvoice = invoice;
+            openEditInvoiceWarningModal();
+        };
+    });
 
-                    const loc = [dist, state, pin ? "PIN: " + pin : ""].filter(Boolean);
-                    if (loc.length > 0) address += "\n" + loc.join(", ");
-                    let extraInfo = [];
-                    if (contact) extraInfo.push("Ph: " + contact);
-                    if (email) extraInfo.push("Email: " + email);
-                    if (extraInfo.length > 0) address += "\n" + extraInfo.join(" | ");
-                    if (gst) address += "\nGSTIN: " + gst;
+    // Copy button
+    tbody.querySelectorAll(".copy-btn").forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            btn.closest('.action-dropdown')?.classList.remove('active');
+            const invoice = getInvoiceFromElement(btn);
+            if (invoice) duplicateInvoice(invoice);
+        };
+    });
 
-                    const defaultDesc = `Against Invoice: ${invoice.invoice_no || invoice.invoiceNo}`;
+    // Delete button
+    tbody.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            btn.closest('.action-dropdown')?.classList.remove('active');
+            const invoice = getInvoiceFromElement(btn);
+            if (!invoice) return showToast("Invoice not found", "#e67e22");
+            const key = getInvoiceKey(invoice);
+            openDeleteModal([key], `Are you sure you want to delete invoice ${invoice.invoice_no || invoice.invoiceNo || key}?`);
+        };
+    });
 
-                    openReceiptDescModal(defaultDesc, async (customDesc, isWhatsApp) => {
-                        if (!customDesc || customDesc.trim() === "") customDesc = defaultDesc;
-                        try {
-                            const paymentData = {
-                                customerName: custName, customerAddress: address,
-                                receiptNo: "REC-" + Date.now().toString().slice(-6),
-                                date: invoice.payment_date ? formatDate(invoice.payment_date) : new Date().toLocaleDateString('en-GB'),
-                                amount: paid, paymentMode: (parseFloat(invoice.paid_bank || 0) > 0 && parseFloat(invoice.paid_cash || 0) > 0) ? 'Mixed' : (parseFloat(invoice.paid_bank || 0) > 0 ? 'Bank' : 'Cash'),
-                                descriptions: [customDesc], previousBalance: parseFloat(invoice.invoice_total || invoice.total || 0), currentBalance: parseFloat(invoice.total_due || 0)
-                            };
+    // Print Smart format
+    tbody.querySelectorAll(".print-smart-btn").forEach(btn => {
+        btn.onclick = async (e) => {
+            e.stopPropagation();
+            btn.closest('.action-dropdown')?.classList.remove('active');
+            const invoice = getInvoiceFromElement(btn);
+            if (invoice) generateTallyInvoicePDF(invoice, false);
+        };
+    });
 
-                            if (isWhatsApp) {
-                                const cleanContact = contact.replace(/\D/g, '');
-                                if (!cleanContact) {
-                                    return showToast("No valid contact number found.", "#e74c3c");
-                                }
-
-                                const downloadPdf = confirm("Do you want to download the Receipt PDF before opening WhatsApp (so you can attach it)?");
-                                if (downloadPdf) {
-                                    await printPaymentReceipt(paymentData, false, false);
-                                } else if (window.electronAPI && window.electronAPI.savePaymentReceipt) {
-                                    window.electronAPI.savePaymentReceipt(paymentData).catch(console.error);
-                                }
-
-                                let companyName = document.querySelector('[data-brand="name"]')?.innerText || "Our Company";
-                                const message = `Dear ${custName},\n\nGreetings from ${companyName}!\n\nWe have successfully received your payment of Rs. ${paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })} via ${paymentData.paymentMode}.\n\nYour current outstanding balance is Rs. ${parseFloat(invoice.total_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}.\n\nThank you!`;
-                                const waUrl = `https://wa.me/91${cleanContact}?text=${encodeURIComponent(message)}`;
-                                window.open(waUrl, '_blank');
-                            } else {
-                                await printPaymentReceipt(paymentData, isPreview, false);
-                            }
-                        } catch (e) {
-                            console.error(e);
-                            showToast("Error generating receipt", "#e74c3c");
-                        }
-                    });
-                }
-            };
-
-            tbody.querySelectorAll(".preview-receipt-btn").forEach(btn => {
-                btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleReceiptAction(e.target.closest("tr"), true); };
-            });
-
-            tbody.querySelectorAll(".print-receipt-btn").forEach(btn => {
-                btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleReceiptAction(e.target.closest("tr"), false); };
-            });
-
-            // --- save payment button ---
-            tbody.querySelectorAll(".save-payment-btn").forEach(btn => {
-                btn.onclick = async (e) => {
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const paid = parseFloat(tr.querySelector(".paid-input").value) || 0;
-                    const paymentDate = tr.querySelector(".paydate-input").value || null;
-
-                    const invIdx = invoices.findIndex(x => String(x.id || x.invoice_no) === String(id));
-                    if (invIdx > -1) {
-                        invoices[invIdx].total_paid = paid;
-                        invoices[invIdx].payment_date = paymentDate;
-                        // Update due amount in object if needed, though usually calculated
-                        invoices[invIdx].total_due = (parseFloat(invoices[invIdx].invoice_total) || 0) - paid;
-
-                        localStorage.setItem("invoices", JSON.stringify(invoices));
-                        saveInvoiceToBackend(invoices[invIdx]).catch(error => {
-                            console.warn(error);
-                            showToast(`Backend save failed: ${error.message}`, "#c0392b");
-                        });
-                        showToast(`✅ Payment saved for ${invoices[invIdx].invoice_no}`, "#27ae60");
-
-                        // update row due
-                        const total = parseFloat(tr.querySelector(".row-invoice-total").textContent.replace(/,/g, '')) || 0;
-                        tr.querySelector(".due").textContent = (total - paid).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        renderFooter();
-                    } else {
-                        showToast("❌ Invoice not found", "#c0392b");
-                    }
-                };
-            });
-
-            // copy buttons
-            tbody.querySelectorAll(".copy-btn").forEach(btn => {
-                btn.onclick = (e) => {
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                    if (invoice) duplicateInvoice(invoice);
-                };
-            });
-
-
-
-
-            // view buttons
-            tbody.querySelectorAll(".view-btn").forEach(btn => {
-                btn.onclick = (e) => {
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                    if (!invoice) return showToast("Invoice not found", "#e67e22");
-                    openViewModal(invoice);
-                };
-            });
-
-            // edit buttons
-            tbody.querySelectorAll(".edit-btn").forEach(btn => {
-                btn.onclick = (e) => {
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                    if (!invoice) return showToast("Invoice not found", "#e67e22");
-
-                    pendingEditInvoice = invoice;
-                    openEditInvoiceWarningModal();
-                };
-            });
-
-            // delete buttons
-            tbody.querySelectorAll(".delete-btn").forEach(btn => {
-                btn.onclick = async (e) => {
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                    if (!invoice) return showToast("Invoice not found", "#e67e22");
-
-                    openDeleteModal([id], `Are you sure you want to delete invoice ${invoice.invoice_no || id}?`);
-                };
-            });
-
-            // print smart format
-            tbody.querySelectorAll(".print-smart-btn").forEach(btn => {
-                btn.onclick = async (e) => {
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                    if (invoice) {
-                        const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
-                        if (mergePdf) {
-                            try {
-                                await generateTallyInvoicePDF(invoice, false, null, null);
-                            } catch (err) { console.error(err); }
-                        } else {
-                            openPrintCopyModal(async (selectedCopies) => {
-                                try {
-                                    for (const copy of selectedCopies) {
-                                        await generateTallyInvoicePDF(invoice, false, copy.label, copy.suffix);
-                                    }
-                                } catch (err) { console.error(err); }
-                            });
-                        }
-                    }
-                };
-            });
-
-            // print std format
-            tbody.querySelectorAll(".print-std-btn").forEach(btn => {
-                btn.onclick = async (e) => {
-                    const tr = e.target.closest("tr");
-                    const id = tr.dataset.invoiceId;
-                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-                    if (invoice) {
-                        const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
-                        if (mergePdf) {
-                            try {
-                                await generateAndSavePDF(invoice, null, null, false, false);
-                            } catch (err) { console.error(err); }
-                        } else {
-                            openPrintCopyModal(async (selectedCopies) => {
-                                try {
-                                    for (const copy of selectedCopies) {
-                                        await generateAndSavePDF(invoice, copy.label, copy.suffix, false, false);
-                                    }
-                                } catch (err) { console.error(err); }
-                            });
-                        }
-                    }
-                };
-            });
+    // Print Standard format
+    tbody.querySelectorAll(".print-std-btn").forEach(btn => {
+        btn.onclick = async (e) => {
+            e.stopPropagation();
+            btn.closest('.action-dropdown')?.classList.remove('active');
+            const invoice = getInvoiceFromElement(btn);
+            if (invoice) generateAndSavePDF(invoice, null, null, false, false);
+        };
+    });
+}
 
             // edit paid buttons
             tbody.querySelectorAll(".edit-paid-btn").forEach(btn => {
@@ -2349,7 +2226,7 @@
                     }
                 };
             });
-        }
+        
 
         async function duplicateInvoice(originalInvoice) {
             const newInvoice = JSON.parse(JSON.stringify(originalInvoice)); // Deep copy
@@ -5941,37 +5818,38 @@
         });
 
         function toggleActionMenu(btn) {
-            // Close others
-            document.querySelectorAll('.action-dropdown.active').forEach(d => {
-                if (d !== btn.parentElement) d.classList.remove('active');
-            });
+    const currentDropdown = btn.closest('.action-dropdown');
+    
+    // Close all other dropdowns
+    document.querySelectorAll('.action-dropdown.active').forEach(d => {
+        if (d !== currentDropdown) d.classList.remove('active');
+    });
 
-            const dropdown = btn.parentElement;
-            dropdown.classList.toggle('active');
+    if (!currentDropdown) return;
+    currentDropdown.classList.toggle('active');
 
-            if (dropdown.classList.contains('active')) {
-                const content = dropdown.querySelector('.action-dropdown-content');
-                content.style.display = 'block'; // Temporarily show to calculate dimensions
-                const rect = btn.getBoundingClientRect();
+    if (currentDropdown.classList.contains('active')) {
+        const content = currentDropdown.querySelector('.action-dropdown-content');
+        if (!content) return;
+        
+        const rect = btn.getBoundingClientRect();
+        content.style.position = 'fixed';
+        content.style.top = (rect.bottom + 2) + 'px';
+        content.style.left = (rect.right - 140) + 'px';
+        content.style.display = 'block';
+    }
+}
 
-                let top = rect.bottom;
-                let left = rect.right - content.offsetWidth;
-
-                if (top + content.offsetHeight > window.innerHeight) {
-                    top = rect.top - content.offsetHeight;
-                }
-
-                content.style.top = top + 'px';
-                content.style.left = left + 'px';
-                content.style.display = ''; // Let CSS class handle visibility
-            }
-        }
-
-        document.addEventListener('click', function (e) {
-            if (!e.target.matches('.action-btn-main')) {
-                document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
-            }
+// Global click handler: close dropdowns only when clicking outside
+document.addEventListener('click', function (e) {
+    if (!e.target.closest('.action-dropdown')) {
+        document.querySelectorAll('.action-dropdown.active').forEach(d => {
+            d.classList.remove('active');
+            const content = d.querySelector('.action-dropdown-content');
+            if (content) content.style.display = 'none';
         });
+    }
+});
 
         // Close dropdowns on scroll to prevent detaching from row
         window.addEventListener('scroll', function () {
