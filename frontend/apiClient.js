@@ -275,7 +275,7 @@ const apiClient = {
     },
     _deleteCollection: async (collectionName, id) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/${collectionName}/${id}${apiClient._getAuthQuery()}`, {
+            const response = await fetch(`${API_BASE_URL}/${collectionName}/${encodeURIComponent(id)}${apiClient._getAuthQuery()}`, {
                 method: 'DELETE',
                 keepalive: true
             });

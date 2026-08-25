@@ -1853,7 +1853,7 @@
             }
 
             paginatedData.forEach((inv, i) => {
-                const id = inv.id || inv.invoice_no;
+                const id = getInvoiceKey(inv);
                 const invoiceNo = inv.invoice_no || inv.invoiceNo || "";
                 const invoiceType = inv.invoiceType || "TAX INVOICE";
                 const date = formatDate(inv.invoice_date || inv.date);
@@ -5022,8 +5022,12 @@
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
 
             const invoicesToDelete = pendingDeleteIds.map(id =>
-                invoices.find(invoice => getInvoiceKey(invoice) === String(id))
+                invoices.find(invoice => getInvoiceKey(invoice) === String(id) || String(invoice.id || invoice._id || '') === String(id))
             ).filter(Boolean);
+            if (invoicesToDelete.length !== pendingDeleteIds.length) {
+                showToast("Invoice could not be identified for deletion.", "#c0392b");
+                return;
+            }
             for (const invoice of invoicesToDelete) {
                 try {
                     await deleteInvoiceFromBackend(invoice);

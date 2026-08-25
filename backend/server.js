@@ -296,8 +296,18 @@ app.post('/api/invoices', async (req, res) => {
 
 app.delete('/api/invoices/:id', async (req, res) => {
     try {
-        await Invoice.findOneAndDelete({ $or: [{ id: req.params.id }, { invoiceNo: req.params.id }, { invoice_no: req.params.id }] });
-        res.json({ success: true });
+        const invoiceId = decodeURIComponent(req.params.id);
+        const deleted = await Invoice.findOneAndDelete({
+            $or: [
+                { id: invoiceId },
+                { invoiceNo: invoiceId },
+                { invoice_no: invoiceId }
+            ]
+        });
+        if (!deleted) {
+            return res.status(404).json({ success: false, message: 'Invoice not found.' });
+        }
+        res.json({ success: true, data: deleted });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
