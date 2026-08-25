@@ -1526,44 +1526,6 @@
             return (inv.customer && inv.customer[field]) || inv[`customer${field.charAt(0).toUpperCase() + field.slice(1)}`] || inv[`customer_${field}`] || "";
         }
 
-        function getInvoiceKey(invoice) {
-            return String(invoice?.invoice_no || invoice?.invoiceNo || invoice?.id || invoice?._id || '');
-        }
-
-        async function saveInvoiceToBackend(invoice) {
-            if (typeof apiClient === 'undefined' || !apiClient.saveInvoice) return;
-
-            const invoiceNo = invoice.invoice_no || invoice.invoiceNo || '';
-            const invoiceDate = invoice.invoice_date || invoice.invoiceDate || invoice.date || '';
-            const total = parseFloat(invoice.invoice_total ?? invoice.invoiceTotal ?? invoice.total ?? 0) || 0;
-            const payload = {
-                ...invoice,
-                id: invoice.id || invoice._id || invoiceNo,
-                invoiceNo,
-                invoice_no: invoiceNo,
-                invoice_date: invoiceDate,
-                date: invoiceDate,
-                invoice_total: total,
-                invoiceTotal: total
-            };
-            const result = await apiClient.saveInvoice(payload);
-            if (!result || result.success === false) {
-                throw new Error(result?.message || 'Backend invoice save failed.');
-            }
-            return result;
-        }
-
-        async function deleteInvoiceFromBackend(invoice) {
-            if (typeof apiClient === 'undefined' || !apiClient.deleteInvoice) return;
-            const key = getInvoiceKey(invoice);
-            if (!key) throw new Error('Invoice identifier is missing.');
-            const result = await apiClient.deleteInvoice(key);
-            if (!result || result.success === false) {
-                throw new Error(result?.message || 'Backend invoice delete failed.');
-            }
-            return result;
-        }
-
         function filterByCustomer(customerName) {
             const filterInput = document.getElementById("search_custName");
             if (filterInput) {
@@ -1705,48 +1667,49 @@
         }
 
         // --- load invoices ---
-async function loadInvoices() {
-    let localInvoices = JSON.parse(localStorage.getItem("invoices")) || JSON.parse(localStorage.getItem("sales_records")) || [];
-    if (!Array.isArray(localInvoices)) localInvoices = [];
+        async function loadInvoices() {
+            let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            if (!Array.isArray(localInvoices)) localInvoices = [];
 
-    const tbody = document.querySelector("#reportTable tbody");
-    if (tbody && localInvoices.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="33" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
-    }
+            const tbody = document.querySelector("#reportTable tbody");
+            if (tbody && localInvoices.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="33" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
+            }
 
-    try {
-        const remoteData = await apiClient.getInvoices();
-        if (remoteData && remoteData.length > 0) {
-            const localInvoiceMap = new Map();
-            localInvoices.forEach((inv, index) => {
-                localInvoiceMap.set(getInvoiceKey(inv), index);
-            });
-            remoteData.forEach(remoteInv => {
-                const remoteKey = getInvoiceKey(remoteInv);
-                if (localInvoiceMap.has(remoteKey)) {
-                    const localIdx = localInvoiceMap.get(remoteKey);
-                    localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
-                } else {
-                    localInvoices.push(remoteInv);
-                    localInvoiceMap.set(remoteKey, localInvoices.length - 1);
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay && localInvoices.length === 0) {
+                overlay.style.display = 'flex';
+                await new Promise(resolve => setTimeout(resolve, 15));
+            }
+            try {
+                const remoteData = await apiClient.getInvoices();
+                if (remoteData && remoteData.length > 0) {
+                    const localInvoiceMap = new Map();
+                    localInvoices.forEach((inv, index) => {
+                        localInvoiceMap.set(inv.invoice_no, index);
+                    });
+                    remoteData.forEach(remoteInv => {
+                        if (localInvoiceMap.has(remoteInv.invoice_no)) {
+                            const localIdx = localInvoiceMap.get(remoteInv.invoice_no);
+                            localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
+                        } else {
+                            localInvoices.push(remoteInv);
+                            localInvoiceMap.set(remoteInv.invoice_no, localInvoices.length - 1);
+                        }
+                    });
+                    localStorage.setItem("invoices", JSON.stringify(localInvoices));
                 }
-            });
+            } catch (e) { console.warn("Failed to fetch remote invoices, using local data."); }
+
+            invoices = localInvoices;
+            populateDistrictFilter();
+            populateInvoiceTypeFilter();
+            populateStateFilter();
+            populateSupplierFilter();
+            applySearch();
+
+            if (overlay) overlay.style.display = 'none';
         }
-    } catch (e) {
-        console.warn("Failed to fetch remote invoices, using local data.");
-    }
-
-    invoices = localInvoices;
-    // Save to both keys to maintain cross-page compatibility
-    localStorage.setItem("invoices", JSON.stringify(invoices));
-    localStorage.setItem("sales_records", JSON.stringify(invoices));
-
-    populateDistrictFilter();
-    populateInvoiceTypeFilter();
-    populateStateFilter();
-    populateSupplierFilter();
-    applySearch();
-}
 
         // --- render table ---
         function renderTable(data) {
@@ -1851,7 +1814,7 @@ async function loadInvoices() {
             }
 
             paginatedData.forEach((inv, i) => {
-                const id = getInvoiceKey(inv);
+                const id = inv.id || inv.invoice_no;
                 const invoiceNo = inv.invoice_no || inv.invoiceNo || "";
                 const invoiceType = inv.invoiceType || "TAX INVOICE";
                 const date = formatDate(inv.invoice_date || inv.date);
@@ -2010,106 +1973,224 @@ async function loadInvoices() {
 
         // --- attach events for rows (view/edit/delete/payment) ---
         function attachRowEvents() {
-    const tbody = document.querySelector("#reportTable tbody");
+            const tbody = document.querySelector("#reportTable tbody");
 
-    // Preview PDF on invoice number click
-    tbody.querySelectorAll(".invoice-link").forEach(link => {
-        link.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const tr = e.target.closest("tr");
-            const id = tr.dataset.invoiceId;
-            const invNo = tr.dataset.invoiceNo;
-            const invoice = invoices.find(x => 
-                String(x.id || '') === String(id) || 
-                String(x.invoice_no || x.invoiceNo || '') === String(invNo) ||
-                String(x.invoice_no || x.invoiceNo || '') === String(id)
-            );
-            if (invoice) {
-                previewInvoicePDF(invoice).catch(err => console.error(err));
-            } else {
-                showToast("Invoice details not found", "#c0392b");
-            }
-        };
-    });
+            // preview PDF on invoice no click
+            tbody.querySelectorAll(".invoice-link").forEach(link => {
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation(); // Prevents the split-view row selection from triggering
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                    if (invoice) previewInvoicePDF(invoice).catch(err => console.error(err));
+                };
+            });
 
-    // Helper to find invoice for any action button
-    const getInvoiceFromElement = (el) => {
-        const tr = el.closest("tr");
-        const id = tr.dataset.invoiceId;
-        const invNo = tr.dataset.invoiceNo;
-        return invoices.find(x => 
-            String(x.id || '') === String(id) || 
-            String(x.invoice_no || x.invoiceNo || '') === String(invNo) ||
-            String(x.invoice_no || x.invoiceNo || '') === String(id)
-        );
-    };
+            // --- receipt buttons ---
+            const handleReceiptAction = async (tr, isPreview) => {
+                const id = tr.dataset.invoiceId;
+                const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                if (invoice) {
+                    const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid || 0);
+                    if (paid <= 0) return showToast("No payment received yet.", "#e67e22");
 
-    // View button
-    tbody.querySelectorAll(".view-btn").forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            btn.closest('.action-dropdown')?.classList.remove('active');
-            const invoice = getInvoiceFromElement(btn);
-            if (!invoice) return showToast("Invoice not found", "#e67e22");
-            openViewModal(invoice);
-        };
-    });
+                    const customers = JSON.parse(localStorage.getItem('customers')) || [];
+                    const custName = invoice.customer_name || getCustomerNameFrom(invoice);
+                    const fullCust = customers.find(c => c.name === custName) || {};
 
-    // Edit button
-    tbody.querySelectorAll(".edit-btn").forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            btn.closest('.action-dropdown')?.classList.remove('active');
-            const invoice = getInvoiceFromElement(btn);
-            if (!invoice) return showToast("Invoice not found", "#e67e22");
-            pendingEditInvoice = invoice;
-            openEditInvoiceWarningModal();
-        };
-    });
+                    let address = invoice.address || getCustomerField(invoice, 'address') || fullCust.address || "";
+                    const dist = invoice.district || getCustomerField(invoice, 'district') || fullCust.district || "";
+                    const state = invoice.state || getCustomerField(invoice, 'state') || fullCust.state || "";
+                    const pin = invoice.pin || getCustomerField(invoice, 'pin') || fullCust.pin || "";
+                    const contact = invoice.contact || getCustomerField(invoice, 'contact') || fullCust.contact || "";
+                    const email = invoice.email || getCustomerField(invoice, 'email') || fullCust.email || "";
+                    const gst = invoice.gst_no || invoice.gst || getCustomerField(invoice, 'gst') || fullCust.gst || "";
 
-    // Copy button
-    tbody.querySelectorAll(".copy-btn").forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            btn.closest('.action-dropdown')?.classList.remove('active');
-            const invoice = getInvoiceFromElement(btn);
-            if (invoice) duplicateInvoice(invoice);
-        };
-    });
+                    const loc = [dist, state, pin ? "PIN: " + pin : ""].filter(Boolean);
+                    if (loc.length > 0) address += "\n" + loc.join(", ");
+                    let extraInfo = [];
+                    if (contact) extraInfo.push("Ph: " + contact);
+                    if (email) extraInfo.push("Email: " + email);
+                    if (extraInfo.length > 0) address += "\n" + extraInfo.join(" | ");
+                    if (gst) address += "\nGSTIN: " + gst;
 
-    // Delete button
-    tbody.querySelectorAll(".delete-btn").forEach(btn => {
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            btn.closest('.action-dropdown')?.classList.remove('active');
-            const invoice = getInvoiceFromElement(btn);
-            if (!invoice) return showToast("Invoice not found", "#e67e22");
-            const key = getInvoiceKey(invoice);
-            openDeleteModal([key], `Are you sure you want to delete invoice ${invoice.invoice_no || invoice.invoiceNo || key}?`);
-        };
-    });
+                    const defaultDesc = `Against Invoice: ${invoice.invoice_no || invoice.invoiceNo}`;
 
-    // Print Smart format
-    tbody.querySelectorAll(".print-smart-btn").forEach(btn => {
-        btn.onclick = async (e) => {
-            e.stopPropagation();
-            btn.closest('.action-dropdown')?.classList.remove('active');
-            const invoice = getInvoiceFromElement(btn);
-            if (invoice) generateTallyInvoicePDF(invoice, false);
-        };
-    });
+                    openReceiptDescModal(defaultDesc, async (customDesc, isWhatsApp) => {
+                        if (!customDesc || customDesc.trim() === "") customDesc = defaultDesc;
+                        try {
+                            const paymentData = {
+                                customerName: custName, customerAddress: address,
+                                receiptNo: "REC-" + Date.now().toString().slice(-6),
+                                date: invoice.payment_date ? formatDate(invoice.payment_date) : new Date().toLocaleDateString('en-GB'),
+                                amount: paid, paymentMode: (parseFloat(invoice.paid_bank || 0) > 0 && parseFloat(invoice.paid_cash || 0) > 0) ? 'Mixed' : (parseFloat(invoice.paid_bank || 0) > 0 ? 'Bank' : 'Cash'),
+                                descriptions: [customDesc], previousBalance: parseFloat(invoice.invoice_total || invoice.total || 0), currentBalance: parseFloat(invoice.total_due || 0)
+                            };
 
-    // Print Standard format
-    tbody.querySelectorAll(".print-std-btn").forEach(btn => {
-        btn.onclick = async (e) => {
-            e.stopPropagation();
-            btn.closest('.action-dropdown')?.classList.remove('active');
-            const invoice = getInvoiceFromElement(btn);
-            if (invoice) generateAndSavePDF(invoice, null, null, false, false);
-        };
-    });
-}
+                            if (isWhatsApp) {
+                                const cleanContact = contact.replace(/\D/g, '');
+                                if (!cleanContact) {
+                                    return showToast("No valid contact number found.", "#e74c3c");
+                                }
+
+                                const downloadPdf = confirm("Do you want to download the Receipt PDF before opening WhatsApp (so you can attach it)?");
+                                if (downloadPdf) {
+                                    await printPaymentReceipt(paymentData, false, false);
+                                } else if (window.electronAPI && window.electronAPI.savePaymentReceipt) {
+                                    window.electronAPI.savePaymentReceipt(paymentData).catch(console.error);
+                                }
+
+                                let companyName = document.querySelector('[data-brand="name"]')?.innerText || "Our Company";
+                                const message = `Dear ${custName},\n\nGreetings from ${companyName}!\n\nWe have successfully received your payment of Rs. ${paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })} via ${paymentData.paymentMode}.\n\nYour current outstanding balance is Rs. ${parseFloat(invoice.total_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}.\n\nThank you!`;
+                                const waUrl = `https://wa.me/91${cleanContact}?text=${encodeURIComponent(message)}`;
+                                window.open(waUrl, '_blank');
+                            } else {
+                                await printPaymentReceipt(paymentData, isPreview, false);
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            showToast("Error generating receipt", "#e74c3c");
+                        }
+                    });
+                }
+            };
+
+            tbody.querySelectorAll(".preview-receipt-btn").forEach(btn => {
+                btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleReceiptAction(e.target.closest("tr"), true); };
+            });
+
+            tbody.querySelectorAll(".print-receipt-btn").forEach(btn => {
+                btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); handleReceiptAction(e.target.closest("tr"), false); };
+            });
+
+            // --- save payment button ---
+            tbody.querySelectorAll(".save-payment-btn").forEach(btn => {
+                btn.onclick = async (e) => {
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const paid = parseFloat(tr.querySelector(".paid-input").value) || 0;
+                    const paymentDate = tr.querySelector(".paydate-input").value || null;
+
+                    const invIdx = invoices.findIndex(x => String(x.id || x.invoice_no) === String(id));
+                    if (invIdx > -1) {
+                        invoices[invIdx].total_paid = paid;
+                        invoices[invIdx].payment_date = paymentDate;
+                        // Update due amount in object if needed, though usually calculated
+                        invoices[invIdx].total_due = (parseFloat(invoices[invIdx].invoice_total) || 0) - paid;
+
+                        localStorage.setItem("invoices", JSON.stringify(invoices));
+                        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
+                        showToast(`✅ Payment saved for ${invoices[invIdx].invoice_no}`, "#27ae60");
+
+                        // update row due
+                        const total = parseFloat(tr.querySelector(".row-invoice-total").textContent.replace(/,/g, '')) || 0;
+                        tr.querySelector(".due").textContent = (total - paid).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        renderFooter();
+                    } else {
+                        showToast("❌ Invoice not found", "#c0392b");
+                    }
+                };
+            });
+
+            // copy buttons
+            tbody.querySelectorAll(".copy-btn").forEach(btn => {
+                btn.onclick = (e) => {
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                    if (invoice) duplicateInvoice(invoice);
+                };
+            });
+
+
+
+
+            // view buttons
+            tbody.querySelectorAll(".view-btn").forEach(btn => {
+                btn.onclick = (e) => {
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                    if (!invoice) return showToast("Invoice not found", "#e67e22");
+                    openViewModal(invoice);
+                };
+            });
+
+            // edit buttons
+            tbody.querySelectorAll(".edit-btn").forEach(btn => {
+                btn.onclick = (e) => {
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                    if (!invoice) return showToast("Invoice not found", "#e67e22");
+
+                    pendingEditInvoice = invoice;
+                    openEditInvoiceWarningModal();
+                };
+            });
+
+            // delete buttons
+            tbody.querySelectorAll(".delete-btn").forEach(btn => {
+                btn.onclick = async (e) => {
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                    if (!invoice) return showToast("Invoice not found", "#e67e22");
+
+                    openDeleteModal([id], `Are you sure you want to delete invoice ${invoice.invoice_no || id}?`);
+                };
+            });
+
+            // print smart format
+            tbody.querySelectorAll(".print-smart-btn").forEach(btn => {
+                btn.onclick = async (e) => {
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                    if (invoice) {
+                        const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+                        if (mergePdf) {
+                            try {
+                                await generateTallyInvoicePDF(invoice, false, null, null);
+                            } catch (err) { console.error(err); }
+                        } else {
+                            openPrintCopyModal(async (selectedCopies) => {
+                                try {
+                                    for (const copy of selectedCopies) {
+                                        await generateTallyInvoicePDF(invoice, false, copy.label, copy.suffix);
+                                    }
+                                } catch (err) { console.error(err); }
+                            });
+                        }
+                    }
+                };
+            });
+
+            // print std format
+            tbody.querySelectorAll(".print-std-btn").forEach(btn => {
+                btn.onclick = async (e) => {
+                    const tr = e.target.closest("tr");
+                    const id = tr.dataset.invoiceId;
+                    const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
+                    if (invoice) {
+                        const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
+                        if (mergePdf) {
+                            try {
+                                await generateAndSavePDF(invoice, null, null, false, false);
+                            } catch (err) { console.error(err); }
+                        } else {
+                            openPrintCopyModal(async (selectedCopies) => {
+                                try {
+                                    for (const copy of selectedCopies) {
+                                        await generateAndSavePDF(invoice, copy.label, copy.suffix, false, false);
+                                    }
+                                } catch (err) { console.error(err); }
+                            });
+                        }
+                    }
+                };
+            });
 
             // edit paid buttons
             tbody.querySelectorAll(".edit-paid-btn").forEach(btn => {
@@ -2139,10 +2220,7 @@ async function loadInvoices() {
                         invoices[invIdx].total_due = (parseFloat(invoices[invIdx].invoice_total) || 0) - paid;
                         // keep existing payment date if not changed here
                         localStorage.setItem("invoices", JSON.stringify(invoices));
-                        saveInvoiceToBackend(invoices[invIdx]).catch(error => {
-                            console.warn(error);
-                            showToast(`Backend save failed: ${error.message}`, "#c0392b");
-                        });
+                        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
 
                         // Lock input and show success modal
                         inp.setAttribute("readonly", true);
@@ -2163,10 +2241,7 @@ async function loadInvoices() {
                     if (invIdx > -1) {
                         invoices[invIdx].payment_date = paymentDate;
                         localStorage.setItem("invoices", JSON.stringify(invoices));
-                        saveInvoiceToBackend(invoices[invIdx]).catch(error => {
-                            console.warn(error);
-                            showToast(`Backend save failed: ${error.message}`, "#c0392b");
-                        });
+                        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
                         showToast(`✅ Payment date saved`, "#27ae60");
                     }
                 };
@@ -2174,7 +2249,7 @@ async function loadInvoices() {
 
             // remarks toggle logic (Edit/Lock)
             tbody.querySelectorAll(".toggle-remarks-btn").forEach(btn => {
-                btn.onclick = async (e) => {
+                btn.onclick = (e) => {
                     const container = e.target.closest("div");
                     const input = container.querySelector(".remarks-input");
                     const isLocked = input.hasAttribute("readonly");
@@ -2198,13 +2273,8 @@ async function loadInvoices() {
                         if (invIdx > -1) {
                             invoices[invIdx].remarks = newVal;
                             localStorage.setItem("invoices", JSON.stringify(invoices));
-                            try {
-                                await saveInvoiceToBackend(invoices[invIdx]);
-                                showToast("✅ Remarks updated", "#27ae60");
-                            } catch (error) {
-                                console.warn(error);
-                                showToast(`Backend save failed: ${error.message}`, "#c0392b");
-                            }
+                            if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
+                            showToast("✅ Remarks updated", "#27ae60");
                         }
 
                         input.setAttribute("readonly", "true");
@@ -2226,9 +2296,9 @@ async function loadInvoices() {
                     }
                 };
             });
-        
+        }
 
-        async function duplicateInvoice(originalInvoice) {
+        function duplicateInvoice(originalInvoice) {
             const newInvoice = JSON.parse(JSON.stringify(originalInvoice)); // Deep copy
 
             // Generate new ID
@@ -2257,14 +2327,6 @@ async function loadInvoices() {
 
             invoices.unshift(newInvoice);
             localStorage.setItem("invoices", JSON.stringify(invoices));
-            try {
-                await saveInvoiceToBackend(newInvoice);
-            } catch (error) {
-                invoices.shift();
-                localStorage.setItem("invoices", JSON.stringify(invoices));
-                showToast(`Backend save failed: ${error.message}`, "#c0392b");
-                return;
-            }
             showToast(`✅ Invoice duplicated: ${newInvoice.invoice_no}`, "#6f42c1");
             applySearch();
         }
@@ -4757,7 +4819,7 @@ async function loadInvoices() {
             currentPaymentInvoiceId = null;
         }
 
-        async function savePaymentSplit() {
+        function savePaymentSplit() {
             const cash = parseFloat(document.getElementById('payCash').value) || 0;
             const bank = parseFloat(document.getElementById('payBank').value) || 0;
             const cashDate = document.getElementById('payCashDate').value;
@@ -4811,13 +4873,7 @@ async function loadInvoices() {
                 invoices[idx].total_due = (parseFloat(invoices[idx].invoice_total) || 0) - (cash + bank);
 
                 localStorage.setItem("invoices", JSON.stringify(invoices));
-                try {
-                    await saveInvoiceToBackend(invoices[idx]);
-                } catch (error) {
-                    console.warn(error);
-                    showToast(`Backend save failed: ${error.message}`, "#c0392b");
-                    return;
-                }
+                if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[idx]).catch(console.warn);
                 renderTable(currentFilteredData); // Refresh table
                 closePaymentSplitModal();
                 showToast("Payment updated successfully", "#27ae60");
@@ -4897,26 +4953,15 @@ async function loadInvoices() {
         document.getElementById("btnCancelDelete").addEventListener("click", closeDeleteModal);
         document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
+            const idsToDelete = new Set(pendingDeleteIds);
 
-            const invoicesToDelete = pendingDeleteIds.map(id =>
-                invoices.find(invoice => getInvoiceKey(invoice) === String(id) || String(invoice.id || invoice._id || '') === String(id))
-            ).filter(Boolean);
-            if (invoicesToDelete.length !== pendingDeleteIds.length) {
-                showToast("Invoice could not be identified for deletion.", "#c0392b");
-                return;
-            }
-            for (const invoice of invoicesToDelete) {
-                try {
-                    await deleteInvoiceFromBackend(invoice);
-                } catch (error) {
-                    console.warn(error);
-                    showToast(`Backend delete failed: ${error.message}`, "#c0392b");
-                    return;
+            for (let id of pendingDeleteIds) {
+                if (typeof apiClient !== 'undefined' && apiClient.deleteInvoice) {
+                    await apiClient.deleteInvoice(id).catch(console.warn);
                 }
             }
 
-            const idsToDelete = new Set(invoicesToDelete.map(getInvoiceKey));
-            invoices = invoices.filter(invoice => !idsToDelete.has(getInvoiceKey(invoice)));
+            invoices = invoices.filter(x => !idsToDelete.has(String(x.id || x.invoice_no)));
             localStorage.setItem("invoices", JSON.stringify(invoices));
             showToast(`✅ Deleted ${pendingDeleteIds.length} invoice(s).`, "#27ae60");
             renderTable(invoices);
@@ -5818,38 +5863,37 @@ async function loadInvoices() {
         });
 
         function toggleActionMenu(btn) {
-    const currentDropdown = btn.closest('.action-dropdown');
-    
-    // Close all other dropdowns
-    document.querySelectorAll('.action-dropdown.active').forEach(d => {
-        if (d !== currentDropdown) d.classList.remove('active');
-    });
+            // Close others
+            document.querySelectorAll('.action-dropdown.active').forEach(d => {
+                if (d !== btn.parentElement) d.classList.remove('active');
+            });
 
-    if (!currentDropdown) return;
-    currentDropdown.classList.toggle('active');
+            const dropdown = btn.parentElement;
+            dropdown.classList.toggle('active');
 
-    if (currentDropdown.classList.contains('active')) {
-        const content = currentDropdown.querySelector('.action-dropdown-content');
-        if (!content) return;
-        
-        const rect = btn.getBoundingClientRect();
-        content.style.position = 'fixed';
-        content.style.top = (rect.bottom + 2) + 'px';
-        content.style.left = (rect.right - 140) + 'px';
-        content.style.display = 'block';
-    }
-}
+            if (dropdown.classList.contains('active')) {
+                const content = dropdown.querySelector('.action-dropdown-content');
+                content.style.display = 'block'; // Temporarily show to calculate dimensions
+                const rect = btn.getBoundingClientRect();
 
-// Global click handler: close dropdowns only when clicking outside
-document.addEventListener('click', function (e) {
-    if (!e.target.closest('.action-dropdown')) {
-        document.querySelectorAll('.action-dropdown.active').forEach(d => {
-            d.classList.remove('active');
-            const content = d.querySelector('.action-dropdown-content');
-            if (content) content.style.display = 'none';
+                let top = rect.bottom;
+                let left = rect.right - content.offsetWidth;
+
+                if (top + content.offsetHeight > window.innerHeight) {
+                    top = rect.top - content.offsetHeight;
+                }
+
+                content.style.top = top + 'px';
+                content.style.left = left + 'px';
+                content.style.display = ''; // Let CSS class handle visibility
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.matches('.action-btn-main')) {
+                document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
+            }
         });
-    }
-});
 
         // Close dropdowns on scroll to prevent detaching from row
         window.addEventListener('scroll', function () {
