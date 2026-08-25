@@ -68,7 +68,13 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
                         <label class="form-label fw-semibold">Invoice No</label>
-                        <input type="text" id="invoiceNo" class="form-control form-control-sm bg-light" readonly>
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="invoiceNo" class="form-control bg-light" readonly>
+                            <button type="button" id="editInvoiceNoButton" class="btn btn-outline-secondary"
+                                onclick="toggleInvoiceNoEditing()" title="Edit invoice number">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label fw-semibold">Invoice Date</label>
@@ -224,6 +230,7 @@
         let customers = [];
         let items = [];
         let isRoundOffEnabled = localStorage.getItem('directSaleRoundOff') === 'true';
+        let isInvoiceNoEditing = false;
 
         async function loadSalesList() {
             try {
@@ -320,6 +327,28 @@
             const sales = JSON.parse(localStorage.getItem('sales_records') || '[]');
             const nextSeq = sales.length + 1;
             document.getElementById('invoiceNo').value = `INV-${new Date().getFullYear()}-${String(nextSeq).padStart(4, '0')}`;
+            setInvoiceNoEditing(false);
+        }
+
+        function toggleInvoiceNoEditing() {
+            setInvoiceNoEditing(!isInvoiceNoEditing);
+        }
+
+        function setInvoiceNoEditing(enabled) {
+            isInvoiceNoEditing = enabled;
+            const invoiceInput = document.getElementById('invoiceNo');
+            const editButton = document.getElementById('editInvoiceNoButton');
+            if (!invoiceInput || !editButton) return;
+
+            invoiceInput.readOnly = !enabled;
+            invoiceInput.classList.toggle('bg-light', !enabled);
+            editButton.innerHTML = enabled ? '<i class="bi bi-check-lg"></i>' : '<i class="bi bi-pencil"></i>';
+            editButton.title = enabled ? 'Use this invoice number' : 'Edit invoice number';
+
+            if (enabled) {
+                invoiceInput.focus();
+                invoiceInput.select();
+            }
         }
 
         function populateCustomerDropdown() {
