@@ -82,7 +82,7 @@ const invoiceSchema = new mongoose.Schema({
     invoiceNo: { type: String },
     date: { type: Date },
     customerName: String,
-    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+    customerId: { type: String },
     items: [],
     taxType: String, // e.g. IGST or Intra-State
     subTotal: { type: Number, default: 0 },

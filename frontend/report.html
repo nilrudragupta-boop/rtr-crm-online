@@ -1526,6 +1526,44 @@
             return (inv.customer && inv.customer[field]) || inv[`customer${field.charAt(0).toUpperCase() + field.slice(1)}`] || inv[`customer_${field}`] || "";
         }
 
+        function getInvoiceKey(invoice) {
+            return String(invoice?.invoice_no || invoice?.invoiceNo || invoice?.id || invoice?._id || '');
+        }
+
+        async function saveInvoiceToBackend(invoice) {
+            if (typeof apiClient === 'undefined' || !apiClient.saveInvoice) return;
+
+            const invoiceNo = invoice.invoice_no || invoice.invoiceNo || '';
+            const invoiceDate = invoice.invoice_date || invoice.invoiceDate || invoice.date || '';
+            const total = parseFloat(invoice.invoice_total ?? invoice.invoiceTotal ?? invoice.total ?? 0) || 0;
+            const payload = {
+                ...invoice,
+                id: invoice.id || invoice._id || invoiceNo,
+                invoiceNo,
+                invoice_no: invoiceNo,
+                invoice_date: invoiceDate,
+                date: invoiceDate,
+                invoice_total: total,
+                invoiceTotal: total
+            };
+            const result = await apiClient.saveInvoice(payload);
+            if (!result || result.success === false) {
+                throw new Error(result?.message || 'Backend invoice save failed.');
+            }
+            return result;
+        }
+
+        async function deleteInvoiceFromBackend(invoice) {
+            if (typeof apiClient === 'undefined' || !apiClient.deleteInvoice) return;
+            const key = getInvoiceKey(invoice);
+            if (!key) throw new Error('Invoice identifier is missing.');
+            const result = await apiClient.deleteInvoice(key);
+            if (!result || result.success === false) {
+                throw new Error(result?.message || 'Backend invoice delete failed.');
+            }
+            return result;
+        }
+
         function filterByCustomer(customerName) {
             const filterInput = document.getElementById("search_custName");
             if (filterInput) {
@@ -1686,15 +1724,16 @@
                 if (remoteData && remoteData.length > 0) {
                     const localInvoiceMap = new Map();
                     localInvoices.forEach((inv, index) => {
-                        localInvoiceMap.set(inv.invoice_no, index);
+                        localInvoiceMap.set(getInvoiceKey(inv), index);
                     });
                     remoteData.forEach(remoteInv => {
-                        if (localInvoiceMap.has(remoteInv.invoice_no)) {
-                            const localIdx = localInvoiceMap.get(remoteInv.invoice_no);
+                        const remoteKey = getInvoiceKey(remoteInv);
+                        if (localInvoiceMap.has(remoteKey)) {
+                            const localIdx = localInvoiceMap.get(remoteKey);
                             localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
                         } else {
                             localInvoices.push(remoteInv);
-                            localInvoiceMap.set(remoteInv.invoice_no, localInvoices.length - 1);
+                            localInvoiceMap.set(remoteKey, localInvoices.length - 1);
                         }
                     });
                     localStorage.setItem("invoices", JSON.stringify(localInvoices));
@@ -2080,7 +2119,10 @@
                         invoices[invIdx].total_due = (parseFloat(invoices[invIdx].invoice_total) || 0) - paid;
 
                         localStorage.setItem("invoices", JSON.stringify(invoices));
-                        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
+                        saveInvoiceToBackend(invoices[invIdx]).catch(error => {
+                            console.warn(error);
+                            showToast(`Backend save failed: ${error.message}`, "#c0392b");
+                        });
                         showToast(`✅ Payment saved for ${invoices[invIdx].invoice_no}`, "#27ae60");
 
                         // update row due
@@ -2220,7 +2262,10 @@
                         invoices[invIdx].total_due = (parseFloat(invoices[invIdx].invoice_total) || 0) - paid;
                         // keep existing payment date if not changed here
                         localStorage.setItem("invoices", JSON.stringify(invoices));
-                        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
+                        saveInvoiceToBackend(invoices[invIdx]).catch(error => {
+                            console.warn(error);
+                            showToast(`Backend save failed: ${error.message}`, "#c0392b");
+                        });
 
                         // Lock input and show success modal
                         inp.setAttribute("readonly", true);
@@ -2241,7 +2286,10 @@
                     if (invIdx > -1) {
                         invoices[invIdx].payment_date = paymentDate;
                         localStorage.setItem("invoices", JSON.stringify(invoices));
-                        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
+                        saveInvoiceToBackend(invoices[invIdx]).catch(error => {
+                            console.warn(error);
+                            showToast(`Backend save failed: ${error.message}`, "#c0392b");
+                        });
                         showToast(`✅ Payment date saved`, "#27ae60");
                     }
                 };
@@ -2249,7 +2297,7 @@
 
             // remarks toggle logic (Edit/Lock)
             tbody.querySelectorAll(".toggle-remarks-btn").forEach(btn => {
-                btn.onclick = (e) => {
+                btn.onclick = async (e) => {
                     const container = e.target.closest("div");
                     const input = container.querySelector(".remarks-input");
                     const isLocked = input.hasAttribute("readonly");
@@ -2273,8 +2321,13 @@
                         if (invIdx > -1) {
                             invoices[invIdx].remarks = newVal;
                             localStorage.setItem("invoices", JSON.stringify(invoices));
-                            if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
-                            showToast("✅ Remarks updated", "#27ae60");
+                            try {
+                                await saveInvoiceToBackend(invoices[invIdx]);
+                                showToast("✅ Remarks updated", "#27ae60");
+                            } catch (error) {
+                                console.warn(error);
+                                showToast(`Backend save failed: ${error.message}`, "#c0392b");
+                            }
                         }
 
                         input.setAttribute("readonly", "true");
@@ -2298,7 +2351,7 @@
             });
         }
 
-        function duplicateInvoice(originalInvoice) {
+        async function duplicateInvoice(originalInvoice) {
             const newInvoice = JSON.parse(JSON.stringify(originalInvoice)); // Deep copy
 
             // Generate new ID
@@ -2327,6 +2380,14 @@
 
             invoices.unshift(newInvoice);
             localStorage.setItem("invoices", JSON.stringify(invoices));
+            try {
+                await saveInvoiceToBackend(newInvoice);
+            } catch (error) {
+                invoices.shift();
+                localStorage.setItem("invoices", JSON.stringify(invoices));
+                showToast(`Backend save failed: ${error.message}`, "#c0392b");
+                return;
+            }
             showToast(`✅ Invoice duplicated: ${newInvoice.invoice_no}`, "#6f42c1");
             applySearch();
         }
@@ -4819,7 +4880,7 @@
             currentPaymentInvoiceId = null;
         }
 
-        function savePaymentSplit() {
+        async function savePaymentSplit() {
             const cash = parseFloat(document.getElementById('payCash').value) || 0;
             const bank = parseFloat(document.getElementById('payBank').value) || 0;
             const cashDate = document.getElementById('payCashDate').value;
@@ -4873,7 +4934,13 @@
                 invoices[idx].total_due = (parseFloat(invoices[idx].invoice_total) || 0) - (cash + bank);
 
                 localStorage.setItem("invoices", JSON.stringify(invoices));
-                if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[idx]).catch(console.warn);
+                try {
+                    await saveInvoiceToBackend(invoices[idx]);
+                } catch (error) {
+                    console.warn(error);
+                    showToast(`Backend save failed: ${error.message}`, "#c0392b");
+                    return;
+                }
                 renderTable(currentFilteredData); // Refresh table
                 closePaymentSplitModal();
                 showToast("Payment updated successfully", "#27ae60");
@@ -4953,15 +5020,22 @@
         document.getElementById("btnCancelDelete").addEventListener("click", closeDeleteModal);
         document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
-            const idsToDelete = new Set(pendingDeleteIds);
 
-            for (let id of pendingDeleteIds) {
-                if (typeof apiClient !== 'undefined' && apiClient.deleteInvoice) {
-                    await apiClient.deleteInvoice(id).catch(console.warn);
+            const invoicesToDelete = pendingDeleteIds.map(id =>
+                invoices.find(invoice => getInvoiceKey(invoice) === String(id))
+            ).filter(Boolean);
+            for (const invoice of invoicesToDelete) {
+                try {
+                    await deleteInvoiceFromBackend(invoice);
+                } catch (error) {
+                    console.warn(error);
+                    showToast(`Backend delete failed: ${error.message}`, "#c0392b");
+                    return;
                 }
             }
 
-            invoices = invoices.filter(x => !idsToDelete.has(String(x.id || x.invoice_no)));
+            const idsToDelete = new Set(invoicesToDelete.map(getInvoiceKey));
+            invoices = invoices.filter(invoice => !idsToDelete.has(getInvoiceKey(invoice)));
             localStorage.setItem("invoices", JSON.stringify(invoices));
             showToast(`✅ Deleted ${pendingDeleteIds.length} invoice(s).`, "#27ae60");
             renderTable(invoices);
