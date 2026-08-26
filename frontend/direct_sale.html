@@ -70,6 +70,8 @@
                     <div class="col-md-3">
                         <label class="form-label fw-semibold">Invoice No</label>
                         <input type="text" id="invoiceNo" class="form-control form-control-sm bg-light">
+                    
+                    <small class="text-muted">Last Invoice No: <span id="lastInvoiceNo">None</span></small>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label fw-semibold">Invoice Date</label>
@@ -321,7 +323,19 @@
             const sales = JSON.parse(localStorage.getItem('sales_records') || '[]');
             const nextSeq = sales.length + 1;
             document.getElementById('invoiceNo').value = `INV-${new Date().getFullYear()}-${String(nextSeq).padStart(4, '0')}`;
+            updateLastInvoiceNumber(sales);
+            setInvoiceNoEditing(false);
+            
         }
+
+        function updateLastInvoiceNumber(sales) {
+            const lastInvoice = Array.isArray(sales) && sales.length
+                ? sales[sales.length - 1].invoiceNo || sales[sales.length - 1].invoice_no || sales[sales.length - 1].id
+                : '';
+            const lastInvoiceElement = document.getElementById('lastInvoiceNo');
+            if (lastInvoiceElement) lastInvoiceElement.textContent = lastInvoice || 'None';
+
+        }    
 
         function populateCustomerDropdown() {
             const select = document.getElementById('customerSelect');
