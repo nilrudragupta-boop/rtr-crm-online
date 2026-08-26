@@ -69,9 +69,14 @@
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
                         <label class="form-label fw-semibold">Invoice No</label>
-                        <input type="text" id="invoiceNo" class="form-control form-control-sm bg-light">
-                    
-                    <small class="text-muted">Last Invoice No: <span id="lastInvoiceNo">None</span></small>
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="invoiceNo" class="form-control bg-light" readonly>
+                            <button type="button" id="editInvoiceNoButton" class="btn btn-outline-secondary"
+                                onclick="toggleInvoiceNoEditing()" title="Edit invoice number">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Last Invoice No: <span id="lastInvoiceNo">None</span></small>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label fw-semibold">Invoice Date</label>
@@ -227,6 +232,7 @@
         let customers = [];
         let items = [];
         let isRoundOffEnabled = localStorage.getItem('directSaleRoundOff') === 'true';
+        let isInvoiceNoEditing = false;
 
         async function loadSalesList() {
             try {
@@ -340,14 +346,35 @@
     setInvoiceNoEditing(false);
 }
 
+
         function updateLastInvoiceNumber(sales) {
             const lastInvoice = Array.isArray(sales) && sales.length
                 ? sales[sales.length - 1].invoiceNo || sales[sales.length - 1].invoice_no || sales[sales.length - 1].id
                 : '';
             const lastInvoiceElement = document.getElementById('lastInvoiceNo');
             if (lastInvoiceElement) lastInvoiceElement.textContent = lastInvoice || 'None';
+        }
 
-        }    
+        function toggleInvoiceNoEditing() {
+            setInvoiceNoEditing(!isInvoiceNoEditing);
+        }
+
+        function setInvoiceNoEditing(enabled) {
+            isInvoiceNoEditing = enabled;
+            const invoiceInput = document.getElementById('invoiceNo');
+            const editButton = document.getElementById('editInvoiceNoButton');
+            if (!invoiceInput || !editButton) return;
+
+            invoiceInput.readOnly = !enabled;
+            invoiceInput.classList.toggle('bg-light', !enabled);
+            editButton.innerHTML = enabled ? '<i class="bi bi-check-lg"></i>' : '<i class="bi bi-pencil"></i>';
+            editButton.title = enabled ? 'Use this invoice number' : 'Edit invoice number';
+
+            if (enabled) {
+                invoiceInput.focus();
+                invoiceInput.select();
+            }
+        }
 
         function populateCustomerDropdown() {
             const select = document.getElementById('customerSelect');
