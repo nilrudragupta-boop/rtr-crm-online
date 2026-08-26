@@ -320,13 +320,25 @@
         }
 
         function generateInvoiceNumber() {
-            const sales = JSON.parse(localStorage.getItem('sales_records') || '[]');
-            const nextSeq = sales.length + 1;
-            document.getElementById('invoiceNo').value = `INV-${new Date().getFullYear()}-${String(nextSeq).padStart(4, '0')}`;
-            updateLastInvoiceNumber(sales);
-            setInvoiceNoEditing(false);
-            
-        }
+    const sales = JSON.parse(localStorage.getItem('sales_records') || '[]');
+    
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const year = now.getFullYear();
+
+    // Financial year: April to March
+    const fyStart = month >= 4 ? year : year - 1;
+    const fyEnd = String(fyStart + 1).slice(-2);
+    const financialYear = `${fyStart}-${fyEnd}`;
+
+    const nextSeq = sales.length + 1;
+
+    document.getElementById('invoiceNo').value =
+        `INV-${financialYear}-${String(nextSeq).padStart(4, '0')}`;
+
+    updateLastInvoiceNumber(sales);
+    setInvoiceNoEditing(false);
+}
 
         function updateLastInvoiceNumber(sales) {
             const lastInvoice = Array.isArray(sales) && sales.length
