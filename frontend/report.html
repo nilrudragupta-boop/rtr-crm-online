@@ -669,33 +669,29 @@
             <button id="btnDateSearch">Search</button>
         </div>
 
-        <!-- Top Controls Toolbar -->
-<div style="display:flex; gap:8px; flex-wrap:wrap;">
-    <button id="btnExportCsv" class="small" style="background:#2ecc71;"
-        data-permission-id="perm_backup_data">Export CSV</button>
-    <button id="btnImportCsv" class="small" style="background:#16a085;"
-        data-permission-id="perm_restore_data">Import CSV</button>
-    <input type="file" id="importCsvInput" accept=".csv" style="display:none">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="btnExportCsv" class="small" style="background:#2ecc71;"
+                data-permission-id="perm_backup_data">Export CSV</button>
+            <button id="btnImportCsv" class="small" style="background:#16a085;"
+                data-permission-id="perm_restore_data">Import CSV</button>
+            <input type="file" id="importCsvInput" accept=".csv" style="display:none">
 
-    <button id="btnReceiptLog" class="small secondary" style="background:rgb(28, 14, 219);"
-        onclick="openReceiptLogModal()" data-permission-id="perm_payment_receipt_log">Receipt Log</button>
+            <button id="btnReceiptLog" class="small secondary" style="background:rgb(28, 14, 219);"
+                onclick="openReceiptLogModal()" data-permission-id="perm_payment_receipt_log">Receipt Log</button>
 
-    <button id="btnPrintHeader" onclick="window.print()" class="small" data-permission-id="perm_print">Print</button>
-</div>
+            <button onclick="window.print()" class="small" data-permission-id="perm_print">Print</button>
+        </div>
     </div>
 
-    <!-- Sort Filters replaced with a clean Dropdown List -->
-<div id="sortFilters">
-    <select id="sortDropdown" onchange="handleSortDropdownChange(this.value)" style="padding: 6px 10px; border-radius: 6px; font-size: 13px;">
-        <option value="">Sort By...</option>
-        <option value="invAZ">Invoice No A→Z</option>
-        <option value="invZA">Invoice No Z→A</option>
-        <option value="custAZ">Customer Name A→Z</option>
-        <option value="custZA">Customer Name Z→A</option>
-    </select>
-    <button id="btnDeleteSelected" class="danger small" style="background:#f80202; color:#fff;"
-        data-permission-id="perm_delete_action">Delete Selected</button>
-</div>
+    <div id="sortFilters">
+        <button id="sortInvAZ">Invoice No A→Z</button>
+        <button id="sortInvZA">Invoice No Z→A</button>
+        <button id="sortCustAZ">Customer Name A→Z</button>
+        <button id="sortCustZA">Customer Name Z→A</button>
+        <button id="btnDeleteSelected" class="danger small" style="background:#f80202; color:#fff;"
+            data-permission-id="perm_delete_action">Delete
+            Selected</button>
+    </div>
 
     <div id="splitLayout">
         <div id="leftPane">
@@ -1105,26 +1101,8 @@
                 <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
                     <input type="checkbox" id="showActionPrintStd" onchange="toggleActionBtn('printStd')"> Print
                     (Standard Format)
-                </label>            
-        </div>
-        <div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #eee;">
-    <h4 style="margin:0 0 10px 0; font-size:14px; color:#555;">Toolbar Buttons</h4>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-        <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
-            <input type="checkbox" id="showToolbarExportCsv" onchange="toggleToolbarBtn('exportCsv')"> Export CSV
-        </label>
-        <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
-            <input type="checkbox" id="showToolbarImportCsv" onchange="toggleToolbarBtn('importCsv')"> Import CSV
-        </label>
-        <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
-            <input type="checkbox" id="showToolbarReceiptLog" onchange="toggleToolbarBtn('receiptLog')"> Receipt Log
-        </label>
-        <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
-            <input type="checkbox" id="showToolbarPrint" onchange="toggleToolbarBtn('print')"> Print
-        </label>
-    </div>
-</div>
-
+                </label>
+            </div>
         </div>
         <p style="font-size:14px; color:#666;">Select columns to display:</p>
         <input type="text" id="columnSearchInput" placeholder="Search columns..." oninput="filterColumnSettings()"
@@ -6063,84 +6041,6 @@
                 doc.save(`Payment_Receipt_${paymentData.receiptNo || 'New'}.pdf`);
             }
         }
-
-
-        // --- Toolbar Buttons Visibility Logic ---
-let toolbarBtnState = JSON.parse(localStorage.getItem("reportToolbarBtnState")) || {
-    exportCsv: true,
-    importCsv: true,
-    receiptLog: true,
-    print: true
-};
-
-function toggleToolbarBtn(type) {
-    const map = {
-        exportCsv: 'showToolbarExportCsv',
-        importCsv: 'showToolbarImportCsv',
-        receiptLog: 'showToolbarReceiptLog',
-        print: 'showToolbarPrint'
-    };
-    const cb = document.getElementById(map[type]);
-    if (cb) {
-        toolbarBtnState[type] = cb.checked;
-        localStorage.setItem("reportToolbarBtnState", JSON.stringify(toolbarBtnState));
-        applyToolbarBtnVisibility();
-    }
-}
-
-function applyToolbarBtnVisibility() {
-    const elements = {
-        exportCsv: document.getElementById('btnExportCsv'),
-        importCsv: document.getElementById('btnImportCsv'),
-        receiptLog: document.getElementById('btnReceiptLog'),
-        print: document.getElementById('btnPrintHeader')
-    };
-    const checkboxes = {
-        exportCsv: document.getElementById('showToolbarExportCsv'),
-        importCsv: document.getElementById('showToolbarImportCsv'),
-        receiptLog: document.getElementById('showToolbarReceiptLog'),
-        print: document.getElementById('showToolbarPrint')
-    };
-
-    Object.keys(toolbarBtnState).forEach(key => {
-        if (elements[key]) {
-            elements[key].style.display = toolbarBtnState[key] ? 'inline-block' : 'none';
-        }
-        if (checkboxes[key]) {
-            checkboxes[key].checked = toolbarBtnState[key];
-        }
-    });
-}
-
-// --- Sort Dropdown Logic ---
-function handleSortDropdownChange(value) {
-    if (!value) return;
-    switch (value) {
-        case 'invAZ':
-            currentSortColumn = 'invoice_no';
-            currentSortDirection = 'asc';
-            break;
-        case 'invZA':
-            currentSortColumn = 'invoice_no';
-            currentSortDirection = 'desc';
-            break;
-        case 'custAZ':
-            currentSortColumn = 'customer_name';
-            currentSortDirection = 'asc';
-            break;
-        case 'custZA':
-            currentSortColumn = 'customer_name';
-            currentSortDirection = 'desc';
-            break;
-    }
-    applySearch();
-}
-
-// Call on page initialization
-document.addEventListener("DOMContentLoaded", () => {
-    applyToolbarBtnVisibility();
-});
-
     </script>
 </body>
 
