@@ -17,6 +17,13 @@
     <script src="brandLoader.js"></script>
     <script src="apiClient.js"></script>
     <style>
+
+        select#customerSelect {
+    width: 100%;
+    min-width: 250px; /* Prevents text clipping */
+    max-width: 100%;
+    white-space: normal;
+}
         @media print {
             .no-print {
                 display: none !important;
@@ -377,31 +384,25 @@
         }
 
         function populateCustomerDropdown() {
-            const select = document.getElementById('customerSelect');
-            select.innerHTML = '<option value="">-- Choose Customer --</option>';
-            customers.forEach(cust => {
-                const opt = document.createElement('option');
-                opt.value = cust.id;
-                const phone = (cust.phone || cust.contact || '').split(',')[0].trim();
-                opt.textContent = `${cust.name} (${phone || 'No Phone'})`;
-                select.appendChild(opt);
-            });
-        }
+    const select = document.getElementById("customerSelect"); // Replace with your select element ID
+    const customers = JSON.parse(localStorage.getItem("customers")) || [];
 
-        function onCustomerChange() {
-            const custId = document.getElementById('customerSelect').value;
-            const infoBox = document.getElementById('customerInfoBox');
-            const cust = customers.find(c => c.id === custId);
+    select.innerHTML = '<option value="">Select Customer</option>';
 
-            if (cust) {
-                document.getElementById('custPhone').textContent = cust.phone || cust.contact || 'N/A';
-                document.getElementById('custGst').textContent = cust.gstin || cust.gst || 'N/A';
-                document.getElementById('custAddress').textContent = cust.address || 'N/A';
-                infoBox.style.display = 'block';
-            } else {
-                infoBox.style.display = 'none';
-            }
-        }
+    customers.forEach(cust => {
+        if (!cust.name) return;
+        
+        const option = document.createElement("option");
+        option.value = cust.id || cust.name;
+        
+        // Use textContent to prevent HTML breaking and ensure the full name string is rendered
+        option.textContent = cust.name + (cust.contact ? ` (${cust.contact})` : '');
+        select.appendChild(option);
+    });
+}
+
+// Call on load
+document.addEventListener("DOMContentLoaded", populateCustomerDropdown);
 
         function addNewRow() {
             const tbody = document.getElementById('invoiceRows');
