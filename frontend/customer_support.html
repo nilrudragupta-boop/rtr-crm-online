@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Support | Rise Tech Evolution</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
+    <script src="apiClient.js"></script>
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --card: #fff;
+            --border: #e5e7eb;
+            --text: #111827;
+            --muted: #6b7280;
+            --primary: #2563eb;
+            --primary2: #1d4ed8;
+            --danger: #dc2626;
+            --success: #059669;
+            --warning: #d97706;
+            --info: #0891b2;
+            --purple: #7c3aed;
+            --radius: 10px
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: Inter, Arial, sans-serif
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit
+        }
+
+        .topbar {
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 20
+        }
+
+        .brand {
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--primary);
+            display: flex;
+            gap: 9px;
+            align-items: center
+        }
+
+        .brand span {
+            color: var(--text)
+        }
+
+        .top-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        .container {
+            padding: 22px;
+            max-width: 1500px;
+            margin: auto
+        }
+
+        .page-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            align-items: flex-start;
+            margin-bottom: 20px
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 5px
+        }
+
+        .btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text);
+            padding: 9px 13px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600
+        }
+
+        .btn:hover {
+            background: #f9fafb
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff
+        }
+
+        .btn-primary:hover {
+            background: var(--primary2)
+        }
+
+        .btn-danger {
+            color: var(--danger);
+            border-color: #fecaca;
+            background: #fff
+        }
+
+        .btn-success {
+            background: var(--success);
+            border-color: var(--success);
+            color: #fff
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 18px
+        }
+
+        .metric {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 15px
+        }
+
+        .metric .label {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600
+        }
+
+        .metric .value {
+            font-size: 25px;
+            font-weight: 700;
+            margin-top: 5px
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden
+        }
+
+        .toolbar {
+            padding: 13px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap
+        }
+
+        .search {
+            min-width: 260px;
+            flex: 1
+        }
+
+        input,
+        select,
+        textarea {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 9px 10px;
+            background: #fff;
+            color: var(--text);
+            outline: none;
+            width: 100%
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 3px #dbeafe
+        }
+
+        .toolbar select {
+            width: 160px
+        }
+
+        .toolbar .search {
+            width: auto
+        }
+
+        .table-wrap {
+            overflow: auto
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1050px
+        }
+
+        th,
+        td {
+            padding: 11px 12px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            font-size: 13px;
+            vertical-align: middle
+        }
+
+        th {
+            background: #f9fafb;
+            color: #6b7280;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            white-space: nowrap
+        }
+
+        tbody tr:hover {
+            background: #fbfdff
+        }
+
+        .id {
+            font-weight: 700;
+            color: #374151;
+            white-space: nowrap
+        }
+
+        .subject {
+            font-weight: 600;
+            max-width: 290px
+        }
+
+        .subject small {
+            display: block;
+            color: var(--muted);
+            font-weight: 400;
+            margin-top: 3px
+        }
+
+        .badge {
+            display: inline-flex;
+            padding: 5px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap
+        }
+
+        .s-open {
+            background: #dbeafe;
+            color: #1d4ed8
+        }
+
+        .s-progress {
+            background: #fef3c7;
+            color: #92400e
+        }
+
+        .s-pending {
+            background: #f3e8ff;
+            color: #6b21a8
+        }
+
+        .s-resolved {
+            background: #dcfce7;
+            color: #166534
+        }
+
+        .s-closed {
+            background: #e5e7eb;
+            color: #374151
+        }
+
+        .s-reopened {
+            background: #fee2e2;
+            color: #991b1b
+        }
+
+        .p-low {
+            color: #059669
+        }
+
+        .p-medium {
+            color: #2563eb
+        }
+
+        .p-high {
+            color: #d97706
+        }
+
+        .p-critical {
+            color: #dc2626;
+            font-weight: 700
+        }
+
+        .actions {
+            display: flex;
+            gap: 5px;
+            white-space: nowrap
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 30px;
+            border: 1px solid var(--border);
+            background: #fff;
+            border-radius: 7px;
+            cursor: pointer
+        }
+
+        .icon-btn:hover {
+            background: #f3f4f6
+        }
+
+        .icon-btn.delete {
+            color: var(--danger)
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted)
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .48);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 15px
+        }
+
+        .modal {
+            width: min(680px, 100%);
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .2);
+            max-height: 92vh;
+            overflow: auto
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .modal-head h2 {
+            font-size: 17px;
+            margin: 0
+        }
+
+        .modal-body {
+            padding: 18px
+        }
+
+        .modal-foot {
+            padding: 13px 18px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px
+        }
+
+        .close {
+            border: 0;
+            background: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: var(--muted)
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px
+        }
+
+        .form-group {
+            margin-bottom: 12px
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            margin-bottom: 5px
+        }
+
+        .full {
+            grid-column: 1/-1
+        }
+
+        .view-grid {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 10px;
+            font-size: 13px
+        }
+
+        .view-grid .k {
+            color: var(--muted);
+            font-weight: 600
+        }
+
+        .notes {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            padding: 11px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            line-height: 1.5
+        }
+
+        .toast {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            background: #111827;
+            color: #fff;
+            padding: 11px 15px;
+            border-radius: 8px;
+            display: none;
+            z-index: 200;
+            font-size: 13px
+        }
+
+        @media(max-width:900px) {
+            .metrics {
+                grid-template-columns: repeat(2, 1fr)
+            }
+
+            .page-head {
+                flex-direction: column
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr
+            }
+
+            .full {
+                grid-column: auto
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="brand">◉ <span>Rise Tech Evolution</span> Customer Support</div>
+        <div class="top-actions">
+            <button class="btn" onclick="openCustomerPage()">👥 Customers</button>
+            <button class="btn btn-primary" onclick="openTicketModal()">＋ New Ticket</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-head">
+            <div>
+                <h1>Customer Support</h1>
+                <div class="subtitle">Centralized ticket management, customer issues, service follow-up and resolution
+                    tracking.</div>
+            </div>
+        </div>
+
+        <section class="metrics">
+            <div class="metric">
+                <div class="label">Total Tickets</div>
+                <div class="value" id="m-total">0</div>
+            </div>
+            <div class="metric">
+                <div class="label">Open</div>
+                <div class="value" id="m-open">0</div>
+            </div>
+            <div class="metric">
+                <div class="label">In Progress</div>
+                <div class="value" id="m-progress">0</div>
+            </div>
+            <div class="metric">
+                <div class="label">Reopened</div>
+                <div class="value" id="m-reopened">0</div>
+            </div>
+            <div class="metric">
+                <div class="label">Resolved / Closed</div>
+                <div class="value" id="m-closed">0</div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="toolbar">
+                <input class="search" id="searchInput"
+                    placeholder="Search ticket no., customer, subject or description..." oninput="render()">
+                <select id="statusFilter" onchange="render()">
+                    <option value="">All Status</option>
+                    <option>Open</option>
+                    <option>In Progress</option>
+                    <option>Pending Customer</option>
+                    <option>Resolved</option>
+                    <option>Closed</option>
+                    <option>Reopened</option>
+                </select>
+                <select id="priorityFilter" onchange="render()">
+                    <option value="">All Priority</option>
+                    <option>Low</option>
+                    <option>Medium</option>
+                    <option>High</option>
+                    <option>Critical</option>
+                </select>
+                <button class="btn" onclick="clearFilters()">Reset</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ticket No.</th>
+                            <th>Customer</th>
+                            <th>Subject / Issue</th>
+                            <th>Priority</th>
+                            <th>Assigned To</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Last Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ticketBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Ticket Modal -->
+    <div class="modal-overlay" id="ticketModal">
+        <div class="modal">
+            <div class="modal-head">
+                <h2 id="ticketModalTitle">Create Support Ticket</h2><button class="close"
+                    onclick="closeModal('ticketModal')">&times;</button>
+            </div>
+            <form id="ticketForm" onsubmit="saveTicket(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="editId">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Customer *</label>
+                            <select id="customerSelect" required></select>
+                            <div style="font-size:11px;color:#6b7280;margin-top:4px">Customer list is read from the same
+                                <b>customers page</b>
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Priority *</label><select id="priority" required>
+                                <option>Low</option>
+                                <option selected>Medium</option>
+                                <option>High</option>
+                                <option>Critical</option>
+                            </select></div>
+                        <div class="form-group full">
+                            <label>Issue Subject *</label>
+                            <select id="subject" required>
+                                <option value="" selected disabled>Select Issue Subject</option>
+                                <option value="Complaints support">Complaints support</option>
+                                <option value="Enquiry support">Enquiry support</option>
+                                <option value="Exchange support">Exchange support</option>
+                                <option value="Maintenance support">Maintenance support</option>
+                                <option value="On-site support">On-site support</option>
+                                <option value="Purchase support">Purchase support</option>
+                                <option value="Replace support">Replace support</option>
+                                <option value="Return support">Return support</option>
+                                <option value="Service support">Service support</option>
+                                <option value="Telephonically support">Telephonically support</option>
+                                <option value="Training support">Training support</option>
+                            </select>
+                        </div>
+                        <div class="form-group full"><label>Description / Complaint Details</label><textarea
+                                id="description" rows="4"
+                                placeholder="Enter complete issue details, symptoms, reference numbers, etc."></textarea>
+                        </div>
+                        <div class="form-group"><label>Status</label><select id="ticketStatus">
+                                <option>Open</option>
+                                <option>In Progress</option>
+                                <option>Pending Customer</option>
+                                <option>Resolved</option>
+                                <option>Closed</option>
+                                <option>Reopened</option>
+                            </select></div>
+                        <div class="form-group"><label>Assigned To</label><input id="assignedTo"
+                                placeholder="Support executive / engineer"></div>
+                        <div class="form-group full"><label>Internal Notes</label><textarea id="internalNotes" rows="3"
+                                placeholder="Internal follow-up notes"></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-foot"><button type="button" class="btn"
+                        onclick="closeModal('ticketModal')">Cancel</button><button class="btn btn-primary"
+                        type="submit">Save Ticket</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Modal -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal">
+            <div class="modal-head">
+                <h2>Ticket Details</h2><button class="close" onclick="closeModal('viewModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="viewBody"></div>
+            <div class="modal-foot"><button class="btn" onclick="closeModal('viewModal')">Close</button></div>
+        </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal" style="max-width:430px">
+            <div class="modal-head">
+                <h2>Delete Ticket</h2><button class="close" onclick="closeModal('deleteModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin:0;color:#4b5563">Are you sure you want to permanently delete this support ticket? This
+                    action cannot be undone.</p>
+            </div>
+            <div class="modal-foot"><button class="btn" onclick="closeModal('deleteModal')">Cancel</button><button
+                    class="btn btn-danger" onclick="confirmDelete()">Delete Ticket</button></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const TICKET_KEY = 'support_tickets';
+        const CUSTOMER_KEY = 'customers';
+        let tickets = [];
+        let customers = [];
+        let pendingDeleteId = null;
+
+        const STATUS = [
+            'Open', 'In Progress', 'Pending Customer', 'Resolved', 'Closed', 'Reopened'
+        ];
+
+        function safeParse(key, fallback = []) {
+            try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return Array.isArray(v) ? v : fallback } catch (e) { return fallback }
+        }
+        function normalizeCustomer(c) {
+            return {
+                id: String(c.id ?? c.customerId ?? c.code ?? ''),
+                name: String(c.name ?? c.customerName ?? c.companyName ?? 'Unnamed Customer'),
+                phone: String(c.phone ?? c.contact ?? c.mobile ?? ''),
+                email: String(c.email ?? ''),
+                gst: String(c.gst ?? c.gstin ?? '')
+            };
+        }
+        function loadCustomers() {
+            customers = safeParse(CUSTOMER_KEY, []).map(normalizeCustomer);
+            const sel = document.getElementById('customerSelect');
+            sel.innerHTML = '<option value="">Select Customer</option>';
+            customers.forEach(c => {
+                const o = document.createElement('option'); o.value = c.id || c.name; o.textContent = c.name + (c.phone ? ' — ' + c.phone : ''); sel.appendChild(o);
+            });
+        }
+        function loadTickets() {
+            tickets = safeParse(TICKET_KEY, []);
+            tickets = tickets.map(t => ({ ...t, id: String(t.id || t.ticketNo || ('T-' + Date.now())), status: STATUS.includes(t.status) ? t.status : 'Open' }));
+        }
+        function saveTickets() { localStorage.setItem(TICKET_KEY, JSON.stringify(tickets)) }
+        function esc(v) { return String(v ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])) }
+        function customerName(id) {
+            const c = customers.find(x => String(x.id) === String(id));
+            return c ? c.name : (tickets.find(t => String(t.customerId) === String(id))?.customerName || '—');
+        }
+        function formatDate(v) { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? esc(v) : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+        function statusClass(s) { return { 'Open': 's-open', 'In Progress': 's-progress', 'Pending Customer': 's-pending', 'Resolved': 's-resolved', 'Closed': 's-closed', 'Reopened': 's-reopened' }[s] || 's-open' }
+        function priorityClass(p) { return 'p-' + String(p || 'medium').toLowerCase() }
+
+        function render() {
+            const q = document.getElementById('searchInput').value.trim().toLowerCase();
+            const sf = document.getElementById('statusFilter').value;
+            const pf = document.getElementById('priorityFilter').value;
+            const data = tickets.filter(t => {
+                const hay = [t.id, t.ticketNo, t.customerName, customerName(t.customerId), t.subject, t.description, t.assignedTo].join(' ').toLowerCase();
+                return (!q || hay.includes(q)) && (!sf || t.status === sf) && (!pf || t.priority === pf);
+            });
+            const body = document.getElementById('ticketBody');
+            if (!data.length) { body.innerHTML = '<tr><td colspan="9" class="empty">No support tickets found.</td></tr>' }
+            else body.innerHTML = data.map(t => `
+    <tr>
+      <td class="id">#${esc(t.id)}</td>
+      <td><b>${esc(customerName(t.customerId) || t.customerName)}</b></td>
+      <td class="subject">${esc(t.subject)}<small>${esc(t.description || 'No description')}</small></td>
+      <td class="${priorityClass(t.priority)}">${esc(t.priority)}</td>
+      <td>${esc(t.assignedTo || '—')}</td>
+      <td>
+        <select onchange="changeStatus('${esc(t.id)}',this.value)" style="width:145px;padding:6px 8px;border-radius:20px;font-size:11px;font-weight:700" class="${statusClass(t.status)}">
+          ${STATUS.map(s => `<option ${s === t.status ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td>${formatDate(t.createdAt)}</td><td>${formatDate(t.updatedAt)}</td>
+      <td><div class="actions">
+        <button class="icon-btn" title="View" onclick="viewTicket('${esc(t.id)}')">👁</button>
+        <button class="icon-btn" title="Edit" onclick="editTicket('${esc(t.id)}')">✏</button>
+        <button class="icon-btn delete" title="Delete" onclick="deleteTicket('${esc(t.id)}')">🗑</button>
+      </div></td>
+    </tr>`).join('');
+            updateMetrics();
+        }
+        function updateMetrics() {
+            document.getElementById('m-total').textContent = tickets.length;
+            document.getElementById('m-open').textContent = tickets.filter(t => t.status === 'Open').length;
+            document.getElementById('m-progress').textContent = tickets.filter(t => t.status === 'In Progress').length;
+            document.getElementById('m-reopened').textContent = tickets.filter(t => t.status === 'Reopened').length;
+            document.getElementById('m-closed').textContent = tickets.filter(t => ['Resolved', 'Closed'].includes(t.status)).length;
+        }
+        function clearFilters() { document.getElementById('searchInput').value = ''; document.getElementById('statusFilter').value = ''; document.getElementById('priorityFilter').value = ''; render() }
+        function openModal(id) { document.getElementById(id).style.display = 'flex' }
+        function closeModal(id) { document.getElementById(id).style.display = 'none' }
+        function openTicketModal(id = null) {
+            document.getElementById('ticketForm').reset(); document.getElementById('editId').value = '';
+            document.getElementById('ticketStatus').value = 'Open';
+            document.getElementById('ticketModalTitle').textContent = id ? 'Edit Support Ticket' : 'Create Support Ticket';
+            if (id) {
+                const t = tickets.find(x => String(x.id) === String(id)); if (!t) return;
+                document.getElementById('editId').value = t.id;
+                document.getElementById('customerSelect').value = t.customerId || '';
+                document.getElementById('priority').value = t.priority || 'Medium';
+                document.getElementById('subject').value = t.subject || '';
+                document.getElementById('description').value = t.description || '';
+                document.getElementById('ticketStatus').value = t.status || 'Open';
+                document.getElementById('assignedTo').value = t.assignedTo || '';
+                document.getElementById('internalNotes').value = t.internalNotes || '';
+            }
+            openModal('ticketModal');
+        }
+        function saveTicket(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editId').value;
+            const custId = document.getElementById('customerSelect').value;
+            const cust = customers.find(c => String(c.id) === String(custId));
+            if (!custId) { showToast('Please select a customer'); return }
+            const now = new Date().toISOString();
+            const payload = {
+                customerId: custId, customerName: cust?.name || '',
+                subject: document.getElementById('subject').value.trim(),
+                description: document.getElementById('description').value.trim(),
+                priority: document.getElementById('priority').value,
+                status: document.getElementById('ticketStatus').value,
+                assignedTo: document.getElementById('assignedTo').value.trim(),
+                internalNotes: document.getElementById('internalNotes').value.trim(),
+                updatedAt: now
+            };
+            if (editId) {
+                const i = tickets.findIndex(t => String(t.id) === String(editId)); if (i >= 0) tickets[i] = { ...tickets[i], ...payload };
+                showToast('Ticket updated successfully');
+            } else {
+                const seq = nextTicketSequence();
+                tickets.unshift({ id: 'T-' + String(seq).padStart(4, '0'), ...payload, createdAt: now });
+                showToast('Support ticket created successfully');
+            }
+            saveTickets(); closeModal('ticketModal'); render();
+        }
+        function nextTicketSequence() {
+            const nums = tickets.map(t => parseInt(String(t.id || '').replace(/\D/g, ''), 10)).filter(Number.isFinite);
+            return Math.max(0, ...nums) + 1;
+        }
+        function changeStatus(id, status) {
+            const t = tickets.find(x => String(x.id) === String(id)); if (!t) return;
+            t.status = status; t.updatedAt = new Date().toISOString(); saveTickets(); render(); showToast(`Ticket ${id} marked ${status}`);
+        }
+        function viewTicket(id) {
+            const t = tickets.find(x => String(x.id) === String(id)); if (!t) return;
+            const c = customers.find(x => String(x.id) === String(t.customerId));
+            document.getElementById('viewBody').innerHTML = `
+    <div class="view-grid">
+      <div class="k">Ticket No.</div><div><b>#${esc(t.id)}</b></div>
+      <div class="k">Customer</div><div><b>${esc(c?.name || t.customerName || '—')}</b></div>
+      <div class="k">Contact</div><div>${esc(c?.phone || '—')} ${c?.email ? ' | ' + esc(c.email) : ''}</div>
+      <div class="k">Subject</div><div><b>${esc(t.subject)}</b></div>
+      <div class="k">Priority</div><div class="${priorityClass(t.priority)}">${esc(t.priority)}</div>
+      <div class="k">Status</div><div><span class="badge ${statusClass(t.status)}">${esc(t.status)}</span></div>
+      <div class="k">Assigned To</div><div>${esc(t.assignedTo || 'Not assigned')}</div>
+      <div class="k">Created</div><div>${formatDate(t.createdAt)}</div>
+      <div class="k">Last Updated</div><div>${formatDate(t.updatedAt)}</div>
+    </div>
+    <hr style="border:0;border-top:1px solid #e5e7eb;margin:16px 0">
+    <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px">DESCRIPTION / COMPLAINT</div>
+    <div class="notes">${esc(t.description || 'No description provided.')}</div>
+    <div style="font-size:11px;font-weight:700;color:#6b7280;margin:14px 0 6px">INTERNAL NOTES</div>
+    <div class="notes">${esc(t.internalNotes || 'No internal notes.')}</div>`;
+            openModal('viewModal');
+        }
+        function editTicket(id) { openTicketModal(id) }
+        function deleteTicket(id) { pendingDeleteId = id; openModal('deleteModal') }
+        function confirmDelete() {
+            if (!pendingDeleteId) return;
+            tickets = tickets.filter(t => String(t.id) !== String(pendingDeleteId)); saveTickets(); pendingDeleteId = null; closeModal('deleteModal'); render(); showToast('Ticket deleted');
+        }
+        function openCustomerPage() { window.location.href = 'customer.html' }
+        function showToast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; clearTimeout(window.__toast); window.__toast = setTimeout(() => el.style.display = 'none', 2200) }
+        window.addEventListener('storage', e => { if (e.key === CUSTOMER_KEY) { loadCustomers(); render() } if (e.key === TICKET_KEY) { loadTickets(); render() } });
+        window.addEventListener('DOMContentLoaded', () => { loadCustomers(); loadTickets(); render() });
+    </script>
+</body>
+
+</html>
