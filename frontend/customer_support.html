@@ -257,7 +257,7 @@
             max-width: 290px
         }
 
-        .subject small {
+        .subject small, .customer-col small {
             display: block;
             color: var(--muted);
             font-weight: 400;
@@ -426,7 +426,7 @@
 
 <body>
     <header class="topbar">
-        <div class="brand">◉ <span>RiseTech Revolution CRM -</span> Customer Support</div>
+        <div class="brand">🧑‍💼 <span></span> Customer Support Management</div>
         <div class="top-actions">
             <button class="btn" onclick="openCustomerPage()">👥 Customers</button>
             <button class="btn btn-primary" onclick="openTicketModal()">＋ New Ticket</button>
@@ -436,8 +436,8 @@
     <main class="container">
         <div class="page-head">
             <div>
-                <h1>Customer Support</h1>
-                <div class="subtitle">Centralized ticket management, customer issues, service follow-up and resolution tracking.</div>
+                <h1></h1>
+                <div class="subtitle">Centralized customer issues management, service follow-up and resolution tracking.</div>
             </div>
         </div>
 
@@ -451,7 +451,7 @@
 
         <section class="panel">
             <div class="toolbar">
-                <input class="search" id="searchInput" placeholder="Search ticket no., customer, subject or description..." oninput="render()">
+                <input class="search" id="searchInput" placeholder="Search ticket no., customer, phone, subject or description..." oninput="render()">
                 <select id="statusFilter" onchange="render()">
                     <option value="">All Status</option>
                     <option>Open</option>
@@ -475,7 +475,7 @@
                     <thead>
                         <tr>
                             <th>Ticket No.</th>
-                            <th>Customer</th>
+                            <th>Customer & Contact</th>
                             <th>Subject / Issue</th>
                             <th>Priority</th>
                             <th>Assigned To</th>
@@ -495,7 +495,7 @@
     <div class="modal-overlay" id="ticketModal">
         <div class="modal">
             <div class="modal-head">
-                <h2 id="ticketModalTitle">Create Support Ticket</h2><button type="button" class="close" onclick="closeModal('ticketModal')">&times;</button>
+                <h2 id="ticketModalTitle">Create Customer Support Ticket</h2><button type="button" class="close" onclick="closeModal('ticketModal')">&times;</button>
             </div>
             <form id="ticketForm" onsubmit="saveTicket(event)">
                 <div class="modal-body">
@@ -709,30 +709,42 @@
             populateSelects();
         }
 
-        /* --- Existing Functions --- */
+        /* --- Customer & Ticket Helpers --- */
         function normalizeCustomer(c) {
             return {
                 id: String(c.id ?? c.customerId ?? c.code ?? ''),
                 name: String(c.name ?? c.customerName ?? c.companyName ?? 'Unnamed Customer'),
-                phone: String(c.phone ?? c.contact ?? c.mobile ?? ''),
+                phone: String(c.phone ?? c.contact ?? c.mobile ?? c.contactNo ?? c.phoneNo ?? ''),
                 email: String(c.email ?? ''),
                 gst: String(c.gst ?? c.gstin ?? '')
             };
         }
+
         function loadCustomers() {
             customers = safeParse(CUSTOMER_KEY, []).map(normalizeCustomer);
             const sel = document.getElementById('customerSelect');
             sel.innerHTML = '<option value="">Select Customer</option>';
             customers.forEach(c => {
-                const o = document.createElement('option'); o.value = c.id || c.name; o.textContent = c.name + (c.phone ? ' — ' + c.phone : ''); sel.appendChild(o);
+                const o = document.createElement('option'); 
+                o.value = c.id || c.name; 
+                o.textContent = c.name + (c.phone ? ' — ' + c.phone : ''); 
+                sel.appendChild(o);
             });
         }
         
+        function getCustomer(t) {
+            const c = customers.find(x => (t.customerId && String(x.id) === String(t.customerId)) || (t.customerName && String(x.name).toLowerCase() === String(t.customerName).toLowerCase()));
+            return {
+                name: c?.name || t.customerName || '—',
+                phone: c?.phone || t.customerPhone || t.phone || '',
+                email: c?.email || t.customerEmail || t.email || ''
+            };
+        }
+
         function loadTickets() {
             tickets = safeParse(TICKET_KEY, []);
             tickets = tickets.map(t => ({ ...t, id: String(t.id || t.ticketNo || ('T-' + Date.now())), status: STATUS.includes(t.status) ? t.status : 'Open' }));
             
-            // Sync orphaned properties into dynamic lists for backward compatibility
             let changed = false;
             tickets.forEach(t => {
                 if (t.subject && !subjectsList.includes(t.subject)) { subjectsList.push(t.subject); changed = true; }
@@ -746,10 +758,6 @@
         }
         
         function saveTickets() { localStorage.setItem(TICKET_KEY, JSON.stringify(tickets)) }
-        function customerName(id) {
-            const c = customers.find(x => String(x.id) === String(id));
-            return c ? c.name : (tickets.find(t => String(t.customerId) === String(id))?.customerName || '—');
-        }
         function formatDate(v) { if (!v) return '—'; const d = new Date(v); return isNaN(d) ? esc(v) : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
         function statusClass(s) { return { 'Open': 's-open', 'In Progress': 's-progress', 'Pending Customer': 's-pending', 'Resolved': 's-resolved', 'Closed': 's-closed', 'Reopened': 's-reopened' }[s] || 's-open' }
         function priorityClass(p) { return 'p-' + String(p || 'medium').toLowerCase() }
@@ -759,32 +767,43 @@
             const sf = document.getElementById('statusFilter').value;
             const pf = document.getElementById('priorityFilter').value;
             const data = tickets.filter(t => {
-                const hay = [t.id, t.ticketNo, t.customerName, customerName(t.customerId), t.subject, t.description, t.assignedTo].join(' ').toLowerCase();
+                const c = getCustomer(t);
+                const hay = [t.id, t.ticketNo, c.name, c.phone, c.email, t.subject, t.description, t.assignedTo].join(' ').toLowerCase();
                 return (!q || hay.includes(q)) && (!sf || t.status === sf) && (!pf || t.priority === pf);
             });
             const body = document.getElementById('ticketBody');
-            if (!data.length) { body.innerHTML = '<tr><td colspan="9" class="empty">No support tickets found.</td></tr>' }
-            else body.innerHTML = data.map(t => `
-                <tr>
-                <td class="id">#${esc(t.id)}</td>
-                <td><b>${esc(customerName(t.customerId) || t.customerName)}</b></td>
-                <td class="subject">${esc(t.subject)}<small>${esc(t.description || 'No description')}</small></td>
-                <td class="${priorityClass(t.priority)}">${esc(t.priority)}</td>
-                <td>${esc(t.assignedTo || '—')}</td>
-                <td>
-                    <select onchange="changeStatus('${esc(t.id)}',this.value)" style="width:145px;padding:6px 8px;border-radius:20px;font-size:11px;font-weight:700" class="${statusClass(t.status)}">
-                    ${STATUS.map(s => `<option ${s === t.status ? 'selected' : ''}>${s}</option>`).join('')}
-                    </select>
-                </td>
-                <td>${formatDate(t.createdAt)}</td><td>${formatDate(t.updatedAt)}</td>
-                <td><div class="actions">
-                    <button class="icon-btn" title="View" onclick="viewTicket('${esc(t.id)}')">👁</button>
-                    <button class="icon-btn" title="Edit" onclick="editTicket('${esc(t.id)}')">✏</button>
-                    <button class="icon-btn delete" title="Delete" onclick="deleteTicket('${esc(t.id)}')">🗑</button>
-                </div></td>
-                </tr>`).join('');
+            if (!data.length) { 
+                body.innerHTML = '<tr><td colspan="9" class="empty">No support tickets found.</td></tr>';
+            } else {
+                body.innerHTML = data.map(t => {
+                    const c = getCustomer(t);
+                    return `
+                    <tr>
+                    <td class="id">#${esc(t.id)}</td>
+                    <td class="customer-col">
+                        <b>${esc(c.name)}</b>
+                        ${c.phone ? `<small style="color:var(--muted)">📞 ${esc(c.phone)}</small>` : '<small style="color:#9ca3af">No phone</small>'}
+                    </td>
+                    <td class="subject">${esc(t.subject)}<small>${esc(t.description || 'No description')}</small></td>
+                    <td class="${priorityClass(t.priority)}">${esc(t.priority)}</td>
+                    <td>${esc(t.assignedTo || '—')}</td>
+                    <td>
+                        <select onchange="changeStatus('${esc(t.id)}',this.value)" style="width:145px;padding:6px 8px;border-radius:20px;font-size:11px;font-weight:700" class="${statusClass(t.status)}">
+                        ${STATUS.map(s => `<option ${s === t.status ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td>${formatDate(t.createdAt)}</td><td>${formatDate(t.updatedAt)}</td>
+                    <td><div class="actions">
+                        <button class="icon-btn" title="View" onclick="viewTicket('${esc(t.id)}')">👁</button>
+                        <button class="icon-btn" title="Edit" onclick="editTicket('${esc(t.id)}')">✏</button>
+                        <button class="icon-btn delete" title="Delete" onclick="deleteTicket('${esc(t.id)}')">🗑</button>
+                    </div></td>
+                    </tr>`;
+                }).join('');
+            }
             updateMetrics();
         }
+
         function updateMetrics() {
             document.getElementById('m-total').textContent = tickets.length;
             document.getElementById('m-open').textContent = tickets.filter(t => t.status === 'Open').length;
@@ -792,17 +811,20 @@
             document.getElementById('m-reopened').textContent = tickets.filter(t => t.status === 'Reopened').length;
             document.getElementById('m-closed').textContent = tickets.filter(t => ['Resolved', 'Closed'].includes(t.status)).length;
         }
+
         function clearFilters() { document.getElementById('searchInput').value = ''; document.getElementById('statusFilter').value = ''; document.getElementById('priorityFilter').value = ''; render() }
         function openModal(id) { document.getElementById(id).style.display = 'flex' }
         function closeModal(id) { document.getElementById(id).style.display = 'none' }
         
         function openTicketModal(id = null) {
-            document.getElementById('ticketForm').reset(); document.getElementById('editId').value = '';
+            document.getElementById('ticketForm').reset(); 
+            document.getElementById('editId').value = '';
             document.getElementById('ticketStatus').value = 'Open';
             populateSelects(); 
             document.getElementById('ticketModalTitle').textContent = id ? 'Edit Support Ticket' : 'Create Support Ticket';
             if (id) {
-                const t = tickets.find(x => String(x.id) === String(id)); if (!t) return;
+                const t = tickets.find(x => String(x.id) === String(id)); 
+                if (!t) return;
                 document.getElementById('editId').value = t.id;
                 document.getElementById('customerSelect').value = t.customerId || '';
                 document.getElementById('priority').value = t.priority || 'Medium';
@@ -814,15 +836,20 @@
             }
             openModal('ticketModal');
         }
+
         function saveTicket(e) {
             e.preventDefault();
             const editId = document.getElementById('editId').value;
             const custId = document.getElementById('customerSelect').value;
-            const cust = customers.find(c => String(c.id) === String(custId));
-            if (!custId) { showToast('Please select a customer'); return }
+            const cust = customers.find(c => String(c.id) === String(custId) || String(c.name) === String(custId));
+            if (!custId) { showToast('Please select a customer'); return; }
+            
             const now = new Date().toISOString();
             const payload = {
-                customerId: custId, customerName: cust?.name || '',
+                customerId: custId,
+                customerName: cust?.name || '',
+                customerPhone: cust?.phone || '',
+                customerEmail: cust?.email || '',
                 subject: document.getElementById('subject').value,
                 description: document.getElementById('description').value.trim(),
                 priority: document.getElementById('priority').value,
@@ -831,32 +858,45 @@
                 internalNotes: document.getElementById('internalNotes').value.trim(),
                 updatedAt: now
             };
+
             if (editId) {
-                const i = tickets.findIndex(t => String(t.id) === String(editId)); if (i >= 0) tickets[i] = { ...tickets[i], ...payload };
+                const i = tickets.findIndex(t => String(t.id) === String(editId)); 
+                if (i >= 0) tickets[i] = { ...tickets[i], ...payload };
                 showToast('Ticket updated successfully');
             } else {
                 const seq = nextTicketSequence();
                 tickets.unshift({ id: 'T-' + String(seq).padStart(4, '0'), ...payload, createdAt: now });
                 showToast('Support ticket created successfully');
             }
-            saveTickets(); closeModal('ticketModal'); render();
+            saveTickets(); 
+            closeModal('ticketModal'); 
+            render();
         }
+
         function nextTicketSequence() {
             const nums = tickets.map(t => parseInt(String(t.id || '').replace(/\D/g, ''), 10)).filter(Number.isFinite);
             return Math.max(0, ...nums) + 1;
         }
+
         function changeStatus(id, status) {
-            const t = tickets.find(x => String(x.id) === String(id)); if (!t) return;
-            t.status = status; t.updatedAt = new Date().toISOString(); saveTickets(); render(); showToast(`Ticket ${id} marked ${status}`);
+            const t = tickets.find(x => String(x.id) === String(id)); 
+            if (!t) return;
+            t.status = status; 
+            t.updatedAt = new Date().toISOString(); 
+            saveTickets(); 
+            render(); 
+            showToast(`Ticket ${id} marked ${status}`);
         }
+
         function viewTicket(id) {
-            const t = tickets.find(x => String(x.id) === String(id)); if (!t) return;
-            const c = customers.find(x => String(x.id) === String(t.customerId));
+            const t = tickets.find(x => String(x.id) === String(id)); 
+            if (!t) return;
+            const c = getCustomer(t);
             document.getElementById('viewBody').innerHTML = `
                 <div class="view-grid">
                 <div class="k">Ticket No.</div><div><b>#${esc(t.id)}</b></div>
-                <div class="k">Customer</div><div><b>${esc(c?.name || t.customerName || '—')}</b></div>
-                <div class="k">Contact</div><div>${esc(c?.phone || '—')} ${c?.email ? ' | ' + esc(c.email) : ''}</div>
+                <div class="k">Customer</div><div><b>${esc(c.name)}</b></div>
+                <div class="k">Contact</div><div><b>📞 ${esc(c.phone || 'No phone')}</b> ${c.email ? ' | ✉️ ' + esc(c.email) : ''}</div>
                 <div class="k">Subject</div><div><b>${esc(t.subject)}</b></div>
                 <div class="k">Priority</div><div class="${priorityClass(t.priority)}">${esc(t.priority)}</div>
                 <div class="k">Status</div><div><span class="badge ${statusClass(t.status)}">${esc(t.status)}</span></div>
@@ -871,21 +911,38 @@
                 <div class="notes">${esc(t.internalNotes || 'No internal notes.')}</div>`;
             openModal('viewModal');
         }
+
         function editTicket(id) { openTicketModal(id) }
         function deleteTicket(id) { pendingDeleteId = id; openModal('deleteModal') }
         function confirmDelete() {
             if (!pendingDeleteId) return;
-            tickets = tickets.filter(t => String(t.id) !== String(pendingDeleteId)); saveTickets(); pendingDeleteId = null; closeModal('deleteModal'); render(); showToast('Ticket deleted');
+            tickets = tickets.filter(t => String(t.id) !== String(pendingDeleteId)); 
+            saveTickets(); 
+            pendingDeleteId = null; 
+            closeModal('deleteModal'); 
+            render(); 
+            showToast('Ticket deleted');
         }
         function openCustomerPage() { window.location.href = 'customer.html' }
-        function showToast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; clearTimeout(window.__toast); window.__toast = setTimeout(() => el.style.display = 'none', 2200) }
-        window.addEventListener('storage', e => { if (e.key === CUSTOMER_KEY) { loadCustomers(); render() } if (e.key === TICKET_KEY) { loadTickets(); render() } });
+        function showToast(msg) { 
+            const el = document.getElementById('toast'); 
+            el.textContent = msg; 
+            el.style.display = 'block'; 
+            clearTimeout(window.__toast); 
+            window.__toast = setTimeout(() => el.style.display = 'none', 2200); 
+        }
+
+        window.addEventListener('storage', e => { 
+            if (e.key === CUSTOMER_KEY) { loadCustomers(); render(); } 
+            if (e.key === TICKET_KEY) { loadTickets(); render(); } 
+        });
+
         window.addEventListener('DOMContentLoaded', () => { 
             loadDynamicLists(); 
             loadCustomers(); 
             loadTickets(); 
             populateSelects(); 
-            render() 
+            render(); 
         });
     </script>
 </body>
