@@ -15,6 +15,79 @@ const customerSchema = new mongoose.Schema({
     openingBalanceType: { type: String, enum: ['Dr', 'Cr'], default: 'Dr' } // Dr = Receivable, Cr = Advance
 }, { timestamps: true, strict: false });
 
+
+// --- CRM Phase 1 Schemas ---
+const crmContactSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    customerId: { type: String, index: true },
+    customerName: String,
+    name: { type: String, required: true },
+    designation: String,
+    department: String,
+    contactType: String,
+    mobile: String,
+    alternateMobile: String,
+    email: String,
+    preferredCommunication: String,
+    remarks: String,
+    isPrimary: { type: Boolean, default: false },
+    createdBy: String
+}, { timestamps: true, strict: false });
+
+const crmPlantSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    customerId: { type: String, index: true },
+    customerName: String,
+    plantName: { type: String, required: true },
+    plantCode: String,
+    address: String,
+    district: String,
+    state: String,
+    pin: String,
+    industry: String,
+    unitDetails: String,
+    equipmentSummary: String,
+    status: { type: String, default: 'Active' },
+    remarks: String,
+    createdBy: String
+}, { timestamps: true, strict: false });
+
+const crmActivitySchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    customerId: { type: String, index: true },
+    customerName: String,
+    plantId: String,
+    plantName: String,
+    activityType: { type: String, default: 'Note' },
+    activityDate: { type: String, required: true },
+    activityTime: String,
+    subject: String,
+    details: String,
+    outcome: String,
+    nextAction: String,
+    nextFollowUp: String,
+    relatedModule: String,
+    relatedId: String,
+    createdBy: String
+}, { timestamps: true, strict: false });
+
+const crmDocumentSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    customerId: { type: String, index: true },
+    customerName: String,
+    plantId: String,
+    plantName: String,
+    documentType: String,
+    documentName: { type: String, required: true },
+    documentDate: String,
+    referenceNo: String,
+    fileName: String,
+    mimeType: String,
+    fileData: String,
+    remarks: String,
+    createdBy: String
+}, { timestamps: true, strict: false });
+
 // --- 8. Bank Account Schema ---
 const bankAccountSchema = new mongoose.Schema({
     id: String,
@@ -230,6 +303,10 @@ const customRecordSchema = new mongoose.Schema({
 
 module.exports = {
     Customer: mongoose.model('Customer', customerSchema),
+    CrmContact: mongoose.model('CrmContact', crmContactSchema),
+    CrmPlant: mongoose.model('CrmPlant', crmPlantSchema),
+    CrmActivity: mongoose.model('CrmActivity', crmActivitySchema),
+    CrmDocument: mongoose.model('CrmDocument', crmDocumentSchema),
     Supplier: mongoose.model('Supplier', supplierSchema),
     Item: mongoose.model('Item', itemSchema),
     Invoice: mongoose.model('Invoice', invoiceSchema),

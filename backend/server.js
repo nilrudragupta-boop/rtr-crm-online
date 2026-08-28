@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -900,6 +900,51 @@ app.delete('/api/follow-ups/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+
+// --- CRM Phase 1 Routes ---
+function crmRoutes(app, Model, basePath) {
+    app.get(basePath, async (req, res) => {
+        try {
+            const query = req.query.user ? { createdBy: req.query.user } : {};
+            const data = await Model.find(query).sort({ createdAt: -1 });
+            res.json({ success: true, data });
+        } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+    });
+    app.post(basePath, async (req, res) => {
+        try {
+            const payload = { ...req.body };
+            if (!payload.createdBy && req.query.user) payload.createdBy = req.query.user;
+            if (!payload.id) payload.id = `${basePath.replace('/api/','').replace(/-/g,'_')}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+            const data = await Model.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true, setDefaultsOnInsert: true });
+            res.status(200).json({ success: true, data });
+        } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+    });
+    app.delete(`${basePath}/:id`, async (req, res) => {
+        try { await Model.findOneAndDelete({ id: req.params.id }); res.json({ success: true }); }
+        catch (err) { res.status(500).json({ success: false, message: err.message }); }
+    });
+}
+crmRoutes(app, CrmContact, '/api/crm-contacts');
+crmRoutes(app, CrmPlant, '/api/crm-plants');
+crmRoutes(app, CrmActivity, '/api/crm-activities');
+crmRoutes(app, CrmDocument, '/api/crm-documents');
+
+app.get('/api/crm/customer/:id/360', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const customer = await Customer.findOne({ id });
+        if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
+        const [contacts, plants, activities, documents, followUps] = await Promise.all([
+            CrmContact.find({ customerId: id }).sort({ createdAt: -1 }),
+            CrmPlant.find({ customerId: id }).sort({ createdAt: -1 }),
+            CrmActivity.find({ customerId: id }).sort({ activityDate: -1, createdAt: -1 }).limit(50),
+            CrmDocument.find({ customerId: id }).select('-fileData').sort({ createdAt: -1 }),
+            FollowUp.find({ partyType: 'Customer', partyId: id }).sort({ date: 1 }).limit(20)
+        ]);
+        res.json({ success: true, data: { customer, contacts, plants, activities, documents, followUps } });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // --- Custom Field Routes ---
