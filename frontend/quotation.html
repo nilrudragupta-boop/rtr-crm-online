@@ -504,6 +504,8 @@
                 </div>
             </div>
 
+            <div id="enquiryContext" style="display:none;margin:12px 0;padding:10px 12px;border:1px solid #d7e3f0;border-radius:6px;background:#f7fbff;font-size:13px;"></div>
+
             <!-- Table -->
             <table id="quotationTable">
                 <thead>
@@ -732,6 +734,32 @@
             }
         }
 
+        window.enquiryContext = null;
+
+        function applyEnquiryContext() {
+            const p = new URLSearchParams(window.location.search);
+            if (p.get('fromEnquiry') !== '1' || !p.get('enquiryId')) return;
+            window.enquiryContext = {
+                enquiryId: p.get('enquiryId') || '', enquiryNo: p.get('enquiryNo') || '',
+                customerId: p.get('customerId') || '', customerName: p.get('customerName') || '',
+                plantName: p.get('plantName') || '', contactName: p.get('contactName') || '',
+                requirement: p.get('requirement') || '', subject: p.get('subject') || ''
+            };
+            const ref = document.getElementById('refNo');
+            if (ref && !ref.value && window.enquiryContext.enquiryNo) ref.value = 'QT-' + window.enquiryContext.enquiryNo.replace(/^ENQ-/, '');
+            const cust = document.getElementById('custName');
+            if (cust && window.enquiryContext.customerName) { cust.value = window.enquiryContext.customerName; fillCustomerDetails(); }
+            if (window.enquiryContext.contactName) document.getElementById('custContact').value = window.enquiryContext.contactName;
+            const context = document.getElementById('enquiryContext');
+            if (context) {
+                context.style.display = 'block';
+                context.innerHTML = '<b>Linked Enquiry:</b> ' + escapeHtml(window.enquiryContext.enquiryNo) +
+                    ' &nbsp;|&nbsp; <b>Subject:</b> ' + escapeHtml(window.enquiryContext.subject || '-') +
+                    (window.enquiryContext.plantName ? ' &nbsp;|&nbsp; <b>Plant:</b> ' + escapeHtml(window.enquiryContext.plantName) : '') +
+                    (window.enquiryContext.requirement ? '<br><b>Requirement:</b> ' + escapeHtml(window.enquiryContext.requirement) : '');
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
             const savedBankToggle = localStorage.getItem('quoteShowBankDetails');
             if (savedBankToggle !== null && document.getElementById('showBankDetailsToggle')) {
@@ -768,7 +796,7 @@
             fetchCustomFieldsConfig().then(() => fetchQuotationsData());
             loadItems();
             updateLastReferenceDisplay();
-            fetchQuotationReferences();
+            fetchQuotationReferences().then(() => applyEnquiryContext());
         });
 
         // 2. Load Customers
@@ -1141,6 +1169,12 @@
                 status: document.getElementById("quotationStatus").value,
                 custContact: document.getElementById("custContact").value,
                 custAddress: document.getElementById("custAddress").value,
+                enquiryId: window.enquiryContext?.enquiryId || '',
+                enquiryNo: window.enquiryContext?.enquiryNo || '',
+                enquiryRequirement: window.enquiryContext?.requirement || '',
+                enquirySubject: window.enquiryContext?.subject || '',
+                plantName: window.enquiryContext?.plantName || '',
+                contactName: window.enquiryContext?.contactName || '',
                 items,
                 grandTotal: document.getElementById("grandTotal").value,
                 terms: document.getElementById("termsConditions").value
