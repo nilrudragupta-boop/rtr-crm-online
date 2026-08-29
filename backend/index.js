@@ -88,6 +88,68 @@ const crmDocumentSchema = new mongoose.Schema({
     createdBy: String
 }, { timestamps: true, strict: false });
 
+
+// --- CRM Sales Enquiry Workflow Schemas ---
+const crmEnquirySchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    enquiryNo: { type: String, required: true },
+    enquiryDate: { type: String, required: true },
+    customerId: { type: String, index: true },
+    customerName: String,
+    plantId: String,
+    plantName: String,
+    contactId: String,
+    contactName: String,
+    source: String,
+    subject: String,
+    requirement: String,
+    items: { type: Array, default: [] },
+    estimatedValue: { type: Number, default: 0 },
+    targetDate: String,
+    assignedTo: String,
+    priority: { type: String, default: 'Medium' },
+    status: { type: String, default: 'New' },
+    probability: { type: Number, default: 20 },
+    lostReason: String,
+    remarks: String,
+    createdBy: { type: String, default: 'System' }
+}, { timestamps: true, strict: false });
+
+const crmTechnicalReviewSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    enquiryId: { type: String, index: true },
+    enquiryNo: String,
+    reviewDate: String,
+    reviewer: String,
+    technicalStatus: { type: String, default: 'Pending' },
+    specification: String,
+    materialComposition: String,
+    drawingReference: String,
+    deviations: String,
+    feasibility: String,
+    remarks: String,
+    createdBy: { type: String, default: 'System' }
+}, { timestamps: true, strict: false });
+
+const crmNegotiationSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    enquiryId: { type: String, index: true },
+    enquiryNo: String,
+    negotiationDate: String,
+    customerContact: String,
+    quotedValue: { type: Number, default: 0 },
+    customerTarget: { type: Number, default: 0 },
+    offeredValue: { type: Number, default: 0 },
+    discountPercent: { type: Number, default: 0 },
+    expectedValue: { type: Number, default: 0 },
+    outcome: { type: String, default: 'Open' },
+    reason: String,
+    nextAction: String,
+    nextFollowUp: String,
+    remarks: String,
+    createdBy: { type: String, default: 'System' }
+}, { timestamps: true, strict: false });
+
 // --- 8. Bank Account Schema ---
 const bankAccountSchema = new mongoose.Schema({
     id: String,
@@ -307,6 +369,9 @@ module.exports = {
     CrmPlant: mongoose.model('CrmPlant', crmPlantSchema),
     CrmActivity: mongoose.model('CrmActivity', crmActivitySchema),
     CrmDocument: mongoose.model('CrmDocument', crmDocumentSchema),
+    CrmEnquiry: mongoose.model('CrmEnquiry', crmEnquirySchema),
+    CrmTechnicalReview: mongoose.model('CrmTechnicalReview', crmTechnicalReviewSchema),
+    CrmNegotiation: mongoose.model('CrmNegotiation', crmNegotiationSchema),
     Supplier: mongoose.model('Supplier', supplierSchema),
     Item: mongoose.model('Item', itemSchema),
     Invoice: mongoose.model('Invoice', invoiceSchema),

@@ -123,6 +123,23 @@ const apiClient = {
     saveQuotation: (data) => apiClient._saveCollection('quotations', data),
     deleteQuotation: (id) => apiClient._deleteCollection('quotations', id),
 
+    // --- CRM Enquiry Workflow ---
+    getCrmEnquiries: () => apiClient._getCollection('crm-enquiries'),
+    saveCrmEnquiry: (data) => apiClient._saveCollection('crm-enquiries', data),
+    deleteCrmEnquiry: (id) => apiClient._deleteCollection('crm-enquiries', id),
+    getCrmTechnicalReviews: () => apiClient._getCollection('crm-technical-reviews'),
+    saveCrmTechnicalReview: (data) => apiClient._saveCollection('crm-technical-reviews', data),
+    deleteCrmTechnicalReview: (id) => apiClient._deleteCollection('crm-technical-reviews', id),
+    getCrmNegotiations: () => apiClient._getCollection('crm-negotiations'),
+    saveCrmNegotiation: (data) => apiClient._saveCollection('crm-negotiations', data),
+    deleteCrmNegotiation: (id) => apiClient._deleteCollection('crm-negotiations', id),
+    getCrmEnquiryWorkflow: async (id) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/crm/enquiry/${encodeURIComponent(id)}/workflow${apiClient._getAuthQuery().replace('?', '&')}`, { cache: 'no-store' });
+            return await response.json();
+        } catch (error) { return { success: false, message: error.message }; }
+    },
+
     // --- Invoices ---
     getInvoices: async () => {
         try {

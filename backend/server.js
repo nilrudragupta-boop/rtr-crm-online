@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -930,6 +930,9 @@ crmRoutes(app, CrmContact, '/api/crm-contacts');
 crmRoutes(app, CrmPlant, '/api/crm-plants');
 crmRoutes(app, CrmActivity, '/api/crm-activities');
 crmRoutes(app, CrmDocument, '/api/crm-documents');
+crmRoutes(app, CrmEnquiry, '/api/crm-enquiries');
+crmRoutes(app, CrmTechnicalReview, '/api/crm-technical-reviews');
+crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
 
 app.get('/api/crm/customer/:id/360', async (req, res) => {
     try {
@@ -944,6 +947,108 @@ app.get('/api/crm/customer/:id/360', async (req, res) => {
             FollowUp.find({ partyType: 'Customer', partyId: id }).sort({ date: 1 }).limit(20)
         ]);
         res.json({ success: true, data: { customer, contacts, plants, activities, documents, followUps } });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// --- Integrated Customer 360 Business Timeline ---
+// This read-only aggregation connects the existing transaction modules to the CRM customer.
+app.get('/api/crm/customer/:id/business-360', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const customer = await Customer.findOne({ id }).lean();
+        if (!customer) return res.status(404).json({ success: false, message: 'Customer not found' });
+
+        const customerName = String(customer.name || '').trim();
+        const nameRegex = customerName ? new RegExp('^' + customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') : null;
+
+        const nameOrId = [];
+        if (id) {
+            nameOrId.push({ customerId: id });
+            nameOrId.push({ partyId: id });
+        }
+        if (nameRegex) {
+            nameOrId.push({ customerName: nameRegex });
+            nameOrId.push({ custName: nameRegex });
+        }
+
+        const [quotations, invoices, notes, customRecords] = await Promise.all([
+            nameRegex ? Quotation.find({ custName: nameRegex }).sort({ date: -1, createdAt: -1 }).lean() : [],
+            Invoice.find(nameOrId.filter(x => x.customerId || x.customerName)).sort({ date: -1, createdAt: -1 }).lean(),
+            nameRegex ? CreditDebitNote.find({ customerName: nameRegex }).sort({ date: -1, createdAt: -1 }).lean() : [],
+            CustomRecord.find({}).sort({ createdAt: -1 }).limit(1000).lean()
+        ]);
+
+        // Generic custom records are used by configurable modules. Include only records
+        // that clearly identify this customer; this keeps the CRM future-proof without
+        // changing existing custom-module logic.
+        const customerRecords = customRecords.filter(r => {
+            const values = [r.customerId, r.partyId, r.customerName, r.partyName, r.custName, r.customer, r.companyName]
+                .filter(v => v !== undefined && v !== null).map(String);
+            return values.some(v => v === id || (customerName && v.toLowerCase() === customerName.toLowerCase()));
+        });
+
+        const money = v => Number(v || 0) || 0;
+        const summary = {
+            quotations: quotations.length,
+            quotationValue: quotations.reduce((a, q) => a + money(q.grandTotal), 0),
+            invoices: invoices.length,
+            invoicedValue: invoices.reduce((a, i) => a + money(i.invoiceTotal ?? i.grandTotal), 0),
+            paidValue: invoices.reduce((a, i) => a + money(i.amountPaid), 0),
+            outstandingValue: invoices.reduce((a, i) => a + Math.max(0, money(i.invoiceTotal ?? i.grandTotal) - money(i.amountPaid)), 0),
+            creditDebitNotes: notes.length,
+            customTransactions: customerRecords.length
+        };
+
+        const timeline = [];
+        quotations.forEach(q => timeline.push({
+            date: q.date || q.createdAt, type: 'Quotation', icon: 'fa-file-invoice-dollar',
+            reference: q.refNo || q.id || '-', status: q.status || 'Saved',
+            amount: money(q.grandTotal), description: 'Quotation created / updated', sourceId: q.id || q.refNo
+        }));
+        invoices.forEach(i => {
+            timeline.push({ date: i.date || i.createdAt, type: 'Invoice', icon: 'fa-file-invoice',
+                reference: i.invoiceNo || i.invoice_no || i.id || '-', status: i.status || 'UNPAID',
+                amount: money(i.invoiceTotal ?? i.grandTotal), paid: money(i.amountPaid),
+                description: 'Customer invoice', sourceId: i.id || i.invoiceNo
+            });
+            if (money(i.amountPaid) > 0) timeline.push({
+                date: i.updatedAt || i.date || i.createdAt, type: 'Payment', icon: 'fa-money-bill-wave',
+                reference: i.invoiceNo || i.invoice_no || '-', status: 'RECEIVED', amount: money(i.amountPaid),
+                description: 'Payment recorded against invoice', sourceId: i.id || i.invoiceNo
+            });
+        });
+        notes.forEach(n => timeline.push({ date: n.date || n.createdAt, type: n.type === 'CREDIT' ? 'Credit Note' : 'Debit Note',
+            icon: n.type === 'CREDIT' ? 'fa-file-circle-minus' : 'fa-file-circle-plus', reference: n.noteNo || '-',
+            status: n.status || 'ACTIVE', amount: money(n.totalAmount), description: n.reason || 'Credit / Debit note', sourceId: n.id || n.noteNo
+        }));
+        customerRecords.forEach(r => timeline.push({
+            date: r.date || r.enquiryDate || r.createdAt, type: r.moduleName || 'Business Record', icon: 'fa-link',
+            reference: r.refNo || r.enquiryNo || r.orderNo || r.poNo || r.id || r._id || '-',
+            status: r.status || 'Recorded', amount: money(r.grandTotal ?? r.totalAmount ?? r.amount),
+            description: r.subject || r.description || r.enquiryType || 'Linked business record', sourceId: r._id
+        }));
+
+        timeline.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        res.json({ success: true, data: { customer, summary, quotations, invoices, notes, customRecords: customerRecords, timeline } });
+    } catch (err) {
+        console.error('Business 360 error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
+app.get('/api/crm/enquiry/:id/workflow', async (req, res) => {
+    try {
+        const enquiry = await CrmEnquiry.findOne({ id: req.params.id }).lean();
+        if (!enquiry) return res.status(404).json({ success: false, message: 'Enquiry not found' });
+        const [reviews, negotiations, quotations] = await Promise.all([
+            CrmTechnicalReview.find({ enquiryId: req.params.id }).sort({ createdAt: -1 }).lean(),
+            CrmNegotiation.find({ enquiryId: req.params.id }).sort({ negotiationDate: -1, createdAt: -1 }).lean(),
+            Quotation.find({ enquiryId: req.params.id }).sort({ date: -1, createdAt: -1 }).lean()
+        ]);
+        const invoiceQuery = { $or: [{ enquiryId: req.params.id }, { enquiryNo: enquiry.enquiryNo }] };
+        const invoices = await Invoice.find(invoiceQuery).sort({ date: -1, createdAt: -1 }).lean();
+        res.json({ success: true, data: { enquiry, reviews, negotiations, quotations, invoices } });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
