@@ -3,13 +3,32 @@
  */
 const B360UI = {
     currentType: 'customer',
-    currentPartyId: 'CUST-000101',
+    currentPartyId: null,
     currentTab: 'overview',
     activeData: null,
 
-    init: function () {
+    init: async function () {
+        // 1. Sync live backend customer data if available
+        if (typeof apiClient !== 'undefined' && apiClient.getCustomers) {
+            try {
+                const res = await apiClient.getCustomers();
+                const remote = Array.isArray(res) ? res : (res && res.data ? res.data : null);
+                if (remote && remote.length) {
+                    localStorage.setItem('customers', JSON.stringify(remote));
+                }
+            } catch (err) {
+                console.warn('apiClient sync bypassed:', err);
+            }
+        }
+
         this.bindSearch();
-        this.loadParty(this.currentType, this.currentPartyId);
+
+        // 2. Select initial party
+        const initialList = Business360Engine.searchParties(this.currentType, '');
+        if (initialList.length) {
+            this.currentPartyId = initialList[0].id;
+            this.loadParty(this.currentType, this.currentPartyId);
+        }
     },
 
     toast: function (msg, type = 'success') {
@@ -24,9 +43,14 @@ const B360UI = {
 
     onPartyTypeChange: function () {
         this.currentType = document.getElementById('partyTypeSelect').value;
+        const searchInput = document.getElementById('partySearchInput');
+        if (searchInput) searchInput.value = '';
+
         const pool = Business360Engine.searchParties(this.currentType, '');
         if (pool.length > 0) {
             this.loadParty(this.currentType, pool[0].id);
+        } else {
+            document.getElementById('b360TabViewport').innerHTML = `<div style="padding:20px; text-align:center; color:#888;">No ${this.currentType} records available.</div>`;
         }
     },
 
@@ -55,14 +79,10 @@ const B360UI = {
         const input = document.getElementById('partySearchInput');
         const results = document.getElementById('partySearchResults');
 
-        // Show on typing
         input.addEventListener('input', () => this.showDropdownList());
-
-        // Show all options immediately on click or focus
         input.addEventListener('focus', () => this.showDropdownList());
         input.addEventListener('click', () => this.showDropdownList());
 
-        // Close when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.slds-search-box')) {
                 results.style.display = 'none';
@@ -109,7 +129,6 @@ const B360UI = {
         if (bcName) bcName.innerText = p.name;
 
         const actionButtons = this.currentType === 'customer' ? `
-      <button class="slds-btn" onclick="B360UI.openQuickEnquiryModal('${p.id}')">📩 New Enquiry</button>
       <button class="slds-btn" onclick="window.location.href='quotation.html';">💰 New Quotation</button>
       <button class="slds-btn slds-btn-brand" onclick="window.location.href='direct_sale.html';">⚡ Direct Sale</button>
       <button class="slds-btn" onclick="B360UI.logCallModal('${p.id}')">📞 Log Activity</button>
@@ -202,6 +221,7 @@ const B360UI = {
     renderCurrentTab: function () {
         const vp = document.getElementById('b360TabViewport');
         const d = this.activeData;
+        if (!d) return;
 
         if (this.currentTab === 'overview') {
             vp.innerHTML = `
@@ -213,14 +233,14 @@ const B360UI = {
             <div class="slds-card-header">Factual Business Insights</div>
             <div class="slds-card-body">
               <ul style="padding-left:18px; line-height:1.8;">
-                ${d.insights.map(i => `<li>${i}</li>`).join('')}
+                ${(d.insights || []).map(i => `<li>${i}</li>`).join('')}
               </ul>
             </div>
           </div>
           <div class="slds-card">
-            <div class="slds-card-header">Key Contacts (${d.contacts.length})</div>
+            <div class="slds-card-header">Key Contacts (${d.contacts ? d.contacts.length : 0})</div>
             <div class="slds-card-body">
-              ${d.contacts.map(c => `
+              ${(d.contacts || []).map(c => `
                 <div style="padding:6px 0; border-bottom:1px solid var(--slds-border-subtle);">
                   <div class="b360-link">${c.name}</div>
                   <div style="font-size:11px; color:#666;">${c.designation} (${c.department})</div>
@@ -358,19 +378,8 @@ const B360UI = {
     logCallModal: function (partyId) {
         const notes = prompt("Enter conversation notes:");
         if (notes) {
-            this.activeData.activities.unshift({ id: `ACT-${Date.now()}`, type: 'Call', outcome: notes, date: new Date().toISOString().split('T')[0] });
+            this.activeData.activities.unshift({ id: `ACT-${Date.now()}`, type: 'Call', outcome: notes, date: new Date().toLocaleDateString('en-GB') });
             this.toast("Activity recorded.");
-            this.renderCurrentTab();
-        }
-    },
-
-    openQuickEnquiryModal: function (partyId) {
-        const subj = prompt("Enter enquiry requirement:");
-        if (subj) {
-            this.activeData.enquiries.unshift({ id: `ENQ-26-27-${Math.floor(1000 + Math.random() * 9000)}`, customerId: partyId, subject: subj, estimatedValue: 500000, status: 'NEW' });
-            this.activeData.kpis.enquiriesCount++;
-            this.toast("Enquiry logged.");
-            this.renderKPIs();
             this.renderCurrentTab();
         }
     },
