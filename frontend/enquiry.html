@@ -36,4 +36,21 @@ function createQuotationFromEnquiry(encodedId){const id=decodeURIComponent(encod
 function activeStep(status,x){const order=['New','Technical Review','Quotation','Negotiation','PO Received','Order Processing','Completed'];let s=order.indexOf(status),i=order.indexOf(x);if(status==='Under Review')s=1;return i>=0&&s>=i}
 init();
 </script>
+
+<script>
+function openEnquiryFromUrl() {
+    const p = new URLSearchParams(window.location.search);
+    const id = p.get('id');
+    const enquiryNo = p.get('enquiryNo');
+    if (!id && !enquiryNo) return;
+    // Keep the URL as the source of truth for the selected enquiry.
+    window.currentEnquiryId = id || null;
+    window.currentEnquiryNo = enquiryNo || null;
+    document.dispatchEvent(new CustomEvent('crm:open-enquiry', {
+        detail: { id, enquiryNo }
+    }));
+}
+document.addEventListener('DOMContentLoaded', openEnquiryFromUrl);
+</script>
+
 </body></html>
