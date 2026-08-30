@@ -76,6 +76,7 @@ const B360UI = {
     esc(value) { return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c])); },
     money(value) { return `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; },
     lakhs(value) { return `₹${(Number(value || 0) / 100000).toFixed(2)} L`; },
+    date(value) { if (!value) return '—'; const d=new Date(value); return isNaN(d) ? this.esc(value) : d.toLocaleDateString('en-GB'); },
 
     onPartyTypeChange() {
         this.currentType = document.getElementById('partyTypeSelect').value;
@@ -331,7 +332,7 @@ const B360UI = {
             const recordId = String(r.id || '');
             const ref = String(r.ref || recordId || '');
             const target = r.page === 'enquiry.html' ? 'Enquiry Management' : (r.page === 'quotation.html' ? 'Quotation Management' : 'Purchase Management');
-            return `<tr><td><a href="${r.page}?${r.page === 'enquiry.html' ? `id=${encodeURIComponent(recordId)}` : `refNo=${encodeURIComponent(ref)}`}" class="b360-link-btn b360-record-link" title="Open ${target}: ${this.esc(ref)}" onclick="event.preventDefault();B360UI.linkRecord('${r.page}','id',${JSON.stringify(recordId)},${JSON.stringify(ref)})">${this.esc(ref)} <span aria-hidden="true">↗</span></a></td><td>${this.esc(r.date || '—')}</td><td>${this.esc(r.targetDate || '—')}</td><td>${this.esc(r.desc || '—')}</td><td>${this.money(r.value)}</td><td><span class="slds-badge slds-badge-info">${this.esc(r.status || '—')}</span></td></tr>`;
+            return `<tr><td><a href="${r.page}?${r.page === 'enquiry.html' ? `id=${encodeURIComponent(recordId)}` : `refNo=${encodeURIComponent(ref)}`}" class="b360-link-btn b360-record-link" title="Open ${target}: ${this.esc(ref)}" onclick="event.preventDefault();B360UI.linkRecord('${r.page}','id',${JSON.stringify(recordId)},${JSON.stringify(ref)})">${this.esc(ref)} <span aria-hidden="true">↗</span></a></td><td>${this.date(r.date)}</td><td>${this.date(r.targetDate)}</td><td>${this.esc(r.desc || '—')}</td><td>${this.money(r.value)}</td><td><span class="slds-badge slds-badge-info">${this.esc(r.status || '—')}</span></td></tr>`;
         }).join('') : `<tr><td colspan="6" class="b360-empty-small">No linked records found.</td></tr>`}</tbody></table></div></div></div>`;
     },
 
