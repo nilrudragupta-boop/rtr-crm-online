@@ -1,208 +1,246 @@
 /**
  * RISE CRM — Business 360° Relational Intelligence Engine
- * Synchronizes with live customer/supplier registries & apiClient.
+ *
+ * One normalized data layer for Customer 360° and Supplier 360°.
+ * No demo/fallback financial figures are injected: all KPIs are derived
+ * from the records available in the application datastore/localStorage.
  */
 const Business360Engine = {
-    getStore: function (key) {
+    getStore(key) {
         try {
-            const data = localStorage.getItem(key);
-            return data ? JSON.parse(data) : [];
+            const raw = localStorage.getItem(key);
+            const data = raw ? JSON.parse(raw) : [];
+            return Array.isArray(data) ? data : [];
         } catch (e) {
-            console.warn(`Error reading localStorage key: ${key}`, e);
+            console.warn(`Business360: cannot read ${key}`, e);
             return [];
         }
     },
 
-    // 1. Unified Search reading directly from live database/localStorage
-    searchParties: function (type, term = '') {
-        const q = (term || '').trim().toLowerCase();
-
-        if (type === 'customer') {
-            // Prioritize live 'customers' storage from customer.html
-            let customers = this.getStore('customers');
-            if (!customers.length) customers = this.getStore('crm_customers');
-
-            return customers
-                .filter(c => c && c.name && c.name.toUpperCase() !== "ANONYMOUS")
-                .filter(c => {
-                    if (!q) return true;
-                    const name = (c.name || c.customerName || '').toLowerCase();
-                    const code = (c.id || c.customerCode || c.code || '').toLowerCase();
-                    const gstin = (c.gst || c.gstin || '').toLowerCase();
-                    const city = (c.district || c.city || c.address || c.state || '').toLowerCase();
-                    const contact = (c.contact || c.phone || '').toLowerCase();
-                    return name.includes(q) || code.includes(q) || gstin.includes(q) || city.includes(q) || contact.includes(q);
-                })
-                .map(c => ({
-                    id: String(c.id || c.customerCode || c.code || 'CUST-001'),
-                    name: c.name || c.customerName || 'Unnamed Customer',
-                    code: c.code || c.customerCode || c.id || 'CUST',
-                    gstin: c.gst || c.gstin || 'N/A',
-                    pan: c.pan || 'N/A',
-                    industry: c.industry || 'Thermal & Industrial Power',
-                    type: 'Customer',
-                    grade: c.grade || 'A',
-                    phone: c.contact || c.phone || c.mobile || 'N/A',
-                    email: c.email || 'N/A',
-                    location: [c.district, c.state, c.pin].filter(Boolean).join(', ') || c.address || 'India',
-                    owner: c.owner || 'Sales Team'
-                }));
-        } else {
-            // Prioritize live 'suppliers' storage from supplier.html
-            let suppliers = this.getStore('suppliers');
-            if (!suppliers.length) suppliers = this.getStore('crm_suppliers');
-
-            // Fallback supplier seed if store is empty
-            if (!suppliers.length) {
-                suppliers = [
-                    { id: 'SUP-000101', name: 'Bharat Heavy Castings & Forgings', code: 'BHC-01', gstin: '27AAACB1122K1Z9', category: 'Castings & Alloy Spares', city: 'Rourkela', state: 'Odisha', phone: '+91 661 2500 110', email: 'sales@bhcforgings.com', grade: 'A' },
-                    { id: 'SUP-000102', name: 'Apex Industrial Rubber Belts Pvt Ltd', code: 'ARB-02', gstin: '19AAACA9922L1Z3', category: 'Rubber & Conveyor Belts', city: 'Kolkata', state: 'West Bengal', phone: '+91 33 2289 4400', email: 'orders@apexrubber.in', grade: 'B' }
-                ];
-                localStorage.setItem('suppliers', JSON.stringify(suppliers));
-            }
-
-            return suppliers
-                .filter(s => s && (s.name || s.supplierName))
-                .filter(s => {
-                    if (!q) return true;
-                    const name = (s.name || s.supplierName || '').toLowerCase();
-                    const code = (s.id || s.supplierCode || s.code || '').toLowerCase();
-                    const gstin = (s.gstin || s.gst || '').toLowerCase();
-                    return name.includes(q) || code.includes(q) || gstin.includes(q);
-                })
-                .map(s => ({
-                    id: String(s.id || s.supplierCode || s.code || 'SUP-001'),
-                    name: s.name || s.supplierName || 'Unnamed Supplier',
-                    code: s.code || s.supplierCode || s.id || 'SUP',
-                    gstin: s.gstin || s.gst || 'N/A',
-                    pan: s.pan || 'N/A',
-                    industry: s.category || s.industry || 'Spares & Industrial Supplies',
-                    type: 'Supplier',
-                    grade: s.grade || 'A',
-                    phone: s.phone || s.contact || 'N/A',
-                    email: s.email || 'N/A',
-                    location: [s.city || s.district, s.state].filter(Boolean).join(', ') || s.address || 'India',
-                    owner: s.owner || 'Purchase Team'
-                }));
-        }
+    setStore(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(Array.isArray(value) ? value : [])); } catch (e) {}
     },
 
-    // 2. Fetch live profile for Customer
-    getCustomer360Data: function (customerId) {
-        const list = this.searchParties('customer', '');
-        const cust = list.find(c => String(c.id) === String(customerId)) || list[0];
-        if (!cust) return null;
+    text(value) { return String(value ?? '').trim(); },
+    lower(value) { return this.text(value).toLowerCase(); },
+    num(value) {
+        if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+        const n = parseFloat(String(value ?? '').replace(/[,₹\s]/g, ''));
+        return Number.isFinite(n) ? n : 0;
+    },
+    first(...values) { return values.find(v => this.text(v)) || ''; },
 
-        const invoices = this.getStore('invoices').concat(this.getStore('crm_invoices'))
-            .filter(i => (String(i.customerId) === String(cust.id) || (i.customer_name && i.customer_name.toLowerCase() === cust.name.toLowerCase()) || (i.customerName && i.customerName.toLowerCase() === cust.name.toLowerCase())));
+    identity(p) {
+        return {
+            id: this.first(p.id, p.customerId, p.supplierId, p._id, p.code, p.customerCode, p.supplierCode),
+            name: this.first(p.name, p.customerName, p.supplierName, p.companyName),
+            code: this.first(p.code, p.customerCode, p.supplierCode, p.id),
+            gstin: this.first(p.gstin, p.gst, p.gstNo, p.gstNumber),
+            pan: this.first(p.pan, p.panNo),
+            phone: this.first(p.phone, p.contact, p.mobile, p.mobileNo),
+            email: this.first(p.email, p.emailId),
+            location: this.first(
+                [p.city || p.district, p.state, p.pin || p.pincode].filter(Boolean).join(', '),
+                p.address,
+                p.location
+            ),
+            industry: this.first(p.industry, p.category, p.businessType, 'Industrial & Power Sector'),
+            grade: this.first(p.grade, 'A'),
+            owner: this.first(p.owner, p.salesOwner, p.purchaseOwner, '—')
+        };
+    },
 
-        const enquiries = this.getStore('crm_enquiries').filter(e => String(e.customerId) === String(cust.id));
-        const quotations = this.getStore('crm_quotations').filter(q => String(q.customerId) === String(cust.id));
-        const plants = this.getStore('crm_plants').filter(p => String(p.customerId) === String(cust.id));
-        const contacts = this.getStore('crm_contacts').filter(c => String(c.customerId) === String(cust.id));
-        const equipment = this.getStore('crm_equipment').filter(e => String(e.customerId) === String(cust.id));
-        const tickets = this.getStore('crm_tickets').filter(t => String(t.customerId) === String(cust.id));
-        const activities = this.getStore('crm_activities').filter(a => String(a.customerId) === String(cust.id));
+    searchParties(type, term = '') {
+        const q = this.lower(term);
+        let source = this.getStore(type === 'customer' ? 'customers' : 'suppliers');
+        if (!source.length) source = this.getStore(type === 'customer' ? 'crm_customers' : 'crm_suppliers');
 
-        let totalInvoiced = invoices.reduce((acc, inv) => acc + (parseFloat(inv.invoice_total || inv.total || inv.grandTotal || 0)), 0);
-        let totalPaid = invoices.reduce((acc, inv) => acc + (parseFloat(inv.total_paid || inv.paid_amount || inv.paid || (inv.status === 'PAID' ? (inv.invoice_total || inv.total || 0) : 0))), 0);
+        return source
+            .filter(p => p && this.text(p.name || p.customerName || p.supplierName))
+            .map(p => {
+                const x = this.identity(p);
+                return {
+                    ...x,
+                    id: String(x.id || `${type}_${x.name}`),
+                    type: type === 'customer' ? 'Customer' : 'Supplier'
+                };
+            })
+            .filter(p => this.lower(p.name) !== 'anonymous')
+            .filter(p => !q || [p.name, p.code, p.gstin, p.pan, p.phone, p.email, p.location]
+                .some(v => this.lower(v).includes(q)));
+    },
 
-        // Default fallback baseline if no invoices exist yet
-        if (invoices.length === 0) {
-            totalInvoiced = 4850000;
-            totalPaid = 3600000;
-        }
+    matches(record, party) {
+        if (!record || !party) return false;
+        const ids = [record.customerId, record.supplierId, record.partyId, record.customer_id, record.supplier_id,
+            record.customer?.id, record.supplier?.id, record.party?.id, record.idCustomer, record.idSupplier]
+            .filter(v => this.text(v)).map(v => this.lower(v));
+        const names = [record.customerName, record.customer_name, record.custName, record.customer,
+            record.supplierName, record.supplier_name, record.vendorName, record.vendor,
+            record.partyName, record.party, record.customer?.name, record.supplier?.name, record.party?.name]
+            .filter(v => typeof v === 'string' && this.text(v)).map(v => this.lower(v));
+        const codes = [record.customerCode, record.supplierCode, record.partyCode, record.code]
+            .filter(v => this.text(v)).map(v => this.lower(v));
+        const gstins = [record.gstin, record.gst, record.customerGST, record.customer_gst, record.supplierGST]
+            .filter(v => this.text(v)).map(v => this.lower(v));
+        const partyIds = [party.id, party.code].filter(v => this.text(v)).map(v => this.lower(v));
+        const partyName = this.lower(party.name);
+        const partyGstin = this.lower(party.gstin);
+        return ids.some(v => partyIds.includes(v)) ||
+            names.includes(partyName) ||
+            codes.some(v => partyIds.includes(v)) ||
+            (!!partyGstin && gstins.includes(partyGstin));
+    },
 
-        const outstanding = Math.max(0, totalInvoiced - totalPaid);
-        const overdue = Math.round(outstanding * 0.45);
+    dateOf(r) { return this.first(r.date, r.invoiceDate, r.invoice_date, r.purchaseDate, r.enquiryDate, r.createdAt, r.updatedAt); },
+    amountOf(r) {
+        return this.num(this.first(r.grandTotal, r.invoiceTotal, r.invoice_total, r.total, r.totalPaid,
+            r.totalValue, r.estimatedValue, r.total, r.amount, r.netAmount, r.value, r.purchaseValue, r.totalPaid));
+    },
+
+    buildCustomer360(party) {
+        const all = key => this.getStore(key);
+        const invoices = [...all('invoices'), ...all('crm_invoices')].filter(r => this.matches(r, party));
+        const sales = [...all('sales_records')].filter(r => this.matches(r, party));
+        const enquiries = all('crm_enquiries').filter(r => this.matches(r, party));
+        const quotations = [...all('quotations'), ...all('crm_quotations')].filter(r => this.matches(r, party));
+        const contacts = all('crm_contacts').filter(r => this.matches(r, party));
+        const plants = all('crm_plants').filter(r => this.matches(r, party));
+        const equipment = all('crm_equipment').filter(r => this.matches(r, party));
+        const tickets = all('crm_tickets').filter(r => this.matches(r, party));
+        const activities = all('crm_activities').filter(r => this.matches(r, party));
+        const followups = all('follow_ups').filter(r => this.matches(r, party));
+        const reminders = all('reminders').filter(r => this.matches(r, party));
+        const returns = all('returns').filter(r => this.matches(r, party));
+        const creditDebitNotes = all('credit_debit_notes').filter(r => this.matches(r, party));
+        const marketingVisits = all('marketing-visits').filter(r => this.matches(r, party));
+
+        const uniqueById = rows => Array.from(new Map(rows.map((r, i) => [String(r.id || r._id || r.invoiceNo || r.refNo || i), r])).values());
+        const transactionInvoices = uniqueById([...invoices, ...sales]);
+        const totalInvoiced = transactionInvoices.reduce((s, r) => s + this.amountOf(r), 0);
+        const totalReceived = transactionInvoices.reduce((s, r) => {
+            const paid = this.first(r.total_paid, r.paid_amount, r.paid, r.receivedAmount, r.amountReceived);
+            if (paid !== '') return s + this.num(paid);
+            return this.lower(r.status) === 'paid' ? s + this.amountOf(r) : s;
+        }, 0);
+        const outstanding = Math.max(0, totalInvoiced - totalReceived);
+        const overdue = transactionInvoices.reduce((s, r) => {
+            const status = this.lower(r.status);
+            const due = this.first(r.dueAmount, r.outstanding, r.balanceDue);
+            return s + (status.includes('overdue') ? this.num(due || this.amountOf(r)) : 0);
+        }, 0);
+        const quotationValue = quotations.reduce((s, r) => s + this.amountOf(r), 0);
+        const orderValue = [...sales].reduce((s, r) => s + this.amountOf(r), 0);
+        const openTickets = tickets.filter(t => !['closed', 'resolved', 'completed'].includes(this.lower(t.status))).length;
+        const pendingFollowups = followups.filter(f => !['completed', 'closed', 'done'].includes(this.lower(f.status))).length;
+        const score = Math.round(Math.min(100,
+            (totalInvoiced > 0 ? 40 : 0) +
+            (outstanding <= 0 ? 25 : outstanding < totalInvoiced * 0.25 ? 18 : 8) +
+            (openTickets === 0 ? 20 : Math.max(5, 20 - openTickets * 4)) +
+            (pendingFollowups === 0 ? 15 : 8)
+        ));
 
         return {
-            party: cust,
+            party,
             kpis: {
-                enquiriesCount: enquiries.length || 4,
-                quotationsVal: quotations.reduce((a, b) => a + (parseFloat(b.totalValue) || 0), 0) || 3250000,
-                ordersVal: Math.round(totalInvoiced * 0.85),
+                enquiriesCount: enquiries.length,
+                quotationsVal: quotationValue,
+                ordersVal: orderValue,
                 invoicedVal: totalInvoiced,
                 outstandingVal: outstanding,
-                receivedVal: totalPaid,
-                openTickets: tickets.filter(t => t.status !== 'CLOSED').length,
-                pendingFollowups: 2,
-                score: 85
+                receivedVal: totalReceived,
+                openTickets,
+                pendingFollowups,
+                score
             },
             financialSummary: {
-                totalInvoiced,
-                totalReceived: totalPaid,
-                outstanding,
-                overdue,
-                ageing: {
-                    b0_30: Math.round(outstanding * 0.40),
-                    b31_60: Math.round(outstanding * 0.30),
-                    b61_90: Math.round(outstanding * 0.15),
-                    b91_180: Math.round(outstanding * 0.10),
-                    b180_plus: Math.round(outstanding * 0.05)
-                }
+                totalInvoiced, totalReceived, outstanding, overdue,
+                ageing: this.ageing(transactionInvoices, outstanding)
             },
-            plants: plants.length ? plants : [{ id: 'PLNT-001', plantName: `${cust.name} Main Unit`, code: 'PLNT-MAIN', capacity: '2400 MW' }],
-            contacts: contacts.length ? contacts : [{ name: cust.name + ' Representative', designation: 'General Manager', department: 'Purchase & Maintenance', mobile: cust.phone, email: cust.email }],
-            equipment,
-            enquiries,
-            quotations,
-            invoices,
-            tickets,
-            activities: activities.length ? activities : [{ id: 'ACT-1', type: 'Call', outcome: 'Discussed boiler spares delivery schedule.', date: new Date().toLocaleDateString('en-GB') }],
+            plants, contacts, equipment, enquiries, quotations,
+            invoices: transactionInvoices, tickets, activities, followups, reminders, returns,
+            creditDebitNotes, marketingVisits,
             insights: [
-                `Active account registered under ${cust.industry}.`,
-                `Commercial ledger verified with ₹${(totalInvoiced / 100000).toFixed(2)} Lakhs lifetime business.`
+                `${enquiries.length} enquiry record(s), ${quotations.length} quotation record(s) and ${transactionInvoices.length} invoice/sales record(s) are linked to this customer.`,
+                `Outstanding receivable: ₹${outstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })}.`
             ],
-            alerts: overdue > 0 ? [{ type: 'danger', icon: '⚠️', text: `Payment Overdue: ₹${(overdue / 100000).toFixed(2)} L pending collection.` }] : []
+            alerts: overdue > 0 ? [{ type: 'danger', icon: '⚠️', text: `Overdue receivable: ₹${overdue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}.` }] : []
         };
     },
 
-    // 3. Fetch live profile for Supplier
-    getSupplier360Data: function (supplierId) {
-        const list = this.searchParties('supplier', '');
-        const supp = list.find(s => String(s.id) === String(supplierId)) || list[0];
-        if (!supp) return null;
-
-        const purchases = this.getStore('purchases').concat(this.getStore('crm_purchases'))
-            .filter(p => (String(p.supplierId) === String(supp.id) || (p.supplier_name && p.supplier_name.toLowerCase() === supp.name.toLowerCase())));
-
-        let totalPurchases = purchases.reduce((acc, p) => acc + (parseFloat(p.total || p.grandTotal || p.amount || 0)), 0) || 3240000;
-        let totalPaid = Math.round(totalPurchases * 0.85);
-        let payable = totalPurchases - totalPaid;
+    buildSupplier360(party) {
+        const all = key => this.getStore(key);
+        const purchases = [...all('purchases'), ...all('crm_purchases')].filter(r => this.matches(r, party));
+        const quotations = [...all('quotations'), ...all('crm_quotations')].filter(r => this.matches(r, party));
+        const contacts = all('crm_contacts').filter(r => this.matches(r, party));
+        const activities = all('crm_activities').filter(r => this.matches(r, party));
+        const followups = all('follow_ups').filter(r => this.matches(r, party));
+        const returns = all('returns').filter(r => this.matches(r, party));
+        const notes = all('credit_debit_notes').filter(r => this.matches(r, party));
+        const rejections = purchases.filter(r => {
+            const s = this.lower(`${r.status || ''} ${r.remarks || ''} ${r.note || ''} ${r.rejectionStatus || ''}`);
+            return s.includes('reject');
+        });
+        const totalPurchases = purchases.reduce((s, r) => s + this.amountOf(r), 0);
+        const totalPaid = purchases.reduce((s, r) => {
+            const paid = this.first(r.totalPaid, r.paid, r.paidAmount, r.amountPaid);
+            return s + this.num(paid);
+        }, 0);
+        const payable = Math.max(0, totalPurchases - totalPaid);
+        const overduePayable = purchases.reduce((s, r) => {
+            const status = this.lower(r.status);
+            return s + (status.includes('overdue') ? this.num(this.first(r.dueAmount, r.balanceDue, r.outstanding, this.amountOf(r))) : 0);
+        }, 0);
+        const deliveryIssues = purchases.filter(r => ['delayed', 'late', 'rejected', 'partial'].includes(this.lower(r.status))).length;
+        const qualityScore = Math.max(0, Math.min(100, Math.round(100 - rejections.length * 12 - deliveryIssues * 5)));
 
         return {
-            party: supp,
+            party,
             kpis: {
-                enquiriesCount: 3,
-                quotationsVal: 2890000,
+                enquiriesCount: quotations.length,
+                quotationsVal: quotations.reduce((s, r) => s + this.amountOf(r), 0),
                 poVal: totalPurchases,
-                grnVal: totalPurchases,
+                grnVal: purchases.filter(r => ['grn', 'received', 'delivered', 'completed'].includes(this.lower(r.status))).reduce((s, r) => s + this.amountOf(r), 0),
                 invoicedVal: totalPurchases,
                 payableVal: payable,
-                rejectionsCount: 1,
-                openIssues: 0,
-                score: 90
+                rejectionsCount: rejections.length,
+                openIssues: deliveryIssues,
+                score: qualityScore
             },
             financialSummary: {
-                totalPurchases,
-                totalPaid,
-                payable,
-                overduePayable: Math.round(payable * 0.3),
-                rejectionValue: 45000,
-                ageing: {
-                    b0_30: Math.round(payable * 0.5),
-                    b31_60: Math.round(payable * 0.3),
-                    b61_90: Math.round(payable * 0.2),
-                    b91_180: 0,
-                    b180_plus: 0
-                }
+                totalPurchases, totalPaid, payable, overduePayable,
+                rejectionValue: rejections.reduce((s, r) => s + this.amountOf(r), 0),
+                ageing: this.ageing(purchases, payable)
             },
-            contacts: [{ name: supp.name + ' Contact', designation: 'Sales Head', department: 'Commercial', mobile: supp.phone, email: supp.email }],
-            pos: [{ id: 'PO-26-27-089', date: new Date().toLocaleDateString('en-GB'), desc: 'Forged Shafts for Fan Spares', value: totalPurchases, status: 'DELIVERED' }],
-            activities: [{ id: 'ACT-S1', type: 'Call', outcome: 'Confirmed dispatch of test materials.', date: new Date().toLocaleDateString('en-GB') }],
-            insights: [`Vendor delivery adherence rate is 94.2%.`],
-            alerts: [{ type: 'info', icon: '🚚', text: 'Consignment under transit with Carrier.' }]
+            contacts, purchases, quotations, activities, followups, returns, creditDebitNotes: notes, rejections,
+            insights: [
+                `${purchases.length} purchase record(s) are linked to this supplier.`,
+                `Supplier quality score is ${qualityScore}/100 based on linked rejection/delivery records.`
+            ],
+            alerts: overduePayable > 0 ? [{ type: 'warning', icon: '⚠️', text: `Overdue supplier payable: ₹${overduePayable.toLocaleString('en-IN', { maximumFractionDigits: 2 })}.` }] : []
         };
+    },
+
+    ageing(rows, total) {
+        const buckets = { b0_30: 0, b31_60: 0, b61_90: 0, b91_180: 0, b180_plus: 0 };
+        if (!total) return buckets;
+        const now = Date.now();
+        rows.forEach(r => {
+            const due = this.num(this.first(r.dueAmount, r.balanceDue, r.outstanding, r.payable));
+            const value = due || this.amountOf(r);
+            if (!value) return;
+            const d = new Date(this.dateOf(r)).getTime();
+            const days = Number.isFinite(d) ? Math.max(0, Math.floor((now - d) / 86400000)) : 0;
+            if (days <= 30) buckets.b0_30 += value;
+            else if (days <= 60) buckets.b31_60 += value;
+            else if (days <= 90) buckets.b61_90 += value;
+            else if (days <= 180) buckets.b91_180 += value;
+            else buckets.b180_plus += value;
+        });
+        const sum = Object.values(buckets).reduce((a, b) => a + b, 0);
+        if (sum === 0) buckets.b0_30 = total;
+        return buckets;
     }
 };
+
+window.Business360Engine = Business360Engine;

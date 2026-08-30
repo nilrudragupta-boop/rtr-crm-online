@@ -1,399 +1,347 @@
 /**
- * RISE CRM — Business 360° Interactive UI Controller
+ * RISE CRM — Business 360° UI Controller
+ * All navigation is routed through the parent dashboard SPA when available.
  */
 const B360UI = {
     currentType: 'customer',
     currentPartyId: null,
     currentTab: 'overview',
     activeData: null,
+    _bound: false,
 
-    init: async function () {
-        // 1. Sync live backend customer data if available
-        if (typeof apiClient !== 'undefined' && apiClient.getCustomers) {
-            try {
-                const res = await apiClient.getCustomers();
-                const remote = Array.isArray(res) ? res : (res && res.data ? res.data : null);
-                if (remote && remote.length) {
-                    localStorage.setItem('customers', JSON.stringify(remote));
-                }
-            } catch (err) {
-                console.warn('apiClient sync bypassed:', err);
-            }
-        }
-
+    async init() {
+        this.readContext();
+        await this.syncLiveData();
         this.bindSearch();
 
-        // 2. Select initial party
-        const initialList = Business360Engine.searchParties(this.currentType, '');
-        if (initialList.length) {
-            this.currentPartyId = initialList[0].id;
-            this.loadParty(this.currentType, this.currentPartyId);
+        const list = Business360Engine.searchParties(this.currentType, '');
+        if (!list.length) {
+            this.renderEmpty();
+            return;
         }
+
+        const requested = this.currentPartyId || this.contextPartyId;
+        const match = requested ? list.find(p => String(p.id) === String(requested)) : null;
+        this.currentPartyId = match?.id || list[0].id;
+        await this.loadParty(this.currentType, this.currentPartyId);
     },
 
-    toast: function (msg, type = 'success') {
+    readContext() {
+        const p = new URLSearchParams(window.location.search);
+        const saved = (() => { try { return JSON.parse(localStorage.getItem('business360Selection') || 'null'); } catch { return null; } })();
+        this.contextPartyId = p.get('id') || p.get('customerId') || p.get('supplierId') || saved?.id || null;
+        this.currentType = (p.get('type') || saved?.type || 'customer').toLowerCase() === 'supplier' ? 'supplier' : 'customer';
+        const typeSelect = document.getElementById('partyTypeSelect');
+        if (typeSelect) typeSelect.value = this.currentType;
+    },
+
+    async syncLiveData() {
+        if (typeof apiClient === 'undefined') return;
+        const jobs = [
+            ['customers', apiClient.getCustomers],
+            ['suppliers', apiClient.getSuppliers],
+            ['quotations', apiClient.getQuotations],
+            ['invoices', apiClient.getInvoices],
+            ['purchases', apiClient.getPurchases],
+            ['crm_enquiries', apiClient.getCrmEnquiries],
+            ['crm_contacts', apiClient._getCollection ? () => apiClient._getCollection('crm-contacts') : null],
+            ['crm_plants', apiClient._getCollection ? () => apiClient._getCollection('crm-plants') : null],
+            ['crm_activities', apiClient._getCollection ? () => apiClient._getCollection('crm-activities') : null],
+            ['crm_documents', apiClient._getCollection ? () => apiClient._getCollection('crm-documents') : null],
+            ['follow_ups', apiClient.getFollowUps],
+            ['reminders', apiClient.getReminders],
+            ['credit_debit_notes', apiClient.getCreditDebitNotes],
+            ['returns', apiClient._getCollection ? () => apiClient._getCollection('returns') : null],
+            ['crm_tickets', apiClient._getCollection ? () => apiClient._getCollection('crm-tickets') : null]
+        ];
+        await Promise.all(jobs.map(async ([key, fn]) => {
+            if (typeof fn !== 'function') return;
+            try {
+                const result = await fn();
+                if (Array.isArray(result)) Business360Engine.setStore(key, result);
+            } catch (e) { console.debug(`Business360 sync skipped: ${key}`, e); }
+        }));
+    },
+
+    toast(msg, type = 'success') {
         const container = document.getElementById('toastContainer');
         if (!container) return;
         const toast = document.createElement('div');
         toast.className = `slds-toast slds-toast-${type}`;
-        toast.innerHTML = `<span>${msg}</span><span style="cursor:pointer; margin-left:12px;" onclick="this.parentElement.remove()">✕</span>`;
+        toast.innerHTML = `<span>${this.esc(msg)}</span><span style="cursor:pointer;margin-left:12px" onclick="this.parentElement.remove()">✕</span>`;
         container.appendChild(toast);
-        setTimeout(() => toast.remove(), 4000);
+        setTimeout(() => toast.remove(), 3500);
     },
 
-    onPartyTypeChange: function () {
+    esc(value) { return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c])); },
+    money(value) { return `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; },
+    lakhs(value) { return `₹${(Number(value || 0) / 100000).toFixed(2)} L`; },
+
+    onPartyTypeChange() {
         this.currentType = document.getElementById('partyTypeSelect').value;
-        const searchInput = document.getElementById('partySearchInput');
-        if (searchInput) searchInput.value = '';
-
-        const pool = Business360Engine.searchParties(this.currentType, '');
-        if (pool.length > 0) {
-            this.loadParty(this.currentType, pool[0].id);
-        } else {
-            document.getElementById('b360TabViewport').innerHTML = `<div style="padding:20px; text-align:center; color:#888;">No ${this.currentType} records available.</div>`;
-        }
+        const list = Business360Engine.searchParties(this.currentType, '');
+        const input = document.getElementById('partySearchInput');
+        if (input) input.value = '';
+        if (list.length) this.loadParty(this.currentType, list[0].id);
+        else this.renderEmpty();
     },
 
-    showDropdownList: function () {
+    showDropdownList() {
         const input = document.getElementById('partySearchInput');
         const results = document.getElementById('partySearchResults');
-        const q = input.value || '';
-        const matches = Business360Engine.searchParties(this.currentType, q);
-
-        if (!matches.length) {
-            results.innerHTML = `<div style="padding:10px; color:#888;">No ${this.currentType} records found.</div>`;
-        } else {
-            results.innerHTML = matches.map(m => `
-        <div class="slds-search-item" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee; background:#fff;" 
-             onmousedown="B360UI.selectParty('${m.id}')">
-          <strong style="color:var(--slds-brand);">${m.name}</strong> 
-          <span style="font-size:11px; color:#666;">(${m.code})</span>
-          <div style="font-size:11px; color:#888;">GSTIN: ${m.gstin} | ${m.location}</div>
-        </div>
-      `).join('');
-        }
+        if (!input || !results) return;
+        const matches = Business360Engine.searchParties(this.currentType, input.value || '').slice(0, 30);
+        results.innerHTML = matches.length ? matches.map(m => `
+            <div class="slds-search-item" data-party-id="${this.esc(m.id)}" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #eee;background:#fff">
+                <strong style="color:var(--slds-brand)">${this.esc(m.name)}</strong> <span style="font-size:11px;color:#666">(${this.esc(m.code)})</span>
+                <div style="font-size:11px;color:#888">GSTIN: ${this.esc(m.gstin || 'N/A')} · ${this.esc(m.location || '—')}</div>
+            </div>`).join('') : `<div style="padding:10px;color:#888">No ${this.currentType} records found.</div>`;
         results.style.display = 'block';
     },
 
-    bindSearch: function () {
+    bindSearch() {
+        if (this._bound) return;
+        this._bound = true;
         const input = document.getElementById('partySearchInput');
         const results = document.getElementById('partySearchResults');
-
+        if (!input || !results) return;
         input.addEventListener('input', () => this.showDropdownList());
         input.addEventListener('focus', () => this.showDropdownList());
-        input.addEventListener('click', () => this.showDropdownList());
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.slds-search-box')) {
-                results.style.display = 'none';
-            }
+        results.addEventListener('mousedown', e => {
+            const item = e.target.closest('[data-party-id]');
+            if (item) this.selectParty(item.dataset.partyId);
+        });
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.slds-search-box')) results.style.display = 'none';
         });
     },
 
-    selectParty: function (id) {
-        const results = document.getElementById('partySearchResults');
-        if (results) results.style.display = 'none';
-        const input = document.getElementById('partySearchInput');
-        if (input) input.value = '';
+    selectParty(id) {
+        document.getElementById('partySearchResults').style.display = 'none';
         this.loadParty(this.currentType, id);
     },
 
-    loadParty: function (type, id) {
+    async loadParty(type, id) {
         this.currentType = type;
-        this.currentPartyId = id;
+        this.currentPartyId = String(id);
+        localStorage.setItem('business360Selection', JSON.stringify({ type, id: String(id) }));
+        this.activeData = type === 'customer'
+            ? Business360Engine.buildCustomer360(Business360Engine.searchParties('customer', '').find(p => String(p.id) === String(id)))
+            : Business360Engine.buildSupplier360(Business360Engine.searchParties('supplier', '').find(p => String(p.id) === String(id)));
+        if (!this.activeData?.party) return this.renderEmpty();
 
-        if (type === 'customer') {
-            this.activeData = Business360Engine.getCustomer360Data(id);
-            const plantBtn = document.getElementById('tabPlantsBtn');
-            const srvBtn = document.getElementById('tabServiceBtn');
-            if (plantBtn) plantBtn.style.display = 'inline-block';
-            if (srvBtn) srvBtn.style.display = 'inline-block';
-        } else {
-            this.activeData = Business360Engine.getSupplier360Data(id);
-            const plantBtn = document.getElementById('tabPlantsBtn');
-            const srvBtn = document.getElementById('tabServiceBtn');
-            if (plantBtn) plantBtn.style.display = 'none';
-            if (srvBtn) srvBtn.style.display = 'none';
-        }
+        const typeSelect = document.getElementById('partyTypeSelect');
+        if (typeSelect) typeSelect.value = type;
+        const service = document.getElementById('tabServiceBtn');
+        const plants = document.getElementById('tabPlantsBtn');
+        if (plants) plants.style.display = type === 'customer' ? 'inline-block' : 'none';
+        if (service) service.style.display = type === 'customer' ? 'inline-block' : 'none';
 
-        if (!this.activeData) return;
-
+        this.currentTab = 'overview';
+        document.querySelectorAll('.b360-tab-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
         this.renderHeader();
         this.renderKPIs();
         this.renderCurrentTab();
     },
 
-    renderHeader: function () {
+    renderEmpty() {
+        document.getElementById('partyHeaderContainer').innerHTML = '';
+        document.getElementById('kpiStripContainer').innerHTML = '';
+        document.getElementById('b360TabViewport').innerHTML = `<div class="b360-empty">No ${this.currentType} records are available. Create the party in the ${this.currentType} master first.</div>`;
+        document.getElementById('bcPartyName').textContent = 'No record selected';
+    },
+
+    navigate(page, params = {}) {
+        const url = new URL(page, window.location.href);
+        Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && String(v) !== '') url.searchParams.set(k, v); });
+        url.searchParams.set('embedded', '1');
+
+        try {
+            if (window.parent && window.parent !== window && typeof window.parent.openWindow === 'function') {
+                window.parent.openWindow(url.pathname.split('/').pop() + url.search, 1100, 760);
+                return;
+            }
+        } catch (e) {}
+        window.location.href = url.pathname.split('/').pop() + url.search;
+    },
+
+    partyParams() {
         const p = this.activeData.party;
-        const bcName = document.getElementById('bcPartyName');
-        if (bcName) bcName.innerText = p.name;
+        return {
+            type: this.currentType,
+            id: p.id,
+            ...(this.currentType === 'customer' ? { customerId: p.id, customer: p.name, customerName: p.name } : { supplierId: p.id, supplier: p.name, supplierName: p.name })
+        };
+    },
 
-        const actionButtons = this.currentType === 'customer' ? `
-      <button class="slds-btn" onclick="window.location.href='quotation.html';">💰 New Quotation</button>
-      <button class="slds-btn slds-btn-brand" onclick="window.location.href='direct_sale.html';">⚡ Direct Sale</button>
-      <button class="slds-btn" onclick="B360UI.logCallModal('${p.id}')">📞 Log Activity</button>
-    ` : `
-      <button class="slds-btn" onclick="window.location.href='purchase.html';">📦 New Purchase PO</button>
-      <button class="slds-btn slds-btn-brand" onclick="B360UI.toast('Payment recording opened');">💳 Record Payment</button>
-    `;
+    openRelated(page, extra = {}) { this.navigate(page, { ...this.partyParams(), ...extra }); },
 
+    renderHeader() {
+        const p = this.activeData.party;
+        document.getElementById('bcPartyName').textContent = p.name;
+        const actions = this.currentType === 'customer' ? `
+            <button class="slds-btn" onclick="B360UI.openRelated('customer.html')">👤 Customer Master</button>
+            <button class="slds-btn" onclick="B360UI.openRelated('quotation.html')">💰 New Quotation</button>
+            <button class="slds-btn slds-btn-brand" onclick="B360UI.openRelated('direct_sale.html')">⚡ Direct Sale</button>
+            <button class="slds-btn" onclick="B360UI.logCallModal()">📞 Log Activity</button>` : `
+            <button class="slds-btn" onclick="B360UI.openRelated('supplier.html')">🏭 Supplier Master</button>
+            <button class="slds-btn" onclick="B360UI.openRelated('purchase.html')">📦 New Purchase</button>`;
         document.getElementById('partyHeaderContainer').innerHTML = `
-      <div class="b360-header-card">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
-          <div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:22px; font-weight:700;">${p.name}</span>
-              <span class="slds-badge slds-badge-success">● Active</span>
-              <span class="slds-badge slds-badge-info">${p.type}</span>
-            </div>
-            <div style="color:var(--slds-text-muted); font-size:12px; margin-top:4px;">
-              <strong>Code:</strong> ${p.code} | <strong>GSTIN:</strong> ${p.gstin} | <strong>PAN:</strong> ${p.pan} | <strong>Location:</strong> ${p.location}
-            </div>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            ${actionButtons}
-          </div>
-        </div>
-      </div>
-    `;
+            <div class="b360-header-card">
+                <div class="b360-header-main">
+                    <div>
+                        <div class="b360-party-title">${this.esc(p.name)} <span class="slds-badge slds-badge-success">● Active</span> <span class="slds-badge slds-badge-info">${this.esc(p.type)}</span></div>
+                        <div class="b360-party-meta"><b>Code:</b> ${this.esc(p.code || '—')} · <b>GSTIN:</b> ${this.esc(p.gstin || '—')} · <b>PAN:</b> ${this.esc(p.pan || '—')} · <b>Location:</b> ${this.esc(p.location || '—')}</div>
+                    </div><div class="b360-actions">${actions}</div>
+                </div>
+            </div>`;
     },
 
-    renderKPIs: function () {
+    kpiCard(label, value, hint, action, tone = '') {
+        return `<button class="b360-kpi-card ${tone}" onclick="${action}"><span>${this.esc(label)}</span><strong>${value}</strong><small>${this.esc(hint || 'Open related records →')}</small></button>`;
+    },
+
+    renderKPIs() {
         const k = this.activeData.kpis;
-        const isCust = this.currentType === 'customer';
-
-        const kpiHtml = isCust ? `
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('transactions')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">ACTIVE ENQUIRIES</div>
-        <strong style="font-size:18px; color:var(--slds-brand);">${k.enquiriesCount} Enquiries</strong>
-      </div>
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('transactions')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">QUOTATION PIPELINE</div>
-        <strong style="font-size:18px;">₹${(k.quotationsVal / 100000).toFixed(2)} L</strong>
-      </div>
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('financials')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">TOTAL INVOICED</div>
-        <strong style="font-size:18px;">₹${(k.invoicedVal / 100000).toFixed(2)} L</strong>
-      </div>
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('financials')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">OUTSTANDING BALANCE</div>
-        <strong style="font-size:18px; color:${k.outstandingVal > 0 ? 'var(--slds-danger)' : 'var(--slds-success)'};">₹${(k.outstandingVal / 100000).toFixed(2)} L</strong>
-      </div>
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('service')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">OPEN SERVICE TICKETS</div>
-        <strong style="font-size:18px; color:${k.openTickets > 0 ? 'var(--slds-warning)' : 'var(--slds-success)'};">${k.openTickets} Open</strong>
-      </div>
-      <div class="b360-kpi-card">
-        <div style="font-size:11px; color:var(--slds-text-muted);">CUSTOMER HEALTH SCORE</div>
-        <strong style="font-size:18px; color:var(--slds-success);">${k.score} / 100 (Grade ${this.activeData.party.grade})</strong>
-      </div>
-    ` : `
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('transactions')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">PURCHASE ORDERS</div>
-        <strong style="font-size:18px; color:var(--slds-brand);">₹${(k.poVal / 100000).toFixed(2)} L</strong>
-      </div>
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('financials')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">TOTAL PAYABLE</div>
-        <strong style="font-size:18px; color:var(--slds-danger);">₹${(k.payableVal / 100000).toFixed(2)} L</strong>
-      </div>
-      <div class="b360-kpi-card" onclick="B360UI.switchTab('financials')">
-        <div style="font-size:11px; color:var(--slds-text-muted);">REJECTIONS LOGGED</div>
-        <strong style="font-size:18px; color:var(--slds-warning);">${k.rejectionsCount} Items</strong>
-      </div>
-      <div class="b360-kpi-card">
-        <div style="font-size:11px; color:var(--slds-text-muted);">SUPPLIER QUALITY SCORE</div>
-        <strong style="font-size:18px; color:var(--slds-success);">${k.score} / 100 (Grade A)</strong>
-      </div>
-    `;
-
-        document.getElementById('kpiStripContainer').innerHTML = kpiHtml;
+        const isCustomer = this.currentType === 'customer';
+        const html = isCustomer ? [
+            this.kpiCard('ACTIVE ENQUIRIES', k.enquiriesCount, 'Enquiry Management', `B360UI.openRelated('enquiry.html')`),
+            this.kpiCard('QUOTATION PIPELINE', this.lakhs(k.quotationsVal), 'Quotation records', `B360UI.openRelated('quotation.html')`),
+            this.kpiCard('TOTAL ORDERS / SALES', this.lakhs(k.ordersVal), 'Sales Register', `B360UI.openRelated('sales_report.html')`),
+            this.kpiCard('TOTAL INVOICED', this.lakhs(k.invoicedVal), 'Invoices', `B360UI.openRelated('invoice_dashboard.html')`),
+            this.kpiCard('OUTSTANDING RECEIVABLE', this.lakhs(k.outstandingVal), 'Customer Ledger', `B360UI.openRelated('ledger.html')`, k.outstandingVal > 0 ? 'danger' : ''),
+            this.kpiCard('OPEN SERVICE TICKETS', k.openTickets, 'Customer Support', `B360UI.openRelated('customer_support.html')`, k.openTickets > 0 ? 'warning' : ''),
+            this.kpiCard('PENDING FOLLOW-UPS', k.pendingFollowups, 'Follow-up Management', `B360UI.openRelated('follow_up.html')`),
+            this.kpiCard('CUSTOMER HEALTH SCORE', `${k.score}/100`, `Grade ${this.activeData.party.grade}`, `B360UI.switchTab('overview')`)
+        ].join('') : [
+            this.kpiCard('PURCHASE ORDERS', this.lakhs(k.poVal), 'Purchase records', `B360UI.openRelated('purchase.html')`),
+            this.kpiCard('TOTAL PAYABLE', this.lakhs(k.payableVal), 'Supplier Ledger', `B360UI.openRelated('ledger.html')`, k.payableVal > 0 ? 'danger' : ''),
+            this.kpiCard('REJECTIONS LOGGED', k.rejectionsCount, 'Rejected / quality records', `B360UI.openRelated('purchase.html')`, k.rejectionsCount > 0 ? 'warning' : ''),
+            this.kpiCard('GRN / RECEIVED VALUE', this.lakhs(k.grnVal), 'Purchase records', `B360UI.openRelated('purchase_dashboard.html')`),
+            this.kpiCard('SUPPLIER QUALITY SCORE', `${k.score}/100`, 'Quality & delivery indicator', `B360UI.switchTab('overview')`)
+        ].join('');
+        document.getElementById('kpiStripContainer').innerHTML = html;
     },
 
-    switchTab: function (tabName, btnElement) {
-        this.currentTab = tabName;
-        if (btnElement) {
-            document.querySelectorAll('.b360-tab-btn').forEach(b => b.classList.remove('active'));
-            btnElement.classList.add('active');
-        }
+    switchTab(tab, btn) {
+        if (!this.activeData) return;
+        this.currentTab = tab;
+        document.querySelectorAll('.b360-tab-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        else document.querySelector(`.b360-tab-btn[onclick*="'${tab}'"]`)?.classList.add('active');
         this.renderCurrentTab();
     },
 
-    renderCurrentTab: function () {
-        const vp = document.getElementById('b360TabViewport');
+    linkRecord(page, idKey, id) {
+        const params = this.partyParams();
+        params.recordId = id;
+        this.openRelated(page, params);
+    },
+
+    renderCurrentTab() {
+        const d = this.activeData, vp = document.getElementById('b360TabViewport');
+        if (!d || !vp) return;
+        if (this.currentTab === 'overview') return this.renderOverview(vp);
+        if (this.currentTab === 'transactions') return this.renderTransactions(vp);
+        if (this.currentTab === 'financials') return this.renderFinancials(vp);
+        if (this.currentTab === 'plants') return this.renderPlants(vp);
+        if (this.currentTab === 'service') return this.renderService(vp);
+        if (this.currentTab === 'timeline') return this.renderTimeline(vp);
+        if (this.currentTab === 'documents') return this.renderDocuments(vp);
+    },
+
+    renderOverview(vp) {
         const d = this.activeData;
-        if (!d) return;
+        const modules = this.currentType === 'customer' ? [
+            ['👤 Customer Master','customer.html'],['🎯 Enquiries','enquiry.html'],['💰 Quotations','quotation.html'],['⚡ Sales Register','sales_report.html'],['📒 Account Ledger','ledger.html'],['🛠️ Customer Support','customer_support.html'],['🔁 Follow-ups','follow_up.html'],['⏰ Reminders','reminder.html'],['↩️ Returns','returns_report.html'],['🧾 Credit/Debit Notes','credit_debit_notes.html'],['📊 Marketing Report','marketing_report.html']
+        ] : [
+            ['🏭 Supplier Master','supplier.html'],['📦 Purchases','purchase.html'],['📊 Purchase Dashboard','purchase_dashboard.html'],['📒 Account Ledger','ledger.html'],['🔁 Follow-ups','follow_up.html'],['↩️ Returns','returns_report.html'],['🧾 Credit/Debit Notes','credit_debit_notes.html']
+        ];
+        vp.innerHTML = `${(d.alerts || []).map(a => `<div class="b360-alert-banner b360-alert-${this.esc(a.type)}">${a.icon} ${this.esc(a.text)}</div>`).join('')}
+            <div class="b360-overview-grid">
+                <div class="slds-card"><div class="slds-card-header">Business Intelligence</div><div class="slds-card-body"><ul class="b360-insights">${(d.insights || []).map(x => `<li>${this.esc(x)}</li>`).join('')}</ul></div></div>
+                <div class="slds-card"><div class="slds-card-header">Key Contacts (${d.contacts?.length || 0})</div><div class="slds-card-body">${this.contactsHtml(d.contacts)}</div></div>
+            </div>
+            <div class="slds-card"><div class="slds-card-header">Integrated Related Modules</div><div class="slds-card-body"><div class="b360-module-grid">${modules.map(([label,page]) => `<button class="b360-module-link" onclick="B360UI.openRelated('${page}')">${label}<span>↗</span></button>`).join('')}</div></div></div>`;
+    },
 
-        if (this.currentTab === 'overview') {
-            vp.innerHTML = `
-        <div style="margin-bottom: 16px;">
-          ${(d.alerts || []).map(a => `<div class="b360-alert-banner b360-alert-${a.type}">${a.icon} ${a.text}</div>`).join('')}
-        </div>
-        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:16px;">
-          <div class="slds-card">
-            <div class="slds-card-header">Factual Business Insights</div>
-            <div class="slds-card-body">
-              <ul style="padding-left:18px; line-height:1.8;">
-                ${(d.insights || []).map(i => `<li>${i}</li>`).join('')}
-              </ul>
-            </div>
-          </div>
-          <div class="slds-card">
-            <div class="slds-card-header">Key Contacts (${d.contacts ? d.contacts.length : 0})</div>
-            <div class="slds-card-body">
-              ${(d.contacts || []).map(c => `
-                <div style="padding:6px 0; border-bottom:1px solid var(--slds-border-subtle);">
-                  <div class="b360-link">${c.name}</div>
-                  <div style="font-size:11px; color:#666;">${c.designation} (${c.department})</div>
-                  <div style="font-size:11px;">📞 ${c.mobile} | ✉️ ${c.email}</div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        </div>
-      `;
-        } else if (this.currentTab === 'transactions') {
-            if (this.currentType === 'customer') {
-                vp.innerHTML = `
-          <div class="slds-card">
-            <div class="slds-card-header"><span>Enquiries &amp; Quotations</span></div>
-            <div class="slds-card-body" style="padding:0;">
-              <table class="slds-table">
-                <thead><tr><th>Record ID</th><th>Requirement</th><th>Value</th><th>Status</th></tr></thead>
-                <tbody>
-                  ${(d.enquiries || []).map(e => `
-                    <tr>
-                      <td><span class="b360-link">${e.id}</span></td>
-                      <td>${e.subject}</td>
-                      <td>₹${(e.estimatedValue || 0).toLocaleString('en-IN')}</td>
-                      <td><span class="slds-badge slds-badge-warning">${e.status}</span></td>
-                    </tr>
-                  `).join('')}
-                  ${(d.quotations || []).map(q => `
-                    <tr style="background:#fafcff;">
-                      <td><span class="b360-link">${q.id}</span></td>
-                      <td>Linked Enquiry: ${q.enquiryId}</td>
-                      <td>₹${(q.totalValue || 0).toLocaleString('en-IN')}</td>
-                      <td><span class="slds-badge slds-badge-success">${q.status}</span></td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        `;
-            } else {
-                vp.innerHTML = `
-          <div class="slds-card">
-            <div class="slds-card-header">Purchase Orders</div>
-            <div class="slds-card-body" style="padding:0;">
-              <table class="slds-table">
-                <thead><tr><th>PO Number</th><th>Date</th><th>Item Description</th><th>Value</th><th>Status</th></tr></thead>
-                <tbody>
-                  ${(d.pos || []).map(po => `
-                    <tr>
-                      <td><span class="b360-link">${po.id}</span></td>
-                      <td>${po.date}</td>
-                      <td>${po.desc}</td>
-                      <td>₹${po.value.toLocaleString('en-IN')}</td>
-                      <td><span class="slds-badge slds-badge-info">${po.status}</span></td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        `;
+    contactsHtml(rows = []) {
+        if (!rows.length) return `<div class="b360-empty-small">No linked contacts.</div>`;
+        return rows.map(c => `<div class="b360-contact"><b>${this.esc(c.name || c.contactName || 'Contact')}</b><span>${this.esc(c.designation || '')}${c.department ? ` · ${this.esc(c.department)}` : ''}</span><small>📞 ${this.esc(c.mobile || c.phone || c.contact || '—')} · ✉️ ${this.esc(c.email || '—')}</small></div>`).join('');
+    },
+
+    renderTransactions(vp) {
+        const d = this.activeData;
+        const rows = this.currentType === 'customer' ? [
+            ...(d.enquiries || []).map(r => ({ page:'enquiry.html', id:r.id || r.enquiryNo, ref:r.enquiryNo || r.id, desc:r.subject || r.requirement, value:r.estimatedValue, status:r.status, date:r.enquiryDate })),
+            ...(d.quotations || []).map(r => ({ page:'quotation.html', id:r.id || r.refNo, ref:r.refNo || r.id, desc:'Quotation', value:r.grandTotal || r.totalValue, status:r.status, date:r.date }))
+        ] : (d.purchases || []).map(r => ({ page:'purchase.html', id:r.id, ref:r.id || r.supplierInv, desc:r.itemName || r.description, value:r.total || r.totalPaid || (Number(r.qty || 0) * Number(r.price || 0)), status:r.status, date:r.date }));
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">${this.currentType === 'customer' ? 'Enquiries & Quotations' : 'Purchase Orders / Records'}</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Record</th><th>Date</th><th>Description</th><th>Value</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(r => `<tr><td><button class="b360-link-btn" onclick="B360UI.linkRecord('${r.page}','id',${JSON.stringify(String(r.id || ''))})">${this.esc(r.ref || '—')}</button></td><td>${this.esc(r.date || '—')}</td><td>${this.esc(r.desc || '—')}</td><td>${this.money(r.value)}</td><td><span class="slds-badge slds-badge-info">${this.esc(r.status || '—')}</span></td></tr>`).join('') : `<tr><td colspan="5" class="b360-empty-small">No linked records found.</td></tr>`}</tbody></table></div></div></div>`;
+    },
+
+    renderFinancials(vp) {
+        const f = this.activeData.financialSummary;
+        const customer = this.currentType === 'customer';
+        const cards = customer ? [
+            ['TOTAL INVOICED', f.totalInvoiced],['RECEIVED', f.totalReceived],['OUTSTANDING', f.outstanding],['OVERDUE', f.overdue]
+        ] : [['TOTAL PURCHASES',f.totalPurchases],['PAID',f.totalPaid],['PAYABLE',f.payable],['OVERDUE PAYABLE',f.overduePayable],['REJECTION VALUE',f.rejectionValue]];
+        const ageing = [['0–30 DAYS',f.ageing.b0_30],['31–60 DAYS',f.ageing.b31_60],['61–90 DAYS',f.ageing.b61_90],['91–180 DAYS',f.ageing.b91_180],['180+ DAYS',f.ageing.b180_plus]];
+        vp.innerHTML = `<div class="b360-fin-grid">${cards.map(([l,v]) => `<button class="slds-card b360-fin-card" onclick="B360UI.openRelated('ledger.html')"><span>${l}</span><strong>${this.lakhs(v)}</strong><small>Open Ledger ↗</small></button>`).join('')}</div><div class="slds-card"><div class="slds-card-header">Ageing Analysis</div><div class="slds-card-body"><div class="b360-ageing-grid">${ageing.map(([l,v]) => `<div><span>${l}</span><strong>${this.lakhs(v)}</strong></div>`).join('')}</div></div></div>`;
+    },
+
+    renderPlants(vp) {
+        const rows = this.activeData.plants || [];
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Operating Plants & Installed Equipment</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Plant</th><th>Code</th><th>Capacity</th><th>Action</th></tr></thead><tbody>${rows.length ? rows.map(p => `<tr><td>${this.esc(p.plantName || p.name || '—')}</td><td>${this.esc(p.code || p.id || '—')}</td><td>${this.esc(p.capacity || '—')}</td><td><button class="b360-link-btn" onclick="B360UI.openRelated('customer.html')">Open Customer ↗</button></td></tr>`).join('') : `<tr><td colspan="4" class="b360-empty-small">No plant records linked.</td></tr>`}</tbody></table></div></div></div>`;
+    },
+
+    renderService(vp) {
+        const rows = this.activeData.tickets || [];
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Service & Complaint Tickets</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Ticket</th><th>Subject</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(t => `<tr><td><button class="b360-link-btn" onclick="B360UI.openRelated('customer_support.html')">${this.esc(t.id || '—')}</button></td><td>${this.esc(t.subject || t.issueSubject || '—')}</td><td>${this.esc(t.priority || '—')}</td><td>${this.esc(t.status || '—')}</td></tr>`).join('') : `<tr><td colspan="4" class="b360-empty-small">No service tickets linked.</td></tr>`}</tbody></table></div></div></div>`;
+    },
+
+    renderTimeline(vp) {
+        const rows = [...(this.activeData.activities || []), ...(this.activeData.followups || [])].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Activity & Follow-up Timeline</div><div class="slds-card-body">${rows.length ? rows.map(a => `<div class="b360-timeline-item"><b>${this.esc(a.type || a.partyType || 'Activity')} — ${this.esc(a.date || a.createdAt || '—')}</b><div>${this.esc(a.outcome || a.notes || a.remarks || a.subject || a.partyName || '—')}</div></div>`).join('') : `<div class="b360-empty-small">No activity records linked.</div>`}</div></div>`;
+    },
+
+    renderDocuments(vp) {
+        const rows = this.activeData.documents || Business360Engine.getStore('crm_documents').filter(r => Business360Engine.matches(r, this.activeData.party));
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Documents</div><div class="slds-card-body">${rows.length ? rows.map(r => `<div class="b360-document"><span>📄 ${this.esc(r.name || r.fileName || r.title || 'Document')}</span><small>${this.esc(r.type || r.documentType || '')}</small></div>`).join('') : `<div class="b360-empty-small">No documents linked to this party.</div>`}</div></div>`;
+    },
+
+    logCallModal() {
+        const notes = prompt(`Enter activity notes for ${this.activeData?.party?.name || 'this party'}:`);
+        if (!notes) return;
+        const row = { id:`ACT-${Date.now()}`, customerId:this.currentType === 'customer' ? this.currentPartyId : undefined, supplierId:this.currentType === 'supplier' ? this.currentPartyId : undefined, type:'Call', outcome:notes, date:new Date().toLocaleDateString('en-GB'), partyName:this.activeData.party.name };
+        const key = 'crm_activities';
+        const data = Business360Engine.getStore(key); data.unshift(row); Business360Engine.setStore(key, data);
+        if (typeof apiClient !== 'undefined' && apiClient._saveCollection) apiClient._saveCollection('crm-activities', row).catch(() => {});
+        this.activeData.activities.unshift(row);
+        this.toast('Activity recorded successfully.');
+        this.renderCurrentTab();
+    },
+
+    exportCSV() {
+        if (!this.activeData) return;
+        const p = this.activeData.party, k = this.activeData.kpis;
+        const lines = [
+            ['Party Type',this.currentType],['Party Name',p.name],['Code',p.code],['GSTIN',p.gstin],
+            ...(this.currentType === 'customer' ? [['Enquiries',k.enquiriesCount],['Quotation Value',k.quotationsVal],['Invoiced',k.invoicedVal],['Outstanding',k.outstandingVal],['Open Tickets',k.openTickets]] : [['Purchase Orders',k.poVal],['Payable',k.payableVal],['Rejections',k.rejectionsCount],['Quality Score',k.score]])
+        ];
+        const csv = lines.map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Business360_${p.code || p.name}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    },
+
+    backToDashboard() {
+        try {
+            if (window.parent && window.parent !== window && typeof window.parent.returnToDashboard === 'function') {
+                window.parent.returnToDashboard(); return;
             }
-        } else if (this.currentTab === 'financials') {
-            const f = d.financialSummary;
-            vp.innerHTML = `
-        <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:12px; margin-bottom:16px;">
-          <div class="slds-card" style="margin:0;"><div class="slds-card-body" style="text-align:center;"><div style="font-size:11px; color:#888;">0–30 DAYS</div><strong>₹${(f.ageing.b0_30 / 1000).toFixed(0)}k</strong></div></div>
-          <div class="slds-card" style="margin:0;"><div class="slds-card-body" style="text-align:center;"><div style="font-size:11px; color:#888;">31–60 DAYS</div><strong>₹${(f.ageing.b31_60 / 1000).toFixed(0)}k</strong></div></div>
-          <div class="slds-card" style="margin:0;"><div class="slds-card-body" style="text-align:center;"><div style="font-size:11px; color:#888;">61–90 DAYS</div><strong>₹${(f.ageing.b61_90 / 1000).toFixed(0)}k</strong></div></div>
-          <div class="slds-card" style="margin:0;"><div class="slds-card-body" style="text-align:center;"><div style="font-size:11px; color:#888;">91–180 DAYS</div><strong style="color:var(--slds-warning);">₹${(f.ageing.b91_180 / 1000).toFixed(0)}k</strong></div></div>
-          <div class="slds-card" style="margin:0;"><div class="slds-card-body" style="text-align:center;"><div style="font-size:11px; color:#888;">180+ DAYS OVERDUE</div><strong style="color:var(--slds-danger);">₹${(f.ageing.b180_plus / 1000).toFixed(0)}k</strong></div></div>
-        </div>
-      `;
-        } else if (this.currentTab === 'plants') {
-            vp.innerHTML = `
-        <div class="slds-card">
-          <div class="slds-card-header">Operating Plants</div>
-          <div class="slds-card-body" style="padding:0;">
-            <table class="slds-table">
-              <thead><tr><th>Plant Name</th><th>Code</th><th>Capacity</th></tr></thead>
-              <tbody>
-                ${(d.plants || []).map(p => `
-                  <tr><td><strong>${p.plantName}</strong></td><td>${p.code}</td><td>${p.capacity}</td></tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-        } else if (this.currentTab === 'service') {
-            vp.innerHTML = `
-        <div class="slds-card">
-          <div class="slds-card-header">Service &amp; Complaint Tickets</div>
-          <div class="slds-card-body" style="padding:0;">
-            <table class="slds-table">
-              <thead><tr><th>Ticket ID</th><th>Subject</th><th>Priority</th><th>Status</th></tr></thead>
-              <tbody>
-                ${(d.tickets || []).map(t => `
-                  <tr><td>${t.id}</td><td>${t.subject}</td><td>${t.priority}</td><td>${t.status}</td></tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-        } else if (this.currentTab === 'timeline') {
-            vp.innerHTML = `
-        <div class="slds-card">
-          <div class="slds-card-header">Activity Timeline</div>
-          <div class="slds-card-body">
-            ${(d.activities || []).map(a => `
-              <div style="margin-bottom:12px; border-left:3px solid var(--slds-brand); padding-left:10px;">
-                <div style="font-weight:600; color:var(--slds-brand);">${a.type} — ${a.date}</div>
-                <div>${a.outcome}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-        } else if (this.currentTab === 'documents') {
-            vp.innerHTML = `
-        <div class="slds-card">
-          <div class="slds-card-header">Attached Documents</div>
-          <div class="slds-card-body">
-            <div style="padding:12px; border:1px dashed #ccc; text-align:center; color:#666;">
-              No documents uploaded for this party.
-            </div>
-          </div>
-        </div>
-      `;
-        }
-    },
-
-    logCallModal: function (partyId) {
-        const notes = prompt("Enter conversation notes:");
-        if (notes) {
-            this.activeData.activities.unshift({ id: `ACT-${Date.now()}`, type: 'Call', outcome: notes, date: new Date().toLocaleDateString('en-GB') });
-            this.toast("Activity recorded.");
-            this.renderCurrentTab();
-        }
-    },
-
-    exportCSV: function () {
-        const p = this.activeData.party;
-        const csvContent = "data:text/csv;charset=utf-8," + `Party Type,${this.currentType}\nParty Name,${p.name}\nCode,${p.code}\nGSTIN,${p.gstin}\n`;
-        const link = document.createElement("a");
-        link.setAttribute("href", encodeURI(csvContent));
-        link.setAttribute("download", `Business360_${p.code}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        } catch (e) {}
+        window.history.back();
     }
 };
 
+window.B360UI = B360UI;
 window.addEventListener('DOMContentLoaded', () => B360UI.init());
