@@ -264,9 +264,23 @@ const B360UI = {
         this.renderCurrentTab();
     },
 
-    linkRecord(page, idKey, id) {
+    linkRecord(page, idKey, id, ref = '') {
+        // Every transaction link must open the actual record in its owning module.
+        // Do not use the generic recordId parameter because the target modules use
+        // their own identifiers (enquiry: id, quotation: refNo).
+        const value = String(id || ref || '').trim();
+        if (!value) return;
         const params = this.partyParams();
-        params.recordId = id;
+
+        if (page === 'enquiry.html') {
+            params.id = value;
+            if (ref) params.enquiryNo = ref;
+        } else if (page === 'quotation.html') {
+            params.refNo = String(ref || value);
+        } else {
+            params[idKey || 'id'] = value;
+        }
+
         this.openRelated(page, params);
     },
 
@@ -308,7 +322,12 @@ const B360UI = {
             ...(d.enquiries || []).map(r => ({ page:'enquiry.html', id:r.id || r.enquiryNo, ref:r.enquiryNo || r.id, desc:r.subject || r.requirement, value:r.estimatedValue, status:r.status, date:r.enquiryDate })),
             ...(d.quotations || []).map(r => ({ page:'quotation.html', id:r.id || r.refNo, ref:r.refNo || r.id, desc:'Quotation', value:r.grandTotal || r.totalValue, status:r.status, date:r.date }))
         ] : (d.purchases || []).map(r => ({ page:'purchase.html', id:r.id, ref:r.id || r.supplierInv, desc:r.itemName || r.description, value:r.total || r.totalPaid || (Number(r.qty || 0) * Number(r.price || 0)), status:r.status, date:r.date }));
-        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">${this.currentType === 'customer' ? 'Enquiries & Quotations' : 'Purchase Orders / Records'}</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Record</th><th>Date</th><th>Description</th><th>Value</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(r => `<tr><td><button class="b360-link-btn" onclick="B360UI.linkRecord('${r.page}','id',${JSON.stringify(String(r.id || ''))})">${this.esc(r.ref || '—')}</button></td><td>${this.esc(r.date || '—')}</td><td>${this.esc(r.desc || '—')}</td><td>${this.money(r.value)}</td><td><span class="slds-badge slds-badge-info">${this.esc(r.status || '—')}</span></td></tr>`).join('') : `<tr><td colspan="5" class="b360-empty-small">No linked records found.</td></tr>`}</tbody></table></div></div></div>`;
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">${this.currentType === 'customer' ? 'Enquiries & Quotations' : 'Purchase Orders / Records'}</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Record</th><th>Date</th><th>Description</th><th>Value</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(r => {
+            const recordId = String(r.id || '');
+            const ref = String(r.ref || recordId || '');
+            const target = r.page === 'enquiry.html' ? 'Enquiry Management' : (r.page === 'quotation.html' ? 'Quotation Management' : 'Purchase Management');
+            return `<tr><td><a href="${r.page}?${r.page === 'enquiry.html' ? `id=${encodeURIComponent(recordId)}` : `refNo=${encodeURIComponent(ref)}`}" class="b360-link-btn b360-record-link" title="Open ${target}: ${this.esc(ref)}" onclick="event.preventDefault();B360UI.linkRecord('${r.page}','id',${JSON.stringify(recordId)},${JSON.stringify(ref)})">${this.esc(ref)} <span aria-hidden="true">↗</span></a></td><td>${this.esc(r.date || '—')}</td><td>${this.esc(r.desc || '—')}</td><td>${this.money(r.value)}</td><td><span class="slds-badge slds-badge-info">${this.esc(r.status || '—')}</span></td></tr>`;
+        }).join('') : `<tr><td colspan="5" class="b360-empty-small">No linked records found.</td></tr>`}</tbody></table></div></div></div>`;
     },
 
     renderFinancials(vp) {
