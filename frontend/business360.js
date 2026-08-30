@@ -212,15 +212,47 @@ const B360UI = {
             this.kpiCard('OUTSTANDING RECEIVABLE', this.lakhs(k.outstandingVal), 'Customer Ledger', `B360UI.openRelated('ledger.html')`, k.outstandingVal > 0 ? 'danger' : ''),
             this.kpiCard('OPEN SERVICE TICKETS', k.openTickets, 'Customer Support', `B360UI.openRelated('customer_support.html')`, k.openTickets > 0 ? 'warning' : ''),
             this.kpiCard('PENDING FOLLOW-UPS', k.pendingFollowups, 'Follow-up Management', `B360UI.openRelated('follow_up.html')`),
-            this.kpiCard('CUSTOMER HEALTH SCORE', `${k.score}/100`, `Grade ${this.activeData.party.grade}`, `B360UI.switchTab('overview')`)
+            this.kpiCard('CUSTOMER HEALTH SCORE', `${k.score}/100`, `${k.scoreGrade || '—'} · View score breakdown`, `B360UI.showScoreBreakdown()`)
         ].join('') : [
             this.kpiCard('PURCHASE ORDERS', this.lakhs(k.poVal), 'Purchase records', `B360UI.openRelated('purchase.html')`),
             this.kpiCard('TOTAL PAYABLE', this.lakhs(k.payableVal), 'Supplier Ledger', `B360UI.openRelated('ledger.html')`, k.payableVal > 0 ? 'danger' : ''),
             this.kpiCard('REJECTIONS LOGGED', k.rejectionsCount, 'Rejected / quality records', `B360UI.openRelated('purchase.html')`, k.rejectionsCount > 0 ? 'warning' : ''),
             this.kpiCard('GRN / RECEIVED VALUE', this.lakhs(k.grnVal), 'Purchase records', `B360UI.openRelated('purchase_dashboard.html')`),
-            this.kpiCard('SUPPLIER QUALITY SCORE', `${k.score}/100`, 'Quality & delivery indicator', `B360UI.switchTab('overview')`)
+            this.kpiCard('SUPPLIER QUALITY SCORE', `${k.score}/100`, `${k.scoreGrade || '—'} · View score breakdown`, `B360UI.showScoreBreakdown()`)
         ].join('');
         document.getElementById('kpiStripContainer').innerHTML = html;
+    },
+
+    showScoreBreakdown() {
+        const hs = this.activeData?.kpis?.healthScore;
+        if (!hs) return;
+        const title = this.currentType === 'customer' ? 'Customer Health Score' : 'Supplier Performance Score';
+        const subtitle = this.currentType === 'customer'
+            ? 'Calculated from this customer’s actual receivables, sales activity, conversion, service, returns, follow-ups and relationship activity.'
+            : 'Calculated from this supplier’s actual delivery, quality/rejections, receipt completion, follow-ups and purchase relationship activity.';
+        const rows = (hs.components || []).map(c => {
+            const pct = c.max ? Math.round((c.score / c.max) * 100) : 0;
+            return `<div class=\"b360-score-row\">
+                <div class=\"b360-score-row-head\"><span>${this.esc(c.label)}</span><b>${c.score}/${c.max}</b></div>
+                <div class=\"b360-score-bar\"><span style=\"width:${pct}%\"></span></div>
+                <small>${this.esc(c.detail || '')}</small>
+            </div>`;
+        }).join('');
+        document.getElementById('b360ModalContainer').innerHTML = `
+            <div class=\"b360-modal-backdrop\" onclick=\"if(event.target===this)B360UI.closeModal()\">
+                <div class=\"b360-score-modal\" role=\"dialog\" aria-modal=\"true\">
+                    <div class=\"b360-score-modal-head\"><div><h2>${title}: ${hs.total}/100</h2><p>${this.esc(this.activeData.party.name)} · <strong>${this.esc(hs.grade)}</strong></p></div><button class=\"b360-modal-close\" onclick=\"B360UI.closeModal()\">✕</button></div>
+                    <div class=\"b360-score-explainer\">${this.esc(subtitle)}</div>
+                    <div class=\"b360-score-total\"><strong>${hs.total}</strong><span>/ 100</span><small>${this.esc(hs.grade)}</small></div>
+                    <div class=\"b360-score-components\">${rows}</div>
+                    <div class=\"b360-score-legend\"><span>90–100 Excellent</span><span>75–89 Good</span><span>60–74 Watch</span><span>40–59 At Risk</span><span>0–39 Critical</span></div>
+                </div>
+            </div>`;
+    },
+
+    closeModal() {
+        const el = document.getElementById('b360ModalContainer');
+        if (el) el.innerHTML = '';
     },
 
     switchTab(tab, btn) {

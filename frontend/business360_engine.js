@@ -133,12 +133,49 @@ const Business360Engine = {
         const orderValue = [...sales].reduce((s, r) => s + this.amountOf(r), 0);
         const openTickets = tickets.filter(t => !['closed', 'resolved', 'completed'].includes(this.lower(t.status))).length;
         const pendingFollowups = followups.filter(f => !['completed', 'closed', 'done'].includes(this.lower(f.status))).length;
-        const score = Math.round(Math.min(100,
-            (totalInvoiced > 0 ? 40 : 0) +
-            (outstanding <= 0 ? 25 : outstanding < totalInvoiced * 0.25 ? 18 : 8) +
-            (openTickets === 0 ? 20 : Math.max(5, 20 - openTickets * 4)) +
-            (pendingFollowups === 0 ? 15 : 8)
+        const now = Date.now();
+        const activeRecords = [...enquiries, ...quotations, ...transactionInvoices, ...activities, ...followups];
+        const recentActivityCount = activeRecords.filter(r => {
+            const d = new Date(this.dateOf(r)).getTime();
+            return Number.isFinite(d) && (now - d) <= 180 * 86400000;
+        }).length;
+        const paidRatio = totalInvoiced > 0 ? Math.min(1, totalReceived / totalInvoiced) : 0;
+        const overdueRatio = totalInvoiced > 0 ? Math.min(1, overdue / totalInvoiced) : 0;
+
+        // Customer Health Score — 100-point business-health model.
+        // 25 Payment + 20 Sales Activity + 15 Conversion + 15 Service +
+        // 10 Returns/Rejections + 10 Follow-up + 5 Relationship Activity.
+        const paymentScore = totalInvoiced > 0
+            ? Math.round(Math.max(0, Math.min(25, (paidRatio * 25) - (overdueRatio * 10))))
+            : 0;
+        const salesScore = Math.round(Math.min(20,
+            (transactionInvoices.length > 0 ? 10 : 0) +
+            Math.min(6, transactionInvoices.length * 2) +
+            (recentActivityCount > 0 ? 4 : 0)
         ));
+        const conversionBase = enquiries.length > 0 ? Math.min(10, (quotations.length / enquiries.length) * 10) : (quotations.length > 0 ? 8 : 0);
+        const orderConversion = quotations.length > 0 ? Math.min(5, (sales.length / quotations.length) * 5) : (sales.length > 0 ? 4 : 0);
+        const conversionScore = Math.round(conversionBase + orderConversion);
+        const serviceScore = Math.round(Math.max(0, 15 - (openTickets * 5)));
+        const returnsCount = returns.length + creditDebitNotes.filter(r => this.lower(r.type || r.noteType || r.category).includes('credit')).length;
+        const returnsScore = Math.round(Math.max(0, 10 - Math.min(10, returnsCount * 2)));
+        const followupScore = Math.round(Math.max(0, 10 - Math.min(10, pendingFollowups * 2)));
+        const relationshipScore = Math.round(Math.min(5, recentActivityCount > 0 ? Math.max(2, Math.min(5, recentActivityCount)) : 0));
+        const score = Math.max(0, Math.min(100, paymentScore + salesScore + conversionScore + serviceScore + returnsScore + followupScore + relationshipScore));
+        const scoreGrade = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 60 ? 'Watch' : score >= 40 ? 'At Risk' : 'Critical';
+
+        const healthScore = {
+            total: score, grade: scoreGrade, max: 100,
+            components: [
+                { key:'payment', label:'Payment / Receivable Health', score:paymentScore, max:25, detail: totalInvoiced > 0 ? `${Math.round(paidRatio*100)}% collected${overdue > 0 ? ` · ${this.num(overdue).toLocaleString('en-IN')} overdue` : ''}` : 'No invoicing history' },
+                { key:'sales', label:'Sales / Order Activity', score:salesScore, max:20, detail:`${transactionInvoices.length} invoice/sales record(s); ${recentActivityCount} recent linked activity record(s)` },
+                { key:'conversion', label:'Enquiry & Quotation Conversion', score:conversionScore, max:15, detail:`${enquiries.length} enquiries · ${quotations.length} quotations · ${sales.length} sales` },
+                { key:'service', label:'Service / Support Health', score:serviceScore, max:15, detail:`${openTickets} open service ticket(s)` },
+                { key:'returns', label:'Return / Rejection Performance', score:returnsScore, max:10, detail:`${returnsCount} return/credit-note issue record(s)` },
+                { key:'followup', label:'Follow-up Responsiveness', score:followupScore, max:10, detail:`${pendingFollowups} pending follow-up(s)` },
+                { key:'relationship', label:'Relationship Activity', score:relationshipScore, max:5, detail:`${recentActivityCount} linked record(s) in the last 180 days` }
+            ]
+        };
 
         return {
             party,
@@ -151,7 +188,9 @@ const Business360Engine = {
                 receivedVal: totalReceived,
                 openTickets,
                 pendingFollowups,
-                score
+                score,
+                scoreGrade,
+                healthScore
             },
             financialSummary: {
                 totalInvoiced, totalReceived, outstanding, overdue,
@@ -192,7 +231,27 @@ const Business360Engine = {
             return s + (status.includes('overdue') ? this.num(this.first(r.dueAmount, r.balanceDue, r.outstanding, this.amountOf(r))) : 0);
         }, 0);
         const deliveryIssues = purchases.filter(r => ['delayed', 'late', 'rejected', 'partial'].includes(this.lower(r.status))).length;
-        const qualityScore = Math.max(0, Math.min(100, Math.round(100 - rejections.length * 12 - deliveryIssues * 5)));
+        const receivedCount = purchases.filter(r => ['grn', 'received', 'delivered', 'completed'].includes(this.lower(r.status))).length;
+        const purchaseCount = purchases.length;
+        const onTimeRate = purchaseCount > 0 ? Math.max(0, 1 - (deliveryIssues / purchaseCount)) : 0;
+        const rejectionRate = purchaseCount > 0 ? Math.min(1, rejections.length / purchaseCount) : 0;
+        const deliveryScore = purchaseCount > 0 ? Math.round(onTimeRate * 35) : 0;
+        const qualityScorePart = purchaseCount > 0 ? Math.round(Math.max(0, 35 - rejectionRate * 35)) : 0;
+        const completionScore = purchaseCount > 0 ? Math.round((receivedCount / purchaseCount) * 15) : 0;
+        const responseScore = Math.max(0, 10 - Math.min(10, followups.filter(f => !['completed','closed','done'].includes(this.lower(f.status))).length * 2));
+        const supplierRelationshipScore = Math.min(5, purchases.length > 0 ? 5 : (quotations.length > 0 ? 3 : 0));
+        const qualityScore = Math.max(0, Math.min(100, deliveryScore + qualityScorePart + completionScore + responseScore + supplierRelationshipScore));
+        const qualityGrade = qualityScore >= 90 ? 'Excellent' : qualityScore >= 75 ? 'Good' : qualityScore >= 60 ? 'Watch' : qualityScore >= 40 ? 'At Risk' : 'Critical';
+        const supplierScoreBreakdown = {
+            total: qualityScore, grade: qualityGrade, max:100,
+            components:[
+                {key:'delivery',label:'Delivery Performance',score:deliveryScore,max:35,detail:`${deliveryIssues} delayed/late/partial/rejected purchase record(s)`},
+                {key:'quality',label:'Quality / Rejection Performance',score:qualityScorePart,max:35,detail:`${rejections.length} rejection record(s) across ${purchaseCount} purchase record(s)`},
+                {key:'completion',label:'GRN / Receipt Completion',score:completionScore,max:15,detail:`${receivedCount} of ${purchaseCount} purchase record(s) received/completed`},
+                {key:'response',label:'Follow-up Responsiveness',score:responseScore,max:10,detail:`${followups.filter(f => !['completed','closed','done'].includes(this.lower(f.status))).length} pending follow-up(s)`},
+                {key:'relationship',label:'Purchase Relationship Activity',score:supplierRelationshipScore,max:5,detail:`${purchases.length} purchase record(s) and ${quotations.length} quotation record(s)`}
+            ]
+        };
 
         return {
             party,
@@ -205,7 +264,9 @@ const Business360Engine = {
                 payableVal: payable,
                 rejectionsCount: rejections.length,
                 openIssues: deliveryIssues,
-                score: qualityScore
+                score: qualityScore,
+                scoreGrade: qualityGrade,
+                healthScore: supplierScoreBreakdown
             },
             financialSummary: {
                 totalPurchases, totalPaid, payable, overduePayable,
