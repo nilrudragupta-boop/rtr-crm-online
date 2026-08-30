@@ -318,16 +318,21 @@ const B360UI = {
 
     renderTransactions(vp) {
         const d = this.activeData;
+        const linkedEnquiries = d.enquiries || [];
+        const findLinkedEnquiry = (q) => linkedEnquiries.find(e =>
+            (q.enquiryId && String(e.id || '') === String(q.enquiryId)) ||
+            (q.enquiryNo && String(e.enquiryNo || '') === String(q.enquiryNo))
+        );
         const rows = this.currentType === 'customer' ? [
-            ...(d.enquiries || []).map(r => ({ page:'enquiry.html', id:r.id || r.enquiryNo, ref:r.enquiryNo || r.id, desc:r.subject || r.requirement, value:r.estimatedValue, status:r.status, date:r.enquiryDate })),
-            ...(d.quotations || []).map(r => ({ page:'quotation.html', id:r.id || r.refNo, ref:r.refNo || r.id, desc:'Quotation', value:r.grandTotal || r.totalValue, status:r.status, date:r.date }))
+            ...linkedEnquiries.map(r => ({ page:'enquiry.html', id:r.id || r.enquiryNo, ref:r.enquiryNo || r.id, desc:r.subject || r.requirement, value:r.estimatedValue, status:r.status, date:r.enquiryDate, targetDate:r.targetDate })),
+            ...(d.quotations || []).map(r => { const e = findLinkedEnquiry(r); return { page:'quotation.html', id:r.id || r.refNo, ref:r.refNo || r.id, desc:'Quotation', value:r.grandTotal || r.totalValue, status:r.status, date:r.date, targetDate:r.targetDate || r.enquiryTargetDate || e?.targetDate || '' }; })
         ] : (d.purchases || []).map(r => ({ page:'purchase.html', id:r.id, ref:r.id || r.supplierInv, desc:r.itemName || r.description, value:r.total || r.totalPaid || (Number(r.qty || 0) * Number(r.price || 0)), status:r.status, date:r.date }));
-        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">${this.currentType === 'customer' ? 'Enquiries & Quotations' : 'Purchase Orders / Records'}</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Record</th><th>Date</th><th>Description</th><th>Value</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(r => {
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">${this.currentType === 'customer' ? 'Enquiries & Quotations' : 'Purchase Orders / Records'}</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Record</th><th>Date</th><th>Target Date</th><th>Description</th><th>Value</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(r => {
             const recordId = String(r.id || '');
             const ref = String(r.ref || recordId || '');
             const target = r.page === 'enquiry.html' ? 'Enquiry Management' : (r.page === 'quotation.html' ? 'Quotation Management' : 'Purchase Management');
-            return `<tr><td><a href="${r.page}?${r.page === 'enquiry.html' ? `id=${encodeURIComponent(recordId)}` : `refNo=${encodeURIComponent(ref)}`}" class="b360-link-btn b360-record-link" title="Open ${target}: ${this.esc(ref)}" onclick="event.preventDefault();B360UI.linkRecord('${r.page}','id',${JSON.stringify(recordId)},${JSON.stringify(ref)})">${this.esc(ref)} <span aria-hidden="true">↗</span></a></td><td>${this.esc(r.date || '—')}</td><td>${this.esc(r.desc || '—')}</td><td>${this.money(r.value)}</td><td><span class="slds-badge slds-badge-info">${this.esc(r.status || '—')}</span></td></tr>`;
-        }).join('') : `<tr><td colspan="5" class="b360-empty-small">No linked records found.</td></tr>`}</tbody></table></div></div></div>`;
+            return `<tr><td><a href="${r.page}?${r.page === 'enquiry.html' ? `id=${encodeURIComponent(recordId)}` : `refNo=${encodeURIComponent(ref)}`}" class="b360-link-btn b360-record-link" title="Open ${target}: ${this.esc(ref)}" onclick="event.preventDefault();B360UI.linkRecord('${r.page}','id',${JSON.stringify(recordId)},${JSON.stringify(ref)})">${this.esc(ref)} <span aria-hidden="true">↗</span></a></td><td>${this.esc(r.date || '—')}</td><td>${this.esc(r.targetDate || '—')}</td><td>${this.esc(r.desc || '—')}</td><td>${this.money(r.value)}</td><td><span class="slds-badge slds-badge-info">${this.esc(r.status || '—')}</span></td></tr>`;
+        }).join('') : `<tr><td colspan="6" class="b360-empty-small">No linked records found.</td></tr>`}</tbody></table></div></div></div>`;
     },
 
     renderFinancials(vp) {
