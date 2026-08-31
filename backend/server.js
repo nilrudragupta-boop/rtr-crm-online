@@ -1044,7 +1044,15 @@ app.get('/api/crm/enquiry/:id/workflow', async (req, res) => {
         const [reviews, negotiations, quotations] = await Promise.all([
             CrmTechnicalReview.find({ enquiryId: req.params.id }).sort({ createdAt: -1 }).lean(),
             CrmNegotiation.find({ enquiryId: req.params.id }).sort({ negotiationDate: -1, createdAt: -1 }).lean(),
-            Quotation.find({ enquiryId: req.params.id }).sort({ date: -1, createdAt: -1 }).lean()
+            // A quotation can be linked by Enquiry ID or by Enquiry No.
+            // Match BOTH so older quotations (saved before enquiryId was stored)
+            // are also counted in the enquiry workflow.
+            Quotation.find({
+                $or: [
+                    { enquiryId: req.params.id },
+                    { enquiryNo: enquiry.enquiryNo }
+                ]
+            }).sort({ date: -1, createdAt: -1 }).lean()
         ]);
         const invoiceQuery = { $or: [{ enquiryId: req.params.id }, { enquiryNo: enquiry.enquiryNo }] };
         const invoices = await Invoice.find(invoiceQuery).sort({ date: -1, createdAt: -1 }).lean();
