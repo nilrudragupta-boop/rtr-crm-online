@@ -597,7 +597,7 @@
                 <div style="display: flex; gap: 10px;">
                     <input type="date" id="quoteFilterDate" onchange="currentPage=1; renderQuotationList()"
                         style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                    <input type="text" id="quoteSearchInput" placeholder="Search Ref No or Customer..."
+                    <input type="text" id="quoteSearchInput" placeholder="Search Ref No, Enquiry No or Customer..."
                         oninput="currentPage=1; renderQuotationList()"
                         style="width: 250px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
                 </div>
@@ -607,6 +607,7 @@
                 <thead>
                     <tr>
                         <th>Ref No</th>
+                        <th>Enquiry No.</th>
                         <th>Date</th>
                         <th>Customer Name</th>
                         <th style="text-align:center;">Status</th>
@@ -776,7 +777,12 @@
         }
 
         function getEnquiryByIdOrNo(id, no) {
-            return getSavedEnquiries().find(e => String(e.id || '') === String(id || '') || (no && String(e.enquiryNo || '') === String(no))) || null;
+            const sid = String(id || '').trim();
+            const sno = String(no || '').trim().toLowerCase();
+            return getSavedEnquiries().find(e =>
+                (sid && String(e.id || '').trim() === sid) ||
+                (sno && String(e.enquiryNo || '').trim().toLowerCase() === sno)
+            ) || null;
         }
 
         function setEnquiryContextFromRecord(e) {
@@ -1438,13 +1444,14 @@
             }
             if (searchTerm) {
                 filtered = filtered.filter(q =>
-                    (q.refNo && q.refNo.toLowerCase().includes(searchTerm)) ||
-                    (q.custName && q.custName.toLowerCase().includes(searchTerm))
+                    (q.refNo && String(q.refNo).toLowerCase().includes(searchTerm)) ||
+                    (q.enquiryNo && String(q.enquiryNo).toLowerCase().includes(searchTerm)) ||
+                    (q.custName && String(q.custName).toLowerCase().includes(searchTerm))
                 );
             }
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#666;">No saved quotations found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No saved quotations found.</td></tr>';
                 return;
             }
 
@@ -1466,8 +1473,15 @@
                 else if (q.status === 'Rejected') statusColor = '#dc3545';
 
                 const tr = document.createElement("tr");
+                const linkedEnquiry = getEnquiryByIdOrNo(q.enquiryId || q.enquiry_id || '', q.enquiryNo || q.enquiry_no || '');
+                const linkedEnquiryNo = q.enquiryNo || q.enquiry_no || linkedEnquiry?.enquiryNo || '';
+                const linkedEnquiryId = q.enquiryId || q.enquiry_id || linkedEnquiry?.id || '';
+                const enquiryCell = linkedEnquiryNo
+                    ? `<a href="enquiry.html?id=${encodeURIComponent(linkedEnquiryId)}&enquiryNo=${encodeURIComponent(linkedEnquiryNo)}" onclick="event.preventDefault();openLinkedEnquiryFromQuotation(${JSON.stringify(String(linkedEnquiryId))},${JSON.stringify(String(linkedEnquiryNo))})" style="color:#0d6efd;font-weight:600;text-decoration:underline;">${escapeHtml(String(linkedEnquiryNo))} ↗</a>`
+                    : '<span style="color:#999;">—</span>';
                 let rowHtml = `
                 <td><strong>${escapeHtml(q.refNo || '-')}</strong></td>
+                <td>${enquiryCell}</td>
                 <td>${q.date ? new Date(q.date).toLocaleDateString('en-GB') : '-'}</td>
                 <td style="text-align:left;">${escapeHtml(q.custName || '-')}</td>
                 <td style="text-align:center;">
