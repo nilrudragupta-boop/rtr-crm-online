@@ -88,6 +88,13 @@
             background: #fff;
         }
 
+        th,
+        td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #eee;
+        }
+
         .table-responsive.sticky-header thead th {
             position: sticky;
             top: 0;
@@ -100,12 +107,6 @@
             background: #1f1f1f;
         }
 
-        th,
-        td {
-            padding: 12px;
-            text-align: center;
-            border: 1px solid #eee;
-        }
 
         th {
             background: #cce2f3;
@@ -637,10 +638,6 @@
                     <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
                 </label>
 
-                <label
-                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 15px;">
-                    <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
-                </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
                     <input type="checkbox" id="stickyHeaderToggle" onchange="toggleStickyHeader()"> Sticky Table Header
@@ -1407,6 +1404,8 @@
             for (const btnId in buttonVisibility) {
                 const toggleId = `show${btnId.charAt(0).toUpperCase() + btnId.slice(1)}Toggle`;
                 const toggle = document.getElementById(toggleId);
+                const stickyToggle = document.getElementById("stickyHeaderToggle");
+                if (stickyToggle) stickyToggle.checked = isStickyHeader;
                 if (toggle) {
                     toggle.checked = buttonVisibility[btnId];
                 }
@@ -2896,6 +2895,27 @@
                 });
             }
         }
+
+        // Sticky Header Logic (defaults to true)
+        let isStickyHeader = localStorage.getItem("supplierStickyHeader") !== "false";
+
+        function toggleStickyHeader() {
+            isStickyHeader = document.getElementById("stickyHeaderToggle").checked;
+            localStorage.setItem("supplierStickyHeader", isStickyHeader);
+            applyStickyHeader();
+        }
+
+        function applyStickyHeader() {
+            const tableContainer = document.querySelector(".table-responsive");
+            if (tableContainer) {
+                if (isStickyHeader) {
+                    tableContainer.classList.add("sticky-header");
+                } else {
+                    tableContainer.classList.remove("sticky-header");
+                }
+            }
+        }
+        applyStickyHeader();
 
     </script>
 </body>
