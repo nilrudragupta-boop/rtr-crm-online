@@ -1041,18 +1041,25 @@ app.get('/api/crm/enquiry/:id/workflow', async (req, res) => {
     try {
         const enquiry = await CrmEnquiry.findOne({ id: req.params.id }).lean();
         if (!enquiry) return res.status(404).json({ success: false, message: 'Enquiry not found' });
+        // A quotation can be linked using either the stable Enquiry ID or the human-facing Enquiry No.
+        // Support both so older quotations and manually-created quotations remain connected.
+        const enquiryId = String(enquiry.id || req.params.id || '').trim();
+        const enquiryNo = String(enquiry.enquiryNo || '').trim();
+        const quotationOr = [];
+        if (enquiryId) {
+            quotationOr.push({ enquiryId });
+            quotationOr.push({ enquiryID: enquiryId });
+        }
+        if (enquiryNo) {
+            const noRegex = new RegExp('^' + enquiryNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+            quotationOr.push({ enquiryNo: noRegex });
+            quotationOr.push({ enquiryNO: noRegex });
+        }
+        const quotationQuery = quotationOr.length ? { $or: quotationOr } : { _id: null };
         const [reviews, negotiations, quotations] = await Promise.all([
             CrmTechnicalReview.find({ enquiryId: req.params.id }).sort({ createdAt: -1 }).lean(),
             CrmNegotiation.find({ enquiryId: req.params.id }).sort({ negotiationDate: -1, createdAt: -1 }).lean(),
-            // A quotation can be linked by Enquiry ID or by Enquiry No.
-            // Match BOTH so older quotations (saved before enquiryId was stored)
-            // are also counted in the enquiry workflow.
-            Quotation.find({
-                $or: [
-                    { enquiryId: req.params.id },
-                    { enquiryNo: enquiry.enquiryNo }
-                ]
-            }).sort({ date: -1, createdAt: -1 }).lean()
+            Quotation.find(quotationQuery).sort({ date: -1, createdAt: -1 }).lean()
         ]);
         const invoiceQuery = { $or: [{ enquiryId: req.params.id }, { enquiryNo: enquiry.enquiryNo }] };
         const invoices = await Invoice.find(invoiceQuery).sort({ date: -1, createdAt: -1 }).lean();
