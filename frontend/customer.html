@@ -71,6 +71,13 @@
             margin-top: 10px;
         }
 
+        th,
+        td {
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
         /* Scrolling container for sticky headers */
         .table-responsive {
             max-height: 600px;
@@ -86,13 +93,6 @@
             top: 0;
             z-index: 20;
             background: #eee;
-        }
-
-        th,
-        td {
-            padding: 8px;
-            text-align: center;
-            border: 1px solid #ddd;
         }
 
         th {
@@ -1182,6 +1182,14 @@
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 15px;">
                     <input type="checkbox" id="greyButtonsToggle" onchange="toggleGreyButtons()"> Grey Buttons Mode
                 </label>
+
+
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
+                    <input type="checkbox" id="stickyHeaderToggle" onchange="toggleStickyHeader()"> Sticky Table Header
+                </label>
+
+
             </div>
             <p style="font-size:14px; color:#666; margin-bottom:10px;">Select columns to display:</p>
             <div style="margin-bottom: 10px; display: flex; gap: 10px; justify-content: center;">
@@ -2759,6 +2767,8 @@
             for (const btnId in buttonVisibility) {
                 const toggleId = `show${btnId.charAt(0).toUpperCase() + btnId.slice(1)}Toggle`;
                 const toggle = document.getElementById(toggleId);
+                const stickyToggle = document.getElementById("stickyHeaderToggle");
+                if (stickyToggle) stickyToggle.checked = isStickyHeader;
                 if (toggle) {
                     toggle.checked = buttonVisibility[btnId];
                 }
@@ -3026,6 +3036,27 @@
             showToast(`Pincode selected: ${postOffice.Name}, ${district}, ${state}.`, "success");
         }
 
+
+        // Sticky Header Logic (defaults to true)
+        let isStickyHeader = localStorage.getItem("supplierStickyHeader") !== "false";
+
+        function toggleStickyHeader() {
+            isStickyHeader = document.getElementById("stickyHeaderToggle").checked;
+            localStorage.setItem("supplierStickyHeader", isStickyHeader);
+            applyStickyHeader();
+        }
+
+        function applyStickyHeader() {
+            const tableContainer = document.querySelector(".table-responsive");
+            if (tableContainer) {
+                if (isStickyHeader) {
+                    tableContainer.classList.add("sticky-header");
+                } else {
+                    tableContainer.classList.remove("sticky-header");
+                }
+            }
+        }
+
         // --- Action Dropdown Logic ---
         function toggleActionMenu(btn) {
             document.querySelectorAll('.action-dropdown.active').forEach(d => {
@@ -3050,6 +3081,8 @@
 
         document.addEventListener('click', function (e) { if (!e.target.matches('.action-btn-main')) { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); } });
         window.addEventListener('scroll', function () { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); }, true);
+
+        applyStickyHeader();
     </script>
 </body>
 
