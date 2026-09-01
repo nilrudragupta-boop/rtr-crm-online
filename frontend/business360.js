@@ -354,7 +354,7 @@ const B360UI = {
         vp.innerHTML = `${(d.alerts || []).map(a => `<div class="b360-alert-banner b360-alert-${this.esc(a.type)}">${a.icon} ${this.esc(a.text)}</div>`).join('')}
             <div class="b360-overview-grid">
                 <div class="slds-card"><div class="slds-card-header">Business Intelligence</div><div class="slds-card-body"><ul class="b360-insights">${(d.insights || []).map(x => `<li>${this.esc(x)}</li>`).join('')}</ul></div></div>
-                <div class="slds-card"><div class="slds-card-header">Key Contacts (${d.contacts?.length || 0})</div><div class="slds-card-body">${this.contactsHtml(d.contacts)}</div></div>
+                <div class="slds-card"><div class="slds-card-header">Key Contacts [Data within 'Contacts' only](${d.contacts?.length || 0})</div><div class="slds-card-body">${this.contactsHtml(d.contacts)}</div></div>
             </div>
             <div class="slds-card"><div class="slds-card-header">Integrated Related Modules</div><div class="slds-card-body"><div class="b360-module-grid">${modules.map(([label, page]) => `<button class="b360-module-link" onclick="B360UI.openRelated('${page}')">${label}<span>↗</span></button>`).join('')}</div></div></div>`;
     },
