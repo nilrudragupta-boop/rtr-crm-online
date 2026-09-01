@@ -75,7 +75,12 @@ const B360UI = {
     },
 
     esc(value) { return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c])); },
-    money(value) { return `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; },
+    money(value) {
+        const sanitized = String(value ?? '').replace(/[₹,\s]/g, '');
+        const parsed = Number(sanitized);
+        const safe = Number.isFinite(parsed) ? parsed : (Number.isFinite(Number(value)) ? Number(value) : 0);
+        return `₹${Number(safe).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+    },
     lakhs(value) { return `₹${(Number(value || 0) / 100000).toFixed(2)} L`; },
     date(value) { if (!value) return '—'; const d = new Date(value); return isNaN(d) ? this.esc(value) : d.toLocaleDateString('en-GB'); },
 
@@ -93,8 +98,8 @@ const B360UI = {
         const results = document.getElementById('partySearchResults');
         if (!input || !results) return;
         const matches = Business360Engine.searchParties(this.currentType, input.value || '').slice(0, 30);
-        results.innerHTML = matches.length ? matches.map(m => `
-            <div class="slds-search-item" data-party-id="${this.esc(m.id)}" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #eee;background:#fff">
+        results.innerHTML = matches.length ? matches.map((m, index) => `
+            <div class="slds-search-item${index === 0 ? ' is-active' : ''}" data-party-id="${this.esc(m.id)}" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #eee;background:${index === 0 ? '#eef5ff' : '#fff'};border-left:${index === 0 ? '3px solid var(--slds-brand)' : '3px solid transparent'}">
                 <strong style="color:var(--slds-brand)">${this.esc(m.name)}</strong> <span style="font-size:11px;color:#666">(${this.esc(m.code)})</span>
                 <div style="font-size:11px;color:#888">GSTIN: ${this.esc(m.gstin || 'N/A')} · ${this.esc(m.location || '—')}</div>
             </div>`).join('') : `<div style="padding:10px;color:#888">No ${this.currentType} records found.</div>`;
@@ -109,9 +114,43 @@ const B360UI = {
         if (!input || !results) return;
         input.addEventListener('input', () => this.showDropdownList());
         input.addEventListener('focus', () => this.showDropdownList());
+        input.addEventListener('keydown', e => {
+            const items = Array.from(results.querySelectorAll('.slds-search-item'));
+            if (!items.length) return;
+            const activeIndex = items.findIndex(item => item.classList.contains('is-active'));
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const nextIndex = activeIndex >= 0 ? (activeIndex + 1) % items.length : 0;
+                items.forEach((item, idx) => item.classList.toggle('is-active', idx === nextIndex));
+                items[nextIndex].scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const nextIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
+                items.forEach((item, idx) => item.classList.toggle('is-active', idx === nextIndex));
+                items[nextIndex].scrollIntoView({ block: 'nearest' });
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const active = results.querySelector('.slds-search-item.is-active') || items[0];
+                if (active) this.selectParty(active.dataset.partyId);
+                return;
+            }
+            if (e.key === 'Escape') {
+                results.style.display = 'none';
+            }
+        });
         results.addEventListener('mousedown', e => {
             const item = e.target.closest('[data-party-id]');
             if (item) this.selectParty(item.dataset.partyId);
+        });
+        results.addEventListener('mouseover', e => {
+            const item = e.target.closest('[data-party-id]');
+            if (!item) return;
+            const items = Array.from(results.querySelectorAll('.slds-search-item'));
+            items.forEach(el => el.classList.toggle('is-active', el === item));
         });
         document.addEventListener('click', e => {
             if (!e.target.closest('.slds-search-box')) results.style.display = 'none';
@@ -322,7 +361,23 @@ const B360UI = {
 
     contactsHtml(rows = []) {
         if (!rows.length) return `<div class="b360-empty-small">No linked contacts.</div>`;
-        return rows.map(c => `<div class="b360-contact"><b>${this.esc(c.name || c.contactName || 'Contact')}</b><span>${this.esc(c.designation || '')}${c.department ? ` · ${this.esc(c.department)}` : ''}</span><small>📞 ${this.esc(c.mobile || c.phone || c.contact || '—')} · ✉️ ${this.esc(c.email || '—')}</small></div>`).join('');
+        return rows.map(c => {
+            const primaryLabel = c.isPrimary || c.primary ? '<span class="slds-badge slds-badge-success" style="font-size:10px; margin-left:8px;">Primary</span>' : '';
+            const companyText = c.company || c.companyName || c.customerName || c.supplierName || '';
+            const designation = c.designation || c.title || '';
+            const department = c.department || c.team || '';
+            const mobile = c.mobile || c.phone || c.contact || c.alternateMobile || '—';
+            const email = c.email || c.emailId || '—';
+            const remarks = c.remarks || c.notes || '';
+            return `<div class="b360-contact">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                    <b>${this.esc(c.name || c.contactName || 'Contact')}</b>${primaryLabel}
+                </div>
+                <span>${this.esc(designation)}${designation && department ? ' · ' : ''}${this.esc(department)}</span>
+                <small>📞 ${this.esc(mobile)} · ✉️ ${this.esc(email)}${companyText ? ` · 🏢 ${this.esc(companyText)}` : ''}${c.contactType ? ` · ${this.esc(c.contactType)}` : ''}</small>
+                ${remarks ? `<small>💬 ${this.esc(remarks)}</small>` : ''}
+            </div>`;
+        }).join('');
     },
 
     renderTransactions(vp) {
@@ -334,7 +389,7 @@ const B360UI = {
         );
         const rows = this.currentType === 'customer' ? [
             ...linkedEnquiries.map(r => ({ page: 'enquiry.html', id: r.id || r.enquiryNo, ref: r.enquiryNo || r.id, desc: r.subject || r.requirement, value: r.estimatedValue, status: r.status, date: r.enquiryDate, targetDate: r.targetDate })),
-            ...(d.quotations || []).map(r => { const e = findLinkedEnquiry(r); return { page: 'quotation.html', id: r.id || r.refNo, ref: r.refNo || r.id, desc: 'Quotation', value: r.grandTotal || r.totalValue, status: r.status, date: r.date, targetDate: r.targetDate || r.enquiryTargetDate || e?.targetDate || '' }; })
+            ...(d.quotations || []).map(r => { const e = findLinkedEnquiry(r); return { page: 'quotation.html', id: r.id || r.refNo, ref: r.refNo || r.id, desc: r.subject || r.description || 'Quotation', value: r.grandTotal ?? r.totalValue ?? r.total ?? r.amount ?? r.value ?? 0, status: r.status, date: r.date, targetDate: r.targetDate || r.enquiryTargetDate || e?.targetDate || '' }; })
         ] : (d.purchases || []).map(r => ({ page: 'purchase.html', id: r.id, ref: r.id || r.supplierInv, desc: r.itemName || r.description, value: r.total || r.totalPaid || (Number(r.qty || 0) * Number(r.price || 0)), status: r.status, date: r.date }));
         vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">${this.currentType === 'customer' ? 'Enquiries & Quotations' : 'Purchase Orders / Records'}</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Record</th><th>Date</th><th>Target Date</th><th>Description</th><th>Value</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(r => {
             const recordId = String(r.id || '');
