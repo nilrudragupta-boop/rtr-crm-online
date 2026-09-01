@@ -135,8 +135,8 @@ const B360UI = {
         if (typeSelect) typeSelect.value = type;
         const service = document.getElementById('tabServiceBtn');
         const plants = document.getElementById('tabPlantsBtn');
-        if (plants) plants.style.display = type === 'customer' ? 'inline-block' : 'none';
-        if (service) service.style.display = type === 'customer' ? 'inline-block' : 'none';
+        if (plants) plants.style.display = type === 'customer' ? 'inline-flex' : 'none';
+        if (service) service.style.display = type === 'customer' ? 'inline-flex' : 'none';
 
         this.currentTab = 'overview';
         document.querySelectorAll('.b360-tab-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
@@ -146,10 +146,15 @@ const B360UI = {
     },
 
     renderEmpty() {
-        document.getElementById('partyHeaderContainer').innerHTML = '';
-        document.getElementById('kpiStripContainer').innerHTML = '';
-        document.getElementById('b360TabViewport').innerHTML = `<div class="b360-empty">No ${this.currentType} records are available. Create the party in the ${this.currentType} master first.</div>`;
-        document.getElementById('bcPartyName').textContent = 'No record selected';
+        const header = document.getElementById('partyHeaderContainer');
+        const strip = document.getElementById('kpiStripContainer');
+        const viewport = document.getElementById('b360TabViewport');
+        const bc = document.getElementById('bcPartyName');
+
+        if (header) header.innerHTML = '';
+        if (strip) strip.innerHTML = '';
+        if (viewport) viewport.innerHTML = `<div class="b360-empty">No ${this.currentType} records are available. Create the party in the ${this.currentType} master first.</div>`;
+        if (bc) bc.textContent = 'No record selected';
     },
 
     navigate(page, params = {}) {
