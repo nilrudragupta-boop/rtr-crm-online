@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Quotation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="apiClient.js"></script>
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            padding: 20px;
+            background: #f4f6f8;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            min-height: 100vh;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
+
+        .brand-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .brand-address {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .doc-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            text-decoration: underline;
+            margin: 20px 0;
+            color: #000;
+        }
+
+        /* Meta Row (Ref & Date) */
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+
+        .meta-group {
+            display: flex;
+            flex-direction: column;
+            width: 200px;
+        }
+
+        label {
+            font-weight: bold;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        input,
+        textarea,
+        select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        /* Customer Section */
+        .customer-section {
+            margin-bottom: 25px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+
+        .customer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #2c3e50;
+            color: white;
+            font-weight: 600;
+        }
+
+        td input {
+            width: 100%;
+            box-sizing: border-box;
+            border: none;
+            text-align: center;
+            background: transparent;
+            font-size: 14px;
+        }
+
+        td input:focus {
+            outline: 1px solid #0d6efd;
+            background: #fff;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .font-bold {
+            font-weight: bold;
+        }
+
+        /* Footer & Signature */
+        .footer {
+            margin-top: 60px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .signature-box {
+            text-align: center;
+            width: 250px;
+        }
+
+        .signature-line {
+            border-top: 1px solid #333;
+            margin-top: 50px;
+            padding-top: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Controls */
+        .controls {
+            margin-top: 30px;
+            text-align: center;
+            padding: 20px;
+            background: #eee;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.success {
+            background: #27ae60;
+        }
+
+        /* Pagination Styles */
+        .pagination button {
+            padding: 4px 10px;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pagination button:disabled {
+            background: #eee;
+            cursor: not-allowed;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .controls,
+            .add-row-btn,
+            .remove-btn-col,
+            .remove-btn,
+            #editTermsBtn,
+            .load-section {
+                display: none !important;
+            }
+
+            input,
+            textarea {
+                border: none;
+                padding: 0;
+                background: transparent;
+                resize: none;
+            }
+
+            .customer-section {
+                background: transparent;
+                border: none;
+                padding: 0;
+            }
+
+            th {
+                background: #eee !important;
+                color: black !important;
+                border-color: #000;
+            }
+
+            td {
+                border-color: #000;
+            }
+
+            #termsConditions {
+                border: none !important;
+                resize: none;
+                padding: 0;
+                overflow: hidden;
+            }
+
+            #statusGroup {
+                display: none !important;
+            }
+
+            .status-stamp {
+                display: block !important;
+            }
+        }
+
+        .status-stamp {
+            display: none;
+            font-size: 40px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: 4px solid;
+            padding: 5px 15px;
+            transform: rotate(-10deg);
+            opacity: 0.6;
+            pointer-events: none;
+            width: fit-content;
+            margin: 10px 50px 20px auto;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            min-width: 300px;
+        }
+
+        .modal-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        /* Resizable Columns */
+        #savedQuotationsTable th {
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .resizer:hover,
+        .resizing {
+            background-color: #3498db;
+            opacity: 0.5;
+        }
+
+        .quote-action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .quote-action-btn {
+            padding: 4px 10px;
+            background: #607d8b;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .quote-action-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + 4px);
+            min-width: 120px;
+            padding: 4px 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 20;
+            text-align: left;
+        }
+
+        .quote-action-dropdown.open .quote-action-menu {
+            display: block;
+        }
+
+        .quote-action-menu button {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 7px 12px;
+            background: transparent;
+            color: #333;
+            border: none;
+            border-radius: 0;
+            font-size: 12px;
+            font-weight: normal;
+            text-align: left;
+        }
+
+        .quote-action-menu button:hover {
+            background: #f1f1f1;
+        }
+
+        .quote-view-body {
+            max-height: 65vh;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .quote-view-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .quote-view-table th,
+        .quote-view-table td {
+            padding: 7px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .quote-view-table th {
+            width: 35%;
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .last-ref-display {
+            margin-left: 10px;
+            color: #2c3e50;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .last-ref-display:hover {
+            color: #0d6efd;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Load Section -->
+        <div class="load-section"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div>
+                <button class="secondary" onclick="toggleView()" id="viewToggleBtn"
+                    style="padding: 6px 12px; font-size: 13px; background-color: #6f42c1; border:none; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><i
+                        class="fas fa-list"></i> View History</button>
+            </div>
+            <div>
+                <input type="text" id="searchRefNo" placeholder="Load by Ref No."
+                    style="width: 150px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                <button class="secondary" onclick="confirmLoad()" style="padding: 6px 12px; font-size: 13px;">📂
+                    Load</button>
+                <span id="lastRefDisplay" class="last-ref-display" title="Click to use the last reference number">Last Ref. No.: -</span>
+            </div>
+        </div>
+
+        <div id="formView">
+            <!-- Header -->
+            <div class="header">
+                <div class="brand-name" data-brand="name"></div>
+                <div class="brand-address" data-brand="address"></div>
+            </div>
+
+            <div class="doc-title">QUOTATION</div>
+
+            <!-- Meta Data -->
+            <div class="meta-row">
+                <div class="meta-group">
+                    <label>Ref. No.</label>
+                    <input type="text" id="refNo" placeholder="Enter Ref No.">
+                </div>
+                <div class="meta-group" id="statusGroup">
+                    <label>Status</label>
+                    <select id="quotationStatus" onchange="updateStatusStamp()">
+                        <option value="Draft">Draft</option>
+                        <option value="Sent">Sent</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
+                </div>
+                <div class="meta-group" style="text-align: right; align-items: flex-end;">
+                    <label>Date</label>
+                    <input type="date" id="quotationDate" style="text-align: right;">
+                </div>
+            </div>
+
+            <!-- Customer Details -->
+            <div class="customer-section">
+                <label style="display:block; margin-bottom:10px; text-decoration:underline;">Customer Details:</label>
+                <div class="customer-grid">
+                    <div>
+                        <input type="text" id="custName" list="customerList" placeholder="Customer Name"
+                            onchange="fillCustomerDetails()" style="width:100%; font-weight:bold; margin-bottom:5px;">
+                        <datalist id="customerList"></datalist>
+                        <datalist id="itemList"></datalist>
+                        <input type="text" id="custContact" placeholder="Contact No." style="width:100%;">
+                    </div>
+                    <div>
+                        <textarea id="custAddress" rows="3" placeholder="Address"
+                            style="width:100%; resize:vertical;"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optional Saved Enquiry Link -->
+            <div class="customer-section" style="margin-top:-10px; margin-bottom:18px;">
+                <label style="display:block; margin-bottom:8px;">Link Saved Enquiry <span style="font-weight:normal;color:#777;">(Optional)</span></label>
+                <select id="enquirySelect" style="width:100%;" onchange="onEnquirySelected(this.value)">
+                    <option value="">— No Enquiry Linked —</option>
+                </select>
+                <small style="display:block;margin-top:6px;color:#777;">Select a saved enquiry to relate this quotation to the enquiry workflow. The selected enquiry will be stored with the quotation.</small>
+            </div>
+
+            <div id="enquiryContext" style="display:none;margin:12px 0;padding:10px 12px;border:1px solid #d7e3f0;border-radius:6px;background:#f7fbff;font-size:13px;"></div>
+
+            <!-- Table -->
+            <table id="quotationTable">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Sl No.</th>
+                        <th>Description</th>
+                        <th style="width: 80px;">UOM</th>
+                        <th style="width: 80px;">Qty</th>
+                        <th style="width: 100px;">Rate/UOM</th>
+                        <th style="width: 80px;">GST %</th>
+                        <th style="width: 120px;">Total Price</th>
+                        <th style="width: 40px;" class="remove-btn-col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Rows injected by JS -->
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="6" class="text-right"><strong>Grand Total:</strong></td>
+                        <td class="text-right font-bold"><input type="text" id="grandTotal" readonly value="0.00"
+                                style="font-weight:bold; text-align:right;"></td>
+                        <td class="remove-btn-col"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="8" style="text-align:left; font-weight:bold; background:#f9f9f9; padding:10px;">
+                            Amount in Words: <span id="amountInWords">Zero Rupees Only</span>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <button class="add-row-btn secondary" onclick="confirmAddRow()" style="font-size:12px;">+ Add Row</button>
+
+            <div id="statusStamp" class="status-stamp">DRAFT</div>
+
+            <!-- Terms and Conditions -->
+            <div class="terms-section" style="margin-top: 30px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+                    <label style="text-decoration: underline; margin:0;">Terms & Conditions:</label>
+                    <button id="editTermsBtn" class="secondary" style="padding: 2px 8px; font-size: 12px;"
+                        onclick="toggleTermsEdit()">✏️ Edit</button>
+                </div>
+                <textarea id="termsConditions" rows="4" readonly
+                    style="width: 100%; font-family: inherit; border: 1px solid #ccc; padding: 8px; border-radius: 4px; background-color: #f9f9f9;"
+                    placeholder="Enter terms here..." oninput="saveTerms(this)"></textarea>
+            </div>
+
+            <!-- Signature -->
+            <div class="footer">
+                <div class="signature-box">
+                    <div style="height: 60px;"></div>
+                    <div class="signature-line">For <span id="signBrandName">Brand Name</span></div>
+                    <p></p>
+                    <p></p>
+                    <div style="font-size:12px; margin-top:2px;">Authorized Signatory</div>
+                </div>
+            </div>
+            
+            <div id="dynamicFieldsContainer" class="form-grid" style="margin-bottom: 25px;"></div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <label
+                    style="cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-weight:bold; margin-right:15px; font-size:13px; color:#555;">
+                    <input type="checkbox" id="showBankDetailsToggle" checked
+                        onchange="localStorage.setItem('quoteShowBankDetails', this.checked)"> Show Bank Details & QR
+                </label>
+                <button class="success" onclick="confirmSave()" style="background:#27ae60;">💾 Save</button>
+                <button class="success" onclick="generateQuotationPDF()">🖨️ Download PDF</button>
+            </div>
+        </div>
+
+        <!-- List View -->
+        <div id="listView"
+            style="display:none; padding: 20px; background: #fff; border-radius: 8px; border: 1px solid #eee;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #2c3e50;">Saved Quotations</h3>
+                <div style="display: flex; gap: 10px;">
+                    <input type="date" id="quoteFilterDate" onchange="currentPage=1; renderQuotationList()"
+                        style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                    <input type="text" id="quoteSearchInput" placeholder="Search Ref No, Enquiry No or Customer..."
+                        oninput="currentPage=1; renderQuotationList()"
+                        style="width: 250px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+            <table id="savedQuotationsTable">
+                <thead>
+                    <tr>
+                        <th>Ref No</th>
+                        <th>Enquiry No.</th>
+                        <th>Date</th>
+                        <th>Customer Name</th>
+                        <th style="text-align:center;">Status</th>
+                        <th style="text-align:right;">Grand Total (₹)</th>
+                        <th style="text-align:center;" class="no-print">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="savedQuotationsBody"></tbody>
+            </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-container"
+                style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span id="totalQuotesDisplay" style="font-weight: bold; color: #3498db; margin-right: 8px;"></span>
+                    <select id="rowsPerPageSelect" onchange="changeRowsPerPage()"
+                        style="width: auto; padding: 4px; border: 1px solid #ccc; border-radius: 4px; margin: 0;">
+                        <option value="10">10 rows</option>
+                        <option value="20" selected>20 rows</option>
+                        <option value="50">50 rows</option>
+                        <option value="100">100 rows</option>
+                        <option value="200">200 rows</option>
+                        <option value="500">500 rows</option>
+                    </select>
+                </div>
+                <div id="paginationInfo" style="color: #666; font-size:13px;"></div>
+                <div class="pagination" id="paginationControls" style="display: flex; gap: 5px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quotation View Modal -->
+    <div id="quotationViewModal" class="modal">
+        <div class="modal-content" style="width: 700px; max-width: 95%; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="quotationViewTitle" style="margin-top:0; color:#2c3e50;">Quotation Details</h3>
+                <button class="secondary" onclick="closeQuotationView()" style="padding:4px 10px;">&times;</button>
+            </div>
+            <div id="quotationViewBody" class="quote-view-body"></div>
+            <div class="modal-buttons">
+                <button class="secondary" onclick="closeQuotationView()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Confirmation Modal -->
+    <div id="actionConfirmModal" class="modal">
+        <div class="modal-content">
+            <h3 id="actionConfirmTitle" style="color: #d35400;">⚠️ Confirmation</h3>
+            <p id="actionConfirmMsg"></p>
+            <div class="modal-buttons">
+                <button id="actionConfirmBtnYes" class="success">Yes</button>
+                <button class="secondary" onclick="closeActionConfirmModal()">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <h3 id="infoModalTitle" style="color: #27ae60;">✅ Success</h3>
+            <p id="infoModalMsg"></p>
+            <div class="modal-buttons">
+                <button class="secondary" onclick="closeInfoModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateBrandInfo(settings) {
+            const nameEls = document.querySelectorAll('[data-brand="name"]');
+            const addressEl = document.querySelector('[data-brand="address"]');
+            const signEl = document.getElementById('signBrandName');
+
+            if (settings.companyName) {
+                nameEls.forEach(el => el.innerText = settings.companyName);
+                if (signEl) signEl.innerText = settings.companyName;
+                document.title = "Quotation - " + settings.companyName;
+            }
+
+            if (addressEl) {
+                let lines = [];
+                if (settings.addressLine1) lines.push(settings.addressLine1);
+                if (settings.addressLine2) lines.push(settings.addressLine2);
+
+                let contactParts = [];
+                if (settings.contactNumber) contactParts.push(`Ph: ${settings.contactNumber}`);
+                if (settings.companyEmail) contactParts.push(`Email: ${settings.companyEmail}`);
+                if (contactParts.length > 0) lines.push(contactParts.join(' | '));
+
+                if (settings.companyWebsite) lines.push(settings.companyWebsite);
+                if (settings.companyGstin) lines.push(`GSTIN: ${settings.companyGstin}`);
+
+                addressEl.innerHTML = lines.join('<br>');
+            }
+        }
+
+        async function fetchQuotationsData() {
+            if (typeof apiClient !== 'undefined' && apiClient.getQuotations) {
+                try {
+                    const remoteData = await apiClient.getQuotations();
+                    if (Array.isArray(remoteData)) {
+                        localStorage.setItem("quotations", JSON.stringify(remoteData));
+                        updateLastReferenceDisplay();
+                        if (currentMode === 'list') {
+                            renderQuotationList();
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Failed to fetch quotations from backend", e);
+                }
+            }
+        }
+
+        async function fetchQuotationReferences() {
+            try {
+                const [remoteCustomers, remoteItems, remoteEnquiries] = await Promise.all([
+                    typeof apiClient !== 'undefined' && apiClient.getCustomers ? apiClient.getCustomers() : null,
+                    typeof apiClient !== 'undefined' && apiClient.getItems ? apiClient.getItems() : null,
+                    typeof apiClient !== 'undefined' && apiClient.getCrmEnquiries ? apiClient.getCrmEnquiries() : null
+                ]);
+
+                if (Array.isArray(remoteCustomers)) {
+                    localStorage.setItem('customers', JSON.stringify(remoteCustomers));
+                    customers = remoteCustomers;
+                    refreshCustomerList(remoteCustomers);
+                }
+                if (Array.isArray(remoteItems)) {
+                    localStorage.setItem('items', JSON.stringify(remoteItems));
+                    refreshItemList(remoteItems);
+                }
+                if (Array.isArray(remoteEnquiries)) {
+                    localStorage.setItem('crm_enquiries', JSON.stringify(remoteEnquiries));
+                }
+                populateEnquiryDropdown();
+            } catch (error) {
+                console.warn("Failed to sync quotation references from backend:", error);
+                populateEnquiryDropdown();
+            }
+        }
+
+        function getSavedEnquiries() {
+            try {
+                const rows = JSON.parse(localStorage.getItem('crm_enquiries') || '[]');
+                return Array.isArray(rows) ? rows : [];
+            } catch (e) { return []; }
+        }
+
+        function enquiryLabel(e) {
+            const no = e.enquiryNo || e.id || 'Enquiry';
+            const customer = e.customerName || e.customer || '';
+            const subject = e.subject || e.requirement || '';
+            const target = e.targetDate ? ` · Target: ${e.targetDate}` : '';
+            return [no, customer, subject].filter(Boolean).join(' | ') + target;
+        }
+
+        function populateEnquiryDropdown(selectedId = '') {
+            const select = document.getElementById('enquirySelect');
+            if (!select) return;
+            const enquiries = getSavedEnquiries().sort((a,b) => new Date(b.enquiryDate || b.createdAt || 0) - new Date(a.enquiryDate || a.createdAt || 0));
+            const current = selectedId || select.value || '';
+            select.innerHTML = '<option value="">— No Enquiry Linked —</option>' + enquiries.map(e =>
+                `<option value="${escapeHtml(String(e.id || ''))}">${escapeHtml(enquiryLabel(e))}</option>`
+            ).join('');
+            if (current) select.value = String(current);
+        }
+
+        function getEnquiryByIdOrNo(id, no) {
+            const sid = String(id || '').trim();
+            const sno = String(no || '').trim().toLowerCase();
+            return getSavedEnquiries().find(e =>
+                (sid && String(e.id || '').trim() === sid) ||
+                (sno && String(e.enquiryNo || '').trim().toLowerCase() === sno)
+            ) || null;
+        }
+
+        function setEnquiryContextFromRecord(e) {
+            if (!e) {
+                window.enquiryContext = null;
+                const context = document.getElementById('enquiryContext');
+                if (context) { context.style.display = 'none'; context.innerHTML = ''; }
+                return;
+            }
+            window.enquiryContext = {
+                enquiryId: e.id || '', enquiryNo: e.enquiryNo || '',
+                customerId: e.customerId || '', customerName: e.customerName || e.customer || '',
+                plantName: e.plantName || '', contactName: e.contactName || '',
+                requirement: e.requirement || '', subject: e.subject || '', targetDate: e.targetDate || ''
+            };
+            const cust = document.getElementById('custName');
+            if (cust && window.enquiryContext.customerName) { cust.value = window.enquiryContext.customerName; fillCustomerDetails(); }
+            const contact = document.getElementById('custContact');
+            if (contact && window.enquiryContext.contactName) contact.value = window.enquiryContext.contactName;
+            const context = document.getElementById('enquiryContext');
+            if (context) {
+                context.style.display = 'block';
+                context.innerHTML = '<b>Linked Enquiry:</b> ' + escapeHtml(window.enquiryContext.enquiryNo) +
+                    ' &nbsp;|&nbsp; <b>Subject:</b> ' + escapeHtml(window.enquiryContext.subject || '-') +
+                    (window.enquiryContext.targetDate ? ' &nbsp;|&nbsp; <b>Target Date:</b> ' + escapeHtml(window.enquiryContext.targetDate) : '') +
+                    (window.enquiryContext.plantName ? ' &nbsp;|&nbsp; <b>Plant:</b> ' + escapeHtml(window.enquiryContext.plantName) : '') +
+                    (window.enquiryContext.requirement ? '<br><b>Requirement:</b> ' + escapeHtml(window.enquiryContext.requirement) : '');
+            }
+        }
+
+        function onEnquirySelected(id) {
+            if (!id) { setEnquiryContextFromRecord(null); return; }
+            const e = getEnquiryByIdOrNo(id, '');
+            if (!e) return;
+            setEnquiryContextFromRecord(e);
+            const ref = document.getElementById('refNo');
+            if (ref && !ref.value && e.enquiryNo) ref.value = 'QT-' + String(e.enquiryNo).replace(/^ENQ-/, '');
+        }
+
+        window.enquiryContext = null;
+
+        function applyEnquiryContext() {
+            populateEnquiryDropdown();
+            const p = new URLSearchParams(window.location.search);
+            if (p.get('fromEnquiry') !== '1' || !p.get('enquiryId')) return;
+            window.enquiryContext = {
+                enquiryId: p.get('enquiryId') || '', enquiryNo: p.get('enquiryNo') || '',
+                customerId: p.get('customerId') || '', customerName: p.get('customerName') || '',
+                plantName: p.get('plantName') || '', contactName: p.get('contactName') || '',
+                requirement: p.get('requirement') || '', subject: p.get('subject') || '', targetDate: p.get('targetDate') || ''
+            };
+            const select = document.getElementById('enquirySelect');
+            if (select) select.value = window.enquiryContext.enquiryId;
+            const saved = getEnquiryByIdOrNo(window.enquiryContext.enquiryId, window.enquiryContext.enquiryNo);
+            if (saved) setEnquiryContextFromRecord(saved);
+            const ref = document.getElementById('refNo');
+            if (ref && !ref.value && window.enquiryContext.enquiryNo) ref.value = 'QT-' + window.enquiryContext.enquiryNo.replace(/^ENQ-/, '');
+            if (!saved) setEnquiryContextFromRecord(window.enquiryContext);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const savedBankToggle = localStorage.getItem('quoteShowBankDetails');
+            if (savedBankToggle !== null && document.getElementById('showBankDetailsToggle')) {
+                document.getElementById('showBankDetailsToggle').checked = savedBankToggle === 'true';
+            }
+
+            // Apply brand details on initial load for browser context
+            if (window.BrandService && !window.electronAPI) {
+                const settings = { companyName: localStorage.getItem('companyName'), addressLine1: localStorage.getItem('addressLine1'), addressLine2: localStorage.getItem('addressLine2'), contactNumber: localStorage.getItem('contactNumber'), companyEmail: localStorage.getItem('companyEmail'), companyWebsite: localStorage.getItem('companyWebsite'), companyGstin: localStorage.getItem('companyGstin') };
+                updateBrandInfo(settings);
+            }
+
+            if (window.electronAPI && window.electronAPI.getAppSettings) {
+                window.electronAPI.getAppSettings().then(res => {
+                    if (res.success) {
+                        updateBrandInfo(res);
+                    }
+                });
+                // Real-time update listener
+                window.electronAPI.onAppSettingsChanged((newSettings) => {
+                    updateBrandInfo(newSettings);
+                });
+            } else if (typeof APP_SETTINGS !== 'undefined') {
+                updateBrandInfo({
+                    companyName: APP_SETTINGS.COMPANY_NAME,
+                    addressLine1: APP_SETTINGS.ADDRESS_LINE_1,
+                    addressLine2: APP_SETTINGS.ADDRESS_LINE_2,
+                    contactNumber: APP_SETTINGS.CONTACT_NUMBER,
+                    companyEmail: APP_SETTINGS.COMPANY_EMAIL,
+                    companyWebsite: APP_SETTINGS.COMPANY_WEBSITE,
+                    companyGstin: APP_SETTINGS.COMPANY_GSTIN
+                });
+            }
+            fetchCustomFieldsConfig().then(() => fetchQuotationsData());
+            loadItems();
+            updateLastReferenceDisplay();
+            fetchQuotationReferences().then(() => applyEnquiryContext());
+        });
+
+        // 2. Load Customers
+        let dynamicFieldsList = [];
+
+        async function fetchCustomFieldsConfig() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
+                    const fields = await apiClient.getCustomFields();
+                    if (fields) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(Array.isArray(fields) ? fields : (fields.data || [])));
+                    }
+                }
+            } catch (error) {
+                console.warn("Failed to fetch custom fields config:", error);
+            }
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            dynamicFieldsList = allFields.filter(f => f.moduleName === 'Quotation' && f.isActive).sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            const theadTr = document.querySelector("#savedQuotationsTable thead tr");
+            if (theadTr) {
+                document.querySelectorAll(".dyn-th").forEach(th => th.remove());
+                const actionsTh = theadTr.lastElementChild;
+                dynamicFieldsList.forEach(f => {
+                    if (f.showInGrid !== false) {
+                        const th = document.createElement("th");
+                        th.className = "dyn-th";
+                        th.innerText = f.fieldLabel;
+                        theadTr.insertBefore(th, actionsTh);
+                    }
+                });
+            }
+
+            renderDynamicFields();
+
+            requestAnimationFrame(() => {
+                loadColumnWidths();
+                enableColumnResizing();
+            });
+        }
+
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            dynamicFieldsList.forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'form-group';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.style.width = 'auto';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                    wrapper.style.gap = '5px';
+                    wrapper.style.display = 'flex';
+                    label.style.marginBottom = '0';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType === 'number' ? 'number' : 'text';
+                    input.placeholder = field.fieldLabel;
+                }
+
+                input.className = 'dynamic-field';
+                input.dataset.fieldName = field.fieldName;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
+
+        let customers = JSON.parse(localStorage.getItem("customers")) || [];
+        const custList = document.getElementById("customerList");
+        function refreshCustomerList(customerData) {
+            if (!custList) return;
+            custList.innerHTML = '';
+            customerData.sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c.name || '';
+            custList.appendChild(opt);
+            });
+        }
+        refreshCustomerList(customers);
+
+        function fillCustomerDetails() {
+            const name = document.getElementById("custName").value;
+            const cust = customers.find(c => c.name === name);
+            if (cust) {
+                document.getElementById("custContact").value = cust.contact || "";
+                document.getElementById("custAddress").value = cust.address || "";
+            }
+        }
+
+        function refreshItemList(itemData) {
+            const list = document.getElementById("itemList");
+            if (list) {
+                list.innerHTML = "";
+                itemData.forEach(i => {
+                    const opt = document.createElement("option");
+                    opt.value = i.name;
+                    list.appendChild(opt);
+                });
+            }
+        }
+
+        function loadItems() {
+            refreshItemList(JSON.parse(localStorage.getItem("items")) || []);
+        }
+
+        function escapeHtml(text) {
+            if (text == null) return "";
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function enableColumnResizing() {
+            const table = document.getElementById('savedQuotationsTable');
+            if (!table) return;
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+
+                resizer.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) {
+                        th.style.width = newWidth + 'px';
+                        th.style.minWidth = newWidth + 'px';
+                    }
+                }
+
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+
+        function saveColumnWidths() {
+            const widths = [];
+            const headers = document.querySelectorAll('#savedQuotationsTable th');
+            headers.forEach(th => {
+                widths.push(th.style.width);
+            });
+            localStorage.setItem('quotationColumnWidths', JSON.stringify(widths));
+        }
+
+        function loadColumnWidths() {
+            const savedWidths = JSON.parse(localStorage.getItem('quotationColumnWidths'));
+            if (savedWidths && Array.isArray(savedWidths)) {
+                const headers = document.querySelectorAll('#savedQuotationsTable th');
+                headers.forEach((th, index) => {
+                    if (savedWidths[index]) {
+                        th.style.width = savedWidths[index];
+                        th.style.minWidth = savedWidths[index];
+                    }
+                });
+            }
+        }
+
+        // 3. Table Logic
+        function addRow() {
+            const tbody = document.querySelector("#quotationTable tbody");
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="sl-no"></td>
+                <td><input type="text" class="item-desc" list="itemList" onchange="autofillItem(this)" placeholder="Description" style="text-align:left;"></td>
+                <td><input type="text" class="item-uom" placeholder="UOM"></td>
+                <td><input type="number" class="qty" oninput="calcRow(this)" placeholder="0" min="0"></td>
+                <td><input type="number" class="rate" oninput="calcRow(this)" placeholder="0.00" style="text-align:right;" min="0"></td>
+                <td><input type="number" class="gst" oninput="calcRow(this)" placeholder="0" style="text-align:center;" min="0"></td>
+                <td><input type="text" class="total" readonly placeholder="0.00" style="text-align:right; font-weight:bold;" min="0"></td>
+                <td class="remove-btn-col"><button class="danger" style="padding: 2px 6px; font-size:12px;" onclick="confirmRemoveRow(this)">X</button></td>
+            `;
+            tbody.appendChild(tr);
+            updateSlNo();
+        }
+
+        function autofillItem(input) {
+            const name = input.value.trim().toLowerCase();
+            if (!name) return;
+
+            const items = JSON.parse(localStorage.getItem("items")) || [];
+            const itemObj = items.find(i => (i.name || "").toLowerCase() === name || (i.itemCode || "").toLowerCase() === name);
+
+            if (itemObj) {
+                const tr = input.closest("tr");
+                input.value = itemObj.name;
+
+                const uomInput = tr.querySelector(".item-uom");
+                const rateInput = tr.querySelector(".rate");
+                const gstInput = tr.querySelector(".gst");
+
+                if (uomInput && itemObj.uom) uomInput.value = itemObj.uom;
+                if (rateInput && itemObj.salePrice && parseFloat(itemObj.salePrice) > 0) rateInput.value = parseFloat(itemObj.salePrice).toFixed(2);
+                if (gstInput && itemObj.gst !== undefined) gstInput.value = itemObj.gst;
+
+                calcRow(input);
+            }
+        }
+
+        function removeRow(btn) {
+            btn.closest("tr").remove();
+            updateSlNo();
+            calcGrandTotal();
+        }
+
+        function updateSlNo() {
+            document.querySelectorAll(".sl-no").forEach((td, i) => td.innerText = i + 1);
+        }
+
+        function calcRow(input) {
+            const tr = input.closest("tr");
+            const qty = parseFloat(tr.querySelector(".qty").value) || 0;
+            const rate = parseFloat(tr.querySelector(".rate").value) || 0;
+            const gst = parseFloat(tr.querySelector(".gst").value) || 0;
+            const base = qty * rate;
+            const totalAmount = base + (base * (gst / 100));
+            tr.querySelector(".total").value = totalAmount.toFixed(2);
+            calcGrandTotal();
+        }
+
+        function calcGrandTotal() {
+            let sum = 0;
+            document.querySelectorAll(".total").forEach(inp => sum += parseFloat(inp.value) || 0);
+            document.getElementById("grandTotal").value = sum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById("amountInWords").innerText = convertNumberToWords(sum);
+        }
+
+        function convertNumberToWords(amount) {
+            var a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+            var b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+            function numToWords(n) {
+                if ((n = n.toString()).length > 9) return 'overflow';
+                var n_array = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+                if (!n_array) return;
+                var str = '';
+                str += (n_array[1] != 0) ? (a[Number(n_array[1])] || b[n_array[1][0]] + ' ' + a[n_array[1][1]]) + 'Crore ' : '';
+                str += (n_array[2] != 0) ? (a[Number(n_array[2])] || b[n_array[2][0]] + ' ' + a[n_array[2][1]]) + 'Lakh ' : '';
+                str += (n_array[3] != 0) ? (a[Number(n_array[3])] || b[n_array[3][0]] + ' ' + a[n_array[3][1]]) + 'Thousand ' : '';
+                str += (n_array[4] != 0) ? (a[Number(n_array[4])] || b[n_array[4][0]] + ' ' + a[n_array[4][1]]) + 'Hundred ' : '';
+                str += (n_array[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n_array[5])] || b[n_array[5][0]] + ' ' + a[n_array[5][1]]) : '';
+                return str;
+            }
+            const [intPart, decPart] = parseFloat(amount).toFixed(2).split('.');
+            let words = numToWords(parseInt(intPart));
+            if (!words || words.trim() === '') words = "Zero ";
+            words += "Rupees";
+            if (parseInt(decPart) > 0) words += " and " + numToWords(parseInt(decPart)) + "Paise";
+            return words + " Only";
+        }
+
+        // 4. Terms Logic
+        const savedTerms = localStorage.getItem("quotationTerms");
+        const termsEl = document.getElementById("termsConditions");
+        if (savedTerms) {
+            termsEl.value = savedTerms;
+            setTimeout(() => { termsEl.style.height = 'auto'; termsEl.style.height = termsEl.scrollHeight + 'px'; }, 100);
+        }
+        function saveTerms(el) {
+            localStorage.setItem("quotationTerms", el.value);
+            el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
+        }
+
+        function toggleTermsEdit() {
+            const el = document.getElementById("termsConditions");
+            const btn = document.getElementById("editTermsBtn");
+            if (el.hasAttribute("readonly")) {
+                el.removeAttribute("readonly");
+                el.style.backgroundColor = "#fff";
+                el.focus();
+                btn.innerText = "🔒 Lock";
+                btn.classList.remove("secondary");
+                btn.classList.add("success");
+            } else {
+                el.setAttribute("readonly", true);
+                el.style.backgroundColor = "#f9f9f9";
+                btn.innerText = "✏️ Edit";
+                btn.classList.remove("success");
+                btn.classList.add("secondary");
+            }
+        }
+
+        // 5. Save Logic
+        function saveQuotation() {
+            const refNo = document.getElementById("refNo").value.trim();
+            const date = document.getElementById("quotationDate").value;
+            const custName = document.getElementById("custName").value.trim();
+
+            if (!refNo) { showInfo("Warning", "Please enter a Reference Number.", true); return; }
+            if (!custName) { showInfo("Warning", "Please enter a Customer Name.", true); return; }
+
+            const items = [];
+            document.querySelectorAll("#quotationTable tbody tr").forEach(tr => {
+                const inputs = tr.querySelectorAll("input");
+                const desc = inputs[0].value.trim();
+                if (desc) {
+                    items.push({
+                        description: desc,
+                        uom: inputs[1].value,
+                        qty: inputs[2].value,
+                        rate: inputs[3].value,
+                        gst: inputs[4].value,
+                        total: inputs[5].value
+                    });
+                }
+            });
+
+            const quotationData = {
+                id: refNo,
+                refNo, date, custName,
+                status: document.getElementById("quotationStatus").value,
+                custContact: document.getElementById("custContact").value,
+                custAddress: document.getElementById("custAddress").value,
+                enquiryId: window.enquiryContext?.enquiryId || document.getElementById('enquirySelect')?.value || '',
+                enquiryNo: window.enquiryContext?.enquiryNo || getEnquiryByIdOrNo(document.getElementById('enquirySelect')?.value, '')?.enquiryNo || '',
+                enquiryRequirement: window.enquiryContext?.requirement || '',
+                enquirySubject: window.enquiryContext?.subject || '',
+                enquiryTargetDate: window.enquiryContext?.targetDate || '',
+                plantName: window.enquiryContext?.plantName || '',
+                contactName: window.enquiryContext?.contactName || '',
+                items,
+                grandTotal: document.getElementById("grandTotal").value,
+                terms: document.getElementById("termsConditions").value
+            };
+
+            document.querySelectorAll('#dynamicFieldsContainer .dynamic-field').forEach(f => {
+                const fn = f.dataset.fieldName;
+                if (f.type === 'checkbox') quotationData[fn] = f.checked;
+                else quotationData[fn] = f.value;
+            });
+
+            let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+            const existingIndex = quotations.findIndex(q => q.refNo === refNo);
+
+            if (existingIndex >= 0) {
+                askConfirm("Overwrite?", "Quotation with this Ref No already exists. Overwrite?", () => {
+                    quotations[existingIndex] = quotationData;
+                    localStorage.setItem("quotations", JSON.stringify(quotations));
+                    updateLastReferenceDisplay();
+                    if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quotationData).catch(e => console.warn(e));
+                    showInfo("Success", "Quotation saved successfully!");
+                });
+            } else {
+                quotations.push(quotationData);
+                localStorage.setItem("quotations", JSON.stringify(quotations));
+                updateLastReferenceDisplay();
+                if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quotationData).catch(e => console.warn(e));
+                showInfo("Success", "Quotation saved successfully!");
+            }
+        }
+
+        // 6. Load Logic
+        function loadQuotation() {
+            const searchRef = document.getElementById("searchRefNo").value.trim();
+            if (!searchRef) { showInfo("Warning", "Please enter a Ref No to load.", true); return; }
+
+            const quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+            const quotation = quotations.find(q => q.refNo === searchRef);
+
+            if (quotation) {
+                document.getElementById("refNo").value = quotation.refNo;
+                document.getElementById("quotationStatus").value = quotation.status || "Draft";
+                document.getElementById("quotationDate").value = quotation.date;
+                document.getElementById("custName").value = quotation.custName;
+                document.getElementById("custContact").value = quotation.custContact || "";
+                document.getElementById("custAddress").value = quotation.custAddress || "";
+                document.getElementById("termsConditions").value = quotation.terms || "";
+                populateEnquiryDropdown(quotation.enquiryId || '');
+                const linkedEnquiry = getEnquiryByIdOrNo(quotation.enquiryId || '', quotation.enquiryNo || '');
+                if (linkedEnquiry) setEnquiryContextFromRecord(linkedEnquiry);
+                else if (quotation.enquiryId || quotation.enquiryNo) setEnquiryContextFromRecord({
+                    id: quotation.enquiryId || '', enquiryNo: quotation.enquiryNo || '',
+                    customerName: quotation.custName || '', requirement: quotation.enquiryRequirement || '',
+                    subject: quotation.enquirySubject || '', targetDate: quotation.enquiryTargetDate || ''
+                });
+                renderDynamicFields(quotation);
+
+                const tbody = document.querySelector("#quotationTable tbody");
+                tbody.innerHTML = "";
+
+                if (quotation.items && quotation.items.length > 0) {
+                    quotation.items.forEach(item => {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td class="sl-no"></td>
+                            <td><input type="text" class="item-desc" list="itemList" onchange="autofillItem(this)" value="${escapeHtml(item.description)}" style="text-align:left;"></td>
+                            <td><input type="text" class="item-uom" value="${escapeHtml(item.uom || '')}"></td>
+                            <td><input type="number" class="qty" oninput="calcRow(this)" value="${item.qty}" min="0"></td>
+                            <td><input type="number" class="rate" oninput="calcRow(this)" value="${item.rate}" style="text-align:right;" min="0"></td>
+                            <td><input type="number" class="gst" oninput="calcRow(this)" value="${item.gst || 0}" style="text-align:center;" min="0"></td>
+                            <td><input type="text" class="total" readonly value="${item.total}" style="text-align:right; font-weight:bold;" min="0"></td>
+                            <td class="remove-btn-col"><button class="danger" style="padding: 2px 6px; font-size:12px;" onclick="confirmRemoveRow(this)">X</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else { addRow(); }
+                updateSlNo();
+                calcGrandTotal();
+                saveTerms(document.getElementById("termsConditions")); // Resize textarea
+                updateStatusStamp();
+                showInfo("Success", "Quotation loaded successfully!");
+            } else { showInfo("Error", "Quotation not found!", true); }
+        }
+
+        function updateStatusStamp() {
+            const status = document.getElementById("quotationStatus").value;
+            const stamp = document.getElementById("statusStamp");
+            stamp.innerText = status;
+
+            let color = "#6c757d"; // Draft (Gray)
+            if (status === "Sent") color = "#0d6efd"; // Blue
+            if (status === "Accepted") color = "#27ae60"; // Green
+            if (status === "Rejected") color = "#dc3545"; // Red
+
+            stamp.style.color = color;
+            stamp.style.borderColor = color;
+        }
+
+        // Modal Helpers
+        function askConfirm(title, msg, callback) {
+            document.getElementById('actionConfirmTitle').innerText = title;
+            document.getElementById('actionConfirmMsg').innerText = msg;
+            const yesBtn = document.getElementById('actionConfirmBtnYes');
+            const newYesBtn = yesBtn.cloneNode(true);
+            yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+            newYesBtn.onclick = () => {
+                closeActionConfirmModal();
+                callback();
+            };
+            document.getElementById('actionConfirmModal').style.display = 'flex';
+        }
+
+        function closeActionConfirmModal() {
+            document.getElementById('actionConfirmModal').style.display = 'none';
+        }
+
+        function showInfo(title, msg, isError = false) {
+            const titleEl = document.getElementById('infoModalTitle');
+            titleEl.innerText = title;
+            titleEl.style.color = isError ? '#dc3545' : '#27ae60';
+            document.getElementById('infoModalMsg').innerText = msg;
+            document.getElementById('infoModal').style.display = 'flex';
+        }
+
+        function closeInfoModal() {
+            document.getElementById('infoModal').style.display = 'none';
+        }
+
+        function updateLastReferenceDisplay() {
+            const display = document.getElementById('lastRefDisplay');
+            if (!display) return;
+
+            const quotations = JSON.parse(localStorage.getItem('quotations') || '[]');
+            const lastQuotation = Array.isArray(quotations) && quotations.length > 0
+                ? quotations[quotations.length - 1]
+                : null;
+            const lastRefNo = lastQuotation && (lastQuotation.refNo || lastQuotation.id);
+
+            display.textContent = `Last Ref. No.: ${lastRefNo || '-'}`;
+            display.title = lastRefNo
+                ? 'Click to use the last reference number'
+                : 'No saved quotation reference number';
+            display.onclick = lastRefNo
+                ? () => { document.getElementById('searchRefNo').value = lastRefNo; }
+                : null;
+        }
+
+        let currentMode = 'form';
+        let currentPage = 1;
+        let rowsPerPage = 20;
+
+        function toggleView() {
+            const formView = document.getElementById('formView');
+            const listView = document.getElementById('listView');
+            const toggleBtn = document.getElementById('viewToggleBtn');
+
+            if (currentMode === 'form') {
+                formView.style.display = 'none';
+                listView.style.display = 'block';
+                toggleBtn.innerHTML = '<i class="fas fa-plus"></i> New Quotation';
+                currentMode = 'list';
+                renderQuotationList();
+            } else {
+                formView.style.display = 'block';
+                listView.style.display = 'none';
+                toggleBtn.innerHTML = '<i class="fas fa-list"></i> View History';
+                currentMode = 'form';
+            }
+        }
+
+        function renderQuotationList() {
+            const quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+            const tbody = document.getElementById("savedQuotationsBody");
+            const searchInput = document.getElementById("quoteSearchInput");
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
+            const filterDate = document.getElementById("quoteFilterDate") ? document.getElementById("quoteFilterDate").value : "";
+
+            tbody.innerHTML = '';
+
+            let filtered = quotations;
+            if (filterDate) {
+                filtered = filtered.filter(q => q.date === filterDate);
+            }
+            if (searchTerm) {
+                filtered = filtered.filter(q =>
+                    (q.refNo && String(q.refNo).toLowerCase().includes(searchTerm)) ||
+                    (q.enquiryNo && String(q.enquiryNo).toLowerCase().includes(searchTerm)) ||
+                    (q.custName && String(q.custName).toLowerCase().includes(searchTerm))
+                );
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">No saved quotations found.</td></tr>';
+                return;
+            }
+
+            const sorted = [...filtered].reverse();
+            const totalItems = sorted.length;
+            const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
+
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+            const paginated = sorted.slice(startIndex, endIndex);
+
+            paginated.forEach(q => {
+                let statusColor = '#6c757d';
+                if (q.status === 'Accepted') statusColor = '#27ae60';
+                else if (q.status === 'Sent') statusColor = '#0d6efd';
+                else if (q.status === 'Rejected') statusColor = '#dc3545';
+
+                const tr = document.createElement("tr");
+                const linkedEnquiry = getEnquiryByIdOrNo(q.enquiryId || q.enquiry_id || '', q.enquiryNo || q.enquiry_no || '');
+                const linkedEnquiryNo = q.enquiryNo || q.enquiry_no || linkedEnquiry?.enquiryNo || '';
+                const linkedEnquiryId = q.enquiryId || q.enquiry_id || linkedEnquiry?.id || '';
+                const enquiryCell = linkedEnquiryNo
+                    ? `<a href="enquiry.html?id=${encodeURIComponent(linkedEnquiryId)}&enquiryNo=${encodeURIComponent(linkedEnquiryNo)}" onclick="event.preventDefault();openLinkedEnquiryFromQuotation(${JSON.stringify(String(linkedEnquiryId))},${JSON.stringify(String(linkedEnquiryNo))})" style="color:#0d6efd;font-weight:600;text-decoration:underline;">${escapeHtml(String(linkedEnquiryNo))} ↗</a>`
+                    : '<span style="color:#999;">—</span>';
+                let rowHtml = `
+                <td><strong>${escapeHtml(q.refNo || '-')}</strong></td>
+                <td>${enquiryCell}</td>
+                <td>${q.date ? new Date(q.date).toLocaleDateString('en-GB') : '-'}</td>
+                <td style="text-align:left;">${escapeHtml(q.custName || '-')}</td>
+                <td style="text-align:center;">
+                    <select onchange="updateQuoteStatus('${escapeHtml(q.refNo)}', this.value, this)" style="padding:4px; border-radius:4px; font-weight:bold; color:${statusColor}; border: 1px solid ${statusColor}; outline: none; background: transparent; cursor: pointer;">
+                        <option value="Draft" ${q.status === 'Draft' || !q.status ? 'selected' : ''}>Draft</option>
+                        <option value="Sent" ${q.status === 'Sent' ? 'selected' : ''}>Sent</option>
+                        <option value="Accepted" ${q.status === 'Accepted' ? 'selected' : ''}>Accepted</option>
+                        <option value="Rejected" ${q.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                    </select>
+                </td>
+                <td style="text-align:right; font-weight:bold;">${q.grandTotal || '0.00'}</td>
+                `;
+                
+                dynamicFieldsList.forEach(f => {
+                    if (f.showInGrid !== false) {
+                        let val = q[f.fieldName];
+                        if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                        rowHtml += `<td>${val !== undefined && val !== null && val !== '' ? escapeHtml(String(val)) : '-'}</td>`;
+                    }
+                });
+                
+                rowHtml += `<td style="text-align:center;" class="no-print">
+                    <div class="quote-action-dropdown">
+                        <button class="quote-action-btn" type="button" onclick="toggleQuoteActions(this)">Actions &#9662;</button>
+                        <div class="quote-action-menu">
+                            <button type="button" onclick="viewQuotation('${escapeHtml(q.refNo)}')">View</button>
+                            <button type="button" onclick="printQuoteFromList('${escapeHtml(q.refNo)}')">Print</button>
+                            <button type="button" onclick="editQuote('${escapeHtml(q.refNo)}')">Edit</button>
+                            <button type="button" style="color:#dc3545;" onclick="deleteQuote('${escapeHtml(q.refNo)}')">Delete</button>
+                        </div>
+                    </div>
+                </td>
+            `;
+                tr.innerHTML = rowHtml;
+                tbody.appendChild(tr);
+            });
+
+            renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+        }
+
+        function updateQuoteStatus(refNo, newStatus, selectElement) {
+            let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+            const quote = quotations.find(q => q.refNo === refNo);
+            if (quote) {
+                const oldStatus = quote.status || 'Draft';
+
+                const yesBtn = document.getElementById('actionConfirmBtnYes');
+                const noBtn = yesBtn.nextElementSibling;
+                const newNoBtn = noBtn.cloneNode(true);
+                noBtn.parentNode.replaceChild(newNoBtn, noBtn);
+
+                newNoBtn.onclick = () => {
+                    closeActionConfirmModal();
+                    selectElement.value = oldStatus;
+                };
+
+                askConfirm("Change Status", `Are you sure you want to change the status of ${refNo} from ${oldStatus} to ${newStatus}?`, () => {
+                    quote.status = newStatus;
+                    localStorage.setItem("quotations", JSON.stringify(quotations));
+                    if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) apiClient.saveQuotation(quote).catch(e => console.warn(e));
+
+                    let statusColor = '#6c757d';
+                    if (newStatus === 'Accepted') statusColor = '#27ae60';
+                    else if (newStatus === 'Sent') statusColor = '#0d6efd';
+                    else if (newStatus === 'Rejected') statusColor = '#dc3545';
+
+                    selectElement.style.color = statusColor;
+                    selectElement.style.borderColor = statusColor;
+
+                    if (document.getElementById('refNo').value === refNo) {
+                        document.getElementById('quotationStatus').value = newStatus;
+                        updateStatusStamp();
+                    }
+
+                    showInfo("Success", "Status updated successfully.");
+                });
+            }
+        }
+
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rowsPerPageSelect').value);
+            currentPage = 1;
+            renderQuotationList();
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            renderQuotationList();
+        }
+
+        function renderPagination(totalItems, start, end, totalPages) {
+            const info = document.getElementById("paginationInfo");
+            const controls = document.getElementById("paginationControls");
+            const totalDisplay = document.getElementById("totalQuotesDisplay");
+
+            if (totalDisplay) totalDisplay.innerText = `Total Quotations: ${totalItems}`;
+
+            if (totalItems === 0) {
+                if (info) info.innerText = "No quotations found";
+                if (controls) controls.innerHTML = "";
+                return;
+            }
+
+            if (info) info.innerText = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+            let html = "";
+            html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} style="padding:4px 10px; background:#fff; border:1px solid #ccc; cursor:pointer; border-radius:4px;">Prev</button>`;
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const activeStyle = i === currentPage ? 'background:#3498db; color:#fff; border-color:#3498db;' : 'background:#fff;';
+                    html += `<button onclick="changePage(${i})" style="padding:4px 10px; ${activeStyle} border:1px solid #ccc; cursor:pointer; border-radius:4px;">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span style="padding:0 5px;">...</span>`;
+                }
+            }
+
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''} style="padding:4px 10px; background:#fff; border:1px solid #ccc; cursor:pointer; border-radius:4px;">Next</button>`;
+            if (controls) controls.innerHTML = html;
+        }
+
+        function editQuote(refNo) {
+            document.getElementById("searchRefNo").value = refNo;
+            loadQuotation();
+            toggleView();
+        }
+
+        function toggleQuoteActions(button) {
+            const dropdown = button.closest('.quote-action-dropdown');
+            document.querySelectorAll('.quote-action-dropdown.open').forEach(item => {
+                if (item !== dropdown) item.classList.remove('open');
+            });
+            dropdown.classList.toggle('open');
+        }
+
+        document.addEventListener('click', event => {
+            if (!event.target.closest('.quote-action-dropdown')) {
+                document.querySelectorAll('.quote-action-dropdown.open').forEach(dropdown => dropdown.classList.remove('open'));
+            }
+        });
+
+        function viewQuotation(refNo) {
+            const quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+            const quotation = quotations.find(q => q.refNo === refNo);
+            if (!quotation) {
+                showInfo("Error", "Quotation not found.", true);
+                return;
+            }
+
+            const rows = (quotation.items || []).map((item, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(item.description || '-')}</td>
+                    <td>${escapeHtml(item.uom || '-')}</td>
+                    <td>${escapeHtml(item.qty || '-')}</td>
+                    <td>${escapeHtml(item.rate || '-')}</td>
+                    <td>${escapeHtml(item.gst || '0')}%</td>
+                    <td>${escapeHtml(item.total || '0.00')}</td>
+                </tr>
+            `).join('');
+
+            const dynamicRows = dynamicFieldsList.map(field => {
+                let value = quotation[field.fieldName];
+                if (field.fieldType === 'boolean') value = value ? 'Yes' : 'No';
+                return `<tr><th>${escapeHtml(field.fieldLabel)}</th><td colspan="6">${value !== undefined && value !== '' ? escapeHtml(String(value)) : '-'}</td></tr>`;
+            }).join('');
+
+            document.getElementById('quotationViewTitle').textContent = `Quotation ${quotation.refNo || ''}`;
+            document.getElementById('quotationViewBody').innerHTML = `
+                <table class="quote-view-table">
+                    <tr><th>Reference No.</th><td>${escapeHtml(quotation.refNo || '-')}</td></tr>
+                    <tr><th>Date</th><td>${escapeHtml(quotation.date || '-')}</td></tr>
+                    <tr><th>Customer</th><td>${escapeHtml(quotation.custName || '-')}</td></tr>
+                    <tr><th>Contact</th><td>${escapeHtml(quotation.custContact || '-')}</td></tr>
+                    <tr><th>Address</th><td>${escapeHtml(quotation.custAddress || '-')}</td></tr>
+                    <tr><th>Status</th><td>${escapeHtml(quotation.status || 'Draft')}</td></tr>
+                    <tr><th>Enquiry No.</th><td>${quotation.enquiryNo ? `<a href="enquiry.html?id=${encodeURIComponent(quotation.enquiryId||'')}&enquiryNo=${encodeURIComponent(quotation.enquiryNo)}" onclick="event.preventDefault();openLinkedEnquiryFromQuotation(${JSON.stringify(quotation.enquiryId||'')},${JSON.stringify(quotation.enquiryNo||'')})" style="color:#0d6efd;font-weight:600;text-decoration:underline">${escapeHtml(quotation.enquiryNo)} ↗</a>` : '-'}</td></tr>
+                    <tr><th>Target Date</th><td>${escapeHtml(quotation.enquiryTargetDate || quotation.targetDate || '-')}</td></tr>
+                    <tr><th>Plant</th><td>${escapeHtml(quotation.plantName || '-')}</td></tr>
+                </table>
+                <table class="quote-view-table">
+                    <thead><tr><th>#</th><th>Description</th><th>UOM</th><th>Qty</th><th>Rate</th><th>GST</th><th>Total</th></tr></thead>
+                    <tbody>${rows || '<tr><td colspan="7">No items recorded.</td></tr>'}</tbody>
+                    <tfoot><tr><th colspan="6" style="text-align:right;">Grand Total</th><th>${escapeHtml(quotation.grandTotal || '0.00')}</th></tr></tfoot>
+                </table>
+                ${quotation.terms ? `<p><strong>Terms & Conditions:</strong><br>${escapeHtml(quotation.terms).replace(/\n/g, '<br>')}</p>` : ''}
+                ${dynamicRows ? `<table class="quote-view-table"><tbody>${dynamicRows}</tbody></table>` : ''}
+            `;
+            document.getElementById('quotationViewModal').style.display = 'flex';
+        }
+
+        function openLinkedEnquiryFromQuotation(enquiryId, enquiryNo) {
+            const qs = new URLSearchParams();
+            if (enquiryId) qs.set('id', enquiryId);
+            if (enquiryNo) qs.set('enquiryNo', enquiryNo);
+            const url = 'enquiry.html?' + qs.toString();
+            try { if (window.parent && window.parent !== window && typeof window.parent.openWindow === 'function') { window.parent.openWindow(url, 1100, 760); return; } } catch(e) {}
+            window.location.href = url;
+        }
+
+        function closeQuotationView() {
+            document.getElementById('quotationViewModal').style.display = 'none';
+        }
+
+        function deleteQuote(refNo) {
+            askConfirm("Delete Quotation", `Are you sure you want to delete quotation ${refNo}?`, () => {
+                let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+                quotations = quotations.filter(q => q.refNo !== refNo);
+                localStorage.setItem("quotations", JSON.stringify(quotations));
+                updateLastReferenceDisplay();
+                if (typeof apiClient !== 'undefined' && apiClient.deleteQuotation) {
+                    apiClient.deleteQuotation(refNo).catch(e => console.warn(e));
+                }
+                renderQuotationList();
+                showInfo("Success", `Quotation ${refNo} deleted.`);
+            });
+        }
+
+        function printQuoteFromList(refNo) {
+            document.getElementById("searchRefNo").value = refNo;
+            loadQuotation();
+            setTimeout(() => {
+                generateQuotationPDF();
+            }, 300);
+        }
+
+        // Button Wrappers
+        function confirmSave() { saveQuotation(); } // saveQuotation handles its own logic/confirm for overwrite
+
+        // Helper to generate dynamic UPI QR with amount
+        function generateDynamicQr(amount, refNo, companyNameOverride) {
+            const bankText = localStorage.getItem("invoiceBankDetails") || "";
+            const upiMatch = bankText.match(/(?:UPI ID|VPA|UPI)\s*[:\-]\s*([a-zA-Z0-9.\-_]+@[a-zA-Z0-9]+)/i);
+            if (!upiMatch) return null;
+
+            const parsedAmount = parseFloat(String(amount).replace(/,/g, '')) || 0;
+            const upiId = upiMatch[1];
+            const companyName = companyNameOverride || "Company Name";
+            const note = `Quote:${refNo}`;
+            const upiData = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(companyName)}&am=${parsedAmount.toFixed(2)}&tn=${encodeURIComponent(note)}&cu=INR`;
+
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.onerror = () => resolve(null); // Fallback on error
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiData)}`;
+            });
+        }
+
+        async function generateQuotationPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // 1. Brand Details
+            let companyName = "Company Name";
+            let addressLine1 = "";
+            let addressLine2 = "";
+            let contactNumber = "";
+            let companyEmail = "";
+            let companyGstin = "";
+            let companyWebsite = "";
+            let sellerDistrict = localStorage.getItem('district') || "";
+            let sellerState = localStorage.getItem('sellerState') || "";
+
+            if (window.electronAPI && window.electronAPI.getAppSettings) {
+                const res = await window.electronAPI.getAppSettings();
+                if (res.success) {
+                    companyName = res.companyName || companyName;
+                    addressLine1 = res.addressLine1 || addressLine1;
+                    addressLine2 = res.addressLine2 || addressLine2;
+                    contactNumber = res.contactNumber ? `Mo: ${res.contactNumber}` : contactNumber;
+                    companyEmail = res.companyEmail || companyEmail;
+                    companyGstin = res.companyGstin || companyGstin;
+                    companyWebsite = res.companyWebsite || companyWebsite;
+                    sellerDistrict = res.district || sellerDistrict;
+                    sellerState = res.sellerState || sellerState;
+                }
+            } else if (window.getBrandSettings) {
+                const brand = window.getBrandSettings();
+                companyName = brand.companyName || companyName;
+                addressLine1 = brand.addressLine1 || addressLine1;
+                addressLine2 = brand.addressLine2 || addressLine2;
+                contactNumber = brand.contactNumber ? `Mo: ${brand.contactNumber}` : contactNumber;
+                companyEmail = brand.companyEmail || companyEmail;
+                companyGstin = brand.companyGstin || companyGstin;
+                companyWebsite = brand.companyWebsite || companyWebsite;
+                sellerDistrict = brand.district || sellerDistrict;
+                sellerState = brand.sellerState || sellerState;
+            }
+
+            // Header
+            doc.setFontSize(20);
+            doc.setTextColor(44, 62, 80);
+            doc.text(companyName, 105, 15, { align: "center" });
+
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+
+            let nextY = 22;
+            if (addressLine1) {
+                doc.text(addressLine1, 105, nextY, { align: "center" });
+                nextY += 5;
+            }
+            if (addressLine2) {
+                doc.text(addressLine2, 105, nextY, { align: "center" });
+                nextY += 5;
+            }
+
+            let distStateParts = [];
+            if (sellerDistrict) distStateParts.push(`Dist: ${sellerDistrict}`);
+            if (sellerState) distStateParts.push(`State: ${sellerState}`);
+            let distState = distStateParts.join(", ");
+            if (distState) {
+                doc.text(distState, 105, nextY, { align: "center" });
+                nextY += 5;
+            }
+
+            let contactParts = [];
+            if (contactNumber) contactParts.push(contactNumber);
+            if (companyEmail) contactParts.push(`Email: ${companyEmail}`);
+            if (companyWebsite) contactParts.push(`Web: ${companyWebsite}`);
+
+            if (contactParts.length > 0) {
+                doc.text(contactParts.join(" | "), 105, nextY, { align: "center" });
+                nextY += 5;
+            }
+            if (companyGstin) {
+                doc.text(`GSTIN: ${companyGstin}`, 105, nextY, { align: "center" });
+                nextY += 4;
+            } else {
+                nextY += 4;
+            }
+
+            doc.setDrawColor(200);
+            doc.line(10, nextY, 200, nextY);
+
+            // Title
+            doc.setFontSize(16);
+            doc.setTextColor(0);
+            doc.text("QUOTATION", 105, nextY + 9, { align: "center" });
+
+            // Meta Data
+            doc.setFontSize(10);
+            const refNo = document.getElementById('refNo').value || '-';
+            const date = document.getElementById('quotationDate').value;
+            const formattedDate = date ? new Date(date).toLocaleDateString('en-GB') : '-';
+
+            doc.text(`Ref. No: ${refNo}`, 14, nextY + 19);
+            doc.text(`Date: ${formattedDate}`, 160, nextY + 19);
+
+            // Customer Details
+            const custName = document.getElementById('custName').value || '-';
+            let custContact = document.getElementById('custContact').value || '';
+            let custAddress = document.getElementById('custAddress').value || '';
+
+            // Fetch comprehensive details from DB
+            const allCustomers = JSON.parse(localStorage.getItem('customers')) || [];
+            const fullCust = allCustomers.find(c => c.name === custName) || {};
+
+            const dist = fullCust.district || "";
+            const state = fullCust.state || "";
+            const pin = fullCust.pin || "";
+            const email = fullCust.email || "";
+            const gst = fullCust.gst || fullCust.gstin || "";
+
+            if (!custContact && fullCust.contact) custContact = fullCust.contact;
+            if (!custAddress && fullCust.address) custAddress = fullCust.address;
+
+            const loc = [dist, state, pin ? "PIN: " + pin : ""].filter(Boolean);
+            if (loc.length > 0) custAddress += "\n" + loc.join(", ");
+
+            let extraInfo = [];
+            if (custContact) extraInfo.push("Ph: " + custContact);
+            if (email) extraInfo.push("Email: " + email);
+            if (extraInfo.length > 0) custAddress += "\n" + extraInfo.join(" | ");
+            if (gst) custAddress += "\nGSTIN: " + gst;
+
+            doc.setFont(undefined, 'bold');
+            doc.text("To:", 14, nextY + 29);
+            doc.setFont(undefined, 'normal');
+            doc.text(custName, 14, nextY + 34);
+
+            const splitAddress = doc.splitTextToSize(custAddress, 80);
+            doc.text(splitAddress, 14, nextY + 39);
+
+            // Table
+            const rows = [];
+            document.querySelectorAll("#quotationTable tbody tr").forEach((tr, i) => {
+                const inputs = tr.querySelectorAll("input");
+                const desc = inputs[0].value;
+                if (desc) {
+                    rows.push([
+                        i + 1,
+                        desc,
+                        inputs[1].value, // UOM
+                        inputs[2].value, // Qty
+                        inputs[3].value, // Rate
+                        (inputs[4].value || 0) + '%', // GST %
+                        inputs[5].value  // Total
+                    ]);
+                }
+            });
+
+            doc.autoTable({
+                startY: Math.max(nextY + 59, nextY + 39 + (splitAddress.length * 5) + 5),
+                head: [['Sl', 'Description', 'UOM', 'Qty', 'Rate', 'GST', 'Total']],
+                body: rows,
+                theme: 'striped',
+                headStyles: { fillColor: [44, 62, 80] },
+                columnStyles: {
+                    3: { halign: 'center' },
+                    4: { halign: 'right' },
+                    5: { halign: 'center' },
+                    6: { halign: 'right' }
+                }
+            });
+
+            // Footer
+            const finalY = doc.lastAutoTable.finalY + 10;
+            const grandTotal = document.getElementById('grandTotal').value;
+            const amountWords = document.getElementById('amountInWords').innerText;
+
+            // Terms & Bank Details
+            const terms = document.getElementById('termsConditions').value;
+            const bankDetails = getFormattedBankDetails();
+            const showBankDetails = document.getElementById('showBankDetailsToggle') ? document.getElementById('showBankDetailsToggle').checked : true;
+
+            let splitTerms = [];
+            let splitBank = [];
+            let qrCodeBase64 = null;
+
+            if (showBankDetails) {
+                const parsedTotal = parseFloat(String(grandTotal).replace(/,/g, '')) || 0;
+                const dynamicQr = await generateDynamicQr(parsedTotal, refNo, companyName);
+                qrCodeBase64 = dynamicQr || localStorage.getItem("invoiceQrCode");
+            }
+
+            if (terms) splitTerms = doc.splitTextToSize(terms, 90);
+            if (showBankDetails && bankDetails) splitBank = doc.splitTextToSize(bankDetails, 55);
+
+            let bankBlockHeight = (showBankDetails && bankDetails) ? splitBank.length * 5 : 0;
+            let qrBlockHeight = (showBankDetails && qrCodeBase64) ? 35 : 0;
+            let maxOffset = Math.max(splitTerms.length * 5, Math.max(bankBlockHeight, qrBlockHeight));
+
+            if (finalY + 25 + maxOffset > 280) {
+                doc.addPage();
+                finalY = 20;
+            }
+
+            doc.setFont(undefined, 'bold');
+            doc.text(`Grand Total: ${grandTotal}`, 195, finalY, { align: "right" });
+
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Amount in Words: ${amountWords}`, 14, finalY + 10);
+
+            if (terms) {
+                doc.setFont(undefined, 'bold');
+                doc.text("Terms & Conditions:", 14, finalY + 20);
+                doc.setFont(undefined, 'normal');
+                doc.text(splitTerms, 14, finalY + 25);
+            }
+
+            if (showBankDetails && bankDetails) {
+                doc.setFont(undefined, 'bold');
+                doc.text("Bank Details:", 110, finalY + 20);
+                doc.setFont(undefined, 'normal');
+                doc.text(splitBank, 110, finalY + 25);
+
+                if (qrCodeBase64) {
+                    try {
+                        doc.setFont(undefined, 'bold');
+                        doc.text("Scan to Pay", 170, finalY + 20);
+                        doc.setFont(undefined, 'normal');
+                        doc.addImage(qrCodeBase64, 'PNG', 170, finalY + 22, 25, 25);
+                    } catch (e) { console.warn("Error adding QR to PDF:", e); }
+                }
+            }
+
+            // Signature
+            let sigY = finalY + 25 + maxOffset + 15;
+            if (sigY > 280) {
+                doc.addPage();
+                sigY = 30;
+            }
+            doc.text("Authorized Signatory", 195, sigY, { align: "right" });
+            doc.text(`For ${companyName}`, 195, sigY - 5, { align: "right" });
+
+            doc.save(`Quotation_${refNo}.pdf`);
+        }
+
+        function getFormattedBankDetails() {
+            const raw = localStorage.getItem("invoiceBankDetails");
+            if (!raw) return null;
+            try {
+                const data = JSON.parse(raw);
+                if (typeof data === 'object' && data !== null && (data.bankName || data.accountNumber)) {
+                    let lines = [];
+                    if (data.bankName) lines.push(`Bank: ${data.bankName}`);
+                    if (data.accountName) lines.push(`A/c Name: ${data.accountName}`);
+                    if (data.accountNumber) lines.push(`A/c No: ${data.accountNumber}`);
+                    if (data.ifscCode) lines.push(`IFSC: ${data.ifscCode}`);
+                    if (data.branchName) lines.push(`Branch: ${data.branchName}`);
+                    if (data.upiId) lines.push(`UPI ID: ${data.upiId}`);
+                    return lines.join("\n");
+                }
+                return raw;
+            } catch (e) {
+                return raw;
+            }
+        }
+
+        function confirmLoad() { askConfirm("Load", "Unsaved changes will be lost. Load?", () => loadQuotation()); }
+        function confirmAddRow() { addRow(); } // No confirm needed for adding
+        function confirmRemoveRow(btn) {
+            askConfirm("Remove Row", "Delete this item?", () => {
+                removeRow(btn);
+            });
+        }
+
+        // Init
+        document.getElementById("quotationDate").valueAsDate = new Date();
+        addRow(); // Add initial row
+        addRow();
+        addRow();
+        updateStatusStamp();
+    </script>
+
+
+<button type="button" id="btnViewEnquiry" class="small" style="display:none;" onclick="viewLinkedEnquiry()">
+    ↩ View Enquiry
+</button>
+<script>
+function viewLinkedEnquiry() {
+    const params = new URLSearchParams(window.location.search);
+    const enquiryId = params.get('enquiryId') || localStorage.getItem('currentQuotationEnquiryId');
+    const enquiryNo = params.get('enquiryNo') || localStorage.getItem('currentQuotationEnquiryNo');
+    if (!enquiryId && !enquiryNo) {
+        alert('No linked enquiry found for this quotation.');
+        return;
+    }
+    const q = new URLSearchParams();
+    if (enquiryId) q.set('id', enquiryId);
+    if (enquiryNo) q.set('enquiryNo', enquiryNo);
+    window.location.href = 'enquiry.html?' + q.toString();
+}
+(function showLinkedEnquiryButton(){
+    const p = new URLSearchParams(window.location.search);
+    const linked = p.get('enquiryId') || p.get('enquiryNo') ||
+        localStorage.getItem('currentQuotationEnquiryId') ||
+        localStorage.getItem('currentQuotationEnquiryNo');
+    const btn = document.getElementById('btnViewEnquiry');
+    if (btn && linked) btn.style.display = 'inline-block';
+})();
+</script>
+
+
+<script>
+// Business 360 deep-link: open the selected quotation by reference number.
+(function openQuotationFromBusiness360() {
+    const p = new URLSearchParams(window.location.search);
+    const refNo = p.get('refNo') || p.get('quotationRefNo');
+    if (!refNo) return;
+    const run = () => {
+        const input = document.getElementById('searchRefNo');
+        if (!input || typeof loadQuotation !== 'function') return;
+        input.value = refNo;
+        loadQuotation();
+        if (typeof toggleView === 'function') toggleView();
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
+    else setTimeout(run, 0);
+})();
+</script>
+</body>
+
+</html>

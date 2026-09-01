@@ -1,0 +1,2859 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Objects | RISE Tech Revolution</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="apiClient.js"></script>
+    <style>
+        :root {
+            --slds-blue: #0176d3;
+            --slds-dark-blue: #0b5cab;
+            --slds-bg: #f3f3f3;
+            --slds-text: #181818;
+            --slds-border: #dddbda;
+            --slds-card-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background: var(--slds-bg);
+            color: var(--slds-text);
+        }
+
+        /* --- Header & Navigation --- */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fff;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--slds-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--slds-blue);
+            letter-spacing: 0.5px;
+        }
+
+        .search-container {
+            flex: 0 1 400px;
+        }
+
+        .search-container input {
+            width: 100%;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--slds-border);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-container input:focus {
+            border-color: var(--slds-blue);
+        }
+
+        .search-results {
+            position: absolute;
+            top: 56px;
+            right: 24px;
+            width: 420px;
+            max-height: 50vh;
+            overflow: auto;
+            background: #fff;
+            border: 1px solid var(--slds-border);
+            border-radius: 6px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+            z-index: 110;
+        }
+
+        .search-result-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f1f1;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .search-result-item:hover {
+            background: #f6f9ff;
+        }
+
+        .search-result-title {
+            font-weight: 600;
+            color: var(--slds-blue);
+            display: block;
+        }
+
+        .search-result-sub {
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .search-match {
+            background: rgba(1, 118, 211, 0.12);
+            border-radius: 2px;
+        }
+
+        .navbar {
+            background: #fff;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--slds-border);
+            display: flex;
+            gap: 24px;
+        }
+
+        .navbar a {
+            padding: 12px 0;
+            color: #444;
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-bottom: 3px solid transparent;
+            cursor: grab;
+        }
+
+        .navbar a:active {
+            cursor: grabbing;
+        }
+
+        .navbar a.active {
+            color: var(--slds-blue);
+            border-bottom-color: var(--slds-blue);
+            font-weight: 600;
+        }
+
+        /* --- Content Area --- */
+        .content {
+            padding: 24px;
+            max-width: 1600px;
+            margin: auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .page-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 400;
+        }
+
+        /* --- Table Card --- */
+        .table-card {
+            background: #fff;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            box-shadow: var(--slds-card-shadow);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            background: #f8f9fa;
+            text-align: left;
+            padding: 12px;
+            border-bottom: none;
+            box-shadow: inset 0 -2px 0 var(--slds-border);
+            color: #444;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--slds-border);
+        }
+
+        tr:hover {
+            background: #f1f7fb;
+        }
+
+        /* --- Buttons --- */
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid var(--slds-border);
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button.primary {
+            background: var(--slds-blue);
+            color: white;
+            border: none;
+        }
+
+        button.primary:hover {
+            background: var(--slds-dark-blue);
+        }
+
+        /* --- Modal & Settings --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background: #fff;
+            margin: 5% auto;
+            padding: 0;
+            width: 95%;
+            max-width: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--slds-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 12px;
+            border-top: 1px solid var(--slds-border);
+            text-align: right;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        }
+
+        #fieldOrderList li {
+            padding: 10px;
+            border: 1px solid var(--slds-border);
+            margin-bottom: 5px;
+            border-radius: 4px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+        }
+
+        /* --- Pagination --- */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 4px;
+            border: 1px solid var(--slds-border);
+            box-shadow: var(--slds-card-shadow);
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid var(--slds-border);
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #444;
+        }
+
+        .pagination button.active {
+            background: var(--slds-blue);
+            color: #fff;
+            border-color: var(--slds-blue);
+        }
+
+        .pagination button:disabled {
+            background: #f8f9fa;
+            cursor: not-allowed;
+            color: #999;
+        }
+
+        .pagination span {
+            padding: 0 5px;
+            color: #666;
+        }
+
+        .sort-icon {
+            font-size: 11px;
+            color: #888;
+            margin-left: 4px;
+        }
+
+        /* --- Action Dropdown & Column Resizing --- */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .action-btn-main {
+            background-color: #607d8b;
+            color: white;
+            padding: 6px 12px;
+            font-size: 13px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .action-dropdown-content {
+            display: none;
+            position: fixed;
+            background-color: #fff;
+            min-width: 120px;
+            box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            padding: 4px 0;
+            text-align: left;
+        }
+
+        .action-dropdown-content button {
+            color: #333 !important;
+            background: none !important;
+            padding: 8px 16px !important;
+            text-decoration: none !important;
+            display: block !important;
+            width: 100% !important;
+            text-align: left !important;
+            border: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            font-weight: normal !important;
+            font-size: 13px !important;
+        }
+
+        .action-dropdown-content button:hover {
+            background-color: #f1f1f1 !important;
+            color: #000 !important;
+        }
+
+        .action-dropdown.active .action-dropdown-content {
+            display: block;
+        }
+
+        #customTable th {
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 11;
+        }
+
+        .resizer:hover,
+        .resizing {
+            background-color: var(--slds-blue);
+            opacity: 0.5;
+        }
+
+        /* --- Spinner & Progress Bar --- */
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--slds-blue);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .progress-container {
+            width: 80%;
+            max-width: 400px;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            margin-top: 20px;
+            overflow: hidden;
+            border: 1px solid var(--slds-border);
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: var(--slds-blue);
+            width: 0%;
+            transition: width 0.1s ease-in-out;
+        }
+
+        .progress-text {
+            margin-top: 10px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="topbar">
+        <div class="logo">RISE TECH REVOLUTION</div>
+        <div class="search-container" style="position:relative;">
+            <input type="text" id="searchInput" placeholder="Search...">
+            <div id="globalSearchResults" class="search-results" style="display:none;"></div>
+        </div>
+        <div class="profile" style="font-weight:600; color:#555;">Admin User</div>
+    </header>
+
+    <nav class="navbar" id="mainNavbar">
+    </nav>
+
+    <!-- Dynamic Custom Object Section -->
+    <section class="content" id="customObjectContent">
+        <div class="page-header">
+            <h2 id="customObjectTitle">Custom Object</h2>
+            <div style="display: flex; gap: 10px;">
+                <button id="bulkDeleteBtn" onclick="deleteSelectedRecords()"
+                    style="background: #e74c3c; color: white; border: none; display: none;">🗑️ Delete Selected</button>
+                <button id="bulkEditBtn" onclick="openBulkEditModal()"
+                    style="background: #f39c12; color: white; border: none; display: none;">✏️ Edit Selected</button>
+                <button onclick="openTableSettingsModal()"><i class="fas fa-cog"></i> ⚙️ Settings</button>
+                <button onclick="openFieldOrderModal()"><i class="fas fa-sort"></i> ↕️ Field Order</button>
+                <button onclick="printTableReport()"><i class="fas fa-print"></i> 🖨️ Print Report</button>
+                <button onclick="exportData()" style="background: #27ae60; color: white; border: none;">Export
+                    Excel</button>
+                <button onclick="document.getElementById('importDataInput').click()"
+                    style="background: #17a2b8; color: white; border: none;">Import Data</button>
+                <input type="file" id="importDataInput" style="display: none;" accept=".xlsx, .xls, .csv"
+                    onchange="importData(this)">
+                <button class="primary" onclick="openCustomRecordModal()">+ New Record</button>
+            </div>
+        </div>
+        <div class="table-card" style="overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 240px);">
+            <table id="customTable">
+                <thead id="customTableHead"></thead>
+                <tbody id="customTableBody"></tbody>
+                <tfoot id="customTableFoot"></tfoot>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination-container" id="paginationWrapper" style="display:none;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="totalRecordsDisplay" style="font-weight: bold; color: var(--slds-blue);"></span>
+                <select id="rowsPerPageSelect" onchange="changeRowsPerPage()"
+                    style="padding: 6px; border: 1px solid var(--slds-border); border-radius: 4px; font-size: 13px;">
+                    <option value="50" selected>50 rows</option>
+                    <option value="100">100 rows</option>
+                    <option value="200">200 rows</option>
+                    <option value="500">500 rows</option>
+                </select>
+            </div>
+            <div id="paginationInfo" style="color: #666; font-size: 13px;"></div>
+            <div class="pagination" id="paginationControls"></div>
+        </div>
+    </section>
+
+    <!-- Dynamic Form Modal -->
+    <div id="customRecordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;" id="customModalTitle">New Record</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeCustomRecordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;" id="customFormContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeCustomRecordModal()">Cancel</button>
+                <button class="primary" onclick="saveCustomRecord()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Record Modal -->
+    <div id="viewRecordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">View Record</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeViewRecordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;"
+                    id="viewRecordContent">
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeViewRecordModal()">Close</button>
+                <button class="primary" id="btnEditFromView">Edit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Settings Modal -->
+    <div id="tableSettingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Table Settings</h3>
+                <span style="font-size:24px; cursor:pointer;"
+                    onclick="document.getElementById('tableSettingsModal').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                    <button onclick="toggleAllColumns(true)">Select All</button>
+                    <button onclick="toggleAllColumns(false)">Deselect All</button>
+                </div>
+                <div id="columnToggles" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="document.getElementById('tableSettingsModal').style.display='none'">Close</button>
+                <button class="primary" onclick="saveColumnSettings()">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Field Order Modal -->
+    <div id="fieldOrderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Field Order</h3>
+                <span style="font-size:24px; cursor:pointer;"
+                    onclick="document.getElementById('fieldOrderModal').style.display='none'">&times;</span>
+            </div>
+            <div class="modal-body">
+                <ul id="fieldOrderList" style="list-style: none; padding: 0; margin: 0;"></ul>
+            </div>
+            <div class="modal-footer">
+                <button onclick="document.getElementById('fieldOrderModal').style.display='none'">Close</button>
+                <button class="primary" onclick="saveFieldOrder()">Save Order</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Mapping Modal -->
+    <div id="importMappingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Map Import Fields</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeImportMappingModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="margin-top:0; font-size:13px; color:#555;">Select which Excel columns correspond to your
+                    fields. Uncheck fields you do not wish to update.</p>
+                <div id="importMappingContainer"
+                    style="display: grid; gap: 10px; max-height: 50vh; overflow-y: auto; padding-right: 5px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeImportMappingModal()">Cancel</button>
+                <button class="primary" onclick="processImportData()">Confirm Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Edit Modal -->
+    <div id="bulkEditModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Bulk Edit Records</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeBulkEditModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">Select
+                        Field to Edit</label>
+                    <select id="bulkEditFieldSelect"
+                        style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"
+                        onchange="renderBulkEditInput()">
+                        <option value="">-- Select Field --</option>
+                    </select>
+                </div>
+                <div id="bulkEditInputContainer"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeBulkEditModal()">Cancel</button>
+                <button class="primary" onclick="applyBulkEdit()">Apply Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:9999; flex-direction:column; justify-content:center; align-items:center;">
+        <div class="spinner"></div>
+        <div class="progress-container" id="importProgressContainer" style="display: none;">
+            <div class="progress-bar" id="importProgressBar"></div>
+        </div>
+        <div class="progress-text" id="importProgressText" style="display: none;">Processing 0 of 0...</div>
+    </div>
+
+    <!-- Attachment Preview Modal -->
+    <div id="attachmentPreviewModal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 800px; width: 90%; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem; color: var(--slds-blue);" id="previewAttachmentTitle">Attachment
+                    Preview</h3>
+                <span style="font-size:24px; cursor:pointer;"
+                    onclick="document.getElementById('attachmentPreviewModal').style.display='none'">&times;</span>
+            </div>
+            <div id="previewAttachmentContent"
+                style="flex: 1; overflow: auto; text-align: center; background: #eee; border-radius: 4px; padding: 10px; min-height: 200px; margin: 20px;">
+            </div>
+            <div class="modal-footer">
+                <button class="primary" id="downloadAttachmentBtn"><i class="fas fa-download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Wire up debounced input handler for global search (anchors + records)
+        let __searchDebounce = null;
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('searchInput');
+            const resultsEl = document.getElementById('globalSearchResults');
+            if (input) {
+                input.addEventListener('input', (e) => {
+                    clearTimeout(__searchDebounce);
+                    __searchDebounce = setTimeout(() => {
+                        currentPage = 1;
+                        renderCustomTable();
+                        performGlobalSearch(input.value || '');
+                    }, 220);
+                });
+
+                // hide results on escape
+                input.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Escape') {
+                        if (resultsEl) { resultsEl.style.display = 'none'; }
+                    }
+                });
+            }
+
+            document.addEventListener('click', (ev) => {
+                const tgt = ev.target;
+                if (!tgt.closest || !document.getElementById('globalSearchResults')) return;
+                const container = document.getElementById('globalSearchResults');
+                if (!container.contains(tgt) && tgt !== input) container.style.display = 'none';
+            });
+        });
+
+        function handleSearch() { // backward-compat
+            const input = document.getElementById('searchInput');
+            const q = input ? input.value : '';
+            currentPage = 1;
+            renderCustomTable();
+            performGlobalSearch(q);
+        }
+
+        function performGlobalSearch(q) {
+            const resultsEl = document.getElementById('globalSearchResults');
+            if (!resultsEl) return;
+            // clear previous highlights
+            document.querySelectorAll('.search-match').forEach(el => el.classList.remove('search-match'));
+
+            const term = String(q || '').trim().toLowerCase();
+            if (!term) {
+                resultsEl.style.display = 'none';
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            const results = [];
+
+            // 1) Search anchors in the document
+            try {
+                const anchors = Array.from(document.querySelectorAll('a'));
+                for (const a of anchors) {
+                    const txt = (a.textContent || '').trim();
+                    const href = (a.getAttribute && a.getAttribute('href')) ? a.getAttribute('href') : '';
+                    if ((txt && txt.toLowerCase().includes(term)) || (href && href.toLowerCase().includes(term))) {
+                        results.push({ type: 'anchor', text: txt || href, href: href || '', el: a });
+                        if (results.length >= 60) break;
+                    }
+                }
+            } catch (e) { console.warn('Anchor search failed', e); }
+
+            // 2) Search current table records (already filtered by renderCustomTable)
+            try {
+                const rows = currentFilteredData || [];
+                for (const row of rows) {
+                    let searchable = JSON.stringify(row || {}).toLowerCase();
+                    // include resolved lookup display values in searchable text
+                    try {
+                        if (Array.isArray(currentCustomFields)) {
+                            for (const f of currentCustomFields) {
+                                if (f && f.fieldType === 'lookup') {
+                                    const disp = resolveLookupDisplay(row, f);
+                                    if (disp) searchable += ' ' + String(disp).toLowerCase();
+                                }
+                            }
+                        }
+                    } catch (e) { /* ignore lookup resolution errors */ }
+
+                    if (searchable.includes(term)) {
+                        const title = getRecordTitle(row);
+                        const snippet = getSnippetFromRow(row, term);
+                        results.push({ type: 'record', id: row.id || row._id, title, snippet });
+                        if (results.length >= 120) break;
+                    }
+                }
+            } catch (e) { console.warn('Record search failed', e); }
+
+            renderGlobalResults(results);
+        }
+
+        function getSnippetFromRow(row, term) {
+            const low = String(term).toLowerCase();
+            for (const k in row) {
+                try {
+                    const v = row[k];
+                    if (!v) continue;
+                    const s = String(v).replace(/<[^>]+>/g, ' ');
+                    const idx = s.toLowerCase().indexOf(low);
+                    if (idx > -1) {
+                        const start = Math.max(0, idx - 24);
+                        return s.substring(start, Math.min(start + 90, s.length)).trim();
+                    }
+                } catch (e) { }
+            }
+            return '';
+        }
+
+        function getRecordTitle(row) {
+            if (!row || typeof row !== 'object') return 'Record';
+            // preferred keys
+            const pref = ['name', 'title', 'label', 'displayName', 'subject'];
+            for (const k of pref) {
+                if (row[k] && String(row[k]).trim()) return String(row[k]);
+            }
+            // prefer first non-empty text field from currentCustomFields
+            if (Array.isArray(currentCustomFields)) {
+                for (const f of currentCustomFields) {
+                    try {
+                        const v = row[f.fieldName];
+                        if (v !== undefined && v !== null) {
+                            const s = String(v).trim();
+                            if (s.length > 0) return s;
+                        }
+                    } catch (e) { }
+                }
+            }
+            // fallback to id/_id
+            return row.id || row._id || 'Record';
+        }
+
+        function resolveLookupDisplay(row, f) {
+            try {
+                if (!f || !f.lookupModule) return '';
+                const rawVal = row[f.fieldName];
+                if (!rawVal) return '';
+                const displayField = f.lookupDisplay;
+                const targetModule = f.lookupModule;
+                const lm = String(targetModule).toLowerCase();
+                let sourceData = [];
+
+                if (lm === 'customer' || lm === 'customers') {
+                    sourceData = JSON.parse(localStorage.getItem('customers') || '[]');
+                } else if (lm === 'supplier' || lm === 'suppliers') {
+                    sourceData = JSON.parse(localStorage.getItem('suppliers') || '[]');
+                } else if (lm === 'item' || lm === 'items') {
+                    sourceData = JSON.parse(localStorage.getItem('items') || '[]');
+                } else if (lm === 'invoice' || lm === 'invoices') {
+                    sourceData = JSON.parse(localStorage.getItem('invoices') || '[]');
+                } else if (lm === 'follow-up' || lm === 'follow-ups') {
+                    sourceData = JSON.parse(localStorage.getItem('follow_ups') || '[]');
+                } else {
+                    sourceData = JSON.parse(localStorage.getItem('data_' + targetModule) || '[]');
+                }
+
+                if (!Array.isArray(sourceData)) return '';
+                for (const m of sourceData) {
+                    if (!m) continue;
+                    // match by common id fields
+                    if ((m.id && String(m.id) === String(rawVal)) || (m._id && String(m._id) === String(rawVal))) {
+                        if (displayField && m[displayField]) return String(m[displayField]);
+                        return m.name || m.title || m.label || m.invoice_no || m.invoiceNo || m.partyName || m.id || m._id || '';
+                    }
+                    // invoice matching by invoice number
+                    if ((m.invoice_no && String(m.invoice_no) === String(rawVal)) || (m.invoiceNo && String(m.invoiceNo) === String(rawVal))) {
+                        if (displayField && m[displayField]) return String(m[displayField]);
+                        return m.invoice_no || m.invoiceNo || m.id || '';
+                    }
+                }
+            } catch (e) { /* ignore */ }
+            return '';
+        }
+
+        function renderGlobalResults(results) {
+            const el = document.getElementById('globalSearchResults');
+            if (!el) return;
+            if (!results || results.length === 0) {
+                el.style.display = 'none'; el.innerHTML = '';
+                return;
+            }
+
+            el.innerHTML = results.map(r => {
+                if (r.type === 'anchor') {
+                    const title = escapeHtml(r.text || r.href);
+                    const sub = escapeHtml(r.href || '');
+                    return `<div class="search-result-item" data-type="anchor"><span class="search-result-title">${title}</span><span class="search-result-sub">${sub}</span></div>`;
+                } else {
+                    const t = escapeHtml(r.title || 'Record');
+                    const s = escapeHtml(r.snippet || '');
+                    return `<div class="search-result-item" data-type="record" data-id="${escapeAttr(r.id)}"><span class="search-result-title">${t}</span><span class="search-result-sub">${s}</span></div>`;
+                }
+            }).join('');
+
+            el.style.display = 'block';
+
+            // attach click handlers
+            el.querySelectorAll('.search-result-item').forEach((item, idx) => {
+                item.addEventListener('click', (ev) => {
+                    const type = item.dataset.type;
+                    const corresponding = results[idx];
+                    if (type === 'anchor') {
+                        if (corresponding) {
+                            const href = String(corresponding.href || '');
+                            if (href.startsWith('http')) window.open(href, '_blank');
+                            else if (href.startsWith('#')) {
+                                const target = document.querySelector(href);
+                                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } else if (href && !href.startsWith('javascript:')) {
+                                window.location.href = href;
+                            } else if (corresponding.el && corresponding.el.onclick) {
+                                try { corresponding.el.click(); } catch (e) { }
+                            }
+                        }
+                    } else if (type === 'record') {
+                        const id = item.dataset.id;
+                        if (id) viewCustomRecord(id);
+                    }
+                    el.style.display = 'none';
+                });
+                // highlight anchors in DOM
+                const r = results[idx];
+                if (r && r.type === 'anchor' && r.el) r.el.classList.add('search-match');
+            });
+        }
+
+        function escapeHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function escapeAttr(s) { return String(s || '').replace(/\"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+        // Initialize
+        window.onload = async () => {
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const profileEl = document.querySelector('.profile');
+            if (profileEl) profileEl.innerText = currentUser;
+
+            try {
+                if (typeof apiClient !== 'undefined') {
+                    if (apiClient.getCustomFields) {
+                        const res = await apiClient.getCustomFields();
+                        const fields = Array.isArray(res) ? res : (res?.data || null);
+                        if (fields) {
+                            customFields = fields;
+                            localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
+                        } else {
+                            customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                        }
+                    }
+
+                    if (apiClient.getSettings) {
+                        const res = await apiClient.getSettings();
+                        const settings = res?.data || res || {};
+                        if (settings && settings.crmCustomPages) {
+                            localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
+                        }
+                    }
+                } else {
+                    customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+                }
+            } catch (e) {
+                customFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            }
+
+            customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            customPages = customPages.filter(p => p.createdBy === currentUser);
+
+            loadCustomTabs();
+            if (customPages.length > 0) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetPageId = urlParams.get('pageId');
+
+                let targetTab = null;
+                if (targetPageId) {
+                    const tabs = document.querySelectorAll('#mainNavbar a');
+                    tabs.forEach(tab => {
+                        if (tab.dataset.pageId === targetPageId) targetTab = tab;
+                    });
+                }
+
+                if (targetTab) {
+                    targetTab.click();
+                } else {
+                    const firstTab = document.querySelector('#mainNavbar a');
+                    if (firstTab) firstTab.click();
+                }
+            } else {
+                document.getElementById('customObjectContent').style.display = 'block';
+                document.getElementById('customObjectTitle').innerText = 'No Custom Objects Found';
+                document.getElementById('customTableHead').innerHTML = '';
+                document.getElementById('customTableBody').innerHTML = '<tr><td style="text-align:center; padding: 30px;">Go to Object Manager to create custom objects.</td></tr>';
+                const headerDiv = document.querySelector('.page-header div');
+                if (headerDiv) {
+                    headerDiv.style.display = 'none';
+                }
+            }
+
+            if (navigator.onLine) {
+                syncOfflineCustomRecords();
+            }
+        };
+
+        // --- Custom Objects Logic ---
+        let customPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+        let customFields = [];
+        let currentActivePageId = null;
+        let editCustomRecordId = null;
+        let currentCustomFields = [];
+        let columnVisibility = {};
+
+        let currentPage = 1;
+        let rowsPerPage = 50;
+        let currentSortColumn = null;
+        let currentSortDirection = 'asc';
+        let currentFilteredData = [];
+
+        function openWindow(url, width, height) {
+            if (window.parent && window.parent !== window && typeof window.parent.openWindow === 'function') {
+                window.parent.openWindow(url, width, height);
+            } else {
+                const windowName = url.split('?')[0].split('/').pop().replace('.html', '').replace(/[^a-zA-Z0-9]/g, '_');
+                window.open(url, windowName, `width=${width},height=${height},resizable=yes,scrollbars=yes`).focus();
+            }
+        }
+
+        function getDependentOptions(optionsRaw, parentVal) {
+            if (!parentVal || !optionsRaw) return [];
+            const parts = String(optionsRaw).split('|');
+            for (let part of parts) {
+                const [p, childs] = part.split(':');
+                if (p && childs && p.trim() === String(parentVal).trim()) {
+                    return childs.split(',').map(s => s.trim()).filter(Boolean);
+                }
+            }
+            return [];
+        }
+
+        function handleDependentFields(parentFieldName) {
+            const parentInput = document.getElementById(parentFieldName);
+            if (!parentInput) return;
+            const parentVal = parentInput.value;
+
+            currentCustomFields.forEach(f => {
+                if (f.dependsOn === parentFieldName && f.fieldType === 'select') {
+                    const childSelect = document.getElementById(f.fieldName);
+                    if (childSelect) {
+                        const currentVal = childSelect.value;
+                        childSelect.innerHTML = '<option value="">-- Select --</option>';
+                        const newOptions = getDependentOptions(f.optionsRaw, parentVal);
+                        newOptions.forEach(o => {
+                            childSelect.innerHTML += `<option value="${String(o).replace(/"/g, '&quot;')}" ${o === currentVal ? 'selected' : ''}>${o}</option>`;
+                        });
+                        childSelect.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+        }
+
+        function loadCustomTabs() {
+            const nav = document.getElementById('mainNavbar');
+            nav.innerHTML = '';
+            customPages.forEach(p => {
+                const a = document.createElement('a');
+                a.href = "#";
+                a.innerText = p.label;
+                a.dataset.pageId = p.pageId;
+                a.onclick = function (e) { e.preventDefault(); switchTab(p.pageId, this, p.label); };
+                nav.appendChild(a);
+            });
+
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(nav, {
+                    animation: 150,
+                    onEnd: async function (evt) {
+                        let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+                        const currentUser = localStorage.getItem('currentUser') || 'System';
+                        let otherUsersPages = allPages.filter(p => p.createdBy !== currentUser);
+
+                        const movedItem = customPages.splice(evt.oldIndex, 1)[0];
+                        customPages.splice(evt.newIndex, 0, movedItem);
+                        const updatedAllPages = [...otherUsersPages, ...customPages];
+                        localStorage.setItem('crmCustomPages', JSON.stringify(updatedAllPages));
+
+                        if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
+                            try {
+                                const res = await apiClient.getSettings();
+                                const settings = res?.data || res || {};
+                                settings.crmCustomPages = updatedAllPages;
+                                await apiClient.saveSettings(settings);
+                            } catch (e) { }
+                        }
+                    }
+                });
+            }
+        }
+
+        async function switchTab(pageId, tabElement, pageLabel = '') {
+            document.querySelectorAll('#mainNavbar a').forEach(a => a.classList.remove('active'));
+            tabElement.classList.add('active');
+            currentActivePageId = pageId;
+            const searchInput = document.getElementById('searchInput');
+
+            document.getElementById('customObjectContent').style.display = 'block';
+            document.getElementById('customObjectTitle').innerText = pageLabel;
+            searchInput.placeholder = `Search ${pageLabel}...`;
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            currentCustomFields = customFields.filter(f => f.moduleName === pageId && f.createdBy === currentUser).sort((a, b) => (a.order || 0) - (b.order || 0));
+            columnVisibility = JSON.parse(localStorage.getItem('customDashColVis_' + pageId)) || {};
+            currentPage = 1;
+            currentSortColumn = null;
+            currentSortDirection = 'asc';
+            document.getElementById('paginationWrapper').style.display = 'flex';
+
+            // Fetch from backend
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
+                    const res = await apiClient.getCustomRecords(pageId);
+                    let records = Array.isArray(res) ? res : (res?.data || []);
+                    records = records.filter(r => r.createdBy === currentUser);
+
+                    let localData = JSON.parse(localStorage.getItem('data_' + pageId));
+                    if (!Array.isArray(localData)) localData = [];
+                    let localUserData = localData.filter(r => r.createdBy === currentUser);
+
+                    const fetchedMap = new Map(records.map(r => [r._id || r.id, r]));
+
+                    localUserData.forEach(localRecord => {
+                        if (localRecord && (localRecord._id || localRecord.id)) {
+                            const recId = localRecord._id || localRecord.id;
+                            if (!fetchedMap.has(recId)) {
+                                records.push(localRecord);
+                            } else {
+                                const apiRecord = fetchedMap.get(recId);
+                                const localTime = new Date(localRecord.updatedAt || 0).getTime();
+                                const apiTime = new Date(apiRecord.updatedAt || 0).getTime();
+                                if (localTime > apiTime) {
+                                    const idx = records.findIndex(r => (r._id || r.id) === recId);
+                                    if (idx > -1) records[idx] = localRecord;
+                                }
+                            }
+                        }
+                    });
+
+                    const mappedRecords = records.map(r => ({ ...r, id: r._id || r.id }));
+                    const otherUsersData = localData.filter(r => r.createdBy !== currentUser);
+                    localStorage.setItem('data_' + pageId, JSON.stringify([...otherUsersData, ...mappedRecords]));
+                }
+            } catch (e) {
+                console.warn("Failed to fetch custom records from API", e);
+            }
+
+            renderCustomTable();
+        }
+
+        function renderCustomTable() {
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const data = allData.filter(r => r.createdBy === currentUser);
+            const thead = document.getElementById('customTableHead');
+            const tbody = document.getElementById('customTableBody');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+            if (currentCustomFields.length === 0) {
+                thead.innerHTML = '';
+                tbody.innerHTML = '<tr><td style="text-align:center; padding: 30px;">No fields defined yet. Go to Object Manager to add fields.</td></tr>';
+                document.getElementById('paginationWrapper').style.display = 'none';
+                return;
+            } else {
+                document.getElementById('paginationWrapper').style.display = 'flex';
+            }
+
+            const visibleFields = currentCustomFields.filter(f => {
+                if (columnVisibility[f.fieldName] !== undefined) return columnVisibility[f.fieldName];
+                return f.showInGrid !== false;
+            });
+
+            let thHTML = '<tr><th style="width: 40px;"><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAllRecords(this)"></th><th>S.No</th>';
+            visibleFields.forEach(f => {
+                const icon = currentSortColumn === f.fieldName ? (currentSortDirection === 'asc' ? '▲' : '▼') : '';
+                thHTML += `<th style="cursor:pointer;" onclick="handleSort('${f.fieldName}')">${f.fieldLabel} <span class="sort-icon">${icon}</span></th>`;
+            });
+            thHTML += '<th style="text-align: center; width: 100px;">Actions</th></tr>';
+            thead.innerHTML = thHTML;
+
+            tbody.innerHTML = '';
+            currentFilteredData = data.filter(row => {
+                return Object.values(row).some(v => String(v).toLowerCase().includes(searchTerm));
+            });
+
+            if (currentSortColumn) {
+                currentFilteredData.sort((a, b) => {
+                    let valA = String(a[currentSortColumn] || "").toLowerCase();
+                    let valB = String(b[currentSortColumn] || "").toLowerCase();
+
+                    const numA = parseFloat(valA);
+                    const numB = parseFloat(valB);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        return currentSortDirection === 'asc' ? numA - numB : numB - numA;
+                    }
+
+                    return currentSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                });
+            }
+
+            const totalItems = currentFilteredData.length;
+            const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+            const paginatedData = currentFilteredData.slice(startIndex, endIndex);
+
+            // Precompile calculated formulas
+            const compiledFormulas = {};
+            const fieldTypeMap = {};
+            currentCustomFields.forEach(cf => {
+                fieldTypeMap[cf.fieldName] = cf.fieldType;
+                if (cf.fieldType === 'calculated' && cf.calculationFormula) {
+                    try {
+                        let formula = cf.calculationFormula.toString();
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+                        const keys = currentCustomFields.map(c => c.fieldName);
+                        compiledFormulas[cf.fieldName] = {
+                            keys: keys,
+                            fn: new Function(...keys, `return ${formula};`)
+                        };
+                    } catch (e) {
+                        console.error("Formula compilation error", e);
+                    }
+                }
+            });
+
+            let htmlBuffer = '';
+            if (paginatedData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${visibleFields.length + 3}" style="text-align:center; padding: 30px;">No records found.</td></tr>`;
+            } else {
+                paginatedData.forEach((row, i) => {
+                    let tr = `<tr><td><input type="checkbox" class="record-checkbox" value="${row.id}" onclick="updateBulkDeleteBtn()"></td><td>${startIndex + i + 1}</td>`;
+                    visibleFields.forEach(f => {
+                        let val;
+                        if (f.fieldType === 'calculated' && f.calculationFormula) {
+                            try {
+                                if (compiledFormulas[f.fieldName]) {
+                                    const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                        let v = row[key];
+                                        if (v === undefined || v === null) v = '';
+                                        const fType = fieldTypeMap[key];
+                                        if (['number', 'currency', 'calculated'].includes(fType)) {
+                                            let clean = String(v).replace(/[^0-9.-]/g, '');
+                                            const num = Number(clean);
+                                            return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                        } else {
+                                            const num = Number(v);
+                                            return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                        }
+                                    });
+                                    val = compiledFormulas[f.fieldName].fn(...vals);
+                                    if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
+                                    if (val === undefined || val === null) val = '';
+                                } else {
+                                    val = '#CALC!';
+                                }
+                            } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                        } else if (f.fieldType === 'url') {
+                            const rawVal = row[f.fieldName];
+                            if (rawVal) {
+                                const url = String(rawVal).startsWith('http') ? rawVal : 'http://' + rawVal;
+                                const linkLabel = f.urlLabel || rawVal;
+                                val = `<a href="${url}" target="_blank" style="color: var(--slds-blue); text-decoration: underline;" onclick="event.stopPropagation()">${linkLabel}</a>`;
+                            } else {
+                                val = '-';
+                            }
+                        } else if (f.fieldType === 'multiselect') {
+                            const rawVal = row[f.fieldName];
+                            val = Array.isArray(rawVal) ? rawVal.join(', ') : String(rawVal || '-');
+                        } else if (f.fieldType === 'richtext') {
+                            const rawVal = row[f.fieldName] || '';
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = rawVal;
+                            const textContent = tempDiv.textContent || tempDiv.innerText || '';
+                            val = textContent.length > 50 ? textContent.substring(0, 50) + '...' : textContent;
+                        } else if (f.fieldType === 'file') {
+                            const rawVal = row[f.fieldName];
+                            if (rawVal) {
+                                try {
+                                    const fileObj = JSON.parse(rawVal);
+                                    if (fileObj.type && fileObj.type.startsWith('image/')) {
+                                        val = `<img src="${fileObj.data}" style="height:32px; width:32px; object-fit:cover; border-radius:4px; cursor:pointer; border:1px solid #ccc;" onclick="previewCustomAttachment('${row.id}', '${f.fieldName}'); event.stopPropagation();" title="${fileObj.name}">`;
+                                    } else {
+                                        val = `<a href="javascript:void(0)" onclick="previewCustomAttachment('${row.id}', '${f.fieldName}'); event.stopPropagation();" style="color: var(--slds-blue); text-decoration: underline;">${fileObj.name}</a>`;
+                                    }
+                                } catch (e) { val = '-'; }
+                            } else {
+                                val = '-';
+                            }
+                        } else if (f.fieldType === 'lookup') {
+                            const rawVal = row[f.fieldName];
+                            let displayText = rawVal;
+                            let linkUrl = '#';
+                            let linkTitle = 'View record';
+                            if (rawVal) {
+                                try {
+                                    const targetModule = f.lookupModule;
+                                    const displayField = f.lookupDisplay;
+                                    if (targetModule) {
+                                        let sourceData = [];
+                                        const targetModuleLower = targetModule.toLowerCase();
+                                        if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                            sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `customer.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                                linkTitle = `View customer: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                            sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `supplier.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                                linkTitle = `View supplier: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                            sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                                linkUrl = `item.html?search=${encodeURIComponent(match.name || match.itemCode || match.id)}`;
+                                                linkTitle = `View item: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                            sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                            const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
+                                            if (match) {
+                                                const invNo = match.invoice_no || match.invoiceNo || match.id;
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : invNo;
+                                                linkUrl = `invoiceB.html?invoiceNo=${encodeURIComponent(invNo)}`;
+                                                linkTitle = `View invoice: ${displayText}`;
+                                            }
+                                        } else if (targetModuleLower === 'follow-up' || targetModuleLower === 'follow-ups') {
+                                            sourceData = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                                            const match = sourceData.find(x => x.id === rawVal);
+                                            if (match) {
+                                                displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.partyName || match.id);
+                                                linkUrl = `follow_up.html?id=${encodeURIComponent(match.id)}`;
+                                                linkTitle = `View follow-up: ${displayText}`;
+                                            }
+                                        } else {
+                                            sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                            const match = sourceData.find(x => (x.id || x._id) === rawVal);
+                                            if (match) {
+                                                const potentialDisplay = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || rawVal);
+                                                displayText = potentialDisplay;
+                                                linkUrl = `custom_dash.html?pageId=${encodeURIComponent(targetModule)}&search=${encodeURIComponent(rawVal)}`;
+                                                linkTitle = `View records in ${targetModule}`;
+                                            }
+                                        }
+                                    }
+                                } catch (e) { console.warn("Error resolving lookup value", e); }
+                            }
+                            if (linkUrl !== '#') {
+                                val = `<a href="javascript:void(0)" onclick="openWindow('${linkUrl}', 1200, 800); event.stopPropagation();" title="${linkTitle}" style="color: var(--slds-blue); text-decoration: none; font-weight: 500;">${displayText || rawVal}</a>`;
+                            } else {
+                                val = displayText || rawVal;
+                            }
+                        } else {
+                            val = row[f.fieldName];
+                        }
+                        if (val !== undefined && val !== null && val !== '') {
+                            if (f.fieldType === 'currency' || f.fieldType === 'number' || (f.fieldType === 'calculated' && typeof val === 'number')) {
+                                let num = parseFloat(val);
+                                if (!isNaN(num)) {
+                                    val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                                    if (f.prefix || f.currencySymbol) val = (f.prefix || f.currencySymbol) + ' ' + val;
+                                    if (f.suffix) val = val + ' ' + f.suffix;
+                                }
+                            } else if (f.fieldType === 'date') {
+                                const d = new Date(val);
+                                if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                            } else if (f.fieldType === 'datetime') {
+                                const d = new Date(val);
+                                if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                            } else if (f.fieldType !== 'lookup' && f.fieldType !== 'url') {
+                                if (f.prefix) val = f.prefix + ' ' + val;
+                                if (f.suffix) val = val + ' ' + f.suffix;
+                            }
+                        } else {
+                            val = '-';
+                        }
+                        tr += `<td>${val}</td>`;
+                    });
+                    tr += `<td style="text-align: center;">
+                        <div class="action-dropdown" id="actionDropdown-${row.id}">
+                            <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
+                            <div class="action-dropdown-content">
+                                <button onclick="viewCustomRecord('${row.id}')">👁️ View</button>
+                                <button onclick="editCustomRecord('${row.id}')">✏️ Edit</button>
+                                <button onclick="duplicateCustomRecord('${row.id}')">📋 Duplicate</button>
+                                <button onclick="deleteCustomRecord('${row.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    </td></tr>`;
+                    htmlBuffer += tr;
+                });
+                tbody.innerHTML = htmlBuffer;
+            }
+
+            renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+            updateBulkDeleteBtn();
+
+            const tfoot = document.getElementById('customTableFoot');
+            if (tfoot) {
+                let hasTotals = false;
+                const totals = {};
+
+                visibleFields.forEach(f => {
+                    if (['number', 'currency', 'calculated'].includes(f.fieldType) && f.showGrandTotal) {
+                        hasTotals = true;
+                        totals[f.fieldName] = 0;
+                    }
+                });
+
+                if (hasTotals && currentFilteredData.length > 0) {
+                    currentFilteredData.forEach(row => {
+                        visibleFields.forEach(f => {
+                            if (totals[f.fieldName] !== undefined) {
+                                let val = 0;
+                                if (f.fieldType === 'calculated' && f.calculationFormula) {
+                                    try {
+                                        if (compiledFormulas[f.fieldName]) {
+                                            const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                                let v = row[key];
+                                                if (v === undefined || v === null) v = '';
+                                                const fType = fieldTypeMap[key];
+                                                if (['number', 'currency', 'calculated'].includes(fType)) {
+                                                    let clean = String(v).replace(/[^0-9.-]/g, '');
+                                                    const num = Number(clean);
+                                                    return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                                } else {
+                                                    const num = Number(v);
+                                                    return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                                }
+                                            });
+                                            let calcRes = compiledFormulas[f.fieldName].fn(...vals);
+                                            if (typeof calcRes === 'number' && isFinite(calcRes)) val = calcRes;
+                                        }
+                                    } catch (e) { console.error("Calculation error for field", f.fieldName, e); }
+                                } else {
+                                    let rawVal = row[f.fieldName];
+                                    let clean = String(rawVal).replace(/[^0-9.-]/g, '');
+                                    val = parseFloat(clean) || 0;
+                                }
+                                totals[f.fieldName] += val;
+                            }
+                        });
+                    });
+
+                    let tfootHTML = `<tr style="font-weight: 600; background: #f8f9fa; border-top: 2px solid var(--slds-border); color: var(--slds-text);">
+                        <td colspan="2" style="text-align: right; padding: 12px;">Grand Total:</td>`;
+
+                    visibleFields.forEach(f => {
+                        if (totals[f.fieldName] !== undefined) {
+                            let val = totals[f.fieldName];
+                            let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                            if (f.prefix || f.currencySymbol) formattedVal = (f.prefix || f.currencySymbol) + ' ' + formattedVal;
+                            if (f.suffix) formattedVal = formattedVal + ' ' + f.suffix;
+                            tfootHTML += `<td style="padding: 12px; font-weight: bold;">${formattedVal}</td>`;
+                        } else {
+                            tfootHTML += `<td></td>`;
+                        }
+                    });
+                    tfootHTML += `<td></td></tr>`;
+                    tfoot.innerHTML = tfootHTML;
+                } else {
+                    tfoot.innerHTML = '';
+                }
+            }
+
+            requestAnimationFrame(() => {
+                loadColumnWidths();
+                enableColumnResizing();
+            });
+        }
+
+        function openCustomRecordModal(recordData = null) {
+            editCustomRecordId = recordData && recordData.id ? recordData.id : null;
+            document.getElementById('customModalTitle').innerText = editCustomRecordId ? "Edit Record" : "New Record";
+            const container = document.getElementById('customFormContainer');
+            container.innerHTML = '';
+
+            currentCustomFields.forEach(f => {
+                const reqHtml = f.isRequired ? '<span style="color:red">*</span>' : '';
+                const val = recordData ? (recordData[f.fieldName] || '') : '';
+                let inputHtml = '';
+                if (f.fieldType === 'calculated') {
+                    inputHtml = `<input type="text" id="${f.fieldName}" value="${val}" readonly style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; background-color:#f1f3f5; cursor:not-allowed;" />`;
+                } else if (f.fieldType === 'autonumber') {
+                    let finalVal = val;
+                    if (!recordData) {
+                        let nextNum = f.autoStart || 1;
+                        let max = nextNum - 1;
+                        const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+                        allData.forEach(r => {
+                            if (r[f.fieldName]) {
+                                let str = String(r[f.fieldName]);
+                                if (f.autoPrefix && str.startsWith(f.autoPrefix)) str = str.substring(f.autoPrefix.length);
+                                let num = parseInt(str, 10);
+                                if (!isNaN(num) && num > max) max = num;
+                            }
+                        });
+                        nextNum = max + 1;
+                        finalVal = (f.autoPrefix || '') + String(nextNum).padStart(f.autoDigits || 4, '0');
+                    }
+                    inputHtml = `<input type="text" id="${f.fieldName}" value="${finalVal}" readonly style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; background-color:#f1f3f5; cursor:not-allowed;" />`;
+                } else if (f.fieldType === 'select') {
+                    inputHtml = `<select id="${f.fieldName}" onchange="updateCalculatedFieldsInModal(); handleDependentFields('${f.fieldName}')" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
+                    let optionsToRender = [];
+                    if (f.dependsOn && f.optionsRaw && f.optionsRaw.includes(':')) {
+                        const parentVal = recordData ? recordData[f.dependsOn] : '';
+                        optionsToRender = getDependentOptions(f.optionsRaw, parentVal);
+                    } else {
+                        optionsToRender = f.optionsRaw && f.optionsRaw.includes(',') && !f.optionsRaw.includes(':') ? f.optionsRaw.split(',').map(s => s.trim()) : (f.options || []);
+                    }
+                    optionsToRender.forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}" ${o === val ? 'selected' : ''}>${o}</option>`);
+                    inputHtml += `</select>`;
+                } else if (f.fieldType === 'multiselect') {
+                    const vals = Array.isArray(val) ? val : (val ? String(val).split(',').map(s => s.trim()) : []);
+                    inputHtml = `<select id="${f.fieldName}" multiple onchange="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; height: 80px;">`;
+                    (f.options || []).forEach(o => {
+                        inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}" ${vals.includes(o) ? 'selected' : ''}>${o}</option>`;
+                    });
+                    inputHtml += `</select><div style="font-size:11px; color:#666; margin-top:2px;">Hold Ctrl (Windows) or Cmd (Mac) to select multiple.</div>`;
+                } else if (f.fieldType === 'textarea' || f.fieldType === 'richtext') {
+                    inputHtml = `<textarea id="${f.fieldName}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; grid-column: 1 / -1;">${val}</textarea>`;
+                } else if (f.fieldType === 'file') {
+                    let previewHtml = '';
+                    if (val) {
+                        try {
+                            const fileObj = JSON.parse(val);
+                            if (fileObj.type && fileObj.type.startsWith('image/')) {
+                                previewHtml = `<img src="${fileObj.data}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border); cursor:pointer;" onclick="previewFileObj('${f.fieldName}')"> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                            } else {
+                                previewHtml = `<a href="javascript:void(0)" onclick="previewFileObj('${f.fieldName}')">${fileObj.name}</a> <button type="button" onclick="clearFile('${f.fieldName}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                            }
+                        } catch (e) { }
+                    }
+                    inputHtml = `<input type="file" id="${f.fieldName}_file" onchange="handleFileSelect(event, '${f.fieldName}')" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />
+                                 <input type="hidden" id="${f.fieldName}" value="${val ? String(val).replace(/"/g, '&quot;') : ''}" />
+                                 <div id="${f.fieldName}_preview" style="margin-top:5px;">${previewHtml}</div>`;
+                } else if (f.fieldType === 'lookup') {
+                    let lookupOptions = [];
+                    try {
+                        const targetModule = f.lookupModule;
+                        const displayField = f.lookupDisplay;
+
+                        if (targetModule) {
+                            if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                                const customers = JSON.parse(localStorage.getItem('customers')) || [];
+                                lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
+                            } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                                const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
+                            } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                                const items = JSON.parse(localStorage.getItem('items')) || [];
+                                lookupOptions = items.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.name || i.id) }));
+                            } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                                const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+                                lookupOptions = invoices.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
+                            } else if (targetModule.toLowerCase() === 'follow-up' || targetModule.toLowerCase() === 'follow-ups') {
+                                const followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                                lookupOptions = followUps.map(f => ({ id: f.id, label: (displayField && f[displayField] !== undefined) ? f[displayField] : (f.partyName || f.id) }));
+                            } else {
+                                const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                lookupOptions = customData.map(r => ({ id: r.id, label: (displayField && r[displayField] !== undefined) ? r[displayField] : r.id }));
+                            }
+                        }
+                        lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
+                    } catch (e) { console.warn("Error loading lookup options", e); }
+
+                    const uniqueOps = [];
+                    const seen = new Set();
+                    lookupOptions.forEach(o => {
+                        if (o && o.id && !seen.has(o.id)) {
+                            seen.add(o.id);
+                            uniqueOps.push(o);
+                        }
+                    });
+
+                    inputHtml = `<select id="${f.fieldName}" onchange="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;">
+                        <option value="">-- Select --</option>`;
+                    uniqueOps.forEach(o => {
+                        inputHtml += `<option value="${String(o.id).replace(/"/g, '&quot;')}" ${o.id === val ? 'selected' : ''}>${String(o.label).replace(/</g, '&lt;')}</option>`;
+                    });
+                    inputHtml += `</select>`;
+                } else {
+                    let inpType = 'text';
+                    if (f.fieldType === 'number') inpType = 'number';
+                    else if (f.fieldType === 'date') inpType = 'date';
+                    else if (f.fieldType === 'url') inpType = 'url';
+                    inputHtml = `<input type="${inpType}" id="${f.fieldName}" value="${val}" oninput="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+                }
+                const fullWidth = f.fieldType === 'textarea' ? 'style="grid-column: 1 / -1;"' : '';
+                container.innerHTML += `<div ${fullWidth}><label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">${f.fieldLabel} ${reqHtml}</label>${inputHtml}</div>`;
+            });
+            document.getElementById('customRecordModal').style.display = 'block';
+            updateCalculatedFieldsInModal();
+            currentCustomFields.filter(f => !f.dependsOn).forEach(f => handleDependentFields(f.fieldName));
+        }
+
+        function updateCalculatedFieldsInModal() {
+            const currentState = {};
+            currentCustomFields.forEach(f => {
+                const el = document.getElementById(f.fieldName);
+                if (el) {
+                    if (el.type === 'checkbox') currentState[f.fieldName] = el.checked;
+                    else if (el.multiple) currentState[f.fieldName] = Array.from(el.selectedOptions).map(o => o.value);
+                    else {
+                        let val = el.value;
+                        if (['number', 'currency', 'calculated'].includes(f.fieldType)) {
+                            let clean = String(val).replace(/[^0-9.-]/g, '');
+                            const num = Number(clean);
+                            currentState[f.fieldName] = (!isNaN(num) && clean.trim() !== '') ? num : val;
+                        } else {
+                            const num = Number(val);
+                            currentState[f.fieldName] = (!isNaN(num) && val.trim() !== '') ? num : val;
+                        }
+                    }
+                } else {
+                    currentState[f.fieldName] = '';
+                }
+            });
+
+            currentCustomFields.forEach(f => {
+                if (f.fieldType === 'calculated' && f.calculationFormula) {
+                    try {
+                        let formula = f.calculationFormula.toString();
+                        // Auto-correct missing braces around field keys
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+
+                        const calcEl = document.getElementById(f.fieldName);
+                        if (calcEl) {
+                            const keys = Object.keys(currentState);
+                            const vals = Object.values(currentState);
+
+                            let res = new Function(...keys, `return ${formula};`)(...vals);
+                            if (typeof res === 'number' && (!isFinite(res) || isNaN(res))) res = '';
+
+                            calcEl.value = res !== undefined && res !== null ? res : '';
+                        }
+                    } catch (e) {
+                        console.error("Calculation error for field", f.fieldName, e);
+                        const calcEl = document.getElementById(f.fieldName);
+                        if (calcEl) calcEl.value = '#CALC!';
+                    }
+                }
+            });
+        }
+
+        function handleFileSelect(event, id) {
+            const file = event.target.files[0];
+            const hiddenInput = document.getElementById(id);
+            const previewDiv = document.getElementById(id + '_preview');
+            const fileInput = document.getElementById(id + '_file');
+
+            if (!file) {
+                return;
+            }
+
+            if (file.size > 2 * 1024 * 1024) {
+                alert('File is too large. Maximum size is 2MB.');
+                if (fileInput) fileInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const fileData = {
+                    name: file.name,
+                    type: file.type,
+                    data: e.target.result
+                };
+                hiddenInput.value = JSON.stringify(fileData);
+
+                if (file.type.startsWith('image/')) {
+                    previewDiv.innerHTML = `<img src="${e.target.result}" style="max-height: 60px; border-radius: 4px; border: 1px solid var(--slds-border); cursor:pointer;" onclick="previewFileObj('${id}')"> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                } else {
+                    previewDiv.innerHTML = `<a href="javascript:void(0)" onclick="previewFileObj('${id}')">${file.name}</a> <button type="button" onclick="clearFile('${id}')" style="background:none; border:none; color:red; cursor:pointer; margin-left:10px;">Remove</button>`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearFile(id) {
+            const hiddenInput = document.getElementById(id);
+            const fileInput = document.getElementById(id + '_file');
+            const previewDiv = document.getElementById(id + '_preview');
+
+            if (hiddenInput) hiddenInput.value = '';
+            if (fileInput) fileInput.value = '';
+            if (previewDiv) previewDiv.innerHTML = '';
+        }
+
+        function previewCustomAttachment(rowId, fieldName) {
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = allData.find(r => r.id === rowId || r._id === rowId);
+            if (record && record[fieldName]) {
+                try {
+                    const fileObj = JSON.parse(record[fieldName]);
+                    showPreviewModal(fileObj);
+                } catch (e) { console.error("Error parsing file object", e); }
+            }
+        }
+
+        function previewFileObj(fieldName) {
+            const hiddenInput = document.getElementById(fieldName);
+            if (hiddenInput && hiddenInput.value) {
+                try {
+                    const fileObj = JSON.parse(hiddenInput.value);
+                    showPreviewModal(fileObj);
+                } catch (e) { console.error("Error parsing file object", e); }
+            }
+        }
+
+        function showPreviewModal(fileObj) {
+            document.getElementById('previewAttachmentTitle').innerText = fileObj.name;
+            const content = document.getElementById('previewAttachmentContent');
+
+            if (fileObj.type && fileObj.type.startsWith('image/')) {
+                content.innerHTML = `<img src="${fileObj.data}" style="max-width: 100%; max-height: 60vh; object-fit: contain;">`;
+            } else if (fileObj.type === 'application/pdf') {
+                content.innerHTML = `<iframe src="${fileObj.data}" style="width: 100%; height: 60vh; border: none;"></iframe>`;
+            } else {
+                content.innerHTML = `<p style="padding: 20px;">Preview not available for this file type.</p>`;
+            }
+
+            const downloadBtn = document.getElementById('downloadAttachmentBtn');
+            downloadBtn.onclick = function () {
+                const a = document.createElement('a');
+                a.href = fileObj.data;
+                a.download = fileObj.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            document.getElementById('attachmentPreviewModal').style.display = 'block';
+        }
+
+        function closeCustomRecordModal() {
+            editCustomRecordId = null;
+            document.getElementById('customRecordModal').style.display = 'none';
+        }
+
+        function closeViewRecordModal() {
+            document.getElementById('viewRecordModal').style.display = 'none';
+        }
+
+        function viewCustomRecord(id) {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = data.find(r => r.id === id || r._id === id);
+            if (!record) return;
+
+            const content = document.getElementById('viewRecordContent');
+            let html = '';
+
+            const compiledFormulas = {};
+            const fieldTypeMap = {};
+            currentCustomFields.forEach(cf => {
+                fieldTypeMap[cf.fieldName] = cf.fieldType;
+                if (cf.fieldType === 'calculated' && cf.calculationFormula) {
+                    try {
+                        let formula = cf.calculationFormula.toString();
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+                        const keys = currentCustomFields.map(c => c.fieldName);
+                        compiledFormulas[cf.fieldName] = {
+                            keys: keys,
+                            fn: new Function(...keys, `return ${formula};`)
+                        };
+                    } catch (e) { }
+                }
+            });
+
+            currentCustomFields.forEach(f => {
+                let val;
+                if (f.fieldType === 'calculated' && f.calculationFormula) {
+                    try {
+                        if (compiledFormulas[f.fieldName]) {
+                            const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                let v = record[key];
+                                if (v === undefined || v === null) v = '';
+                                const fType = fieldTypeMap[key];
+                                if (['number', 'currency', 'calculated'].includes(fType)) {
+                                    let clean = String(v).replace(/[^0-9.-]/g, '');
+                                    const num = Number(clean);
+                                    return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                } else {
+                                    const num = Number(v);
+                                    return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                }
+                            });
+                            val = compiledFormulas[f.fieldName].fn(...vals);
+                            if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
+                            if (val === undefined || val === null) val = '';
+                        } else {
+                            val = '#CALC!';
+                        }
+                    } catch (e) { val = '#CALC!'; }
+                } else {
+                    val = record[f.fieldName];
+                }
+
+                let displayVal = val;
+                if (val !== undefined && val !== null && val !== '') {
+                    if (f.fieldType === 'boolean') {
+                        displayVal = (val === true || val === 'true') ? 'Yes' : 'No';
+                    } else if (f.fieldType === 'multiselect') {
+                        displayVal = Array.isArray(val) ? val.join(', ') : String(val);
+                    } else if (f.fieldType === 'richtext') {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = val;
+                        displayVal = tempDiv.textContent || tempDiv.innerText || '';
+                    } else if (f.fieldType === 'file') {
+                        try {
+                            const fileObj = JSON.parse(val);
+                            displayVal = fileObj.name || 'Attachment';
+                            if (fileObj.type && fileObj.type.startsWith('image/')) {
+                                displayVal = `<img src="${fileObj.data}" style="max-height: 60px; max-width: 100%; border-radius: 4px; border: 1px solid var(--slds-border); cursor:pointer;" onclick="previewCustomAttachment('${record.id}', '${f.fieldName}')">`;
+                            } else {
+                                displayVal = `<a href="javascript:void(0)" onclick="previewCustomAttachment('${record.id}', '${f.fieldName}')" style="color: var(--slds-blue); text-decoration: underline;">${fileObj.name}</a>`;
+                            }
+                        } catch (e) { displayVal = 'Attachment'; }
+                    } else if (['currency', 'number', 'calculated'].includes(f.fieldType) && !isNaN(parseFloat(val))) {
+                        displayVal = parseFloat(val).toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                        if (f.prefix || f.currencySymbol) displayVal = (f.prefix || f.currencySymbol) + ' ' + displayVal;
+                        if (f.suffix) displayVal = displayVal + ' ' + f.suffix;
+                    } else if (f.fieldType === 'date') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) displayVal = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                    } else if (f.fieldType === 'datetime') {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) displayVal = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                    } else if (f.fieldType === 'url') {
+                        const url = String(val).startsWith('http') ? val : 'http://' + val;
+                        const linkLabel = f.urlLabel || val;
+                        displayVal = `<a href="${url}" target="_blank" style="color: var(--slds-blue); text-decoration: underline;">${linkLabel}</a>`;
+                    } else if (f.fieldType === 'lookup') {
+                        try {
+                            const targetModule = f.lookupModule;
+                            const displayField = f.lookupDisplay;
+                            if (targetModule) {
+                                let sourceData = [];
+                                const targetModuleLower = targetModule.toLowerCase();
+                                if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                    sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                    sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                    sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                    sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                } else if (targetModuleLower === 'follow-up' || targetModuleLower === 'follow-ups') {
+                                    sourceData = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                                } else {
+                                    sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                }
+
+                                const match = sourceData.find(x => (x.id || x._id || x.invoice_no || x.invoiceNo) === val);
+                                if (match) {
+                                    displayVal = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.invoice_no || match.invoiceNo || match.partyName || match.id);
+                                }
+                            }
+                        } catch (e) { }
+                    } else {
+                        if (f.prefix) displayVal = f.prefix + ' ' + displayVal;
+                        if (f.suffix) displayVal = displayVal + ' ' + f.suffix;
+                    }
+                } else {
+                    displayVal = '-';
+                }
+
+                html += `<tr><th style="width:40%; padding:10px; background:#f8f9fa; border:1px solid var(--slds-border); color: #444;">${f.fieldLabel}</th><td style="padding:10px; border:1px solid var(--slds-border);">${displayVal}</td></tr>`;
+            });
+
+            content.innerHTML = html;
+            document.getElementById('btnEditFromView').onclick = function () {
+                closeViewRecordModal();
+                editCustomRecord(id);
+            };
+
+            document.getElementById('viewRecordModal').style.display = 'block';
+        }
+
+        function editCustomRecord(id) {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = data.find(r => r.id === id);
+            if (record) openCustomRecordModal(record);
+        }
+
+        function duplicateCustomRecord(id) {
+            const data = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const record = data.find(r => r.id === id);
+            if (record) {
+                let duplicate = { ...record };
+                delete duplicate.id;
+                delete duplicate._id;
+                openCustomRecordModal(duplicate);
+            }
+        }
+
+        async function saveCustomRecord() {
+            let newId = editCustomRecordId || ('cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+            let currentUser = localStorage.getItem('currentUser') || 'System';
+            let newRow = { id: newId, _id: newId, moduleName: currentActivePageId, createdBy: currentUser, updatedAt: new Date().toISOString() };
+            let apiPayload = { _id: newId, moduleName: currentActivePageId, createdBy: currentUser, updatedAt: new Date().toISOString() };
+            let hasError = false;
+
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let data = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+
+            if (editCustomRecordId) {
+                const existing = data.find(r => r.id === editCustomRecordId || r._id === editCustomRecordId);
+                if (existing) {
+                    newRow.createdBy = existing.createdBy || currentUser;
+                    apiPayload.createdBy = existing.createdBy || currentUser;
+                    newRow.createdAt = existing.createdAt || new Date().toISOString();
+                    apiPayload.createdAt = existing.createdAt || new Date().toISOString();
+                }
+            } else {
+                newRow.createdAt = new Date().toISOString();
+                apiPayload.createdAt = new Date().toISOString();
+            }
+
+            currentCustomFields.forEach(f => {
+                const el = document.getElementById(f.fieldName);
+                let val;
+                if (f.fieldType === 'multiselect' && el && el.multiple) {
+                    val = Array.from(el.selectedOptions).map(o => o.value);
+                } else {
+                    val = el ? el.value : '';
+                }
+                if (f.isRequired && (!val || (Array.isArray(val) && val.length === 0))) hasError = true;
+                newRow[f.fieldName] = val;
+                apiPayload[f.fieldName] = val;
+            });
+
+            if (hasError) return alert("Please fill all required fields");
+
+            if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                try {
+                    const res = await apiClient.saveCustomRecord(apiPayload);
+                    if (res && res.data && res.data._id) {
+                        newRow.id = res.data._id;
+                        newRow._id = res.data._id;
+                    }
+                } catch (err) { console.warn("API sync failed", err); }
+            }
+
+            if (editCustomRecordId) {
+                const index = data.findIndex(r => r.id === editCustomRecordId || r._id === editCustomRecordId);
+                if (index !== -1) data[index] = newRow;
+            } else {
+                data.push(newRow);
+            }
+
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
+            closeCustomRecordModal();
+            renderCustomTable();
+        }
+
+        async function deleteCustomRecord(id, skipConfirm = false) {
+            if (!skipConfirm && !confirm("Delete this record?")) return;
+            let allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            let data = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+            data = data.filter(r => r.id !== id && r._id !== id);
+
+            if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
+                await apiClient.deleteCustomRecord(id).catch(err => console.warn("API delete failed", err));
+            }
+
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
+            if (!skipConfirm) renderCustomTable();
+        }
+
+        function toggleSelectAllRecords(source) {
+            const checkboxes = document.querySelectorAll('.record-checkbox');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+            const btn = document.getElementById('bulkDeleteBtn');
+            if (btn) {
+                btn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                btn.innerHTML = `🗑️ Delete Selected (${checkedCount})`;
+            }
+            const editBtn = document.getElementById('bulkEditBtn');
+            if (editBtn) {
+                editBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                editBtn.innerHTML = `✏️ Edit Selected (${checkedCount})`;
+            }
+            const selectAllCb = document.getElementById('selectAllCheckbox');
+            if (selectAllCb) {
+                const totalCheckboxes = document.querySelectorAll('.record-checkbox').length;
+                selectAllCb.checked = totalCheckboxes > 0 && checkedCount === totalCheckboxes;
+            }
+        }
+
+        async function deleteSelectedRecords() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return;
+            if (!confirm(`Are you sure you want to delete ${checkboxes.length} selected record(s)?`)) return;
+
+            const idsToDelete = Array.from(checkboxes).map(cb => cb.value);
+            const overlay = document.getElementById('loadingOverlay');
+            const progressContainer = document.getElementById('importProgressContainer');
+            const progressBar = document.getElementById('importProgressBar');
+            const progressText = document.getElementById('importProgressText');
+            const total = idsToDelete.length;
+            let processed = 0;
+
+            if (overlay) overlay.style.display = 'flex';
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (progressText) {
+                progressText.style.display = 'block';
+                progressText.innerText = `Deleting 0 of ${total}...`;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            try {
+                for (const id of idsToDelete) {
+                    await deleteCustomRecord(id, true);
+                    processed++;
+                    if (progressBar) progressBar.style.width = Math.round((processed / total) * 100) + '%';
+                    if (progressText) progressText.innerText = `Deleting ${processed} of ${total}...`;
+                    if (processed % 10 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                renderCustomTable();
+            } finally {
+                if (overlay) overlay.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (progressText) progressText.style.display = 'none';
+                if (progressBar) progressBar.style.width = '0%';
+            }
+        }
+
+        function exportData() {
+            if (!currentActivePageId) return alert("No active page.");
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            const data = allData.filter(r => r.createdBy === currentUser);
+            if (data.length === 0) return alert("No data to export.");
+
+            // Precompile calculated formulas
+            const compiledFormulas = {};
+            const fieldTypeMap = {};
+            currentCustomFields.forEach(cf => {
+                fieldTypeMap[cf.fieldName] = cf.fieldType;
+                if (cf.fieldType === 'calculated' && cf.calculationFormula) {
+                    try {
+                        let formula = cf.calculationFormula.toString();
+                        formula = formula.replace(/(^|[^a-zA-Z0-9_{])(cf_[a-zA-Z0-9_]+)(?=[^a-zA-Z0-9_}]|$)/g, '$1{$2}');
+                        formula = formula.replace(/\{(\w+)\}/g, '$1');
+                        const keys = currentCustomFields.map(c => c.fieldName);
+                        compiledFormulas[cf.fieldName] = {
+                            keys: keys,
+                            fn: new Function(...keys, `return ${formula};`)
+                        };
+                    } catch (e) {
+                        console.error("Formula compilation error", e);
+                    }
+                }
+            });
+
+            const exportData = data.map(row => {
+                const obj = { 'Record ID': row.id || row._id };
+                currentCustomFields.forEach(f => {
+                    let val;
+                    if (f.fieldType === 'calculated' && f.calculationFormula) {
+                        try {
+                            if (compiledFormulas[f.fieldName]) {
+                                const vals = compiledFormulas[f.fieldName].keys.map(key => {
+                                    let v = row[key];
+                                    if (v === undefined || v === null) v = '';
+                                    const fType = fieldTypeMap[key];
+                                    if (['number', 'currency', 'calculated'].includes(fType)) {
+                                        let clean = String(v).replace(/[^0-9.-]/g, '');
+                                        const num = Number(clean);
+                                        return (!isNaN(num) && clean.trim() !== '') ? num : v;
+                                    } else {
+                                        const num = Number(v);
+                                        return (!isNaN(num) && String(v).trim() !== '') ? num : v;
+                                    }
+                                });
+                                val = compiledFormulas[f.fieldName].fn(...vals);
+                                if (typeof val === 'number' && (!isFinite(val) || isNaN(val))) val = '#CALC!';
+                                if (val === undefined || val === null) val = '';
+                            } else {
+                                val = '#CALC!';
+                            }
+                        } catch (e) { console.error("Calculation error for field", f.fieldName, e); val = '#CALC!'; }
+                    } else if (f.fieldType === 'richtext') {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = row[f.fieldName] || '';
+                        val = tempDiv.textContent || tempDiv.innerText || '';
+                    } else if (f.fieldType === 'multiselect') {
+                        const rawVal = row[f.fieldName];
+                        val = Array.isArray(rawVal) ? rawVal.join(', ') : (rawVal || '');
+                    } else if (f.fieldType === 'file') {
+                        const rawVal = row[f.fieldName];
+                        if (rawVal) {
+                            try {
+                                const fileObj = JSON.parse(rawVal);
+                                val = fileObj.name || 'Attachment';
+                            } catch (e) { val = 'Attachment'; }
+                        } else {
+                            val = '';
+                        }
+                    } else if (f.fieldType === 'lookup') {
+                        const rawVal = row[f.fieldName];
+                        let displayText = rawVal;
+                        let linkUrl = '#';
+                        let linkTitle = 'View record';
+                        if (rawVal) {
+                            try {
+                                const targetModule = f.lookupModule;
+                                const displayField = f.lookupDisplay;
+                                if (targetModule) {
+                                    let sourceData = [];
+                                    const targetModuleLower = targetModule.toLowerCase();
+                                    if (targetModuleLower === 'customer' || targetModuleLower === 'customers') {
+                                        sourceData = JSON.parse(localStorage.getItem('customers')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                            linkUrl = `customer.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                            linkTitle = `View customer: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'supplier' || targetModuleLower === 'suppliers') {
+                                        sourceData = JSON.parse(localStorage.getItem('suppliers')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                            linkUrl = `supplier.html?search=${encodeURIComponent(match.name || match.id)}`;
+                                            linkTitle = `View supplier: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'item' || targetModuleLower === 'items') {
+                                        sourceData = JSON.parse(localStorage.getItem('items')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.id);
+                                            linkUrl = `item.html?search=${encodeURIComponent(match.name || match.itemCode || match.id)}`;
+                                            linkTitle = `View item: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'invoice' || targetModuleLower === 'invoices') {
+                                        sourceData = JSON.parse(localStorage.getItem('invoices')) || [];
+                                        const match = sourceData.find(x => (x.invoice_no || x.invoiceNo || x.id) === rawVal);
+                                        if (match) {
+                                            const invNo = match.invoice_no || match.invoiceNo || match.id;
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : invNo;
+                                            linkUrl = `invoiceB.html?invoiceNo=${encodeURIComponent(invNo)}`;
+                                            linkTitle = `View invoice: ${displayText}`;
+                                        }
+                                    } else if (targetModuleLower === 'follow-up' || targetModuleLower === 'follow-ups') {
+                                        sourceData = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                                        const match = sourceData.find(x => x.id === rawVal);
+                                        if (match) {
+                                            displayText = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.partyName || match.id);
+                                            linkUrl = `follow_up.html?id=${encodeURIComponent(match.id)}`;
+                                            linkTitle = `View follow-up: ${displayText}`;
+                                        }
+                                    } else {
+                                        sourceData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                                        const match = sourceData.find(x => (x.id || x._id) === rawVal);
+                                        if (match) {
+                                            const potentialDisplay = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || rawVal);
+                                            displayText = potentialDisplay;
+                                            linkUrl = `custom_dash.html?pageId=${encodeURIComponent(targetModule)}&search=${encodeURIComponent(rawVal)}`;
+                                            linkTitle = `View records in ${targetModule}`;
+                                        }
+                                    }
+                                }
+                            } catch (e) { }
+                        }
+                        if (linkUrl !== '#') {
+                            val = `<a href="javascript:void(0)" onclick="openWindow('${linkUrl}', 1200, 800); event.stopPropagation();" title="${linkTitle}" style="color: var(--slds-blue); text-decoration: none; font-weight: 500;">${displayText || rawVal}</a>`;
+                        } else {
+                            val = displayText || rawVal;
+                        }
+                    } else {
+                        val = row[f.fieldName];
+                    }
+                    if (val !== undefined && val !== null && val !== '') {
+                        if (f.fieldType === 'currency' || f.fieldType === 'number' || (f.fieldType === 'calculated' && typeof val === 'number')) {
+                            let num = parseFloat(val);
+                            if (!isNaN(num)) {
+                                val = num.toLocaleString('en-IN', { minimumFractionDigits: f.currencyDecimals ?? 2, maximumFractionDigits: f.currencyDecimals ?? 2 });
+                                if (f.prefix || f.currencySymbol) val = (f.prefix || f.currencySymbol) + ' ' + val;
+                                if (f.suffix) val = val + ' ' + f.suffix;
+                            }
+                        } else if (f.fieldType === 'date') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                        } else if (f.fieldType === 'datetime') {
+                            const d = new Date(val);
+                            if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toLocaleTimeString('en-IN')}`;
+                        } else {
+                            if (f.prefix) val = f.prefix + ' ' + val;
+                            if (f.suffix) val = val + ' ' + f.suffix;
+                        }
+                    } else {
+                        val = '';
+                    }
+                    obj[f.fieldLabel] = val;
+                });
+                return obj;
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, currentActivePageId);
+            XLSX.writeFile(wb, `${currentActivePageId}_export.xlsx`);
+        }
+
+        let pendingImportData = [];
+        let pendingImportHeaders = [];
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                pendingImportData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+                if (pendingImportData.length === 0) {
+                    alert("The file is empty or formatted incorrectly.");
+                    input.value = '';
+                    return;
+                }
+
+                // Extract headers from the first data row
+                pendingImportHeaders = Object.keys(pendingImportData[0] || {});
+                showImportMappingModal();
+                input.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function showImportMappingModal() {
+            const container = document.getElementById('importMappingContainer');
+            let html = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr 60px; gap: 10px; font-weight: bold; border-bottom: 1px solid var(--slds-border); padding-bottom: 5px;">
+                    <div>System / Custom Field</div>
+                    <div>Excel Column</div>
+                    <div style="text-align:center;">Update?</div>
+                </div>
+            `;
+
+            // Auto-detect the Record ID column
+            const matchedIdHeader = pendingImportHeaders.find(h => ['record id', 'id', '_id'].includes(h.trim().toLowerCase())) || '';
+            let idSelectHtml = `<select id="map_record_id" style="width:100%; padding:6px; border:1px solid var(--slds-border); border-radius:4px;">
+                <option value="">-- Auto / Insert as New --</option>`;
+            pendingImportHeaders.forEach(h => {
+                idSelectHtml += `<option value="${h}" ${h === matchedIdHeader ? 'selected' : ''}>${h}</option>`;
+            });
+            idSelectHtml += `</select>`;
+
+            html += `
+                <div style="display: grid; grid-template-columns: 1fr 1fr 60px; gap: 10px; align-items: center; margin-top: 5px; padding-bottom: 10px; border-bottom: 1px dashed var(--slds-border);">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--slds-blue);">Record ID (For Updates)</div>
+                    <div>${idSelectHtml}</div>
+                    <div style="text-align:center; color: #888;" title="Used to find and update existing records">🔑</div>
+                </div>
+            `;
+
+            currentCustomFields.forEach(f => {
+                // Attempt to auto-map by matching strings
+                const matchedHeader = pendingImportHeaders.find(h => h.toLowerCase() === f.fieldLabel.toLowerCase()) || '';
+
+                let selectHtml = `<select id="map_${f.fieldName}" style="width:100%; padding:6px; border:1px solid var(--slds-border); border-radius:4px;">
+                    <option value="">-- Ignore --</option>`;
+                pendingImportHeaders.forEach(h => {
+                    selectHtml += `<option value="${h}" ${h === matchedHeader ? 'selected' : ''}>${h}</option>`;
+                });
+                selectHtml += `</select>`;
+
+                html += `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 60px; gap: 10px; align-items: center;">
+                        <div style="font-size: 13px;">${f.fieldLabel} ${f.isRequired ? '<span style="color:red">*</span>' : ''}</div>
+                        <div>${selectHtml}</div>
+                        <div style="text-align:center;"><input type="checkbox" id="import_${f.fieldName}" ${matchedHeader ? 'checked' : ''}></div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            document.getElementById('importMappingModal').style.display = 'block';
+        }
+
+        function closeImportMappingModal() {
+            document.getElementById('importMappingModal').style.display = 'none';
+            pendingImportData = [];
+            pendingImportHeaders = [];
+        }
+
+        async function processImportData() {
+            let currentUser = localStorage.getItem('currentUser') || 'System';
+            let allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let savedData = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+            let added = 0;
+            let updated = 0;
+
+            const totalRows = pendingImportData.length;
+            let processedRows = 0;
+
+            const overlay = document.getElementById('loadingOverlay');
+            const progressContainer = document.getElementById('importProgressContainer');
+            const progressBar = document.getElementById('importProgressBar');
+            const progressText = document.getElementById('importProgressText');
+
+            // 1. Show overlay UI
+            if (overlay) overlay.style.display = 'flex';
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (progressText) {
+                progressText.style.display = 'block';
+                progressText.innerText = `Processing 0 of ${totalRows}...`;
+            }
+
+            // 2. Add a tiny delay so the browser can paint the overlay to the screen
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            try {
+                // Gather mapping config from checkboxes
+                const fieldMapping = {};
+                currentCustomFields.forEach(f => {
+                    const mapSelect = document.getElementById('map_' + f.fieldName);
+                    const importCheck = document.getElementById('import_' + f.fieldName);
+                    if (mapSelect && importCheck && importCheck.checked && mapSelect.value) {
+                        fieldMapping[f.fieldName] = mapSelect.value;
+                    }
+                });
+
+                const idMapSelect = document.getElementById('map_record_id');
+                const idMapping = idMapSelect ? idMapSelect.value : null;
+
+                for (const row of pendingImportData) {
+                    // Match existing records
+                    let recordId = null;
+                    if (idMapping && row[idMapping] !== undefined) {
+                        recordId = String(row[idMapping]).trim();
+                    } else {
+                        const idKey = Object.keys(row).find(k => ['record id', 'id', '_id'].includes(k.trim().toLowerCase()));
+                        if (idKey && row[idKey] !== undefined) recordId = String(row[idKey]).trim();
+                    }
+
+                    let isUpdate = false;
+                    let existingRecord = {};
+                    let newId = null;
+
+                    if (recordId) {
+                        const existingIdx = savedData.findIndex(r => String(r.id) === recordId || String(r._id) === recordId);
+                        if (existingIdx > -1) {
+                            isUpdate = true;
+                            existingRecord = savedData[existingIdx];
+                            newId = existingRecord.id || existingRecord._id;
+                        }
+                    }
+
+                    if (!newId) newId = 'cr_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5);
+
+                    // Use existingRecord as the baseline, preserving unmapped values 
+                    let newRow = { ...existingRecord, id: newId, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+                    let apiPayload = { ...existingRecord, _id: newId, moduleName: currentActivePageId, updatedAt: new Date().toISOString() };
+
+                    if (!isUpdate) {
+                        newRow.createdBy = currentUser;
+                        newRow.createdAt = new Date().toISOString();
+                        apiPayload.createdBy = currentUser;
+                        apiPayload.createdAt = new Date().toISOString();
+                    }
+
+                    currentCustomFields.forEach(f => {
+                        const mappedHeader = fieldMapping[f.fieldName];
+
+                        if (mappedHeader) {
+                            let val = row[mappedHeader];
+                            if (val !== undefined) {
+                                if (val instanceof Date) {
+                                    const offset = val.getTimezoneOffset() * 60000;
+                                    const localDate = new Date(val.getTime() - offset);
+                                    if (f.fieldType === 'date') val = localDate.toISOString().split('T')[0];
+                                    else if (f.fieldType === 'datetime') val = localDate.toISOString().slice(0, 16);
+                                }
+                                if (!(isUpdate && val === '')) {
+                                    newRow[f.fieldName] = val;
+                                    apiPayload[f.fieldName] = val;
+                                }
+                            }
+                        } else if (!isUpdate && existingRecord[f.fieldName] === undefined) {
+                            // Initialize unmapped fields on entirely new records
+                            newRow[f.fieldName] = '';
+                            apiPayload[f.fieldName] = '';
+                        }
+                    });
+
+                    if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                        try {
+                            const res = await apiClient.saveCustomRecord(apiPayload);
+                            if (res && res.data && res.data._id && !isUpdate) {
+                                newRow.id = res.data._id;
+                                newRow._id = res.data._id;
+                            }
+                        } catch (err) { console.warn("API sync failed", err); }
+                    }
+
+                    if (isUpdate) {
+                        const idx = savedData.findIndex(r => r.id === newRow.id || r._id === newRow._id);
+                        savedData[idx] = newRow;
+                        updated++;
+                    } else {
+                        savedData.push(newRow);
+                        added++;
+                    }
+
+                    // 3. Update Progress Bar state
+                    processedRows++;
+                    if (progressBar) progressBar.style.width = Math.round((processedRows / totalRows) * 100) + '%';
+                    if (progressText) progressText.innerText = `Processing ${processedRows} of ${totalRows}...`;
+
+                    // 4. Yield briefly so the UI can draw the updated progress bar
+                    if (processedRows % 10 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                }
+
+                localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...savedData]));
+                renderCustomTable();
+                alert(`Import successful: ${added} added, ${updated} updated.`);
+                closeImportMappingModal();
+            } finally {
+                // 5. Securely wipe & hide overlay afterwards
+                if (overlay) overlay.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (progressText) progressText.style.display = 'none';
+                if (progressBar) progressBar.style.width = '0%';
+            }
+        }
+
+        function openBulkEditModal() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return;
+
+            const select = document.getElementById('bulkEditFieldSelect');
+            select.innerHTML = '<option value="">-- Select Field --</option>';
+            currentCustomFields.forEach(f => {
+                if (f.fieldType !== 'calculated' && f.fieldType !== 'file' && f.fieldType !== 'autonumber') {
+                    select.innerHTML += `<option value="${f.fieldName}">${f.fieldLabel}</option>`;
+                }
+            });
+            document.getElementById('bulkEditInputContainer').innerHTML = '';
+            document.getElementById('bulkEditModal').style.display = 'block';
+        }
+
+        function closeBulkEditModal() {
+            document.getElementById('bulkEditModal').style.display = 'none';
+        }
+
+        function renderBulkEditInput() {
+            const fieldName = document.getElementById('bulkEditFieldSelect').value;
+            const container = document.getElementById('bulkEditInputContainer');
+            container.innerHTML = '';
+            if (!fieldName) return;
+
+            const f = currentCustomFields.find(x => x.fieldName === fieldName);
+            if (!f) return;
+
+            let inputHtml = '';
+            if (f.fieldType === 'select') {
+                inputHtml = `<select id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"><option value="">-- Select --</option>`;
+                (f.options || []).forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}">${o}</option>`);
+                inputHtml += `</select>`;
+            } else if (f.fieldType === 'multiselect') {
+                inputHtml = `<select id="bulkEditValue" multiple style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px; height: 80px;">`;
+                (f.options || []).forEach(o => inputHtml += `<option value="${String(o).replace(/"/g, '&quot;')}">${o}</option>`);
+                inputHtml += `</select><div style="font-size:11px; color:#666; margin-top:2px;">Hold Ctrl (Windows) or Cmd (Mac) to select multiple.</div>`;
+            } else if (f.fieldType === 'textarea' || f.fieldType === 'richtext') {
+                inputHtml = `<textarea id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;"></textarea>`;
+            } else if (f.fieldType === 'file' || f.fieldType === 'autonumber') {
+                inputHtml = `<em>This field cannot be updated via bulk edit.</em>`;
+            } else if (f.fieldType === 'lookup') {
+                let lookupOptions = [];
+                try {
+                    const targetModule = f.lookupModule;
+                    const displayField = f.lookupDisplay;
+                    if (targetModule) {
+                        if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
+                            const customers = JSON.parse(localStorage.getItem('customers')) || [];
+                            lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
+                        } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
+                            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+                            lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
+                        } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
+                            const items = JSON.parse(localStorage.getItem('items')) || [];
+                            lookupOptions = items.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.name || i.id) }));
+                        } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
+                            const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+                            lookupOptions = invoices.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
+                        } else if (targetModule.toLowerCase() === 'follow-up' || targetModule.toLowerCase() === 'follow-ups') {
+                            const followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
+                            lookupOptions = followUps.map(f => ({ id: f.id, label: (displayField && f[displayField] !== undefined) ? f[displayField] : (f.partyName || f.id) }));
+                        } else {
+                            const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
+                            lookupOptions = customData.map(r => ({ id: r.id, label: (displayField && r[displayField] !== undefined) ? r[displayField] : r.id }));
+                        }
+                    }
+                    lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
+                } catch (e) { console.warn("Error loading lookup options", e); }
+
+                const uniqueOps = [];
+                const seen = new Set();
+                lookupOptions.forEach(o => {
+                    if (o && o.id && !seen.has(o.id)) {
+                        seen.add(o.id);
+                        uniqueOps.push(o);
+                    }
+                });
+
+                inputHtml = `<select id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;">
+                    <option value="">-- Select --</option>`;
+                uniqueOps.forEach(o => {
+                    inputHtml += `<option value="${String(o.id).replace(/"/g, '&quot;')}">${String(o.label).replace(/</g, '&lt;')}</option>`;
+                });
+                inputHtml += `</select>`;
+            } else {
+                let inpType = 'text';
+                if (f.fieldType === 'number') inpType = 'number';
+                else if (f.fieldType === 'date') inpType = 'date';
+                else if (f.fieldType === 'url') inpType = 'url';
+                inputHtml = `<input type="${inpType}" id="bulkEditValue" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;" />`;
+            }
+
+            container.innerHTML = `<label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">New Value for ${f.fieldLabel}</label>${inputHtml}`;
+        }
+
+        async function applyBulkEdit() {
+            const fieldName = document.getElementById('bulkEditFieldSelect').value;
+            const valInput = document.getElementById('bulkEditValue');
+
+            if (!fieldName) {
+                alert("Please select a field to edit.");
+                return;
+            }
+
+            const f = currentCustomFields.find(x => x.fieldName === fieldName);
+            if (f && (f.fieldType === 'file' || f.fieldType === 'autonumber')) {
+                alert("This field type cannot be updated via bulk edit.");
+                return;
+            }
+
+            let newValue;
+            if (f && f.fieldType === 'multiselect' && valInput && valInput.multiple) {
+                newValue = Array.from(valInput.selectedOptions).map(o => o.value);
+            } else {
+                newValue = valInput ? valInput.value : '';
+            }
+
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return;
+            if (!confirm(`Are you sure you want to update ${checkboxes.length} records?`)) return;
+
+            const idsToEdit = Array.from(checkboxes).map(cb => cb.value);
+            let currentUser = localStorage.getItem('currentUser') || 'System';
+
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId)) || [];
+            let data = allData.filter(r => r.createdBy === currentUser);
+            const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+
+            const overlay = document.getElementById('loadingOverlay');
+            const progressContainer = document.getElementById('importProgressContainer');
+            const progressBar = document.getElementById('importProgressBar');
+            const progressText = document.getElementById('importProgressText');
+            const total = idsToEdit.length;
+            let processed = 0;
+
+            if (overlay) overlay.style.display = 'flex';
+            if (progressContainer) progressContainer.style.display = 'block';
+            if (progressText) {
+                progressText.style.display = 'block';
+                progressText.innerText = `Processing 0 of ${total}...`;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            try {
+                for (const id of idsToEdit) {
+                    const index = data.findIndex(r => r.id === id || r._id === id);
+                    if (index !== -1) {
+                        let existingRecord = data[index];
+                        let newRow = { ...existingRecord, updatedAt: new Date().toISOString() };
+                        newRow[fieldName] = newValue;
+
+                        if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                            try {
+                                await apiClient.saveCustomRecord(newRow);
+                            } catch (err) { console.warn("API sync failed", err); }
+                        }
+                        data[index] = newRow;
+                    }
+                    processed++;
+                    if (progressBar) progressBar.style.width = Math.round((processed / total) * 100) + '%';
+                    if (progressText) progressText.innerText = `Processing ${processed} of ${total}...`;
+                    if (processed % 10 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
+                closeBulkEditModal();
+                renderCustomTable();
+            } finally {
+                if (overlay) overlay.style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (progressText) progressText.style.display = 'none';
+                if (progressBar) progressBar.style.width = '0%';
+            }
+        }
+
+        // --- Settings / Columns Logic ---
+        function openTableSettingsModal() {
+            if (!currentActivePageId) return alert("No active page.");
+            const container = document.getElementById('columnToggles');
+            container.innerHTML = '';
+            currentCustomFields.forEach(f => {
+                let isChecked = columnVisibility[f.fieldName];
+                if (isChecked === undefined) isChecked = f.showInGrid !== false;
+
+                const label = document.createElement('label');
+                label.style.display = 'flex';
+                label.style.alignItems = 'center';
+                label.style.gap = '8px';
+                label.style.cursor = 'pointer';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = 'col_' + f.fieldName;
+                cb.checked = isChecked;
+
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(f.fieldLabel));
+                container.appendChild(label);
+            });
+            document.getElementById('tableSettingsModal').style.display = 'block';
+        }
+
+        function toggleAllColumns(state) {
+            currentCustomFields.forEach(f => {
+                const cb = document.getElementById('col_' + f.fieldName);
+                if (cb) cb.checked = state;
+            });
+        }
+
+        function saveColumnSettings() {
+            currentCustomFields.forEach(f => {
+                const cb = document.getElementById('col_' + f.fieldName);
+                if (cb) columnVisibility[f.fieldName] = cb.checked;
+            });
+            localStorage.setItem('customDashColVis_' + currentActivePageId, JSON.stringify(columnVisibility));
+            document.getElementById('tableSettingsModal').style.display = 'none';
+            renderCustomTable();
+        }
+
+        // --- Field Order Logic ---
+        function openFieldOrderModal() {
+            if (!currentActivePageId) return alert("No active page.");
+            const list = document.getElementById('fieldOrderList');
+            list.innerHTML = '';
+            currentCustomFields.forEach(f => {
+                const li = document.createElement('li');
+                li.dataset.fieldId = f._id || f.fieldName;
+                li.innerHTML = `<span style="color:#999; cursor:grab; margin-right:10px;">☰</span> <span>${f.fieldLabel}</span> <code style="font-size:11px;color:#666;margin-left:auto;">${f.fieldName}</code>`;
+                list.appendChild(li);
+            });
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(list, { animation: 150 });
+            }
+            document.getElementById('fieldOrderModal').style.display = 'block';
+        }
+
+        async function saveFieldOrder() {
+            const listItems = document.querySelectorAll('#fieldOrderList li');
+            const newOrderIds = Array.from(listItems).map(li => li.dataset.fieldId);
+
+            currentCustomFields.sort((a, b) => newOrderIds.indexOf(a._id || a.fieldName) - newOrderIds.indexOf(b._id || b.fieldName));
+            currentCustomFields.forEach((f, i) => f.order = i);
+
+            currentCustomFields.forEach(cf => {
+                const idx = customFields.findIndex(f => (f._id || f.fieldName) === (cf._id || cf.fieldName));
+                if (idx > -1) customFields[idx].order = cf.order;
+            });
+            localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(customFields));
+
+            if (typeof apiClient !== 'undefined' && apiClient.reorderCustomFields) {
+                const payload = currentCustomFields.map(f => ({ _id: f._id, order: f.order }));
+                apiClient.reorderCustomFields(payload).catch(console.warn);
+            }
+
+            document.getElementById('fieldOrderModal').style.display = 'none';
+            renderCustomTable();
+        }
+
+        // --- Print Report Logic ---
+        function printTableReport() {
+            if (!currentActivePageId) return alert("No active page.");
+            const tableHTML = document.getElementById('customTable').outerHTML;
+            const title = document.getElementById('customObjectTitle').innerText;
+
+            let html = `<!DOCTYPE html><html><head><title>Print Report - ${title}</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f8fafc; font-weight: 600; }
+                @media print { .no-print { display: none !important; } th:last-child, td:last-child { display: none !important; } }
+            </style></head><body>
+            <h2 style="text-align:center;">${title} Report</h2>
+            ${tableHTML}
+            <div style="text-align:center; margin-top:30px;" class="no-print">
+                <button onclick="window.print()" style="padding:10px 20px; font-size:16px; background:#0176d3; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
+            </div></body></html>`;
+
+            const win = window.open('', '', 'width=900,height=700');
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+        }
+
+        // --- Sorting and Pagination Engine ---
+        function handleSort(column) {
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+            }
+            renderCustomTable();
+        }
+
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rowsPerPageSelect').value);
+            currentPage = 1;
+            renderCustomTable();
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            renderCustomTable();
+        }
+
+        function renderPagination(totalItems, start, end, totalPages) {
+            const info = document.getElementById("paginationInfo");
+            const controls = document.getElementById("paginationControls");
+            const totalDisplay = document.getElementById("totalRecordsDisplay");
+
+            if (totalDisplay) totalDisplay.innerText = `Total Records: ${totalItems}`;
+
+            if (totalItems === 0) {
+                if (info) info.innerText = "No records found";
+                if (controls) controls.innerHTML = "";
+                return;
+            }
+
+            if (info) info.innerText = `Showing ${start} to ${end} of ${totalItems} entries`;
+            let html = `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const activeStyle = i === currentPage ? 'class="active"' : '';
+                    html += `<button ${activeStyle} onclick="changePage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span>...</span>`;
+                }
+            }
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+            if (controls) controls.innerHTML = html;
+        }
+
+        // --- Auto-Sync Engine ---
+        async function syncOfflineCustomRecords() {
+            const currentUser = localStorage.getItem('currentUser') || 'System';
+            if (!navigator.onLine || typeof apiClient === 'undefined' || !apiClient.saveCustomRecord) return;
+
+            let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+            let pages = allPages.filter(p => p.createdBy === currentUser);
+
+            for (const p of pages) {
+                const pageId = p.pageId;
+                const allData = JSON.parse(localStorage.getItem('data_' + pageId)) || [];
+                const userData = allData.filter(r => r.createdBy === currentUser);
+                const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+                let updated = false;
+
+                for (let i = 0; i < userData.length; i++) {
+                    const record = userData[i];
+                    try {
+                        let apiPayload = { ...record };
+                        if (!apiPayload._id && apiPayload.id) apiPayload._id = apiPayload.id;
+
+                        const res = await apiClient.saveCustomRecord(apiPayload);
+                        if (res && res.data && res.data._id && !record._id) {
+                            userData[i].id = res.data._id;
+                            userData[i]._id = res.data._id;
+                            updated = true;
+                        }
+                    } catch (e) {
+                        console.warn("Auto-sync failed for record:", record.id, e);
+                    }
+                }
+
+                if (updated) {
+                    localStorage.setItem('data_' + pageId, JSON.stringify([...otherUsersData, ...userData]));
+                }
+            }
+        }
+
+        window.addEventListener('online', () => {
+            syncOfflineCustomRecords().then(() => {
+                if (currentActivePageId) handleSearch(); // Refresh active view
+            });
+        });
+
+        // --- Action Dropdown Logic ---
+        function toggleActionMenu(btn) {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => {
+                if (d !== btn.parentElement) d.classList.remove('active');
+            });
+            const dropdown = btn.parentElement;
+            dropdown.classList.toggle('active');
+            if (dropdown.classList.contains('active')) {
+                const content = dropdown.querySelector('.action-dropdown-content');
+                content.style.display = 'block';
+                const rect = btn.getBoundingClientRect();
+                let top = rect.bottom;
+                let left = rect.right - content.offsetWidth;
+                if (top + content.offsetHeight > window.innerHeight) { top = rect.top - content.offsetHeight; }
+                content.style.top = top + 'px';
+                content.style.left = left + 'px';
+                content.style.display = '';
+            }
+        }
+        document.addEventListener('click', function (e) { if (!e.target.matches('.action-btn-main')) { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); } });
+        window.addEventListener('scroll', function () { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); }, true);
+
+        // --- Column Resizing Logic ---
+        function enableColumnResizing() {
+            const table = document.getElementById('customTable');
+            const headers = table.querySelectorAll('th');
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+                resizer.addEventListener('click', function (e) { e.stopPropagation(); });
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault(); e.stopPropagation();
+                    startX = e.pageX; startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) { th.style.width = newWidth + 'px'; th.style.minWidth = newWidth + 'px'; }
+                }
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+        function saveColumnWidths() { const widths = []; document.querySelectorAll('#customTable th').forEach(th => { widths.push(th.style.width); }); localStorage.setItem('customDashColWidths_' + currentActivePageId, JSON.stringify(widths)); }
+        function loadColumnWidths() { const savedWidths = JSON.parse(localStorage.getItem('customDashColWidths_' + currentActivePageId)); if (savedWidths && Array.isArray(savedWidths)) { document.querySelectorAll('#customTable th').forEach((th, index) => { if (savedWidths[index]) { th.style.width = savedWidths[index]; th.style.minWidth = savedWidths[index]; } }); } }
+    </script>
+
+</body>
+
+</html>

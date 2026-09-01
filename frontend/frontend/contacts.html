@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Contacts Directory</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="apiClient.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            margin-bottom: 15px;
+        }
+
+        input,
+        button {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+
+        button {
+            cursor: pointer;
+            color: white;
+            border: none;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background: #0d6efd;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: #000;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            padding: 12px 15px;
+            text-align: left;
+            border: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        th {
+            background: #cce2f3;
+            color: rgb(10, 10, 10);
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #f1f3f5;
+        }
+
+        .highlight {
+            background-color: #fff176;
+            font-weight: bold;
+            color: #000;
+        }
+
+        /* Pagination Styles */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+        }
+
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #333;
+        }
+
+        .pagination button.active {
+            background: #0d6efd;
+            color: #fff;
+            border-color: #0d6efd;
+        }
+
+        .pagination button:disabled {
+            background: #e9ecef;
+            cursor: not-allowed;
+            color: #999;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .close-modal {
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+            color: #aaa;
+            line-height: 1;
+        }
+
+        .close-modal:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        /* Sortable List Styles */
+        #columnToggles {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #columnToggles li {
+            padding: 8px 12px;
+            border: 1px solid #eee;
+            margin-bottom: 5px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 4px;
+        }
+
+        body.dark-mode #columnToggles li {
+            background: #333;
+            border-color: #444;
+        }
+
+        .form-group input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Dark Mode Support */
+        body.dark-mode {
+            background: #121212;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .controls,
+        body.dark-mode table,
+        body.dark-mode .modal-content {
+            background: #2c2c2c;
+            color: #e0e0e0;
+            border-color: #444;
+        }
+
+        body.dark-mode th {
+            background: #1f1f1f;
+            border-color: #444;
+        }
+
+        body.dark-mode td {
+            border-color: #444;
+        }
+
+        body.dark-mode tr:hover {
+            background: #3a3a3a;
+        }
+
+        body.dark-mode input,
+        body.dark-mode select {
+            background: #3a3a3a;
+            color: #fff;
+            border-color: #555;
+        }
+
+        body.dark-mode .pagination-container {
+            background: #2c2c2c;
+            border-color: #444;
+        }
+
+        body.dark-mode .pagination button {
+            background: #3a3a3a;
+            color: #fff;
+            border-color: #555;
+        }
+
+        body.dark-mode .pagination button.active {
+            background: #0d6efd;
+            color: #fff;
+            border-color: #0d6efd;
+        }
+
+        body.dark-mode .pagination button:disabled {
+            background: #222;
+            color: #666;
+        }
+
+        /* Action Dropdown Menu */
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .action-btn-main {
+            background-color: #607d8b;
+            color: white;
+            padding: 6px 12px;
+            font-size: 13px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .action-dropdown-content {
+            display: none;
+            position: fixed;
+            background-color: #fff;
+            min-width: 140px;
+            box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 0;
+            text-align: left;
+        }
+
+        .action-dropdown-content button {
+            color: #333 !important;
+            background: none !important;
+            padding: 8px 16px !important;
+            text-decoration: none !important;
+            display: block !important;
+            width: 100% !important;
+            text-align: left !important;
+            border: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            font-weight: normal !important;
+            font-size: 13px !important;
+        }
+
+        .action-dropdown-content button:hover {
+            background-color: #f1f1f1 !important;
+            color: #000 !important;
+        }
+
+        .action-dropdown.active .action-dropdown-content {
+            display: block;
+        }
+
+        body.dark-mode .action-dropdown-content {
+            background-color: #2c2c2c;
+            border-color: #444;
+        }
+
+        body.dark-mode .action-dropdown-content button {
+            color: #e0e0e0 !important;
+        }
+
+        body.dark-mode .action-dropdown-content button:hover {
+            background-color: #3a3a3a !important;
+            color: #fff !important;
+        }
+
+        body.dark-mode #viewModal table th {
+            background: #1f1f1f !important;
+            color: #fff;
+        }
+
+        body.dark-mode #viewModal table td {
+            color: #e0e0e0;
+        }
+
+        /* Resizable Columns */
+        #contactsTable th {
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        .resizer:hover,
+        .resizing {
+            background-color: #3498db;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h2><i class="fas fa-address-book"></i> Contacts Directory</h2>
+        <div>
+            <button class="btn-primary" onclick="openContactModal()"><i class="fas fa-plus"></i> New Contact</button>
+            <button class="btn-danger" id="bulkDeleteBtn" onclick="deleteSelectedContacts()" style="display:none;"><i
+                    class="fas fa-trash"></i> Delete Selected</button>
+            <button class="btn-warning" id="btnExportPdf" onclick="exportContactsPDF()"><i class="fas fa-file-pdf"></i>
+                Export
+                PDF</button>
+            <button class="btn-success" id="btnExportCsv" onclick="exportContactsCSV()"><i class="fas fa-file-csv"></i>
+                Export
+                CSV</button>
+            <button class="btn-info" id="btnImportCsv" onclick="document.getElementById('importCsvInput').click()"><i
+                    class="fas fa-file-import"></i> Import CSV</button>
+            <input type="file" id="importCsvInput" accept=".csv" style="display:none"
+                onchange="importContactsCSV(this)">
+            <button class="btn-secondary" onclick="openSettingsModal()" style="background:#607d8b;"><i
+                    class="fas fa-cog"></i> Settings</button>
+            <button class="btn-secondary" onclick="fetchContacts()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <select id="filterTypeBox" onchange="handleSearchInput()" style="min-width: 150px; cursor: pointer;">
+            <option value="">All Types</option>
+            <option value="Customer">Customers</option>
+            <option value="Supplier">Suppliers</option>
+            <option value="Employee">Employees</option>
+            <option value="Internal">Internal</option>
+            <option value="Other">Other</option>
+        </select>
+        <div style="flex: 1; position: relative;">
+            <i class="fas fa-search"
+                style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #888;"></i>
+            <input type="text" id="searchBox" placeholder="Search any field (Name, Dept, Mobile, Remarks)..."
+                style="width: 100%; padding-left: 35px; box-sizing: border-box;" oninput="handleSearchInput()">
+        </div>
+    </div>
+
+    <div
+        style="overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-height: 70vh;">
+        <table id="contactsTable">
+            <thead>
+                <tr id="contactsHeadRow"></tr>
+            </thead>
+            <tbody id="contactsBody">
+                <tr>
+                    <td colspan="10" style="text-align: center; padding: 20px;">Loading contacts...</td>
+                </tr>
+            </tbody>
+            <tfoot id="contactsFootRow"></tfoot>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="pagination-container">
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <span id="totalContactsDisplay" style="font-weight: bold; color: #0d6efd; margin-right: 8px;"></span>
+            <select id="rowsPerPageSelect" onchange="changeRowsPerPage()"
+                style="width: auto; padding: 4px; border: 1px solid #ccc; border-radius: 4px; margin: 0;">
+                <option value="10">10 rows</option>
+                <option value="20" selected>20 rows</option>
+                <option value="50">50 rows</option>
+                <option value="100">100 rows</option>
+                <option value="200">200 rows</option>
+                <option value="500">500 rows</option>
+            </select>
+            <input type="number" id="goToPageInput"
+                style="width: 60px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;" placeholder="Go to"
+                min="1" onchange="goToPage()">
+        </div>
+        <div id="paginationInfo" style="color: #666; font-size: 14px;"></div>
+        <div class="pagination" id="paginationControls"></div>
+    </div>
+
+    <!-- Add/Edit Contact Modal -->
+    <div id="contactModal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #2c3e50;" id="modalTitle">Add Contact</h3>
+                <span class="close-modal" onclick="closeContactModal()">&times;</span>
+            </div>
+            <input type="hidden" id="contactId">
+
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="width: 100px;">
+                    <label>Prefix</label>
+                    <select id="cPrefix"
+                        style="width: 100%; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                        <option value="">None</option>
+                        <option value="Mr.">Mr.</option>
+                        <option value="Mrs.">Mrs.</option>
+                        <option value="Ms.">Ms.</option>
+                        <option value="Dr.">Dr.</option>
+                        <option value="Prof.">Prof.</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Name *</label>
+                    <input type="text" id="cName" placeholder="Full Name" list="nameList">
+                    <datalist id="nameList"></datalist>
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Company</label>
+                    <input type="text" id="cCompany" placeholder="e.g. Acme Corp" list="companyList">
+                    <datalist id="companyList"></datalist>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Type</label>
+                    <select id="cContactType"
+                        style="width: 100%; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;">
+                        <option value="">Select...</option>
+                        <option value="Customer">Customer</option>
+                        <option value="Supplier">Supplier</option>
+                        <option value="Internal">Internal</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Designation</label>
+                    <input type="text" id="cDesignation" placeholder="e.g. Manager">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Department</label>
+                    <input type="text" id="cDepartment" placeholder="e.g. Sales">
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Mobile(s)</label>
+                    <input type="text" id="cMobile" placeholder="Comma separated for multiple">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Email</label>
+                    <input type="email" id="cEmail" placeholder="Email Address">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Remarks</label>
+                <input type="text" id="cRemarks" placeholder="Additional Notes">
+            </div>
+            <div id="dynamicFieldsContainer" style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px;">
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn-secondary" onclick="closeContactModal()">Cancel</button>
+                <button class="btn-success" onclick="saveContact()">Save Contact</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Contact Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content" style="width: 600px; max-width: 90%;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin: 0; color: #2c3e50;">👁️ Contact Details</h3>
+                <span class="close-modal" onclick="closeViewModal()">&times;</span>
+            </div>
+            <div id="viewContent" style="max-height: 60vh; overflow-y: auto; text-align: left;">
+                <!-- Details injected here -->
+            </div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button class="btn-primary" id="btnEditFromView" style="margin-right: 5px;">Edit</button>
+                <button class="btn-secondary" onclick="closeViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Attachments Modal -->
+    <div id="attachmentsModal" class="modal" style="z-index: 1050;">
+        <div class="modal-content" style="width: 500px; max-width: 90%;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin:0; color: #2c3e50;">📎 Attachments for <span id="attachContactName"
+                        style="color: #0d6efd;"></span></h3>
+                <span class="close-modal" onclick="closeAttachmentsModal()">&times;</span>
+            </div>
+            <input type="hidden" id="manageAttachId">
+            <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                <label style="font-size: 13px; font-weight: bold; color: #555;">Add Files (Max 500KB each)</label>
+                <input type="file" id="attachmentsInput" multiple onchange="handleAttachmentsSelect(this)"
+                    accept="image/*,.pdf"
+                    style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box;">
+
+                <div id="attachmentPreviews"
+                    style="display: flex; gap: 10px; flex-wrap: wrap; max-height: 250px; overflow-y: auto; padding: 10px; border: 1px solid #eee; border-radius: 4px; background: #f9f9f9; margin-top: 10px;">
+                    <!-- Previews injected here -->
+                </div>
+            </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="btn-primary" onclick="saveAttachments()">💾 Save Attachments</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attachment Preview/Download Modal -->
+    <div id="filePreviewModal" class="modal" style="z-index: 1100;">
+        <div class="modal-content" style="max-width: 800px; width: 90%; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; color: #0d6efd;" id="previewFileName">File Preview</h3>
+                <span class="close-modal"
+                    onclick="document.getElementById('filePreviewModal').style.display='none'">&times;</span>
+            </div>
+            <div id="previewFileContent"
+                style="flex: 1; overflow: auto; text-align: center; background: #eee; border-radius: 4px; padding: 10px; min-height: 200px;">
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="btn-primary" id="downloadFileBtn"><i class="fas fa-download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content" style="width: 400px; max-width: 90%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #2c3e50;">⚙️ Table Settings</h3>
+                <span class="close-modal" onclick="closeSettingsModal()">&times;</span>
+            </div>
+            <div
+                style="margin: 15px 0; text-align: left; padding-left: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h5 style="font-size: 1rem; margin-top: 0; margin-bottom: 10px;" class="text-secondary">Button
+                    Visibility</h5>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnExportPdfToggle"
+                        onchange="toggleButtonVisibility('btnExportPdf', this.checked)"> Show Export PDF
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnExportCsvToggle"
+                        onchange="toggleButtonVisibility('btnExportCsv', this.checked)"> Show Export CSV
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 5px;">
+                    <input type="checkbox" id="showBtnImportCsvToggle"
+                        onchange="toggleButtonVisibility('btnImportCsv', this.checked)"> Show Import CSV
+                </label>
+            </div>
+            <p style="font-size:14px; color:#666; margin-bottom:10px;">Select and drag to reorder columns:</p>
+            <ul id="columnToggles" style="margin-bottom: 15px;">
+            </ul>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn-secondary" onclick="closeSettingsModal()">Close</button>
+                <button class="btn-success" onclick="saveColumnSettings()">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h3 style="color: #c0392b;">🗑️ Confirm Deletion</h3>
+            <p id="modalMessage">Are you sure you want to delete?</p>
+            <div class="modal-buttons" style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+                <button class="btn-danger" onclick="confirmDelete()">Yes, Delete</button>
+                <button class="btn-secondary" onclick="closeConfirmationModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const MODULE_NAME = "Contacts";
+        let contactsData = [];
+        let currentAttachments = [];
+        let currentPage = 1;
+        let rowsPerPage = 20;
+        let currentSortColumn = 'name';
+        let currentSortDirection = 'asc';
+        let columnVisibility = JSON.parse(localStorage.getItem('contactsColumnVis')) || {};
+        let dynamicFieldsList = [];
+        let idsToDelete = [];
+
+
+        let savedButtonVisibility = JSON.parse(localStorage.getItem("contactsButtonVisibility")) || {};
+        let buttonVisibility = {
+            btnExportPdf: true,
+            btnExportCsv: true,
+            btnImportCsv: true,
+            ...savedButtonVisibility
+        };
+
+        // Init Theme
+        if (localStorage.getItem("appThemeMode") === "dark") {
+            document.body.classList.add("dark-mode");
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchCustomFieldsConfig().then(() => {
+                fetchContacts();
+                populateCompanyList();
+                populateNameList();
+                requestAnimationFrame(() => {
+                    loadColumnWidths();
+                    enableColumnResizing();
+                });
+                applyButtonVisibility();
+            });
+        });
+
+        async function fetchCustomFieldsConfig() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
+                    const fields = await apiClient.getCustomFields();
+                    if (fields) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(Array.isArray(fields) ? fields : (fields.data || [])));
+                    }
+                }
+            } catch (error) {
+                console.warn("Failed to fetch custom fields config:", error);
+            }
+            const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
+            dynamicFieldsList = allFields.filter(f => f.moduleName === MODULE_NAME && f.isActive).sort((a, b) => (a.order || 0) - (b.order || 0));
+        }
+
+        function renderDynamicFields(existingData = {}) {
+            const container = document.getElementById('dynamicFieldsContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            dynamicFieldsList.forEach(field => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'form-group';
+                wrapper.style.flex = '1';
+                wrapper.style.minWidth = '200px';
+
+                const label = document.createElement('label');
+                label.innerText = field.fieldLabel + (field.isRequired ? ' *' : '');
+
+                let input;
+                if (field.fieldType === 'select') {
+                    input = document.createElement('select');
+                    input.style.width = '100%';
+                    input.style.padding = '8px 12px';
+                    input.style.borderRadius = '4px';
+                    input.style.border = '1px solid #ccc';
+                    input.style.boxSizing = 'border-box';
+                    input.className = 'dynamic-field';
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = ''; defaultOpt.innerText = 'Select...';
+                    input.appendChild(defaultOpt);
+                    (field.options || []).forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt; option.innerText = opt;
+                        input.appendChild(option);
+                    });
+                } else if (field.fieldType === 'boolean') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.className = 'dynamic-field';
+                    wrapper.style.flexDirection = 'row';
+                    wrapper.style.alignItems = 'center';
+                    wrapper.style.gap = '5px';
+                    wrapper.style.display = 'flex';
+                    label.style.marginBottom = '0';
+                    input.style.width = 'auto';
+                } else {
+                    input = document.createElement('input');
+                    input.type = field.fieldType === 'number' ? 'number' : 'text';
+                    input.placeholder = field.fieldLabel;
+                    input.className = 'dynamic-field';
+                    input.style.width = '100%';
+                    input.style.padding = '8px 12px';
+                    input.style.borderRadius = '4px';
+                    input.style.border = '1px solid #ccc';
+                    input.style.boxSizing = 'border-box';
+                }
+
+                input.dataset.fieldName = field.fieldName;
+
+                if (existingData[field.fieldName] !== undefined) {
+                    if (field.fieldType === 'boolean') {
+                        input.checked = existingData[field.fieldName] === true || existingData[field.fieldName] === 'true';
+                    } else {
+                        input.value = existingData[field.fieldName];
+                    }
+                }
+
+                if (field.fieldType === 'boolean') {
+                    wrapper.appendChild(input);
+                    wrapper.appendChild(label);
+                } else {
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(input);
+                }
+
+                container.appendChild(wrapper);
+            });
+        }
+
+        // --- API & Data Handling ---
+        async function fetchContacts() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomRecords) {
+                    const res = await apiClient.getCustomRecords(MODULE_NAME);
+                    if (res) {
+                        contactsData = res;
+                        localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                    } else {
+                        throw new Error("Failed to fetch");
+                    }
+                } else {
+                    const res = await fetch(`/api/custom-records/${MODULE_NAME}`);
+                    const json = await res.json();
+                    if (json.success) {
+                        contactsData = json.data;
+                        localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                    } else {
+                        throw new Error("Failed to fetch");
+                    }
+                }
+            } catch (e) {
+                console.warn("API offline, loading from local storage.");
+                contactsData = JSON.parse(localStorage.getItem(`CUSTOM_RECORDS_${MODULE_NAME}`)) || [];
+            }
+            applySearch(); // Renders table
+        }
+
+        async function saveContact() {
+            const id = document.getElementById('contactId').value;
+            const name = document.getElementById('cName').value.trim();
+
+            if (!name) return alert("Name is required!");
+
+            const payload = {
+                moduleName: MODULE_NAME,
+                prefix: document.getElementById('cPrefix').value,
+                name: name,
+                company: document.getElementById('cCompany').value.trim(),
+                contactType: document.getElementById('cContactType').value,
+                designation: document.getElementById('cDesignation').value.trim(),
+                department: document.getElementById('cDepartment').value.trim(),
+                mobile: document.getElementById('cMobile').value.trim(),
+                email: document.getElementById('cEmail').value.trim(),
+                remarks: document.getElementById('cRemarks').value.trim(),
+                updatedAt: new Date().toISOString()
+            };
+
+            document.querySelectorAll('#contactModal .dynamic-field').forEach(f => {
+                const fn = f.dataset.fieldName;
+                if (f.type === 'checkbox') payload[fn] = f.checked;
+                else payload[fn] = f.value;
+            });
+
+            if (id) {
+                payload._id = id;
+                // Retain existing attachments if editing main data
+                const existing = contactsData.find(c => c._id === id);
+                if (existing && existing.attachments) {
+                    payload.attachments = existing.attachments;
+                }
+            } else {
+                payload._id = 'cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                payload.attachments = [];
+                payload.createdAt = new Date().toISOString();
+            }
+
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                    const res = await apiClient.saveCustomRecord(payload);
+                    if (res && res.success && res.data && res.data._id) {
+                        payload._id = res.data._id;
+                    }
+                } else {
+                    const res = await fetch(`/api/custom-records`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        if (json.data && json.data._id) payload._id = json.data._id;
+                    }
+                }
+            } catch (e) {
+                console.warn("Saved locally (API Offline)");
+            }
+
+            // Local update
+            const idx = contactsData.findIndex(c => c._id === payload._id);
+            if (idx > -1) contactsData[idx] = payload;
+            else contactsData.push(payload);
+
+            localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+
+            closeContactModal();
+            applySearch();
+        }
+
+        async function deleteContact(id) {
+            if (!confirm("Are you sure you want to delete this contact?")) return;
+
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
+                    await apiClient.deleteCustomRecord(id);
+                } else {
+                    await fetch(`/api/custom-records/${id}`, { method: 'DELETE' });
+                }
+            } catch (e) {
+                console.warn("Deleted locally (API Offline)");
+            }
+
+            contactsData = contactsData.filter(c => c._id !== id);
+            localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+            applySearch();
+        }
+
+        function populateCompanyList() {
+            const customers = JSON.parse(localStorage.getItem('customers')) || [];
+            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            const list = document.getElementById('companyList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const companies = new Set();
+            customers.forEach(c => { if (c.name) companies.add(c.name); });
+            suppliers.forEach(s => { if (s.name) companies.add(s.name); });
+
+            Array.from(companies).sort().forEach(company => {
+                const opt = document.createElement('option');
+                opt.value = company;
+                list.appendChild(opt);
+            });
+        }
+
+        function populateNameList() {
+            const customers = JSON.parse(localStorage.getItem('customers')) || [];
+            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            const list = document.getElementById('nameList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const names = new Set();
+            customers.forEach(c => { if (c.name) names.add(c.name); });
+            suppliers.forEach(s => { if (s.name) names.add(s.name); });
+
+            Array.from(names).sort().forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                list.appendChild(opt);
+            });
+        }
+
+        // --- Table Settings & Columns ---
+        function getAvailableColumns() {
+            const baseCols = [
+                { id: 'name', label: 'Name' },
+                { id: 'company', label: 'Company' },
+                { id: 'contactType', label: 'Type' },
+                { id: 'designation', label: 'Designation' },
+                { id: 'department', label: 'Department' },
+                { id: 'mobile', label: 'Mobile' },
+                { id: 'email', label: 'Email' },
+                { id: 'remarks', label: 'Remarks' }
+            ];
+
+            dynamicFieldsList.forEach(f => {
+                if (f.showInGrid !== false) {
+                    baseCols.push({ id: f.fieldName, label: f.fieldLabel, isCustom: true, fieldDef: f });
+                }
+            });
+            return baseCols;
+        }
+
+        function getOrderedColumns() {
+            const available = getAvailableColumns();
+            const savedOrder = JSON.parse(localStorage.getItem('contactsColumnOrder')) || [];
+
+            available.sort((a, b) => {
+                let idxA = savedOrder.indexOf(a.id);
+                let idxB = savedOrder.indexOf(b.id);
+                if (idxA === -1) idxA = 999;
+                if (idxB === -1) idxB = 999;
+                return idxA - idxB;
+            });
+            return available;
+        }
+
+        function openSettingsModal() {
+            const container = document.getElementById('columnToggles');
+            container.innerHTML = '';
+
+            for (const btnId in buttonVisibility) {
+                const toggleId = `show${btnId.charAt(0).toUpperCase() + btnId.slice(1)}Toggle`;
+                const toggle = document.getElementById(toggleId);
+                if (toggle) {
+                    toggle.checked = buttonVisibility[btnId];
+                }
+            }
+
+            const cols = getOrderedColumns();
+
+            cols.forEach(col => {
+                let isChecked = columnVisibility[col.id];
+                if (isChecked === undefined) isChecked = true; // default to true
+
+                const li = document.createElement('li');
+                li.dataset.id = col.id;
+                li.innerHTML = `
+                    <i class="fas fa-grip-vertical" style="color: #aaa; cursor: grab;"></i>
+                    <input type="checkbox" id="col_${col.id}" ${isChecked ? 'checked' : ''} style="width: auto; margin: 0; cursor: pointer;">
+                    <label for="col_${col.id}" style="margin: 0; cursor: pointer; flex: 1; font-size: 13px;">${col.label}</label>
+                `;
+                container.appendChild(li);
+            });
+
+            if (typeof Sortable !== 'undefined') {
+                new Sortable(container, {
+                    animation: 150,
+                    handle: '.fa-grip-vertical'
+                });
+            }
+
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function saveColumnSettings() {
+            const container = document.getElementById('columnToggles');
+            const items = container.querySelectorAll('li');
+            const newOrder = [];
+
+            items.forEach(li => {
+                const id = li.dataset.id;
+                newOrder.push(id);
+                const cb = li.querySelector(`input[type="checkbox"]`);
+                if (cb) columnVisibility[id] = cb.checked;
+            });
+
+            localStorage.setItem('contactsColumnOrder', JSON.stringify(newOrder));
+            localStorage.setItem('contactsColumnVis', JSON.stringify(columnVisibility));
+            closeSettingsModal();
+            applySearch();
+        }
+
+        function toggleButtonVisibility(btnId, isVisible) {
+            buttonVisibility[btnId] = isVisible;
+            localStorage.setItem("contactsButtonVisibility", JSON.stringify(buttonVisibility));
+            applyButtonVisibility();
+        }
+
+        function applyButtonVisibility() {
+            for (const btnId in buttonVisibility) {
+                const btn = document.getElementById(btnId);
+                if (btn) btn.style.display = buttonVisibility[btnId] ? '' : 'none';
+            }
+        }
+
+        // --- Export / Import CSV ---
+        function exportContactsCSV() {
+            if (contactsData.length === 0) return alert("No contacts to export.");
+
+            const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
+            const headers = ["Prefix", ...orderedCols.map(c => c.label)];
+
+            const rows = contactsData.map(c => {
+                const escape = (t) => `"${String(t || "").replace(/"/g, '""')}"`;
+
+                const rowData = [escape(c.prefix)];
+                orderedCols.forEach(col => {
+                    let val = c[col.id];
+                    const dynField = dynamicFieldsList.find(f => f.fieldName === col.id);
+                    if (dynField && dynField.fieldType === 'boolean') {
+                        val = val ? 'Yes' : 'No';
+                    }
+                    rowData.push(escape(val));
+                });
+                return rowData.join(",");
+            });
+
+            const csvContent = [headers.join(",")].concat(rows).join("\n");
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "Contacts_Export.csv";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function importContactsCSV(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const text = e.target.result;
+                    const rows = parseCSV(text);
+                    if (rows.length < 2) throw new Error("Invalid CSV format (no data)");
+
+                    const headers = rows[0].map(h => h.trim().toLowerCase());
+                    const prefixIdx = headers.indexOf('prefix');
+                    const nameIdx = headers.indexOf('name');
+                    const companyIdx = headers.indexOf('company');
+                    const typeIdx = headers.indexOf('type');
+                    const desigIdx = headers.indexOf('designation');
+                    const deptIdx = headers.indexOf('department');
+                    const mobileIdx = headers.indexOf('mobile');
+                    const emailIdx = headers.indexOf('email');
+                    const remarksIdx = headers.indexOf('remarks');
+
+                    let dynIndices = {};
+                    dynamicFieldsList.forEach(f => {
+                        const idx = headers.indexOf(f.fieldLabel.toLowerCase());
+                        if (idx > -1) dynIndices[f.fieldName] = { idx, type: f.fieldType };
+                    });
+
+                    if (nameIdx === -1) throw new Error("CSV must have a 'Name' column");
+
+                    let added = 0, updated = 0;
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (row.length < 1 || !row[nameIdx]) continue;
+
+                        const name = row[nameIdx].trim();
+                        const getVal = (idx) => (idx > -1 && row[idx]) ? row[idx].trim() : "";
+
+                        const payload = {
+                            moduleName: MODULE_NAME,
+                            prefix: getVal(prefixIdx),
+                            name: name,
+                            company: getVal(companyIdx),
+                            contactType: getVal(typeIdx),
+                            designation: getVal(desigIdx),
+                            department: getVal(deptIdx),
+                            mobile: getVal(mobileIdx),
+                            email: getVal(emailIdx),
+                            remarks: getVal(remarksIdx),
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        Object.keys(dynIndices).forEach(fn => {
+                            const info = dynIndices[fn];
+                            let val = getVal(info.idx);
+                            if (info.type === 'boolean') {
+                                val = val.toLowerCase() === 'yes' || val.toLowerCase() === 'true';
+                            } else if (info.type === 'number') {
+                                val = parseFloat(val) || 0;
+                            }
+                            payload[fn] = val;
+                        });
+
+                        let existingIdx = contactsData.findIndex(c => c.name.toLowerCase() === name.toLowerCase() && (c.company || "").toLowerCase() === getVal(companyIdx).toLowerCase());
+
+                        if (existingIdx > -1) {
+                            payload._id = contactsData[existingIdx]._id;
+                            payload.attachments = contactsData[existingIdx].attachments || [];
+                            contactsData[existingIdx] = { ...contactsData[existingIdx], ...payload };
+                            updated++;
+                        } else {
+                            payload._id = 'cr_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                            payload.attachments = [];
+                            payload.createdAt = new Date().toISOString();
+                            contactsData.push(payload);
+                            added++;
+                        }
+
+                        if (typeof apiClient !== 'undefined' && apiClient.saveCustomRecord) {
+                            apiClient.saveCustomRecord(payload).catch(e => { });
+                        } else {
+                            fetch(`/api/custom-records`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            }).catch(e => { });
+                        }
+                    }
+
+                    localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                    applySearch();
+                    alert(`Import successful! Added: ${added}, Updated: ${updated}`);
+                } catch (err) {
+                    alert("Import Error: " + err.message);
+                }
+                input.value = "";
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(text) {
+            const rows = [];
+            let row = [];
+            let cur = '';
+            let inQuote = false;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (inQuote) {
+                    if (c === '"') {
+                        if (i + 1 < text.length && text[i + 1] === '"') { cur += '"'; i++; }
+                        else inQuote = false;
+                    } else cur += c;
+                } else {
+                    if (c === '"') inQuote = true;
+                    else if (c === ',') { row.push(cur); cur = ''; }
+                    else if (c === '\n' || c === '\r') {
+                        if (cur || row.length > 0) row.push(cur);
+                        if (row.length > 0) rows.push(row);
+                        row = []; cur = '';
+                        if (c === '\r' && i + 1 < text.length && text[i + 1] === '\n') i++;
+                    } else cur += c;
+                }
+            }
+            if (cur || row.length > 0) { row.push(cur); rows.push(row); }
+            return rows;
+        }
+
+        // --- UI Rendering & Search ---
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        }
+
+        function highlightMatch(text, term) {
+            if (!text) return "";
+            text = String(text);
+            if (!term) return escapeHtml(text);
+            const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.split(regex).map(part => part.toLowerCase() === term.toLowerCase() ? `<span class="highlight">${escapeHtml(part)}</span>` : escapeHtml(part)).join('');
+        }
+
+        function handleSort(column) {
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+            }
+            applySearch();
+        }
+
+        function handleSearchInput() {
+            currentPage = 1;
+            applySearch();
+        }
+
+        function applySearch() {
+            const term = document.getElementById('searchBox').value.toLowerCase().trim();
+            const filterType = document.getElementById('filterTypeBox').value;
+            const tbody = document.getElementById('contactsBody');
+            tbody.innerHTML = '';
+
+            const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
+
+            const theadTr = document.getElementById('contactsHeadRow');
+            let thHtml = `<th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th><th style="width: 50px; text-align: center;">SL</th>`;
+            orderedCols.forEach(c => {
+                let widthStyle = '';
+                if (c.id === 'mobile' || c.id === 'company') widthStyle = 'width: 140px;';
+                if (c.id === 'email') widthStyle = 'width: 180px;';
+                thHtml += `<th style="${widthStyle} cursor: pointer;" onclick="handleSort('${c.id}')">${c.label} <span id="sort-icon-${c.id}" style="font-size: 11px;"></span></th>`;
+            });
+            thHtml += `<th style="width: 130px; text-align: center;">Action</th>`;
+            theadTr.innerHTML = thHtml;
+
+            const filtered = contactsData.filter(c => {
+                if (filterType && c.contactType !== filterType) return false;
+                if (!term) return true;
+                let rowText = [c.prefix, c.name, c.company, c.contactType, c.designation, c.department, c.mobile, c.email, c.remarks].join(' ').toLowerCase();
+                dynamicFieldsList.forEach(f => rowText += " " + (c[f.fieldName] || '').toString().toLowerCase());
+                return rowText.includes(term);
+            });
+
+            // Sorting
+            filtered.sort((a, b) => {
+                let valA = (a[currentSortColumn] || '').toLowerCase();
+                let valB = (b[currentSortColumn] || '').toLowerCase();
+                if (currentSortColumn === 'name') {
+                    valA = ((a.prefix ? a.prefix + ' ' : '') + a.name).toLowerCase();
+                    valB = ((b.prefix ? b.prefix + ' ' : '') + b.name).toLowerCase();
+                }
+                if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Update Sort Icons
+            orderedCols.forEach(col => {
+                const icon = document.getElementById(`sort-icon-${col.id}`);
+                if (icon) icon.innerHTML = (currentSortColumn === col.id) ? (currentSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${orderedCols.length + 3}" style="text-align: center; padding: 20px; color: #666;">No contacts found.</td></tr>`;
+                renderPagination(0, 0, 0, 1);
+                const tfoot = document.getElementById('contactsFootRow');
+                if (tfoot) tfoot.innerHTML = '';
+                requestAnimationFrame(() => { loadColumnWidths(); enableColumnResizing(); });
+                return;
+            }
+
+            const totalItems = filtered.length;
+            const totalPages = Math.ceil(totalItems / rowsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+
+            const paginatedData = filtered.slice(startIndex, endIndex);
+
+            let htmlBuffer = '';
+            paginatedData.forEach((c, index) => {
+                const attachCount = c.attachments ? c.attachments.length : 0;
+                const attachBadge = attachCount > 0 ? `<span style="background:#17a2b8; color:white; padding:2px 6px; border-radius:12px; font-size:11px; margin-left:4px;">${attachCount}</span>` : '';
+
+                const fullName = c.prefix ? `${c.prefix} ${c.name}` : c.name;
+
+                let trHtml = `<td style="text-align: center;"><input type="checkbox" class="contact-checkbox" value="${c._id}" onchange="toggleRowSelection()"></td><td style="text-align: center;">${startIndex + index + 1}</td>`;
+
+                orderedCols.forEach(col => {
+                    if (col.id === 'name') {
+                        trHtml += `<td style="font-weight: bold; color: #2c3e50;">${highlightMatch(fullName, term)}</td>`;
+                    } else if (col.id === 'company') {
+                        trHtml += `<td>${highlightMatch(c.company, term) || '-'}</td>`;
+                    } else if (col.id === 'contactType') {
+                        let typeBadge = '-';
+                        if (c.contactType) {
+                            let badgeColor = '#6c757d';
+                            if (c.contactType === 'Customer') badgeColor = '#27ae60';
+                            else if (c.contactType === 'Supplier') badgeColor = '#0d6efd';
+                            else if (c.contactType === 'Internal') badgeColor = '#f39c12';
+                            typeBadge = `<span style="background-color:${badgeColor}; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">${highlightMatch(c.contactType, term)}</span>`;
+                        }
+                        trHtml += `<td>${typeBadge}</td>`;
+                    } else if (col.id === 'designation') {
+                        trHtml += `<td>${highlightMatch(c.designation, term) || '-'}</td>`;
+                    } else if (col.id === 'department') {
+                        trHtml += `<td>${highlightMatch(c.department, term) || '-'}</td>`;
+                    } else if (col.id === 'mobile') {
+                        let mobileHtml = '-';
+                        if (c.mobile) {
+                            const numbers = c.mobile.split(',').map(n => n.trim()).filter(n => n);
+                            mobileHtml = numbers.map(num => {
+                                const cleanNum = num.replace(/\D/g, '');
+                                let waNum = cleanNum;
+                                if (waNum.length === 10) waNum = '91' + waNum;
+                                const callLink = cleanNum ? `<a href="tel:${cleanNum}" style="color:#0d6efd; text-decoration:none; margin-right:6px;" title="Call"><i class="fas fa-phone-alt" style="font-size:12px;"></i></a>` : '';
+                                const waLink = cleanNum ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:#25D366; text-decoration:none; margin-left:6px;" title="WhatsApp"><i class="fab fa-whatsapp" style="font-size:14px;"></i></a>` : '';
+                                return `<div style="margin-bottom: 2px; white-space: nowrap;">${callLink}${highlightMatch(num, term)}${waLink}</div>`;
+                            }).join('');
+                        }
+                        trHtml += `<td>${mobileHtml}</td>`;
+                    } else if (col.id === 'email') {
+                        let emailHtml = c.email ? String(c.email).split(/[, ]+/).filter(e => e).map(em => {
+                            const mailLink = `<a href="mailto:${em}" style="color:#0d6efd; text-decoration:none;"><i class="fas fa-envelope" style="font-size:12px; margin-right:4px;"></i>${highlightMatch(String(em), term)}</a>`;
+                            const copyLink = `<a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeHtml(String(em))}'); this.style.color='#27ae60'; setTimeout(()=>this.style.color='#6c757d', 1000);" style="color:#6c757d; text-decoration:none; margin-left:6px;" title="Copy Email"><i class="fas fa-copy" style="font-size:12px;"></i></a>`;
+                            return `<div style="margin-bottom: 2px; white-space: nowrap;">${mailLink}${copyLink}</div>`;
+                        }).join('') : '-';
+                        trHtml += `<td>${emailHtml}</td>`;
+                    } else if (col.id === 'remarks') {
+                        trHtml += `<td>${highlightMatch(c.remarks, term) || '-'}</td>`;
+                    } else {
+                        const dynField = dynamicFieldsList.find(f => f.fieldName === col.id);
+                        if (dynField) {
+                            let val = c[dynField.fieldName];
+                            if (dynField.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                            trHtml += `<td>${val !== undefined && val !== null && val !== '' ? highlightMatch(String(val), term) : '-'}</td>`;
+                        } else {
+                            trHtml += `<td>${highlightMatch(c[col.id], term) || '-'}</td>`;
+                        }
+                    }
+                });
+
+                let actionsHtml = `
+                    <div class="action-dropdown" id="actionDropdown-${c._id}">
+                        <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
+                        <div class="action-dropdown-content">
+                            <button onclick="viewContact('${c._id}')">👁️ View</button>
+                            <button onclick="openAttachmentsModal('${c._id}')">📎 Attachments${attachCount > 0 ? ` (${attachCount})` : ''}</button>
+                            <button onclick="editContact('${c._id}')">✏️ Edit</button>
+                            <button onclick="deleteContact('${c._id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
+                        </div>
+                    </div>`;
+
+                trHtml += `<td style="text-align: center; white-space: nowrap;">${actionsHtml}</td>`;
+
+                htmlBuffer += `<tr>${trHtml}</tr>`;
+            });
+            tbody.innerHTML = htmlBuffer;
+
+            const selectAll = document.getElementById("selectAll");
+            if (selectAll) selectAll.checked = false;
+            updateBulkDeleteBtn();
+
+
+            renderPagination(totalItems, startIndex + 1, endIndex, totalPages);
+
+            let hasGrandTotals = false;
+            let grandTotals = {};
+            dynamicFieldsList.forEach(cf => {
+                if (cf.showGrandTotal) {
+                    hasGrandTotals = true;
+                    grandTotals[cf.fieldName] = 0;
+                }
+            });
+
+            if (hasGrandTotals && filtered.length > 0) {
+                filtered.forEach(c => {
+                    dynamicFieldsList.forEach(cf => {
+                        if (cf.showGrandTotal && grandTotals[cf.fieldName] !== undefined) {
+                            let rawVal = c[cf.fieldName];
+                            let clean = String(rawVal || '').replace(/[^0-9.-]/g, '');
+                            grandTotals[cf.fieldName] += parseFloat(clean) || 0;
+                        }
+                    });
+                });
+            }
+
+            const tfoot = document.getElementById('contactsFootRow');
+            if (tfoot) {
+                if (hasGrandTotals && filtered.length > 0) {
+                    let tfootHtml = `<tr style="font-weight: bold; background: #f8f9fa;">`;
+                    tfootHtml += `<td></td>`;
+                    let labelPlaced = false;
+                    orderedCols.forEach((c) => {
+                        if (c.isCustom && c.fieldDef && c.fieldDef.showGrandTotal) {
+                            let val = grandTotals[c.id] || 0;
+                            let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: c.fieldDef.currencyDecimals ?? 2, maximumFractionDigits: c.fieldDef.currencyDecimals ?? 2 });
+                            if (c.fieldDef.prefix || c.fieldDef.currencySymbol) formattedVal = (c.fieldDef.prefix || c.fieldDef.currencySymbol) + ' ' + formattedVal;
+                            if (c.fieldDef.suffix) formattedVal = formattedVal + ' ' + c.fieldDef.suffix;
+                            tfootHtml += `<td>${formattedVal}</td>`;
+                        } else {
+                            if (!labelPlaced && !c.isCustom) {
+                                tfootHtml += `<td style="text-align: right; color: #2c3e50;">Grand Total:</td>`;
+                                labelPlaced = true;
+                            } else {
+                                tfootHtml += `<td></td>`;
+                            }
+                        }
+                    });
+                    tfootHtml += `<td></td></tr>`;
+                    tfoot.innerHTML = tfootHtml;
+                } else {
+                    tfoot.innerHTML = '';
+                }
+            }
+
+            requestAnimationFrame(() => { loadColumnWidths(); enableColumnResizing(); });
+        }
+
+        function renderPagination(totalItems, start, end, totalPages) {
+            const info = document.getElementById("paginationInfo");
+            const controls = document.getElementById("paginationControls");
+            const totalDisplay = document.getElementById("totalContactsDisplay");
+
+            if (totalDisplay) totalDisplay.innerText = `Total Contacts: ${totalItems}`;
+
+            if (totalItems === 0) {
+                if (info) info.innerText = "No contacts found";
+                if (controls) controls.innerHTML = "";
+                return;
+            }
+
+            if (info) info.innerText = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+            let html = "";
+            html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    const activeStyle = i === currentPage ? 'class="active"' : '';
+                    html += `<button ${activeStyle} onclick="changePage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span style="padding: 0 5px;">...</span>`;
+                }
+            }
+
+            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+
+            if (controls) controls.innerHTML = html;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            applySearch();
+        }
+
+        function changeRowsPerPage() {
+            rowsPerPage = parseInt(document.getElementById('rowsPerPageSelect').value);
+            currentPage = 1;
+            applySearch();
+        }
+
+        function goToPage() {
+            const pageInput = document.getElementById("goToPageInput");
+            const page = parseInt(pageInput.value);
+            if (page >= 1) {
+                currentPage = page;
+                applySearch();
+            }
+            pageInput.value = "";
+        }
+
+        function exportContactsPDF() {
+            if (!window.jspdf) {
+                alert("jsPDF library not loaded!");
+                return;
+            }
+            if (contactsData.length === 0) return alert("No contacts to export.");
+
+            const term = document.getElementById('searchBox').value.toLowerCase().trim();
+            const filterType = document.getElementById('filterTypeBox').value;
+
+            const filtered = contactsData.filter(c => {
+                if (filterType && c.contactType !== filterType) return false;
+                if (!term) return true;
+                const rowText = [c.prefix, c.name, c.company, c.contactType, c.designation, c.department, c.mobile, c.email, c.remarks].join(' ').toLowerCase();
+                return rowText.includes(term);
+            });
+
+            if (filtered.length === 0) return alert("No contacts match current filters.");
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+
+            doc.setFontSize(16);
+            doc.text("Contacts Directory", 148.5, 15, { align: "center" });
+
+            doc.setFontSize(10);
+            doc.text("Generated on: " + new Date().toLocaleString('en-GB'), 14, 22);
+
+            const orderedCols = getOrderedColumns().filter(c => columnVisibility[c.id] !== false);
+            const headers = [["Sl No", "Prefix", ...orderedCols.map(c => c.label)]];
+
+            const data = filtered.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((c, i) => {
+                const rowData = [i + 1, c.prefix || '-'];
+                orderedCols.forEach(col => rowData.push(c[col.id] || '-'));
+                return rowData;
+            });
+
+            doc.autoTable({
+                startY: 28,
+                head: headers,
+                body: data,
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+                styles: { fontSize: 8, cellPadding: 2, valign: 'middle' },
+                columnStyles: { 0: { halign: 'center' } }
+            });
+
+            doc.save("Contacts_Directory.pdf");
+        }
+
+        // --- Modals Logic ---
+        function openContactModal() {
+            document.getElementById('modalTitle').innerText = "Add New Contact";
+            document.getElementById('contactId').value = "";
+            document.getElementById('cPrefix').value = "";
+            document.getElementById('cName').value = "";
+            document.getElementById('cCompany').value = "";
+            document.getElementById('cContactType').value = "";
+            document.getElementById('cDesignation').value = "";
+            document.getElementById('cDepartment').value = "";
+            document.getElementById('cMobile').value = "";
+            document.getElementById('cEmail').value = "";
+            document.getElementById('cRemarks').value = "";
+            renderDynamicFields({});
+            document.getElementById('contactModal').style.display = 'flex';
+            document.getElementById('cName').focus();
+        }
+
+        function editContact(id) {
+            const c = contactsData.find(x => x._id === id);
+            if (!c) return;
+
+            document.getElementById('modalTitle').innerText = "Edit Contact";
+            document.getElementById('contactId').value = c._id;
+            document.getElementById('cPrefix').value = c.prefix || "";
+            document.getElementById('cName').value = c.name || "";
+            document.getElementById('cCompany').value = c.company || "";
+            document.getElementById('cContactType').value = c.contactType || "";
+            document.getElementById('cDesignation').value = c.designation || "";
+            document.getElementById('cDepartment').value = c.department || "";
+            document.getElementById('cMobile').value = c.mobile || "";
+            document.getElementById('cEmail').value = c.email || "";
+            document.getElementById('cRemarks').value = c.remarks || "";
+            renderDynamicFields(c);
+
+            document.getElementById('contactModal').style.display = 'flex';
+        }
+
+        function closeContactModal() {
+            document.getElementById('contactModal').style.display = 'none';
+        }
+
+        function viewContact(id) {
+            const c = contactsData.find(x => x._id === id);
+            if (!c) return;
+
+            let html = `
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;">
+                    <tr><th style="width:40%; padding:8px; background:#f8f9fa;">Prefix</th><td style="padding:8px;">${escapeHtml(c.prefix || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Name</th><td style="padding:8px;">${escapeHtml(c.name)}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Company</th><td style="padding:8px;">${escapeHtml(c.company || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Type</th><td style="padding:8px;">${escapeHtml(c.contactType || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Designation</th><td style="padding:8px;">${escapeHtml(c.designation || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Department</th><td style="padding:8px;">${escapeHtml(c.department || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Mobile(s)</th><td style="padding:8px;">${escapeHtml(c.mobile || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Email</th><td style="padding:8px;">${escapeHtml(c.email || '-')}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Remarks</th><td style="padding:8px;">${escapeHtml(c.remarks || '-')}</td></tr>
+                </table>
+            `;
+
+            if (dynamicFieldsList && dynamicFieldsList.length > 0) {
+                html += `<h4 style="margin-top:20px; margin-bottom:10px; color:#2c3e50; border-bottom:1px solid #eee; padding-bottom:5px;">Extra Fields</h4>
+                <table style="width:100%; border-collapse: collapse; text-align:left; font-size:14px;">`;
+                dynamicFieldsList.forEach(f => {
+                    let val = c[f.fieldName];
+                    if (f.fieldType === 'boolean') val = val ? 'Yes' : 'No';
+                    html += `<tr><th style="width:40%; padding:8px; background:#f8f9fa;">${escapeHtml(f.fieldLabel)}</th><td style="padding:8px;">${val !== undefined && val !== null && val !== '' ? escapeHtml(String(val)) : '-'}</td></tr>`;
+                });
+                html += `</table>`;
+            }
+
+            document.getElementById('viewContent').innerHTML = html;
+            document.getElementById('btnEditFromView').onclick = () => { closeViewModal(); editContact(id); };
+            document.getElementById('viewModal').style.display = 'flex';
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
+        }
+
+        function toggleActionMenu(btn) {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => {
+                if (d !== btn.parentElement) d.classList.remove('active');
+            });
+            const dropdown = btn.parentElement;
+            dropdown.classList.toggle('active');
+            if (dropdown.classList.contains('active')) {
+                const content = dropdown.querySelector('.action-dropdown-content');
+                content.style.display = 'block';
+                const rect = btn.getBoundingClientRect();
+                let top = rect.bottom;
+                let left = rect.right - content.offsetWidth;
+                if (top + content.offsetHeight > window.innerHeight) { top = rect.top - content.offsetHeight; }
+                content.style.top = top + 'px';
+                content.style.left = left + 'px';
+                content.style.display = '';
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.matches('.action-btn-main')) {
+                document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
+            }
+        });
+
+        window.addEventListener('scroll', function () {
+            document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
+        }, true);
+
+
+        // --- Attachments Logic ---
+        function openAttachmentsModal(id) {
+            const c = contactsData.find(x => x._id === id);
+            if (!c) return;
+
+            document.getElementById('manageAttachId').value = id;
+            document.getElementById('attachContactName').innerText = c.name;
+            currentAttachments = c.attachments ? JSON.parse(JSON.stringify(c.attachments)) : [];
+            document.getElementById('attachmentsInput').value = '';
+
+            renderAttachmentPreviews();
+            document.getElementById('attachmentsModal').style.display = 'flex';
+        }
+
+        function closeAttachmentsModal() {
+            document.getElementById('attachmentsModal').style.display = 'none';
+        }
+
+        function handleAttachmentsSelect(input) {
+            const files = input.files;
+            if (!files.length) return;
+            Array.from(files).forEach(file => {
+                if (file.size > 500 * 1024) {
+                    alert(`File ${file.name} is too large (Max 500KB).`);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    currentAttachments.push({ name: file.name, data: e.target.result, type: file.type });
+                    renderAttachmentPreviews();
+                };
+                reader.readAsDataURL(file);
+            });
+            input.value = "";
+        }
+
+        function renderAttachmentPreviews() {
+            const container = document.getElementById("attachmentPreviews");
+            container.innerHTML = "";
+            if (currentAttachments.length === 0) return container.innerHTML = "<p style='color:#999; font-size:13px; margin:0;'>No attachments found.</p>";
+
+            currentAttachments.forEach((att, index) => {
+                const div = document.createElement("div");
+                div.style.cssText = "position: relative; border: 1px solid #ccc; padding: 5px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; width: 80px; background: #fff;";
+
+                let previewHtml = "";
+                if (att.type && att.type.startsWith("image/")) {
+                    previewHtml = `<img src="${att.data}" style="width: 60px; height: 60px; object-fit: cover; cursor: pointer;" onclick="previewFile(${index})" title="${att.name}">`;
+                } else if (att.type === "application/pdf") {
+                    previewHtml = `<div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #eef2f5; cursor: pointer; font-weight: bold; color: #dc3545;" onclick="previewFile(${index})" title="${att.name}">PDF</div>`;
+                } else {
+                    previewHtml = `<div style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; background: #eef2f5; cursor: pointer; font-size: 10px; overflow: hidden;" onclick="previewFile(${index})" title="${att.name}">FILE</div>`;
+                }
+
+                div.innerHTML = `${previewHtml}<span style="font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; margin-top:4px;" title="${att.name}">${att.name}</span><button onclick="removeAttachment(${index})" style="position: absolute; top: -8px; right: -8px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 10px; padding: 0; line-height:1; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">X</button>`;
+                container.appendChild(div);
+            });
+        }
+
+        function removeAttachment(index) {
+            currentAttachments.splice(index, 1);
+            renderAttachmentPreviews();
+        }
+
+        async function saveAttachments() {
+            const id = document.getElementById('manageAttachId').value;
+            const idx = contactsData.findIndex(c => c._id === id);
+            if (idx > -1) {
+                contactsData[idx].attachments = currentAttachments;
+                contactsData[idx].updatedAt = new Date().toISOString();
+
+                try {
+                    await fetch(`/api/custom-records`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(contactsData[idx])
+                    });
+                } catch (e) { }
+
+                localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+                closeAttachmentsModal();
+                applySearch(); // Update badge count
+            }
+        }
+
+        function previewFile(index) {
+            const att = currentAttachments[index];
+            if (!att) return;
+
+            document.getElementById('previewFileName').innerText = att.name;
+            const content = document.getElementById('previewFileContent');
+
+            if (att.type && att.type.startsWith('image/')) {
+                content.innerHTML = `<img src="${att.data}" style="max-width: 100%; max-height: 60vh; object-fit: contain;">`;
+            } else if (att.type === 'application/pdf') {
+                content.innerHTML = `<iframe src="${att.data}" style="width: 100%; height: 60vh; border: none;"></iframe>`;
+            } else {
+                content.innerHTML = `<p style="padding: 20px;">Preview not available for this file type.</p>`;
+            }
+
+            document.getElementById('downloadFileBtn').onclick = () => {
+                const a = document.createElement('a');
+                a.href = att.data;
+                a.download = att.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            document.getElementById('filePreviewModal').style.display = 'flex';
+        }
+
+        function enableColumnResizing() {
+            const table = document.getElementById('contactsTable');
+            if (!table) return;
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((th) => {
+                if (th.querySelector('.resizer')) return;
+
+                const resizer = document.createElement('div');
+                resizer.classList.add('resizer');
+                th.appendChild(resizer);
+
+                resizer.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                });
+
+                let startX, startWidth;
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startX = e.pageX;
+                    startWidth = th.offsetWidth;
+                    resizer.classList.add('resizing');
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                function onMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 30) {
+                        th.style.width = newWidth + 'px';
+                        th.style.minWidth = newWidth + 'px';
+                    }
+                }
+
+                function onMouseUp() {
+                    resizer.classList.remove('resizing');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    saveColumnWidths();
+                }
+            });
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById("selectAll");
+            const checkboxes = document.querySelectorAll(".contact-checkbox");
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateBulkDeleteBtn();
+        }
+
+        function toggleRowSelection() {
+            const selectAll = document.getElementById("selectAll");
+            const checkboxes = document.querySelectorAll(".contact-checkbox");
+            if (checkboxes.length > 0) {
+                const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+                if (selectAll) {
+                    selectAll.checked = allChecked;
+                    selectAll.indeterminate = !allChecked && someChecked;
+                }
+            }
+            updateBulkDeleteBtn();
+        }
+
+        function updateBulkDeleteBtn() {
+            const checkedCount = document.querySelectorAll(".contact-checkbox:checked").length;
+            const btn = document.getElementById("bulkDeleteBtn");
+            if (btn) {
+                btn.style.display = checkedCount > 0 ? "inline-block" : "none";
+                btn.innerHTML = `<i class="fas fa-trash"></i> Delete Selected (${checkedCount})`;
+            }
+        }
+
+        function deleteSelectedContacts() {
+            const checkboxes = document.querySelectorAll(".contact-checkbox:checked");
+            if (checkboxes.length === 0) return alert("Please select contacts to delete.");
+
+            idsToDelete = Array.from(checkboxes).map(cb => cb.value);
+            document.getElementById("modalMessage").innerText = `Are you sure you want to delete ${idsToDelete.length} selected contact(s)?`;
+            document.getElementById("confirmationModal").style.display = "flex";
+        }
+
+        function closeConfirmationModal() {
+            document.getElementById("confirmationModal").style.display = "none";
+            idsToDelete = [];
+        }
+
+        async function confirmDelete() {
+            if (idsToDelete.length === 0) return;
+
+            for (let id of idsToDelete) {
+                try {
+                    if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
+                        await apiClient.deleteCustomRecord(id);
+                    } else {
+                        await fetch(`/api/custom-records/${id}`, { method: 'DELETE' });
+                    }
+                } catch (e) {
+                    console.warn("Deleted locally (API Offline)");
+                }
+            }
+
+            contactsData = contactsData.filter(c => !idsToDelete.includes(c._id));
+            localStorage.setItem(`CUSTOM_RECORDS_${MODULE_NAME}`, JSON.stringify(contactsData));
+
+            closeConfirmationModal();
+            applySearch();
+        }
+
+        function saveColumnWidths() {
+            const widths = [];
+            const headers = document.querySelectorAll('#contactsTable th');
+            headers.forEach(th => {
+                widths.push(th.style.width);
+            });
+            localStorage.setItem('contactsColumnWidths', JSON.stringify(widths));
+        }
+
+        function loadColumnWidths() {
+            const savedWidths = JSON.parse(localStorage.getItem('contactsColumnWidths'));
+            if (savedWidths && Array.isArray(savedWidths)) {
+                const headers = document.querySelectorAll('#contactsTable th');
+                headers.forEach((th, index) => {
+                    if (savedWidths[index]) {
+                        th.style.width = savedWidths[index];
+                        th.style.minWidth = savedWidths[index];
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>
