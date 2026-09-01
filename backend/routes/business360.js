@@ -40,6 +40,7 @@ const B360UI = {
         const jobs = [
             ['customers', apiClient.getCustomers],
             ['suppliers', apiClient.getSuppliers],
+            ['sales_records', apiClient.getSales],
             ['quotations', apiClient.getQuotations],
             ['invoices', apiClient.getInvoices],
             ['purchases', apiClient.getPurchases],
@@ -73,10 +74,10 @@ const B360UI = {
         setTimeout(() => toast.remove(), 3500);
     },
 
-    esc(value) { return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c])); },
+    esc(value) { return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c])); },
     money(value) { return `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; },
     lakhs(value) { return `₹${(Number(value || 0) / 100000).toFixed(2)} L`; },
-    date(value) { if (!value) return '—'; const d=new Date(value); return isNaN(d) ? this.esc(value) : d.toLocaleDateString('en-GB'); },
+    date(value) { if (!value) return '—'; const d = new Date(value); return isNaN(d) ? this.esc(value) : d.toLocaleDateString('en-GB'); },
 
     onPartyTypeChange() {
         this.currentType = document.getElementById('partyTypeSelect').value;
@@ -167,7 +168,7 @@ const B360UI = {
                 window.parent.openWindow(url.pathname.split('/').pop() + url.search, 1100, 760);
                 return;
             }
-        } catch (e) {}
+        } catch (e) { }
         window.location.href = url.pathname.split('/').pop() + url.search;
     },
 
@@ -283,6 +284,8 @@ const B360UI = {
             if (ref) params.enquiryNo = ref;
         } else if (page === 'quotation.html') {
             params.refNo = String(ref || value);
+        } else if (page === 'customer_support.html') {
+            params.ticketId = value;
         } else {
             params[idKey || 'id'] = value;
         }
@@ -305,16 +308,16 @@ const B360UI = {
     renderOverview(vp) {
         const d = this.activeData;
         const modules = this.currentType === 'customer' ? [
-            ['👤 Customer Master','customer.html'],['🎯 Enquiries','enquiry.html'],['💰 Quotations','quotation.html'],['⚡ Sales Register','sales_report.html'],['📒 Account Ledger','ledger.html'],['🛠️ Customer Support','customer_support.html'],['🔁 Follow-ups','follow_up.html'],['⏰ Reminders','reminder.html'],['↩️ Returns','returns_report.html'],['🧾 Credit/Debit Notes','credit_debit_notes.html'],['📊 Marketing Report','marketing_report.html']
+            ['👤 Customer Master', 'customer.html'], ['🎯 Enquiries', 'enquiry.html'], ['💰 Quotations', 'quotation.html'], ['⚡ Sales Register', 'sales_report.html'], ['📒 Account Ledger', 'ledger.html'], ['🛠️ Customer Support', 'customer_support.html'], ['🔁 Follow-ups', 'follow_up.html'], ['⏰ Reminders', 'reminder.html'], ['↩️ Returns', 'returns_report.html'], ['🧾 Credit/Debit Notes', 'credit_debit_notes.html'], ['📊 Marketing Report', 'marketing_report.html']
         ] : [
-            ['🏭 Supplier Master','supplier.html'],['📦 Purchases','purchase.html'],['📊 Purchase Dashboard','purchase_dashboard.html'],['📒 Account Ledger','ledger.html'],['🔁 Follow-ups','follow_up.html'],['↩️ Returns','returns_report.html'],['🧾 Credit/Debit Notes','credit_debit_notes.html']
+            ['🏭 Supplier Master', 'supplier.html'], ['📦 Purchases', 'purchase.html'], ['📊 Purchase Dashboard', 'purchase_dashboard.html'], ['📒 Account Ledger', 'ledger.html'], ['🔁 Follow-ups', 'follow_up.html'], ['↩️ Returns', 'returns_report.html'], ['🧾 Credit/Debit Notes', 'credit_debit_notes.html']
         ];
         vp.innerHTML = `${(d.alerts || []).map(a => `<div class="b360-alert-banner b360-alert-${this.esc(a.type)}">${a.icon} ${this.esc(a.text)}</div>`).join('')}
             <div class="b360-overview-grid">
                 <div class="slds-card"><div class="slds-card-header">Business Intelligence</div><div class="slds-card-body"><ul class="b360-insights">${(d.insights || []).map(x => `<li>${this.esc(x)}</li>`).join('')}</ul></div></div>
                 <div class="slds-card"><div class="slds-card-header">Key Contacts (${d.contacts?.length || 0})</div><div class="slds-card-body">${this.contactsHtml(d.contacts)}</div></div>
             </div>
-            <div class="slds-card"><div class="slds-card-header">Integrated Related Modules</div><div class="slds-card-body"><div class="b360-module-grid">${modules.map(([label,page]) => `<button class="b360-module-link" onclick="B360UI.openRelated('${page}')">${label}<span>↗</span></button>`).join('')}</div></div></div>`;
+            <div class="slds-card"><div class="slds-card-header">Integrated Related Modules</div><div class="slds-card-body"><div class="b360-module-grid">${modules.map(([label, page]) => `<button class="b360-module-link" onclick="B360UI.openRelated('${page}')">${label}<span>↗</span></button>`).join('')}</div></div></div>`;
     },
 
     contactsHtml(rows = []) {
@@ -330,9 +333,9 @@ const B360UI = {
             (q.enquiryNo && String(e.enquiryNo || '') === String(q.enquiryNo))
         );
         const rows = this.currentType === 'customer' ? [
-            ...linkedEnquiries.map(r => ({ page:'enquiry.html', id:r.id || r.enquiryNo, ref:r.enquiryNo || r.id, desc:r.subject || r.requirement, value:r.estimatedValue, status:r.status, date:r.enquiryDate, targetDate:r.targetDate })),
-            ...(d.quotations || []).map(r => { const e = findLinkedEnquiry(r); return { page:'quotation.html', id:r.id || r.refNo, ref:r.refNo || r.id, desc:'Quotation', value:r.grandTotal || r.totalValue, status:r.status, date:r.date, targetDate:r.targetDate || r.enquiryTargetDate || e?.targetDate || '' }; })
-        ] : (d.purchases || []).map(r => ({ page:'purchase.html', id:r.id, ref:r.id || r.supplierInv, desc:r.itemName || r.description, value:r.total || r.totalPaid || (Number(r.qty || 0) * Number(r.price || 0)), status:r.status, date:r.date }));
+            ...linkedEnquiries.map(r => ({ page: 'enquiry.html', id: r.id || r.enquiryNo, ref: r.enquiryNo || r.id, desc: r.subject || r.requirement, value: r.estimatedValue, status: r.status, date: r.enquiryDate, targetDate: r.targetDate })),
+            ...(d.quotations || []).map(r => { const e = findLinkedEnquiry(r); return { page: 'quotation.html', id: r.id || r.refNo, ref: r.refNo || r.id, desc: 'Quotation', value: r.grandTotal || r.totalValue, status: r.status, date: r.date, targetDate: r.targetDate || r.enquiryTargetDate || e?.targetDate || '' }; })
+        ] : (d.purchases || []).map(r => ({ page: 'purchase.html', id: r.id, ref: r.id || r.supplierInv, desc: r.itemName || r.description, value: r.total || r.totalPaid || (Number(r.qty || 0) * Number(r.price || 0)), status: r.status, date: r.date }));
         vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">${this.currentType === 'customer' ? 'Enquiries & Quotations' : 'Purchase Orders / Records'}</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Record</th><th>Date</th><th>Target Date</th><th>Description</th><th>Value</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(r => {
             const recordId = String(r.id || '');
             const ref = String(r.ref || recordId || '');
@@ -345,10 +348,10 @@ const B360UI = {
         const f = this.activeData.financialSummary;
         const customer = this.currentType === 'customer';
         const cards = customer ? [
-            ['TOTAL INVOICED', f.totalInvoiced],['RECEIVED', f.totalReceived],['OUTSTANDING', f.outstanding],['OVERDUE', f.overdue]
-        ] : [['TOTAL PURCHASES',f.totalPurchases],['PAID',f.totalPaid],['PAYABLE',f.payable],['OVERDUE PAYABLE',f.overduePayable],['REJECTION VALUE',f.rejectionValue]];
-        const ageing = [['0–30 DAYS',f.ageing.b0_30],['31–60 DAYS',f.ageing.b31_60],['61–90 DAYS',f.ageing.b61_90],['91–180 DAYS',f.ageing.b91_180],['180+ DAYS',f.ageing.b180_plus]];
-        vp.innerHTML = `<div class="b360-fin-grid">${cards.map(([l,v]) => `<button class="slds-card b360-fin-card" onclick="B360UI.openRelated('ledger.html')"><span>${l}</span><strong>${this.lakhs(v)}</strong><small>Open Ledger ↗</small></button>`).join('')}</div><div class="slds-card"><div class="slds-card-header">Ageing Analysis</div><div class="slds-card-body"><div class="b360-ageing-grid">${ageing.map(([l,v]) => `<div><span>${l}</span><strong>${this.lakhs(v)}</strong></div>`).join('')}</div></div></div>`;
+            ['TOTAL INVOICED', f.totalInvoiced], ['RECEIVED', f.totalReceived], ['OUTSTANDING', f.outstanding], ['OVERDUE', f.overdue]
+        ] : [['TOTAL PURCHASES', f.totalPurchases], ['PAID', f.totalPaid], ['PAYABLE', f.payable], ['OVERDUE PAYABLE', f.overduePayable], ['REJECTION VALUE', f.rejectionValue]];
+        const ageing = [['0–30 DAYS', f.ageing.b0_30], ['31–60 DAYS', f.ageing.b31_60], ['61–90 DAYS', f.ageing.b61_90], ['91–180 DAYS', f.ageing.b91_180], ['180+ DAYS', f.ageing.b180_plus]];
+        vp.innerHTML = `<div class="b360-fin-grid">${cards.map(([l, v]) => `<button class="slds-card b360-fin-card" onclick="B360UI.openRelated('ledger.html')"><span>${l}</span><strong>${this.lakhs(v)}</strong><small>Open Ledger ↗</small></button>`).join('')}</div><div class="slds-card"><div class="slds-card-header">Ageing Analysis</div><div class="slds-card-body"><div class="b360-ageing-grid">${ageing.map(([l, v]) => `<div><span>${l}</span><strong>${this.lakhs(v)}</strong></div>`).join('')}</div></div></div>`;
     },
 
     renderPlants(vp) {
@@ -358,11 +361,15 @@ const B360UI = {
 
     renderService(vp) {
         const rows = this.activeData.tickets || [];
-        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Service & Complaint Tickets</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Ticket</th><th>Subject</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(t => `<tr><td><button class="b360-link-btn" onclick="B360UI.openRelated('customer_support.html')">${this.esc(t.id || '—')}</button></td><td>${this.esc(t.subject || t.issueSubject || '—')}</td><td>${this.esc(t.priority || '—')}</td><td>${this.esc(t.status || '—')}</td></tr>`).join('') : `<tr><td colspan="4" class="b360-empty-small">No service tickets linked.</td></tr>`}</tbody></table></div></div></div>`;
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Service & Complaint Tickets</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Ticket</th><th>Subject</th><th>Priority</th><th>Status</th></tr></thead><tbody>${rows.length ? rows.map(t => {
+            const ticketId = String(t.id || t.ticketNo || t._id || '');
+            const ticketRef = ticketId || '—';
+            return `<tr><td><a href="customer_support.html?ticketId=${encodeURIComponent(ticketId)}" class="b360-link-btn b360-record-link" title="Open support ticket ${this.esc(ticketRef)}" onclick="event.preventDefault();B360UI.linkRecord('customer_support.html','id',${JSON.stringify(ticketId)})">${this.esc(ticketRef)} <span aria-hidden="true">↗</span></a></td><td>${this.esc(t.subject || t.issueSubject || '—')}</td><td>${this.esc(t.priority || '—')}</td><td>${this.esc(t.status || '—')}</td></tr>`;
+        }).join('') : `<tr><td colspan="4" class="b360-empty-small">No service tickets linked.</td></tr>`}</tbody></table></div></div></div>`;
     },
 
     renderTimeline(vp) {
-        const rows = [...(this.activeData.activities || []), ...(this.activeData.followups || [])].sort((a,b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+        const rows = [...(this.activeData.activities || []), ...(this.activeData.followups || [])].sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
         vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Activity & Follow-up Timeline</div><div class="slds-card-body">${rows.length ? rows.map(a => `<div class="b360-timeline-item"><b>${this.esc(a.type || a.partyType || 'Activity')} — ${this.esc(a.date || a.createdAt || '—')}</b><div>${this.esc(a.outcome || a.notes || a.remarks || a.subject || a.partyName || '—')}</div></div>`).join('') : `<div class="b360-empty-small">No activity records linked.</div>`}</div></div>`;
     },
 
@@ -374,10 +381,10 @@ const B360UI = {
     logCallModal() {
         const notes = prompt(`Enter activity notes for ${this.activeData?.party?.name || 'this party'}:`);
         if (!notes) return;
-        const row = { id:`ACT-${Date.now()}`, customerId:this.currentType === 'customer' ? this.currentPartyId : undefined, supplierId:this.currentType === 'supplier' ? this.currentPartyId : undefined, type:'Call', outcome:notes, date:new Date().toLocaleDateString('en-GB'), partyName:this.activeData.party.name };
+        const row = { id: `ACT-${Date.now()}`, customerId: this.currentType === 'customer' ? this.currentPartyId : undefined, supplierId: this.currentType === 'supplier' ? this.currentPartyId : undefined, type: 'Call', outcome: notes, date: new Date().toLocaleDateString('en-GB'), partyName: this.activeData.party.name };
         const key = 'crm_activities';
         const data = Business360Engine.getStore(key); data.unshift(row); Business360Engine.setStore(key, data);
-        if (typeof apiClient !== 'undefined' && apiClient._saveCollection) apiClient._saveCollection('crm-activities', row).catch(() => {});
+        if (typeof apiClient !== 'undefined' && apiClient._saveCollection) apiClient._saveCollection('crm-activities', row).catch(() => { });
         this.activeData.activities.unshift(row);
         this.toast('Activity recorded successfully.');
         this.renderCurrentTab();
@@ -387,11 +394,11 @@ const B360UI = {
         if (!this.activeData) return;
         const p = this.activeData.party, k = this.activeData.kpis;
         const lines = [
-            ['Party Type',this.currentType],['Party Name',p.name],['Code',p.code],['GSTIN',p.gstin],
-            ...(this.currentType === 'customer' ? [['Enquiries',k.enquiriesCount],['Quotation Value',k.quotationsVal],['Invoiced',k.invoicedVal],['Outstanding',k.outstandingVal],['Open Tickets',k.openTickets]] : [['Purchase Orders',k.poVal],['Payable',k.payableVal],['Rejections',k.rejectionsCount],['Quality Score',k.score]])
+            ['Party Type', this.currentType], ['Party Name', p.name], ['Code', p.code], ['GSTIN', p.gstin],
+            ...(this.currentType === 'customer' ? [['Enquiries', k.enquiriesCount], ['Quotation Value', k.quotationsVal], ['Invoiced', k.invoicedVal], ['Outstanding', k.outstandingVal], ['Open Tickets', k.openTickets]] : [['Purchase Orders', k.poVal], ['Payable', k.payableVal], ['Rejections', k.rejectionsCount], ['Quality Score', k.score]])
         ];
-        const csv = lines.map(r => r.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(',')).join('\n');
-        const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+        const csv = lines.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Business360_${p.code || p.name}.csv`; a.click(); URL.revokeObjectURL(a.href);
     },
 
@@ -400,7 +407,7 @@ const B360UI = {
             if (window.parent && window.parent !== window && typeof window.parent.returnToDashboard === 'function') {
                 window.parent.returnToDashboard(); return;
             }
-        } catch (e) {}
+        } catch (e) { }
         window.history.back();
     }
 };
