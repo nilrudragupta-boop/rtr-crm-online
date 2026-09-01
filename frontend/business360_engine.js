@@ -77,7 +77,8 @@ const Business360Engine = {
             .filter(v => this.text(v)).map(v => this.lower(v));
         const names = [record.customerName, record.customer_name, record.custName, record.customer,
         record.supplierName, record.supplier_name, record.vendorName, record.vendor,
-        record.partyName, record.party, record.customer?.name, record.supplier?.name, record.party?.name]
+        record.partyName, record.party, record.company, record.companyName, record.contactCompany,
+        record.customer?.name, record.supplier?.name, record.party?.name]
             .filter(v => typeof v === 'string' && this.text(v)).map(v => this.lower(v));
         const codes = [record.customerCode, record.supplierCode, record.partyCode, record.code]
             .filter(v => this.text(v)).map(v => this.lower(v));
@@ -92,6 +93,20 @@ const Business360Engine = {
             (!!partyGstin && gstins.includes(partyGstin));
     },
 
+    getLinkedContacts(party) {
+        const rows = [];
+        ['crm_contacts', 'CUSTOM_RECORDS_Contacts', 'custom-records'].forEach(key => {
+            const store = this.getStore(key);
+            if (!Array.isArray(store) || !store.length) return;
+            if (key === 'custom-records') {
+                rows.push(...store.filter(r => String(r.moduleName || '').toLowerCase() === 'contacts'));
+            } else {
+                rows.push(...store);
+            }
+        });
+        return rows.filter(r => r && this.matches(r, party));
+    },
+
     dateOf(r) { return this.first(r.date, r.invoiceDate, r.invoice_date, r.purchaseDate, r.enquiryDate, r.createdAt, r.updatedAt); },
     amountOf(r) {
         return this.num(this.first(r.grandTotal, r.invoiceTotal, r.invoice_total, r.total, r.totalPaid,
@@ -104,7 +119,7 @@ const Business360Engine = {
         const sales = [...all('sales_records')].filter(r => this.matches(r, party));
         const enquiries = all('crm_enquiries').filter(r => this.matches(r, party));
         const quotations = [...all('quotations'), ...all('crm_quotations')].filter(r => this.matches(r, party));
-        const contacts = all('crm_contacts').filter(r => this.matches(r, party));
+        const contacts = this.getLinkedContacts(party);
         const plants = all('crm_plants').filter(r => this.matches(r, party));
         const equipment = all('crm_equipment').filter(r => this.matches(r, party));
         const tickets = [...all('crm_tickets'), ...all('support_tickets')].filter(r => this.matches(r, party));
@@ -211,7 +226,7 @@ const Business360Engine = {
         const all = key => this.getStore(key);
         const purchases = [...all('purchases'), ...all('crm_purchases')].filter(r => this.matches(r, party));
         const quotations = [...all('quotations'), ...all('crm_quotations')].filter(r => this.matches(r, party));
-        const contacts = all('crm_contacts').filter(r => this.matches(r, party));
+        const contacts = this.getLinkedContacts(party);
         const activities = all('crm_activities').filter(r => this.matches(r, party));
         const followups = all('follow_ups').filter(r => this.matches(r, party));
         const returns = all('returns').filter(r => this.matches(r, party));
