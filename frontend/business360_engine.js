@@ -78,7 +78,8 @@ const Business360Engine = {
         const names = [record.customerName, record.customer_name, record.custName, record.customer,
         record.supplierName, record.supplier_name, record.vendorName, record.vendor,
         record.partyName, record.party, record.company, record.companyName, record.contactCompany,
-        record.customer?.name, record.supplier?.name, record.party?.name]
+        record.customer?.name, record.supplier?.name, record.party?.name, record.name,
+        record.contactName, record.contact, record.businessName, record.companyName, record.customer_company]
             .filter(v => typeof v === 'string' && this.text(v)).map(v => this.lower(v));
         const codes = [record.customerCode, record.supplierCode, record.partyCode, record.code]
             .filter(v => this.text(v)).map(v => this.lower(v));
@@ -87,19 +88,27 @@ const Business360Engine = {
         const partyIds = [party.id, party.code].filter(v => this.text(v)).map(v => this.lower(v));
         const partyName = this.lower(party.name);
         const partyGstin = this.lower(party.gstin);
+        const partyNameCompact = this.text(party.name).replace(/[^a-z0-9]/gi, '').toLowerCase();
+        const exactNameMatch = names.some(v => v === partyName || v === this.lower(party.code));
+        const fuzzyNameMatch = names.some(v => {
+            const compact = this.text(v).replace(/[^a-z0-9]/gi, '').toLowerCase();
+            return !!compact && (compact === partyNameCompact || compact.includes(partyNameCompact) || partyNameCompact.includes(compact));
+        });
         return ids.some(v => partyIds.includes(v)) ||
-            names.includes(partyName) ||
+            exactNameMatch ||
+            fuzzyNameMatch ||
             codes.some(v => partyIds.includes(v)) ||
             (!!partyGstin && gstins.includes(partyGstin));
     },
 
     getLinkedContacts(party) {
         const rows = [];
-        ['crm_contacts', 'CUSTOM_RECORDS_Contacts', 'custom-records'].forEach(key => {
+        const candidates = ['crm_contacts', 'CUSTOM_RECORDS_Contacts', 'custom-records', 'contacts'];
+        candidates.forEach(key => {
             const store = this.getStore(key);
             if (!Array.isArray(store) || !store.length) return;
-            if (key === 'custom-records') {
-                rows.push(...store.filter(r => String(r.moduleName || '').toLowerCase() === 'contacts'));
+            if (key === 'custom-records' || key === 'contacts' || key === 'CUSTOM_RECORDS_Contacts') {
+                rows.push(...store.filter(r => !r || String(r.moduleName || '').toLowerCase() === 'contacts' || !r.moduleName || r.company || r.companyName || r.name || r.contactName));
             } else {
                 rows.push(...store);
             }
