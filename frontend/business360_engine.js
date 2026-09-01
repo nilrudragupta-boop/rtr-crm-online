@@ -18,7 +18,7 @@ const Business360Engine = {
     },
 
     setStore(key, value) {
-        try { localStorage.setItem(key, JSON.stringify(Array.isArray(value) ? value : [])); } catch (e) {}
+        try { localStorage.setItem(key, JSON.stringify(Array.isArray(value) ? value : [])); } catch (e) { }
     },
 
     text(value) { return String(value ?? '').trim(); },
@@ -73,11 +73,11 @@ const Business360Engine = {
     matches(record, party) {
         if (!record || !party) return false;
         const ids = [record.customerId, record.supplierId, record.partyId, record.customer_id, record.supplier_id,
-            record.customer?.id, record.supplier?.id, record.party?.id, record.idCustomer, record.idSupplier]
+        record.customer?.id, record.supplier?.id, record.party?.id, record.idCustomer, record.idSupplier]
             .filter(v => this.text(v)).map(v => this.lower(v));
         const names = [record.customerName, record.customer_name, record.custName, record.customer,
-            record.supplierName, record.supplier_name, record.vendorName, record.vendor,
-            record.partyName, record.party, record.customer?.name, record.supplier?.name, record.party?.name]
+        record.supplierName, record.supplier_name, record.vendorName, record.vendor,
+        record.partyName, record.party, record.customer?.name, record.supplier?.name, record.party?.name]
             .filter(v => typeof v === 'string' && this.text(v)).map(v => this.lower(v));
         const codes = [record.customerCode, record.supplierCode, record.partyCode, record.code]
             .filter(v => this.text(v)).map(v => this.lower(v));
@@ -107,7 +107,7 @@ const Business360Engine = {
         const contacts = all('crm_contacts').filter(r => this.matches(r, party));
         const plants = all('crm_plants').filter(r => this.matches(r, party));
         const equipment = all('crm_equipment').filter(r => this.matches(r, party));
-        const tickets = all('crm_tickets').filter(r => this.matches(r, party));
+        const tickets = [...all('crm_tickets'), ...all('support_tickets')].filter(r => this.matches(r, party));
         const activities = all('crm_activities').filter(r => this.matches(r, party));
         const followups = all('follow_ups').filter(r => this.matches(r, party));
         const reminders = all('reminders').filter(r => this.matches(r, party));
@@ -167,13 +167,13 @@ const Business360Engine = {
         const healthScore = {
             total: score, grade: scoreGrade, max: 100,
             components: [
-                { key:'payment', label:'Payment / Receivable Health', score:paymentScore, max:25, detail: totalInvoiced > 0 ? `${Math.round(paidRatio*100)}% collected${overdue > 0 ? ` · ${this.num(overdue).toLocaleString('en-IN')} overdue` : ''}` : 'No invoicing history' },
-                { key:'sales', label:'Sales / Order Activity', score:salesScore, max:20, detail:`${transactionInvoices.length} invoice/sales record(s); ${recentActivityCount} recent linked activity record(s)` },
-                { key:'conversion', label:'Enquiry & Quotation Conversion', score:conversionScore, max:15, detail:`${enquiries.length} enquiries · ${quotations.length} quotations · ${sales.length} sales` },
-                { key:'service', label:'Service / Support Health', score:serviceScore, max:15, detail:`${openTickets} open service ticket(s)` },
-                { key:'returns', label:'Return / Rejection Performance', score:returnsScore, max:10, detail:`${returnsCount} return/credit-note issue record(s)` },
-                { key:'followup', label:'Follow-up Responsiveness', score:followupScore, max:10, detail:`${pendingFollowups} pending follow-up(s)` },
-                { key:'relationship', label:'Relationship Activity', score:relationshipScore, max:5, detail:`${recentActivityCount} linked record(s) in the last 180 days` }
+                { key: 'payment', label: 'Payment / Receivable Health', score: paymentScore, max: 25, detail: totalInvoiced > 0 ? `${Math.round(paidRatio * 100)}% collected${overdue > 0 ? ` · ${this.num(overdue).toLocaleString('en-IN')} overdue` : ''}` : 'No invoicing history' },
+                { key: 'sales', label: 'Sales / Order Activity', score: salesScore, max: 20, detail: `${transactionInvoices.length} invoice/sales record(s); ${recentActivityCount} recent linked activity record(s)` },
+                { key: 'conversion', label: 'Enquiry & Quotation Conversion', score: conversionScore, max: 15, detail: `${enquiries.length} enquiries · ${quotations.length} quotations · ${sales.length} sales` },
+                { key: 'service', label: 'Service / Support Health', score: serviceScore, max: 15, detail: `${openTickets} open service ticket(s)` },
+                { key: 'returns', label: 'Return / Rejection Performance', score: returnsScore, max: 10, detail: `${returnsCount} return/credit-note issue record(s)` },
+                { key: 'followup', label: 'Follow-up Responsiveness', score: followupScore, max: 10, detail: `${pendingFollowups} pending follow-up(s)` },
+                { key: 'relationship', label: 'Relationship Activity', score: relationshipScore, max: 5, detail: `${recentActivityCount} linked record(s) in the last 180 days` }
             ]
         };
 
@@ -238,18 +238,18 @@ const Business360Engine = {
         const deliveryScore = purchaseCount > 0 ? Math.round(onTimeRate * 35) : 0;
         const qualityScorePart = purchaseCount > 0 ? Math.round(Math.max(0, 35 - rejectionRate * 35)) : 0;
         const completionScore = purchaseCount > 0 ? Math.round((receivedCount / purchaseCount) * 15) : 0;
-        const responseScore = Math.max(0, 10 - Math.min(10, followups.filter(f => !['completed','closed','done'].includes(this.lower(f.status))).length * 2));
+        const responseScore = Math.max(0, 10 - Math.min(10, followups.filter(f => !['completed', 'closed', 'done'].includes(this.lower(f.status))).length * 2));
         const supplierRelationshipScore = Math.min(5, purchases.length > 0 ? 5 : (quotations.length > 0 ? 3 : 0));
         const qualityScore = Math.max(0, Math.min(100, deliveryScore + qualityScorePart + completionScore + responseScore + supplierRelationshipScore));
         const qualityGrade = qualityScore >= 90 ? 'Excellent' : qualityScore >= 75 ? 'Good' : qualityScore >= 60 ? 'Watch' : qualityScore >= 40 ? 'At Risk' : 'Critical';
         const supplierScoreBreakdown = {
-            total: qualityScore, grade: qualityGrade, max:100,
-            components:[
-                {key:'delivery',label:'Delivery Performance',score:deliveryScore,max:35,detail:`${deliveryIssues} delayed/late/partial/rejected purchase record(s)`},
-                {key:'quality',label:'Quality / Rejection Performance',score:qualityScorePart,max:35,detail:`${rejections.length} rejection record(s) across ${purchaseCount} purchase record(s)`},
-                {key:'completion',label:'GRN / Receipt Completion',score:completionScore,max:15,detail:`${receivedCount} of ${purchaseCount} purchase record(s) received/completed`},
-                {key:'response',label:'Follow-up Responsiveness',score:responseScore,max:10,detail:`${followups.filter(f => !['completed','closed','done'].includes(this.lower(f.status))).length} pending follow-up(s)`},
-                {key:'relationship',label:'Purchase Relationship Activity',score:supplierRelationshipScore,max:5,detail:`${purchases.length} purchase record(s) and ${quotations.length} quotation record(s)`}
+            total: qualityScore, grade: qualityGrade, max: 100,
+            components: [
+                { key: 'delivery', label: 'Delivery Performance', score: deliveryScore, max: 35, detail: `${deliveryIssues} delayed/late/partial/rejected purchase record(s)` },
+                { key: 'quality', label: 'Quality / Rejection Performance', score: qualityScorePart, max: 35, detail: `${rejections.length} rejection record(s) across ${purchaseCount} purchase record(s)` },
+                { key: 'completion', label: 'GRN / Receipt Completion', score: completionScore, max: 15, detail: `${receivedCount} of ${purchaseCount} purchase record(s) received/completed` },
+                { key: 'response', label: 'Follow-up Responsiveness', score: responseScore, max: 10, detail: `${followups.filter(f => !['completed', 'closed', 'done'].includes(this.lower(f.status))).length} pending follow-up(s)` },
+                { key: 'relationship', label: 'Purchase Relationship Activity', score: supplierRelationshipScore, max: 5, detail: `${purchases.length} purchase record(s) and ${quotations.length} quotation record(s)` }
             ]
         };
 
