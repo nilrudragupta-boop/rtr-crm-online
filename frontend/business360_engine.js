@@ -101,6 +101,61 @@ const Business360Engine = {
             (!!partyGstin && gstins.includes(partyGstin));
     },
 
+    normalizeContactRecord(record, fallbackParty = null) {
+        if (!record || typeof record !== 'object') return null;
+        const fallbackName = this.first(fallbackParty?.name, fallbackParty?.companyName, fallbackParty?.customerName, fallbackParty?.supplierName);
+        const company = this.first(record.company, record.companyName, record.customerName, record.supplierName, fallbackName);
+        const name = this.first(record.name, record.contactName, record.personName, record.primaryContact, record.contact_person, fallbackName);
+        return {
+            ...record,
+            id: this.first(record.id, record._id, record.contactId, record.contactID, record.uuid, `${company || 'contact'}-${name || 'unknown'}-${record.mobile || record.email || Date.now()}`),
+            name,
+            company,
+            mobile: this.first(record.mobile, record.phone, record.contact, record.contactNo, record.mobileNo, record.alternateMobile),
+            email: this.first(record.email, record.emailId, record.contactEmail),
+            designation: this.first(record.designation, record.title, record.role),
+            department: this.first(record.department, record.team),
+            remarks: this.first(record.remarks, record.notes, record.comment),
+            contactType: this.first(record.contactType, record.type, fallbackParty?.type || 'Customer'),
+            isPrimary: Boolean(record.isPrimary || record.primary || record.mainContact)
+        };
+    },
+
+    getPartyContacts(party) {
+        if (!party) return [];
+        const rows = [];
+        const add = (item) => {
+            if (!item) return;
+            if (Array.isArray(item)) {
+                item.forEach(add);
+                return;
+            }
+            const normalized = this.normalizeContactRecord(item, party);
+            if (!normalized) return;
+            if (normalized.name || normalized.mobile || normalized.email || normalized.company) rows.push(normalized);
+        };
+
+        add(party.contacts);
+        add(party.contactList);
+        add(party.customerContacts);
+        add(party.supplierContacts);
+        add(party.contactPerson);
+        add(party.primaryContact ? { name: party.primaryContact, company: party.name, mobile: party.contact || party.mobile || party.phone, email: party.email || party.emailId, isPrimary: true } : null);
+        add({
+            name: this.first(party.contactPersonName, party.primaryContactName, party.personName, party.name),
+            company: this.first(party.company, party.companyName, party.customerName, party.supplierName, party.name),
+            mobile: this.first(party.mobile, party.phone, party.contact, party.alternateMobile),
+            email: this.first(party.email, party.emailId, party.contactEmail),
+            designation: this.first(party.designation, party.title, party.role),
+            department: this.first(party.department, party.team),
+            remarks: this.first(party.remarks, party.notes),
+            isPrimary: true,
+            contactType: party.type || 'Customer'
+        });
+
+        return rows;
+    },
+
     getLinkedContacts(party) {
         const rows = [];
         const candidates = ['crm_contacts', 'CUSTOM_RECORDS_Contacts', 'custom-records', 'contacts'];
@@ -113,7 +168,36 @@ const Business360Engine = {
                 rows.push(...store);
             }
         });
-        return rows.filter(r => r && this.matches(r, party));
+
+        rows.push(...this.getPartyContacts(party).map(c => this.normalizeContactRecord(c, party)).filter(Boolean));
+
+        const unique = [];
+        const seen = new Set();
+        rows.forEach(r => {
+            const normalized = this.normalizeContactRecord(r, party);
+            if (!normalized) return;
+            const key = [normalized.id, normalized.name, normalized.mobile, normalized.email, normalized.company]
+                .filter(Boolean)
+                .map(v => String(v).trim().toLowerCase())
+                .join('|');
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            unique.push(normalized);
+        });
+
+        return unique.filter(r => r && (this.matches(r, party) || this.matches({
+            customerName: r.company || party.name,
+            supplierName: r.company || party.name,
+            customerId: party.id,
+            supplierId: party.id,
+            name: r.name,
+            mobile: r.mobile,
+            email: r.email,
+            company: r.company,
+            gstin: party.gstin,
+            contact: r.mobile,
+            contactName: r.name
+        }, party) || (r.company === party.name || r.company === party.companyName || (!r.company && (r.name === party.name || r.mobile === party.phone || r.email === party.email)))));
     },
 
     dateOf(r) { return this.first(r.date, r.invoiceDate, r.invoice_date, r.purchaseDate, r.enquiryDate, r.createdAt, r.updatedAt); },
