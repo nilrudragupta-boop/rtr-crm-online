@@ -164,7 +164,14 @@ const Business360Engine = {
             const store = this.getStore(key);
             if (!Array.isArray(store) || !store.length) return;
             if (key === 'custom-records' || key === 'contacts' || key === 'CUSTOM_RECORDS_Contacts') {
-                rows.push(...store.filter(r => !r || String(r.moduleName || '').toLowerCase() === 'contacts' || !r.moduleName || r.company || r.companyName || r.name || r.contactName));
+                rows.push(...store.filter(r => {
+                    if (!r) return false;
+                    const moduleName = String(r.moduleName || '').toLowerCase();
+                    if (moduleName !== 'contacts' && moduleName !== '') return false;
+                    const company = this.first(r.company, r.companyName, r.customerName, r.supplierName, r.partyName, r.customer, r.supplier, r.businessName);
+                    const partyId = this.first(r.customerId, r.supplierId, r.partyId, r.customer_id, r.supplier_id, r.idCustomer, r.idSupplier);
+                    return !!(company || partyId || r.customerId === party?.id || r.supplierId === party?.id || r.partyId === party?.id || r.name === party?.name || r.contactName === party?.name);
+                }));
             } else {
                 rows.push(...store);
             }
@@ -175,11 +182,19 @@ const Business360Engine = {
             .filter(Boolean)
             .filter(r => {
                 if (!r || !party) return false;
-                const companyMatches = [r.company, r.companyName, r.customerName, r.supplierName].some(v => {
-                    const a = this.lower(v || '');
-                    return !!a && (a === this.lower(party.name) || a === this.lower(party.code) || a.includes(this.lower(party.name)) || this.lower(party.name).includes(a));
-                });
-                return this.matches(r, party) || companyMatches;
+                const partyName = this.lower(party.name);
+                const partyCode = this.lower(party.code);
+                const companyMatches = [r.company, r.companyName, r.customerName, r.supplierName, r.partyName]
+                    .filter(Boolean)
+                    .some(v => {
+                        const a = this.lower(v);
+                        return !!a && (a === partyName || a === partyCode || a.includes(partyName) || partyName.includes(a));
+                    });
+                const idMatches = [r.customerId, r.supplierId, r.partyId, r.customer_id, r.supplier_id, r.idCustomer, r.idSupplier]
+                    .filter(v => this.text(v))
+                    .some(v => String(v).toLowerCase() === String(party.id).toLowerCase() || String(v).toLowerCase() === String(party.code).toLowerCase());
+                const directNameMatch = this.lower(r.name || '') === partyName || this.lower(r.company || '') === partyName;
+                return this.matches(r, party) || idMatches || companyMatches || directNameMatch;
             });
 
         const unique = [];
