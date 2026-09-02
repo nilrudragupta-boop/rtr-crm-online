@@ -157,6 +157,7 @@ const Business360Engine = {
     },
 
     getLinkedContacts(party) {
+        const directRows = this.getPartyContacts(party).map(c => this.normalizeContactRecord(c, party)).filter(Boolean);
         const rows = [];
         const candidates = ['crm_contacts', 'CUSTOM_RECORDS_Contacts', 'custom-records', 'contacts'];
         candidates.forEach(key => {
@@ -169,35 +170,31 @@ const Business360Engine = {
             }
         });
 
-        rows.push(...this.getPartyContacts(party).map(c => this.normalizeContactRecord(c, party)).filter(Boolean));
+        const linkedRows = rows
+            .map(r => this.normalizeContactRecord(r, party))
+            .filter(Boolean)
+            .filter(r => {
+                if (!r || !party) return false;
+                const companyMatches = [r.company, r.companyName, r.customerName, r.supplierName].some(v => {
+                    const a = this.lower(v || '');
+                    return !!a && (a === this.lower(party.name) || a === this.lower(party.code) || a.includes(this.lower(party.name)) || this.lower(party.name).includes(a));
+                });
+                return this.matches(r, party) || companyMatches;
+            });
 
         const unique = [];
         const seen = new Set();
-        rows.forEach(r => {
-            const normalized = this.normalizeContactRecord(r, party);
-            if (!normalized) return;
-            const key = [normalized.id, normalized.name, normalized.mobile, normalized.email, normalized.company]
+        [...directRows, ...linkedRows].forEach(r => {
+            const key = [r.id, r.name, r.mobile, r.email, r.company]
                 .filter(Boolean)
                 .map(v => String(v).trim().toLowerCase())
                 .join('|');
             if (!key || seen.has(key)) return;
             seen.add(key);
-            unique.push(normalized);
+            unique.push(r);
         });
 
-        return unique.filter(r => r && (this.matches(r, party) || this.matches({
-            customerName: r.company || party.name,
-            supplierName: r.company || party.name,
-            customerId: party.id,
-            supplierId: party.id,
-            name: r.name,
-            mobile: r.mobile,
-            email: r.email,
-            company: r.company,
-            gstin: party.gstin,
-            contact: r.mobile,
-            contactName: r.name
-        }, party) || (r.company === party.name || r.company === party.companyName || (!r.company && (r.name === party.name || r.mobile === party.phone || r.email === party.email)))));
+        return unique;
     },
 
     dateOf(r) { return this.first(r.date, r.invoiceDate, r.invoice_date, r.purchaseDate, r.enquiryDate, r.createdAt, r.updatedAt); },
