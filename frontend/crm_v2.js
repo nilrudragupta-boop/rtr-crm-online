@@ -9,7 +9,11 @@ const V2 = (() => {
     const taskTarget = item => {
         const module = String(item?.module || item?.relatedModule || item?.type || '').toLowerCase();
         const id = item?.id || item?.relatedId || item?.recordId || item?.referenceNo || item?.reference || item?.enquiryNo || item?.ticketNo || item?.customerId || item?.partyId;
-        const label = item?.subject || item?.outcome || item?.activityType || item?.title || item?.name || 'Record';
+        const moduleName = item?.relatedModule || item?.module || item?.type || 'CRM';
+        const reference = item?.reference || item?.referenceNo || item?.enquiryNo || item?.ticketNo || item?.recordRef || id;
+        const rawLabel = item?.subject || item?.outcome || item?.activityType || item?.title || item?.name;
+        const generic = !rawLabel || ['record', 'activity', 'task'].includes(String(rawLabel).trim().toLowerCase());
+        const label = generic ? `${moduleName} follow-up${reference ? `: ${reference}` : ''}` : rawLabel;
         const map = {
             customer: 'customer.html',
             customers: 'customer.html',
@@ -58,7 +62,10 @@ const V2 = (() => {
         const qs = data.recent?.quotations || [];
         document.getElementById('quotes').innerHTML = qs.length ? `<table class="table"><thead><tr><th>Quotation</th><th>Customer</th><th>Status</th><th>Value</th></tr></thead><tbody>${qs.map(x => `<tr><td>${link('quotation.html', 'refNo=' + encodeURIComponent(x.refNo || x.id), x.refNo || x.id)}</td><td>${q(x.custName || '-')}</td><td><span class="pill">${q(x.status || 'Saved')}</span></td><td>${money(x.grandTotal || x.totalValue)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No quotations found.</div>';
 
-        const acts = [...(data.recent?.activities || []), ...(data.recent?.followUps || [])].sort((a, b) => new Date(a.dueDate || a.createdAt || 0) - new Date(b.dueDate || b.createdAt || 0)).slice(0, 10);
+        const acts = [...(data.recent?.activities || []), ...(data.recent?.followUps || [])]
+            .filter(a => !['done', 'completed', 'closed', 'cancelled'].includes(String(a.status || '').toLowerCase()))
+            .sort((a, b) => new Date(a.dueDate || a.createdAt || 0) - new Date(b.dueDate || b.createdAt || 0))
+            .slice(0, 10);
         document.getElementById('tasks').innerHTML = acts.length ? acts.map(a => `<div style="padding:9px 0;border-bottom:1px solid #edf0f3"><div><b>${taskTarget(a)}</b></div><div style="font-size:10px;color:#667085">${q(a.dueDate || a.nextFollowUp || a.activityDate || '')} · ${q(a.status || 'Open')} · ${q(a.priority || 'Medium')}</div></div>`).join('') : '<div class="empty">No follow-ups or activities found.</div>';
     }
     async function search(term) { if (!term.trim()) { document.getElementById('results').style.display = 'none'; return } try { const rows = await get('/crm/v2/search?q=' + encodeURIComponent(term)); const el = document.getElementById('results'); el.innerHTML = rows.length ? rows.map(x => `<div class="result" data-type="${q(x.type)}" data-id="${q(x.id)}"><b>${q(x.type)}</b> · ${q(x.ref)}<div style="font-size:11px;color:#667085">${q(x.name)}</div></div>`).join('') : '<div class="result">No records found.</div>'; el.style.display = 'block' } catch (e) { console.warn(e) } }

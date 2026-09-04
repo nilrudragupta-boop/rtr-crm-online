@@ -108,7 +108,7 @@
     }
 
     async function runAutomation() {
-        const b = document.getElementById('run');
+        const b = document.activeElement?.id === 'run2' ? document.getElementById('run2') : document.getElementById('run');
         if (b) b.disabled = true;
         try {
             const d = await post('/crm/v2/phase4/run', {});
@@ -198,7 +198,7 @@
                         <div>${esc(x.trigger)}</div>
                         <div>${x.thresholdDays || 0} day(s)</div>
                         <div><span class="pill">${x.enabled ? 'On' : 'Off'}</span></div>
-                        <button class="btn switch" data-id="${esc(x.id)}" data-enabled="${x.enabled}">${x.enabled ? 'Turn off' : 'Turn on'}</button>
+                        <button class="btn switch" data-id="${esc(x.id)}" data-name="${esc(x.name)}" data-trigger="${esc(x.trigger)}" data-enabled="${x.enabled}">${x.enabled ? 'Turn off' : 'Turn on'}</button>
                     </div>
                 `).join('')}
             </div>
@@ -207,10 +207,18 @@
         document.querySelectorAll('.switch').forEach(b => {
             b.onclick = async () => {
                 try {
-                    await post('/crm/v2/phase4/rules', { id: b.dataset.id, enabled: b.dataset.enabled !== 'true' });
-                    rules();
+                    b.disabled = true;
+                    await post('/crm/v2/phase4/rules', {
+                        id: b.dataset.id,
+                        name: b.dataset.name,
+                        trigger: b.dataset.trigger,
+                        enabled: b.dataset.enabled !== 'true'
+                    });
+                    await rules();
                 } catch (e) {
                     err(e);
+                } finally {
+                    b.disabled = false;
                 }
             };
         });
