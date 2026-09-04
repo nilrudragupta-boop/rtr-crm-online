@@ -7,6 +7,7 @@ const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, Cr
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
+const registerCrmV2 = require('./routes/crm_v2');
 
 const app = express();
 
@@ -933,6 +934,7 @@ crmRoutes(app, CrmDocument, '/api/crm-documents');
 crmRoutes(app, CrmEnquiry, '/api/crm-enquiries');
 crmRoutes(app, CrmTechnicalReview, '/api/crm-technical-reviews');
 crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
+registerCrmV2(app, { Customer, Supplier, CrmContact, CrmPlant, CrmEnquiry, Invoice, Purchase, FollowUp, Quotation });
 
 app.get('/api/crm/customer/:id/360', async (req, res) => {
     try {
