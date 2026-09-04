@@ -203,6 +203,29 @@ module.exports = function registerCrmV2(app, deps) {
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
   });
 
+  // Phase 2: resolve relationship records into a single connected view.
+  app.get('/api/crm/v2/record/:module/:id/related', async (req, res) => {
+    try {
+      const { module, id } = req.params;
+      const rels = await Relationship.find({ $or: [{ fromModule: module, fromId: id }, { toModule: module, toId: id }] }).sort({ createdAt: -1 }).limit(500).lean();
+      const modelMap = { customer: Customer, supplier: Supplier, enquiry: CrmEnquiry, quotation: Quotation, invoice: Invoice, purchase: Purchase, followup: FollowUp };
+      const idsByModule = {};
+      for (const r of rels) {
+        const otherModule = r.fromModule === module && String(r.fromId) === String(id) ? r.toModule : r.fromModule;
+        const otherId = r.fromModule === module && String(r.fromId) === String(id) ? r.toId : r.fromId;
+        if (!idsByModule[otherModule]) idsByModule[otherModule] = new Set();
+        idsByModule[otherModule].add(String(otherId));
+      }
+      const resolved = {};
+      for (const [m, set] of Object.entries(idsByModule)) {
+        const Model = modelMap[m];
+        if (!Model) continue;
+        resolved[m] = await Model.find({ id: { $in: [...set] } }).lean();
+      }
+      res.json({ success: true, data: { relationships: rels, records: resolved } });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+  });
+
   app.get('/api/crm/v2/overview', async (req, res) => {
     try {
       const [customers, suppliers, enquiries, quotations, invoices, purchases, followUps, activities, tickets] = await Promise.all([
