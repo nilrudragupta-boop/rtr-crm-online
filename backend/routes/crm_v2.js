@@ -90,6 +90,18 @@ module.exports = function registerCrmV2(app, deps) {
         } catch (err) { res.status(500).json({ success: false, message: err.message }); }
     });
 
+    app.get('/api/crm/v2/parties', async (req, res) => {
+        try {
+            const type = norm(req.query.type) === 'supplier' ? 'supplier' : 'customer';
+            const term = norm(req.query.q);
+            const Model = type === 'supplier' ? Supplier : Customer;
+            const fields = type === 'supplier' ? ['name', 'gstin', 'id'] : ['name', 'gstin', 'id', 'contact', 'email'];
+            const filter = term ? { $or: fields.map(field => ({ [field]: new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') })) } : {};
+            const rows = await Model.find(filter).sort({ name: 1 }).limit(30).lean();
+            res.json({ success: true, data: rows.map(row => ({ id: row.id, name: row.name || row.customerName || row.supplierName || row.id, ref: row.id, type })) });
+        } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+    });
+
     app.post('/api/crm/v2/relationships', async (req, res) => {
         try {
             const b = req.body || {};
