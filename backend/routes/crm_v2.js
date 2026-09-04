@@ -294,4 +294,73 @@ module.exports = function registerCrmV2(app, deps) {
       res.json({ success: true, data: { supplier, purchases, relationships, kpis: { purchaseValue, openPOs: 0, rejectionRate: 0, qualityScore: 100 } } });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
   });
+
+  // ========================= RISE TECH CRM V2 PHASE 3 =========================
+  // Customer/Supplier 360, pipeline, ageing, profitability, approvals and RBAC.
+  const phase3Id = p => `${p}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const P3Role = mongoose.models.CrmV2Role || mongoose.model('CrmV2Role', new mongoose.Schema({
+    id:{type:String,unique:true,index:true}, name:{type:String,unique:true}, permissions:{type:Object,default:{}}, active:{type:Boolean,default:true}
+  },{timestamps:true,strict:false}));
+  const P3Approval = mongoose.models.CrmV2Approval || mongoose.model('CrmV2Approval', new mongoose.Schema({
+    id:{type:String,unique:true,index:true}, module:String, recordId:String, recordRef:String, requestedBy:String,
+    approverRole:String, amount:Number, reason:String, status:{type:String,default:'Pending'}, decidedBy:String, decidedAt:String, decisionNote:String
+  },{timestamps:true,strict:false}));
+  const DEFAULT_PERMISSIONS = {
+    Admin:['*'], Management:['dashboard.view','customer.view','supplier.view','sales.view','accounts.view','reports.view','approval.approve'],
+    Sales:['customer.view','customer.edit','enquiry.*','quotation.*','pipeline.*','activity.*','business360.view'],
+    Purchase:['supplier.view','purchase.*','activity.*','business360.view'], Accounts:['invoice.*','payment.*','accounts.view','reports.view'],
+    Service:['ticket.*','warranty.*','rejection.*','activity.*','business360.view'], Viewer:['dashboard.view','customer.view','supplier.view','sales.view','reports.view']
+  };
+  app.get('/api/crm/v2/roles', async (req,res)=>{try{
+    let rows=await P3Role.find({}).lean();
+    if(!rows.length){ rows=await Promise.all(Object.entries(DEFAULT_PERMISSIONS).map(async ([name,permissions])=>P3Role.findOneAndUpdate({name},{id:phase3Id('ROLE'),name,permissions,active:true},{upsert:true,new:true,setDefaultsOnInsert:true}).lean())); }
+    res.json({success:true,data:rows});
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+  app.post('/api/crm/v2/roles', async(req,res)=>{try{const b=req.body||{};const d=await P3Role.findOneAndUpdate({name:b.name},{id:b.id||phase3Id('ROLE'),name:b.name,permissions:b.permissions||{},active:b.active!==false},{upsert:true,new:true,setDefaultsOnInsert:true});res.json({success:true,data:d})}catch(e){res.status(400).json({success:false,message:e.message})}});
+  app.get('/api/crm/v2/permissions/check', async(req,res)=>{try{const role=req.query.role||'Viewer', permission=req.query.permission||'dashboard.view';const r=await P3Role.findOne({name:role}).lean();const p=r?.permissions||DEFAULT_PERMISSIONS[role]||[];res.json({success:true,data:{role,permission,allowed:p.includes('*')||p.includes(permission)||p.some(x=>x.endsWith('.*')&&permission.startsWith(x.slice(0,-1)))}})}catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/pipeline', async(req,res)=>{try{
+    const enquiries=await CrmEnquiry.find({}).lean();
+    const groups={};
+    for(const e of enquiries){const status=String(e.status||'New');const value=money(e.estimatedValue);const prob=Math.max(0,Math.min(100,money(e.probability)||0));if(!groups[status])groups[status]={status,count:0,value:0,weightedValue:0};groups[status].count++;groups[status].value+=value;groups[status].weightedValue+=value*prob/100;}
+    const total=Object.values(groups).reduce((a,x)=>a+x.value,0), weighted=Object.values(groups).reduce((a,x)=>a+x.weightedValue,0);
+    res.json({success:true,data:{stages:Object.values(groups),total,weighted,winRate:enquiries.length?Math.round(enquiries.filter(e=>['Won','Completed'].includes(e.status)).length/enquiries.length*100):0}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/ageing', async(req,res)=>{try{
+    const invoices=await Invoice.find({}).lean(); const today=new Date(); today.setHours(0,0,0,0);
+    const buckets={notDue:0,d0_30:0,d31_60:0,d61_90:0,d91_180:0,d180Plus:0}; const rows=[];
+    for(const i of invoices){const total=money(i.invoiceTotal??i.grandTotal),paid=money(i.amountPaid),bal=Math.max(0,total-paid);if(!bal)continue;const due=new Date(i.dueDate||i.paymentDueDate||i.date||i.createdAt||today);due.setHours(0,0,0,0);const days=Math.floor((today-due)/86400000);let bucket='notDue';if(days>0&&days<=30)bucket='d0_30';else if(days<=60)bucket='d31_60';else if(days<=90)bucket='d61_90';else if(days<=180)bucket='d91_180';else if(days>180)bucket='d180Plus';buckets[bucket]+=bal;rows.push({id:i.id,invoiceNo:i.invoiceNo,total,paid,balance:bal,dueDate:i.dueDate||i.paymentDueDate||i.date,bucket,customerName:i.customerName});}
+    res.json({success:true,data:{buckets,total:Object.values(buckets).reduce((a,b)=>a+b,0),rows:rows.sort((a,b)=>b.balance-a.balance)}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/profitability', async(req,res)=>{try{
+    const [invoices,quotations,purchases]=await Promise.all([Invoice.find({}).lean(),Quotation.find({}).lean(),Purchase.find({}).lean()]);
+    const sales=invoices.reduce((a,x)=>a+money(x.invoiceTotal??x.grandTotal),0), purchaseCost=purchases.reduce((a,x)=>a+money(x.totalAmount),0);
+    const explicitCost=invoices.reduce((a,x)=>a+money(x.costAmount??x.materialCost??x.cost),0); const cost=explicitCost||purchaseCost; const profit=sales-cost;
+    const byCustomer={}; for(const i of invoices){const n=i.customerName||i.customerId||'Unknown';if(!byCustomer[n])byCustomer[n]={customer:n,sales:0,cost:0,profit:0};byCustomer[n].sales+=money(i.invoiceTotal??i.grandTotal);byCustomer[n].cost+=money(i.costAmount??i.materialCost??0);byCustomer[n].profit=byCustomer[n].sales-byCustomer[n].cost;}
+    res.json({success:true,data:{sales,cost,profit,margin:sales?profit/sales*100:0,quotationValue:quotations.reduce((a,x)=>a+money(x.grandTotal??x.totalValue),0),byCustomer:Object.values(byCustomer).sort((a,b)=>b.profit-a.profit)}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/360/customer/:id', async(req,res)=>{try{
+    const id=req.params.id, c=await Customer.findOne({id}).lean(); if(!c)return res.status(404).json({success:false,message:'Customer not found'}); const rx=exact(c.name);
+    const [plants,contacts,enquiries,quotations,invoices,activities,tickets]=await Promise.all([CrmPlant.find({customerId:id}).lean(),CrmContact.find({customerId:id}).lean(),CrmEnquiry.find({$or:[{customerId:id},{customerName:rx}]}).lean(),Quotation.find({$or:[{customerId:id},{custName:rx}]}).lean(),Invoice.find({$or:[{customerId:id},{customerName:rx}]}).lean(),V2Activity.find({customerId:id}).sort({createdAt:-1}).limit(20).lean(),mongoose.models.CrmTicket?mongoose.models.CrmTicket.find({customerId:id}).lean():[]]);
+    const sales=invoices.reduce((a,x)=>a+money(x.invoiceTotal??x.grandTotal),0),paid=invoices.reduce((a,x)=>a+money(x.amountPaid),0),quotes=quotations.reduce((a,x)=>a+money(x.grandTotal??x.totalValue),0),openTickets=tickets.filter(x=>!['Closed','Resolved'].includes(x.status)).length;
+    const score=Math.max(0,Math.min(100,Math.round(50+Math.min(20,quotes/100000)+Math.min(15,enquiries.length*3)+Math.min(15,sales?paid/sales*15:0)-Math.min(20,openTickets*4))));
+    res.json({success:true,data:{customer,plants,contacts,enquiries,quotations,invoices,activities,tickets,kpis:{sales,paid,receivable:Math.max(0,sales-paid),quoteValue:quotes,enquiries:enquiries.length,openTickets,healthScore:score}}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/360/supplier/:id', async(req,res)=>{try{
+    const id=req.params.id,s=await Supplier.findOne({id}).lean();if(!s)return res.status(404).json({success:false,message:'Supplier not found'});const rx=exact(s.name);const purchases=await Purchase.find({$or:[{supplierId:id},{supplierName:rx}]}).lean();const total=purchases.reduce((a,x)=>a+money(x.totalAmount),0);const delivered=purchases.filter(x=>['Completed','Received','Delivered'].includes(String(x.status||''))).length;res.json({success:true,data:{supplier,purchases,kpis:{purchaseValue:total,poCount:purchases.length,onTimeRate:purchases.length?delivered/purchases.length*100:0,qualityScore:100}}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/approvals', async(req,res)=>{try{const q={};if(req.query.status)q.status=req.query.status;if(req.query.module)q.module=req.query.module;res.json({success:true,data:await P3Approval.find(q).sort({createdAt:-1}).limit(500).lean()})}catch(e){res.status(500).json({success:false,message:e.message})}});
+  app.post('/api/crm/v2/approvals', async(req,res)=>{try{const b=req.body||{};if(!b.module||!b.recordId)return res.status(400).json({success:false,message:'module and recordId are required'});const d=await P3Approval.findOneAndUpdate({id:b.id||phase3Id('APR')},{...b,id:b.id||phase3Id('APR'),status:b.status||'Pending'},{new:true,upsert:true,setDefaultsOnInsert:true});res.json({success:true,data:d})}catch(e){res.status(400).json({success:false,message:e.message})}});
+  app.post('/api/crm/v2/approvals/:id/decision', async(req,res)=>{try{const b=req.body||{},status=['Approved','Rejected'].includes(b.status)?b.status:null;if(!status)return res.status(400).json({success:false,message:'status must be Approved or Rejected'});const d=await P3Approval.findOneAndUpdate({id:req.params.id},{status,decidedBy:b.decidedBy||'System',decidedAt:new Date().toISOString(),decisionNote:b.decisionNote||''},{new:true});if(!d)return res.status(404).json({success:false,message:'Approval not found'});res.json({success:true,data:d})}catch(e){res.status(400).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/management', async(req,res)=>{try{
+    const [p,a,age,profit]=await Promise.all([fetchInternal('/api/crm/v2/pipeline',req),fetchInternal('/api/crm/v2/ageing',req),fetchInternal('/api/crm/v2/ageing',req),fetchInternal('/api/crm/v2/profitability',req)]);res.json({success:true,data:{pipeline:p,ageing:a,profitability:profit}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+  async function fetchInternal(path,req){ return new Promise((resolve,reject)=>{ const fake={query:req.query}; let body; const rr={json:o=>resolve(o.data),status:()=>rr}; try{ if(path.includes('/pipeline')){CrmEnquiry.find({}).lean().then(es=>{const stages={};es.forEach(e=>{const k=String(e.status||'New');stages[k]??={status:k,count:0,value:0,weightedValue:0};stages[k].count++;stages[k].value+=money(e.estimatedValue);stages[k].weightedValue+=money(e.estimatedValue)*money(e.probability)/100});resolve({stages:Object.values(stages),total:Object.values(stages).reduce((a,x)=>a+x.value,0),weighted:Object.values(stages).reduce((a,x)=>a+x.weightedValue,0)})}).catch(reject)} else if(path.includes('/profitability')){Promise.all([Invoice.find({}).lean(),Purchase.find({}).lean()]).then(([is,ps])=>{const sales=is.reduce((a,x)=>a+money(x.invoiceTotal??x.grandTotal),0),cost=is.reduce((a,x)=>a+money(x.costAmount??x.materialCost??0),0)||ps.reduce((a,x)=>a+money(x.totalAmount),0);resolve({sales,cost,profit:sales-cost,margin:sales?((sales-cost)/sales*100):0})}).catch(reject)} else {Invoice.find({}).lean().then(is=>{const today=new Date();const b={notDue:0,d0_30:0,d31_60:0,d61_90:0,d91_180:0,d180Plus:0};is.forEach(i=>{const bal=Math.max(0,money(i.invoiceTotal??i.grandTotal)-money(i.amountPaid));if(!bal)return;const due=new Date(i.dueDate||i.paymentDueDate||i.date||today);const d=Math.floor((today-due)/86400000);let k='notDue';if(d>0&&d<=30)k='d0_30';else if(d<=60)k='d31_60';else if(d<=90)k='d61_90';else if(d<=180)k='d91_180';else if(d>180)k='d180Plus';b[k]+=bal});resolve({buckets:b,total:Object.values(b).reduce((a,x)=>a+x,0)})}).catch(reject)}}catch(e){reject(e)} }); }
+
 };
