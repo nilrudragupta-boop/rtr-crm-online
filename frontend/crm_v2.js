@@ -60,7 +60,12 @@ const V2 = (() => {
         document.getElementById('enquiries').innerHTML = ens.length ? `<table class="table"><thead><tr><th>Enquiry</th><th>Customer</th><th>Status</th><th>Value</th></tr></thead><tbody>${ens.map(e => `<tr><td>${link('enquiry.html', 'enquiryNo=' + encodeURIComponent(e.enquiryNo || e.id), e.enquiryNo || e.id)}</td><td>${q(e.customerName || '-')}</td><td><span class="pill">${q(e.status || 'New')}</span></td><td>${money(e.estimatedValue)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No enquiries found.</div>';
 
         const qs = data.recent?.quotations || [];
-        document.getElementById('quotes').innerHTML = qs.length ? `<table class="table"><thead><tr><th>Quotation</th><th>Customer</th><th>Status</th><th>Value</th></tr></thead><tbody>${qs.map(x => `<tr><td>${link('quotation.html', 'refNo=' + encodeURIComponent(x.refNo || x.id), x.refNo || x.id)}</td><td>${q(x.custName || '-')}</td><td><span class="pill">${q(x.status || 'Saved')}</span></td><td>${money(x.grandTotal || x.totalValue)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No quotations found.</div>';
+        document.getElementById('quotes').innerHTML = qs.length ? `<table class="table"><thead><tr><th>Quotation</th><th>Customer</th><th>Status</th><th>Value</th></tr></thead><tbody>${qs.map(x => {
+            const ref = x.refNo || x.quotationNo || x.id || '-';
+            const customer = x.custName || x.customerName || x.customer || '-';
+            const value = x.grandTotal ?? x.totalValue ?? x.total ?? x.amount ?? x.value ?? 0;
+            return `<tr><td>${link('quotation.html', 'refNo=' + encodeURIComponent(ref), ref)}</td><td>${q(customer)}</td><td><span class="pill">${q(x.status || 'Saved')}</span></td><td>${money(value)}</td></tr>`;
+        }).join('')}</tbody></table>` : '<div class="empty">No quotations found.</div>';
 
         const acts = [...(data.recent?.activities || []), ...(data.recent?.followUps || [])]
             .filter(a => !['done', 'completed', 'closed', 'cancelled'].includes(String(a.status || '').toLowerCase()))
