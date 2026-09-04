@@ -27,6 +27,51 @@
         return j.data;
     }
 
+    async function post(p, body) {
+        const r = await fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const j = await r.json();
+        if (!r.ok || !j.success) throw Error(j.message || 'Request failed');
+        return j.data;
+    }
+
+    function pageFor(type) {
+        return { customer: 'business360.html', supplier: 'business360.html', enquiry: 'enquiry.html', quotation: 'quotation.html', invoice: 'invoice.html' }[String(type || '').toLowerCase()];
+    }
+
+    function openSearchResult(item) {
+        const type = String(item.type || '').toLowerCase();
+        const page = pageFor(type);
+        if (!page) return;
+        if (type === 'customer' || type === 'supplier') location.href = `${page}?type=${type}&id=${encodeURIComponent(item.id)}`;
+        else location.href = `${page}?id=${encodeURIComponent(item.id)}`;
+    }
+
+    function bindGlobalSearch() {
+        const input = document.getElementById('phase3Search');
+        const results = document.getElementById('phase3SearchResults');
+        let timer;
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            const term = input.value.trim();
+            if (!term) { results.style.display = 'none'; return; }
+            timer = setTimeout(async () => {
+                try {
+                    const rows = await get('/crm/v2/search?q=' + encodeURIComponent(term));
+                    results.innerHTML = rows.length ? rows.map((x, index) => `<button class="global-result" data-index="${index}"><b>${esc(x.type)}</b> · ${esc(x.ref || x.id)}<br><span class="muted">${esc(x.name || '')}</span></button>`).join('') : '<div class="global-result">No matching records.</div>';
+                    results._rows = rows;
+                    results.style.display = 'block';
+                } catch (e) { results.innerHTML = `<div class="global-result">${esc(e.message)}</div>`; results.style.display = 'block'; }
+            }, 220);
+        });
+        results.addEventListener('click', event => {
+            const result = event.target.closest('.global-result');
+            if (!result || !results._rows) return;
+            const item = results._rows[Number(result.dataset.index)];
+            if (item) openSearchResult(item);
+        });
+        document.addEventListener('click', event => { if (!event.target.closest('.global-search')) results.style.display = 'none'; });
+    }
+
     function k(t, v, isMoney = true) {
         const value = isMoney ? money(v) : v;
         return `<div class="card"><div class="k">${esc(t)}</div><div class="v">${value}</div></div>`;
@@ -155,12 +200,21 @@
                             <td>${esc(x.recordRef || x.recordId)}</td>
                             <td>${money(x.amount)}</td>
                             <td>${esc(x.requestedBy)}</td>
-                            <td><span class="pill">${esc(x.status)}</span></td>
+                            <td><span class="pill">${esc(x.status)}</span>${x.status === 'Pending' ? `<br><button class="btn approval-decision" data-id="${esc(x.id)}" data-status="Approved" style="padding:4px 7px;margin-top:6px;color:#067647">Approve</button> <button class="btn approval-decision" data-id="${esc(x.id)}" data-status="Rejected" style="padding:4px 7px;margin-top:6px;color:#b42318">Reject</button>` : ''}</td>
                         </tr>
                     `).join('') || '<tr><td colspan="5">No approvals waiting.</td></tr>'}
                 </table>
             </div>
         `;
+        document.querySelectorAll('.approval-decision').forEach(button => {
+            button.onclick = async () => {
+                const decision = button.dataset.status;
+                if (!confirm(`${decision} this approval?`)) return;
+                button.disabled = true;
+                try { await post(`/crm/v2/approvals/${encodeURIComponent(button.dataset.id)}/decision`, { status: decision, decidedBy: localStorage.getItem('currentUser') || 'System' }); await approvals(); }
+                catch (e) { app.innerHTML = `<div class="card" style="color:#b42318">${esc(e.message)}</div>`; }
+            };
+        });
     }
 
     async function lookup() {
@@ -172,16 +226,34 @@
                         <option value="customer">Customer</option>
                         <option value="supplier">Supplier</option>
                     </select>
-                    <input id="id" placeholder="Enter customer or supplier ID">
+                    <input id="recordSearch" placeholder="Search by name or ID">
+                    <select id="recordSelect" disabled><option value="">Choose a record</option></select>
                     <button class="btn primary" id="go">Open view</button>
                 </div>
+                <p class="muted">Type a few letters, choose the person or supplier, then open their business view.</p>
                 <div id="out" style="margin-top:14px"></div>
             </div>
         `;
 
+        const recordSearch = document.getElementById('recordSearch');
+        const recordSelect = document.getElementById('recordSelect');
+        let lookupTimer;
+        recordSearch.addEventListener('input', () => {
+            clearTimeout(lookupTimer);
+            const term = recordSearch.value.trim();
+            if (!term) { recordSelect.innerHTML = '<option value="">Choose a record</option>'; recordSelect.disabled = true; return; }
+            lookupTimer = setTimeout(async () => {
+                try {
+                    const rows = (await get('/crm/v2/search?q=' + encodeURIComponent(term))).filter(x => x.type.toLowerCase() === document.getElementById('typ').value);
+                    recordSelect.innerHTML = '<option value="">Choose a record</option>' + rows.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.ref || x.id)} · ${esc(x.ref || x.id)}</option>`).join('');
+                    recordSelect.disabled = !rows.length;
+                } catch (e) { recordSelect.innerHTML = `<option value="">${esc(e.message)}</option>`; recordSelect.disabled = true; }
+            }, 220);
+        });
+        document.getElementById('typ').addEventListener('change', () => { recordSearch.dispatchEvent(new Event('input')); });
         document.getElementById('go').onclick = async () => {
             const type = document.getElementById('typ').value;
-            const id = document.getElementById('id').value.trim();
+            const id = recordSelect.value;
             if (!id) return;
 
             const d = await get(`/crm/v2/360/${type}/${encodeURIComponent(id)}`);
@@ -239,5 +311,6 @@
         };
     });
 
+    bindGlobalSearch();
     load('dashboard');
 })();
