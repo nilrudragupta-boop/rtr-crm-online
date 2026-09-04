@@ -34,6 +34,34 @@
         return j.data;
     }
 
+    function localParties(type, term) {
+        const key = type === 'supplier' ? 'suppliers' : 'customers';
+        let rows = [];
+        try { rows = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { rows = []; }
+        const needle = String(term || '').toLowerCase();
+        return rows.filter(row => [row.id, row.name, row.customerName, row.supplierName, row.gstin, row.contact, row.email].some(value => String(value || '').toLowerCase().includes(needle))).slice(0, 30).map(row => ({
+            id: row.id,
+            name: row.name || row.customerName || row.supplierName || row.id,
+            ref: row.id,
+            type
+        }));
+    }
+
+    async function findParties(type, term) {
+        try {
+            const rows = await get(`/crm/v2/parties?type=${encodeURIComponent(type)}&q=${encodeURIComponent(term)}`);
+            return rows.length ? rows : localParties(type, term);
+        } catch (e) {
+            if (typeof apiClient !== 'undefined') {
+                try {
+                    const rows = type === 'supplier' ? await apiClient.getSuppliers() : await apiClient.getCustomers();
+                    if (Array.isArray(rows)) return rows.filter(row => [row.id, row.name, row.customerName, row.supplierName, row.gstin, row.contact, row.email].some(value => String(value || '').toLowerCase().includes(String(term).toLowerCase()))).slice(0, 30).map(row => ({ id: row.id, name: row.name || row.customerName || row.supplierName || row.id, ref: row.id, type }));
+                } catch (fallbackError) { console.warn(fallbackError); }
+            }
+            return localParties(type, term);
+        }
+    }
+
     function pageFor(type) {
         return { customer: 'business360.html', supplier: 'business360.html', enquiry: 'enquiry.html', quotation: 'quotation.html', invoice: 'invoice.html' }[String(type || '').toLowerCase()];
     }
@@ -244,9 +272,10 @@
             if (!term) { recordSelect.innerHTML = '<option value="">Choose a record</option>'; recordSelect.disabled = true; return; }
             lookupTimer = setTimeout(async () => {
                 try {
-                    const rows = (await get('/crm/v2/search?q=' + encodeURIComponent(term))).filter(x => x.type.toLowerCase() === document.getElementById('typ').value);
+                    const rows = await findParties(document.getElementById('typ').value, term);
                     recordSelect.innerHTML = '<option value="">Choose a record</option>' + rows.map(x => `<option value="${esc(x.id)}">${esc(x.name || x.ref || x.id)} · ${esc(x.ref || x.id)}</option>`).join('');
                     recordSelect.disabled = !rows.length;
+                    if (!rows.length) recordSelect.innerHTML = '<option value="">No matching records</option>';
                 } catch (e) { recordSelect.innerHTML = `<option value="">${esc(e.message)}</option>`; recordSelect.disabled = true; }
             }, 220);
         });
