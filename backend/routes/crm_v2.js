@@ -363,4 +363,80 @@ module.exports = function registerCrmV2(app, deps) {
   }catch(e){res.status(500).json({success:false,message:e.message})}});
   async function fetchInternal(path,req){ return new Promise((resolve,reject)=>{ const fake={query:req.query}; let body; const rr={json:o=>resolve(o.data),status:()=>rr}; try{ if(path.includes('/pipeline')){CrmEnquiry.find({}).lean().then(es=>{const stages={};es.forEach(e=>{const k=String(e.status||'New');stages[k]??={status:k,count:0,value:0,weightedValue:0};stages[k].count++;stages[k].value+=money(e.estimatedValue);stages[k].weightedValue+=money(e.estimatedValue)*money(e.probability)/100});resolve({stages:Object.values(stages),total:Object.values(stages).reduce((a,x)=>a+x.value,0),weighted:Object.values(stages).reduce((a,x)=>a+x.weightedValue,0)})}).catch(reject)} else if(path.includes('/profitability')){Promise.all([Invoice.find({}).lean(),Purchase.find({}).lean()]).then(([is,ps])=>{const sales=is.reduce((a,x)=>a+money(x.invoiceTotal??x.grandTotal),0),cost=is.reduce((a,x)=>a+money(x.costAmount??x.materialCost??0),0)||ps.reduce((a,x)=>a+money(x.totalAmount),0);resolve({sales,cost,profit:sales-cost,margin:sales?((sales-cost)/sales*100):0})}).catch(reject)} else {Invoice.find({}).lean().then(is=>{const today=new Date();const b={notDue:0,d0_30:0,d31_60:0,d61_90:0,d91_180:0,d180Plus:0};is.forEach(i=>{const bal=Math.max(0,money(i.invoiceTotal??i.grandTotal)-money(i.amountPaid));if(!bal)return;const due=new Date(i.dueDate||i.paymentDueDate||i.date||today);const d=Math.floor((today-due)/86400000);let k='notDue';if(d>0&&d<=30)k='d0_30';else if(d<=60)k='d31_60';else if(d<=90)k='d61_90';else if(d<=180)k='d91_180';else if(d>180)k='d180Plus';b[k]+=bal});resolve({buckets:b,total:Object.values(b).reduce((a,x)=>a+x,0)})}).catch(reject)}}catch(e){reject(e)} }); }
 
+
+  // ==================== CRM V2 PHASE 4 ====================
+  // Workflow Automation · SLA Monitoring · Task Generation · Notification Centre
+  const p4RuleSchema = new mongoose.Schema({
+    id:{type:String,unique:true,index:true}, name:{type:String,required:true},
+    trigger:{type:String,required:true,index:true}, enabled:{type:Boolean,default:true,index:true},
+    thresholdDays:{type:Number,default:0}, priority:{type:String,default:'Medium'},
+    assignedTo:{type:String,default:''}, description:String, createdBy:{type:String,default:'System'}
+  },{timestamps:true,strict:false});
+  const p4RunSchema = new mongoose.Schema({
+    id:{type:String,unique:true,index:true}, ruleId:{type:String,index:true}, eventKey:{type:String,unique:true,index:true},
+    module:String, recordId:String, reference:String, action:String, status:{type:String,default:'Created'}, details:String
+  },{timestamps:true,strict:false});
+  const P4Rule=mongoose.models.CrmV2WorkflowRule||mongoose.model('CrmV2WorkflowRule',p4RuleSchema);
+  const P4Run=mongoose.models.CrmV2AutomationRun||mongoose.model('CrmV2AutomationRun',p4RunSchema);
+
+  const p4Defaults=[
+    ['invoice_overdue','Overdue Invoice Alert','Invoice becomes overdue',1,'High'],
+    ['enquiry_quote_missing','Enquiry Quote Follow-up','Enquiry has no quotation after threshold days',3,'High'],
+    ['quotation_followup_due','Quotation Follow-up Due','Quotation needs follow-up',7,'Medium'],
+    ['open_ticket_sla','Open Ticket SLA Alert','Open service ticket exceeds SLA',2,'High']
+  ];
+  async function ensureP4Rules(){
+    for(const [trigger,name,description,thresholdDays,priority] of p4Defaults){
+      const exists=await P4Rule.findOne({trigger});
+      if(!exists) await P4Rule.create({id:idFor('RULE'),trigger,name,description,thresholdDays,priority,enabled:true});
+    }
+  }
+  app.get('/api/crm/v2/phase4/rules',async(req,res)=>{try{await ensureP4Rules();res.json({success:true,data:await P4Rule.find({}).sort({createdAt:1}).lean()})}catch(e){res.status(500).json({success:false,message:e.message})}});
+  app.post('/api/crm/v2/phase4/rules',async(req,res)=>{try{const b=req.body||{};if(!b.name||!b.trigger)return res.status(400).json({success:false,message:'name and trigger are required'});const d=await P4Rule.findOneAndUpdate({id:b.id||idFor('RULE')},{...b,id:b.id||idFor('RULE')},{new:true,upsert:true,setDefaultsOnInsert:true});res.json({success:true,data:d})}catch(e){res.status(400).json({success:false,message:e.message})}});
+
+  async function p4CreateActivity(payload){
+    const key=payload.eventKey;
+    const exists=await P4Run.findOne({eventKey:key});
+    if(exists)return {created:false,run:exists};
+    const a=await V2Activity.findOneAndUpdate({id:payload.activityId||idFor('ACT')},{
+      id:payload.activityId||idFor('ACT'),activityType:'Task',subject:payload.subject,details:payload.details,status:'Open',priority:payload.priority||'Medium',
+      dueDate:payload.dueDate||new Date().toISOString().slice(0,10),assignedTo:payload.assignedTo||'',customerId:payload.customerId||'',supplierId:payload.supplierId||'',
+      relatedModule:payload.module,relatedId:payload.recordId,createdBy:'CRM V2 Phase 4',automation:true
+    },{new:true,upsert:true,setDefaultsOnInsert:true});
+    const run=await P4Run.create({id:idFor('RUN'),ruleId:payload.ruleId,eventKey:key,module:payload.module,recordId:payload.recordId,reference:payload.reference,action:'CREATE_ACTIVITY',details:payload.details});
+    return {created:true,activity:a,run};
+  }
+  app.post('/api/crm/v2/phase4/run',async(req,res)=>{try{
+    await ensureP4Rules(); const rules=await P4Rule.find({enabled:true}).lean(); const today=new Date();today.setHours(0,0,0,0); let created=0,skipped=0; const results=[];
+    const invoices=await Invoice.find({}).lean();
+    const invoiceRule=rules.find(r=>r.trigger==='invoice_overdue');
+    if(invoiceRule){for(const i of invoices){const total=money(i.invoiceTotal??i.grandTotal),paid=money(i.amountPaid),bal=Math.max(0,total-paid);if(!bal)continue;const due=new Date(i.dueDate||i.paymentDueDate||i.date||i.createdAt||today);due.setHours(0,0,0,0);const days=Math.floor((today-due)/86400000);if(days<invoiceRule.thresholdDays)continue;const ref=i.invoiceNo||i.id;const r=await p4CreateActivity({ruleId:invoiceRule.id,eventKey:`${invoiceRule.id}:invoice:${i.id}:${due.toISOString().slice(0,10)}`,module:'Invoice',recordId:i.id,reference:ref,subject:`Payment follow-up: ${ref}`,details:`Invoice ${ref} is overdue by ${days} day(s). Outstanding ₹${bal.toLocaleString('en-IN')}.`,priority:invoiceRule.priority,assignedTo:invoiceRule.assignedTo,customerId:i.customerId||''});r.created?created++:skipped++;results.push({trigger:invoiceRule.trigger,reference:ref,created:r.created});}}
+    const enquiries=await CrmEnquiry.find({}).lean(), quotations=await Quotation.find({}).lean();
+    const quoteByEnq=new Set(quotations.map(q=>String(q.enquiryId||'')).filter(Boolean));
+    const quoteNoByEnq=new Set(quotations.map(q=>String(q.enquiryNo||'')).filter(Boolean));
+    const enqRule=rules.find(r=>r.trigger==='enquiry_quote_missing');
+    if(enqRule){for(const e of enquiries){const createdAt=new Date(e.createdAt||e.enquiryDate||today);const days=Math.floor((today-createdAt)/86400000);if(days<enqRule.thresholdDays)continue;const linked=quoteByEnq.has(String(e.id))||(e.enquiryNo&&quoteNoByEnq.has(String(e.enquiryNo)));if(linked)continue;const ref=e.enquiryNo||e.id;const r=await p4CreateActivity({ruleId:enqRule.id,eventKey:`${enqRule.id}:enquiry:${e.id}`,module:'Enquiry',recordId:e.id,reference:ref,subject:`Quotation follow-up: ${ref}`,details:`Enquiry ${ref} has no linked quotation after ${days} day(s).`,priority:enqRule.priority,assignedTo:enqRule.assignedTo,customerId:e.customerId||''});r.created?created++:skipped++;results.push({trigger:enqRule.trigger,reference:ref,created:r.created});}}
+    const qRule=rules.find(r=>r.trigger==='quotation_followup_due');
+    if(qRule){for(const q of quotations){const d=new Date(q.followUpDate||q.nextFollowUp||q.targetDate||q.createdAt||today);d.setHours(0,0,0,0);if(d>today)continue;const ref=q.refNo||q.quotationNo||q.id;const r=await p4CreateActivity({ruleId:qRule.id,eventKey:`${qRule.id}:quotation:${q.id}:${d.toISOString().slice(0,10)}`,module:'Quotation',recordId:q.id,reference:ref,subject:`Quotation follow-up due: ${ref}`,details:`Quotation ${ref} requires follow-up.`,priority:qRule.priority,assignedTo:qRule.assignedTo,customerId:q.customerId||''});r.created?created++:skipped++;results.push({trigger:qRule.trigger,reference:ref,created:r.created});}}
+    const tRule=rules.find(r=>r.trigger==='open_ticket_sla'); const Ticket=mongoose.models.CrmTicket;
+    if(tRule&&Ticket){const tickets=await Ticket.find({}).lean();for(const t of tickets){if(['Closed','Resolved'].includes(String(t.status||'')))continue;const d=new Date(t.createdAt||t.date||today);const days=Math.floor((today-d)/86400000);if(days<tRule.thresholdDays)continue;const ref=t.ticketNo||t.id;const r=await p4CreateActivity({ruleId:tRule.id,eventKey:`${tRule.id}:ticket:${t.id}`,module:'Ticket',recordId:t.id,reference:ref,subject:`SLA attention: ${ref}`,details:`Open service ticket ${ref} has exceeded the ${tRule.thresholdDays}-day SLA threshold.`,priority:tRule.priority,assignedTo:tRule.assignedTo,customerId:t.customerId||'',ticketId:t.id});r.created?created++:skipped++;results.push({trigger:tRule.trigger,reference:ref,created:r.created});}}
+    res.json({success:true,data:{created,skipped,results,ranAt:new Date().toISOString()}});
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  app.get('/api/crm/v2/phase4/notifications',async(req,res)=>{try{
+    const [activities,approvals]=await Promise.all([V2Activity.find({$or:[{automation:true},{priority:'High'}],status:{$nin:['Completed','Closed']}}).sort({createdAt:-1}).limit(200).lean(),P3Approval.find({status:'Pending'}).sort({createdAt:-1}).limit(100).lean()]);
+    res.json({success:true,data:{activities,approvals,count:activities.length+approvals.length}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+  app.get('/api/crm/v2/phase4/sla',async(req,res)=>{try{
+    const today=new Date();today.setHours(0,0,0,0);const Ticket=mongoose.models.CrmTicket;let tickets=[];
+    if(Ticket){tickets=(await Ticket.find({}).lean()).filter(t=>!['Closed','Resolved'].includes(String(t.status||''))).map(t=>{const d=new Date(t.createdAt||t.date||today);const age=Math.max(0,Math.floor((today-d)/86400000));const sla=Number(t.slaDays||t.sla||2);return {...t,ageDays:age,slaDays:sla,slaStatus:age>sla?'Breached':age>=Math.max(0,sla-1)?'At Risk':'Within SLA'}})}
+    const summary={within: tickets.filter(t=>t.slaStatus==='Within SLA').length,atRisk:tickets.filter(t=>t.slaStatus==='At Risk').length,breached:tickets.filter(t=>t.slaStatus==='Breached').length};res.json({success:true,data:{summary,tickets}})
+  }catch(e){res.status(500).json({success:false,message:e.message})}});
+
+  // Lightweight server-side scheduler. It is idempotent through CrmV2AutomationRun.eventKey.
+  if(!global.__RISE_CRM_V2_P4_TIMER){
+    global.__RISE_CRM_V2_P4_TIMER=setInterval(()=>{ app._riseP4AutoRun?.().catch(()=>{}); }, 15*60*1000);
+  }
+  app._riseP4AutoRun=async()=>{try{await ensureP4Rules(); const r=await P4Rule.findOne({enabled:true}); if(r) { /* execution endpoint remains explicit to avoid duplicate heavy scans */ }}catch(e){}}
+
 };
