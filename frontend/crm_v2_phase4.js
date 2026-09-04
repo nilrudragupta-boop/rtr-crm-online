@@ -30,6 +30,41 @@
         app.innerHTML = `<div class="card bad">${esc(e.message)}</div>`;
     }
 
+    function tableLink(page, id, label) {
+        if (!page || !id) return esc(label || '-');
+        return `<a href="${page}${page.includes('?') ? '&' : '?'}id=${encodeURIComponent(id)}" title="Open record">${esc(label || id)}</a>`;
+    }
+
+    function linkFromRecord(record) {
+        const module = String(record?.module || record?.relatedModule || record?.type || '').toLowerCase();
+        const id = record?.id || record?.relatedId || record?.recordId || record?.ticketId || record?.referenceNo || record?.reference || record?.recordRef || record?.ticketNo;
+        const text = record?.subject || record?.title || record?.ticketNo || record?.recordRef || record?.name || record?.id || 'View';
+
+        const pages = {
+            customer: 'customer.html',
+            customers: 'customer.html',
+            supplier: 'supplier.html',
+            suppliers: 'supplier.html',
+            enquiry: 'enquiry.html',
+            enquiries: 'enquiry.html',
+            quotation: 'quotation.html',
+            quotations: 'quotation.html',
+            invoice: 'invoice.html',
+            invoices: 'invoice.html',
+            followup: 'follow_up.html',
+            'follow-up': 'follow_up.html',
+            'follow-ups': 'follow_up.html',
+            ticket: 'customer_support.html',
+            tickets: 'customer_support.html',
+            support: 'customer_support.html',
+            'customer support': 'customer_support.html'
+        };
+
+        const page = pages[module] || pages[Object.keys(pages).find(k => module.includes(k))];
+        if (!page || !id) return esc(text);
+        return tableLink(page, id, text);
+    }
+
     async function dashboard() {
         const [n, r] = await Promise.all([
             get('/crm/v2/phase4/notifications'),
@@ -54,7 +89,7 @@
                     <button class="btn primary" id="run2">Start daily task run</button>
                     <div style="margin-top:14px">
                         ${n.activities.slice(0, 8).map(x => `
-                            <p><b>${esc(x.subject)}</b><br><span class="muted">${esc(x.details || '')} · ${esc(x.priority || 'Medium')}</span></p>
+                            <p><b>${linkFromRecord(x)}</b><br><span class="muted">${esc(x.details || '')} · ${esc(x.priority || 'Medium')}</span></p>
                         `).join('') || '<div class="empty">No tasks right now.</div>'}
                     </div>
                 </div>
@@ -96,8 +131,8 @@
                     ${d.activities.map(x => `
                         <tr>
                             <td><span class="pill ${x.priority === 'High' ? 'bad' : ''}">${esc(x.priority)}</span></td>
-                            <td><b>${esc(x.subject)}</b><br><span class="muted">${esc(x.details || '')}</span></td>
-                            <td>${esc(x.relatedModule || '-')} · ${esc(x.relatedId || '-')}</td>
+                            <td><b>${linkFromRecord(x)}</b><br><span class="muted">${esc(x.details || '')}</span></td>
+                            <td>${esc(x.relatedModule || '-')} · ${tableLink((String(x.relatedModule || '').toLowerCase().includes('enquiry') ? 'enquiry.html' : String(x.relatedModule || '').toLowerCase().includes('quotation') ? 'quotation.html' : String(x.relatedModule || '').toLowerCase().includes('ticket') || String(x.relatedModule || '').toLowerCase().includes('support') ? 'customer_support.html' : String(x.relatedModule || '').toLowerCase().includes('follow') ? 'follow_up.html' : String(x.relatedModule || '').toLowerCase().includes('customer') ? 'customer.html' : String(x.relatedModule || '').toLowerCase().includes('supplier') ? 'supplier.html' : ''), x.relatedId || x.id, x.relatedId || x.id || '-')}</td>
                             <td>${esc(x.status)}</td>
                             <td>${esc(x.dueDate || '-')}</td>
                         </tr>
@@ -111,7 +146,7 @@
                     ${d.approvals.map(x => `
                         <tr>
                             <td>${esc(x.module)}</td>
-                            <td>${esc(x.recordRef || x.recordId)}</td>
+                            <td>${tableLink((String(x.module || '').toLowerCase().includes('enquiry') ? 'enquiry.html' : String(x.module || '').toLowerCase().includes('quotation') ? 'quotation.html' : String(x.module || '').toLowerCase().includes('invoice') ? 'invoice.html' : String(x.module || '').toLowerCase().includes('customer') ? 'customer.html' : String(x.module || '').toLowerCase().includes('supplier') ? 'supplier.html' : ''), x.recordId || x.id, x.recordRef || x.recordId || x.id || 'View')}</td>
                             <td>${money(x.amount)}</td>
                             <td>${esc(x.requestedBy)}</td>
                         </tr>
@@ -136,7 +171,7 @@
                     <tr><th>Ticket</th><th>Status</th><th>Age</th><th>SLA</th><th>Condition</th></tr>
                     ${d.tickets.map(x => `
                         <tr>
-                            <td>${esc(x.ticketNo || x.id)}</td>
+                            <td>${tableLink('customer_support.html', x.id || x.ticketNo, x.ticketNo || x.id || 'Open ticket')}</td>
                             <td>${esc(x.status || '-')}</td>
                             <td>${x.ageDays} day(s)</td>
                             <td>${x.slaDays} day(s)</td>
@@ -191,9 +226,9 @@
                     <tr><th>Subject</th><th>Module</th><th>Reference</th><th>Created</th></tr>
                     ${a.filter(x => x.automation).map(x => `
                         <tr>
-                            <td>${esc(x.subject)}</td>
+                            <td>${linkFromRecord(x)}</td>
                             <td>${esc(x.relatedModule || '-')}</td>
-                            <td>${esc(x.relatedId || '-')}</td>
+                            <td>${tableLink((String(x.relatedModule || '').toLowerCase().includes('enquiry') ? 'enquiry.html' : String(x.relatedModule || '').toLowerCase().includes('quotation') ? 'quotation.html' : String(x.relatedModule || '').toLowerCase().includes('invoice') ? 'invoice.html' : String(x.relatedModule || '').toLowerCase().includes('ticket') || String(x.relatedModule || '').toLowerCase().includes('support') ? 'customer_support.html' : String(x.relatedModule || '').toLowerCase().includes('follow') ? 'follow_up.html' : String(x.relatedModule || '').toLowerCase().includes('customer') ? 'customer.html' : String(x.relatedModule || '').toLowerCase().includes('supplier') ? 'supplier.html' : ''), x.relatedId || x.id, x.relatedId || x.id || '-')}</td>
                             <td>${esc(x.createdAt || '-')}</td>
                         </tr>
                     `).join('') || '<tr><td colspan="4">No daily log entries yet.</td></tr>'}

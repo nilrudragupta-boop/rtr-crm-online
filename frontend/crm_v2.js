@@ -2,6 +2,36 @@ const V2 = (() => {
     const base = (() => { const local = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:'; return localStorage.getItem('backendApiUrl') || (local ? 'http://localhost:5000/api' : location.origin + '/api') })();
     const q = s => String(s ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
     const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    const actionLink = (page, id, label, extra = '') => {
+        if (!page || !id) return q(label || 'View');
+        return `<a href="${page}${page.includes('?') ? '&' : '?'}id=${encodeURIComponent(id)}" style="color:#0176d3;font-weight:700;text-decoration:none;${extra}">${q(label || id)}</a>`;
+    };
+    const taskTarget = item => {
+        const module = String(item?.module || item?.relatedModule || item?.type || '').toLowerCase();
+        const id = item?.id || item?.relatedId || item?.recordId || item?.referenceNo || item?.reference || item?.enquiryNo || item?.ticketNo || item?.customerId || item?.partyId;
+        const label = item?.subject || item?.outcome || item?.activityType || item?.title || item?.name || 'Record';
+        const map = {
+            customer: 'customer.html',
+            customers: 'customer.html',
+            supplier: 'supplier.html',
+            suppliers: 'supplier.html',
+            enquiry: 'enquiry.html',
+            enquiries: 'enquiry.html',
+            quotation: 'quotation.html',
+            quotations: 'quotation.html',
+            invoice: 'invoice.html',
+            invoices: 'invoice.html',
+            followup: 'follow_up.html',
+            'follow-up': 'follow_up.html',
+            'follow-ups': 'follow_up.html',
+            ticket: 'customer_support.html',
+            tickets: 'customer_support.html',
+            support: 'customer_support.html',
+            'customer support': 'customer_support.html'
+        };
+        const page = map[module] || map[Object.keys(map).find(k => module.includes(k))];
+        return actionLink(page, id, label);
+    };
     async function get(path) { const r = await fetch(base + path, { cache: 'no-store' }); const j = await r.json(); if (!r.ok || !j.success) throw new Error(j.message || 'Request failed'); return j.data }
     function card(label, value, sub) { return `<div class="kpi"><div class="label">${q(label)}</div><div class="value">${value}</div><div class="sub">${q(sub || '')}</div></div>` }
     function link(page, params, text) { return `<a href="${page}${params ? '?' + params : ''}" style="color:#0176d3;font-weight:700;text-decoration:none">${q(text)}</a>` }
@@ -29,7 +59,7 @@ const V2 = (() => {
         document.getElementById('quotes').innerHTML = qs.length ? `<table class="table"><thead><tr><th>Quotation</th><th>Customer</th><th>Status</th><th>Value</th></tr></thead><tbody>${qs.map(x => `<tr><td>${link('quotation.html', 'refNo=' + encodeURIComponent(x.refNo || x.id), x.refNo || x.id)}</td><td>${q(x.custName || '-')}</td><td><span class="pill">${q(x.status || 'Saved')}</span></td><td>${money(x.grandTotal || x.totalValue)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No quotations found.</div>';
 
         const acts = [...(data.recent?.activities || []), ...(data.recent?.followUps || [])].sort((a, b) => new Date(a.dueDate || a.createdAt || 0) - new Date(b.dueDate || b.createdAt || 0)).slice(0, 10);
-        document.getElementById('tasks').innerHTML = acts.length ? acts.map(a => `<div style="padding:9px 0;border-bottom:1px solid #edf0f3"><b>${q(a.subject || a.outcome || a.activityType || 'Activity')}</b><div style="font-size:10px;color:#667085">${q(a.dueDate || a.nextFollowUp || a.activityDate || '')} · ${q(a.status || 'Open')} · ${q(a.priority || 'Medium')}</div></div>`).join('') : '<div class="empty">No follow-ups or activities found.</div>';
+        document.getElementById('tasks').innerHTML = acts.length ? acts.map(a => `<div style="padding:9px 0;border-bottom:1px solid #edf0f3"><div><b>${taskTarget(a)}</b></div><div style="font-size:10px;color:#667085">${q(a.dueDate || a.nextFollowUp || a.activityDate || '')} · ${q(a.status || 'Open')} · ${q(a.priority || 'Medium')}</div></div>`).join('') : '<div class="empty">No follow-ups or activities found.</div>';
     }
     async function search(term) { if (!term.trim()) { document.getElementById('results').style.display = 'none'; return } try { const rows = await get('/crm/v2/search?q=' + encodeURIComponent(term)); const el = document.getElementById('results'); el.innerHTML = rows.length ? rows.map(x => `<div class="result" data-type="${q(x.type)}" data-id="${q(x.id)}"><b>${q(x.type)}</b> · ${q(x.ref)}<div style="font-size:11px;color:#667085">${q(x.name)}</div></div>`).join('') : '<div class="result">No records found.</div>'; el.style.display = 'block' } catch (e) { console.warn(e) } }
     function bind() { const input = document.getElementById('globalSearch'), results = document.getElementById('results'); let timer; input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => search(input.value), 220) }); document.addEventListener('click', e => { const r = e.target.closest('.result'); if (r && r.dataset.id) { const type = r.dataset.type.toLowerCase(); const page = { customer: 'customer.html', supplier: 'supplier.html', enquiry: 'enquiry.html', quotation: 'quotation.html', invoice: 'invoice.html' }[type]; if (type === 'customer' || type === 'supplier') location.href = `business360.html?type=${type}&id=${encodeURIComponent(r.dataset.id)}`; else if (page) location.href = page + '?id=' + encodeURIComponent(r.dataset.id); return } if (!e.target.closest('.search')) results.style.display = 'none' }); document.getElementById('modules').innerHTML = [['Customers', 'customer.html', 'Customer records'], ['Suppliers', 'supplier.html', 'Supplier records'], ['Enquiries', 'enquiry.html', 'Sales intake'], ['Quotations', 'quotation.html', 'Commercial'], ['Customer 360°', 'business360.html', 'Business view'], ['Follow-ups', 'follow_up.html', 'Action items'], ['Customer support', 'customer_support.html', 'Service work'], ['Purchase', 'purchase.html', 'Buying work'], ['Invoices', 'invoice.html', 'Billing'], ['Reports', 'report.html', 'Management'], ['Order execution', 'order-sheet.html', 'Operations'], ['Purchase dashboard', 'purchase_dashboard.html', 'Procurement'], ['Invoice dashboard', 'invoice_dashboard.html', 'Accounts']].map(x => `<div class="module" onclick="location.href='${x[1]}'"><b>${x[0]}</b><span>${x[2]}</span></div>`).join('') }
