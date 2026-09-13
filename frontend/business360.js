@@ -251,19 +251,19 @@ const B360UI = {
         const k = this.activeData.kpis;
         const isCustomer = this.currentType === 'customer';
         const html = isCustomer ? [
-            this.kpiCard('ACTIVE ENQUIRIES', k.enquiriesCount, 'Enquiry Management', `B360UI.openRelated('enquiry.html')`, '20px'),
-            this.kpiCard('QUOTATION PIPELINE', this.lakhs(k.quotationsVal), 'Quotation records', `B360UI.openRelated('quotation.html')`, '20px'),
-            this.kpiCard('TOTAL ORDERS / SALES', this.lakhs(k.ordersVal), 'Sales Register', `B360UI.openRelated('sales_report.html')`, '20px'),
-            this.kpiCard('TOTAL INVOICED', this.lakhs(k.invoicedVal), 'Invoices', `B360UI.openRelated('invoice_dashboard.html')`, '20px'),
-            this.kpiCard('OUTSTANDING RECEIVABLE', this.lakhs(k.outstandingVal), 'Customer Ledger', `B360UI.openRelated('ledger.html')`, k.outstandingVal > 0 ? 'danger' : ''),
-            this.kpiCard('OPEN SERVICE TICKETS', k.openTickets, 'Customer Support', `B360UI.openRelated('customer_support.html')`, k.openTickets > 0 ? 'warning' : ''),
-            this.kpiCard('PENDING FOLLOW-UPS', k.pendingFollowups, 'Follow-up Management', `B360UI.openRelated('follow_up.html')`, '20px'),
+            this.kpiCard('ACTIVE ENQUIRIES', k.enquiriesCount, '<span style="font-size:18px;">Enquiry Management</span>', `B360UI.openRelated('enquiry.html')`, '20px'),
+            this.kpiCard('QUOTATION PIPELINE', this.lakhs(k.quotationsVal), '<span style="font-size:18px;">Quotation records</span>', `B360UI.openRelated('quotation.html')`, '20px'),
+            this.kpiCard('TOTAL ORDERS / SALES', this.lakhs(k.ordersVal), '<span style="font-size:18px;">Sales Register</span>', `B360UI.openRelated('sales_report.html')`, '20px'),
+            this.kpiCard('TOTAL INVOICED', this.lakhs(k.invoicedVal), '<span style="font-size:18px;">Invoices</span>', `B360UI.openRelated('invoice_dashboard.html')`, '20px'),
+            this.kpiCard('OUTSTANDING RECEIVABLE', this.lakhs(k.outstandingVal), '<span style="font-size:18px;">Customer Ledger</span>', `B360UI.openRelated('ledger.html')`, k.outstandingVal > 0 ? 'danger' : ''),
+            this.kpiCard('OPEN SERVICE TICKETS', k.openTickets, '<span style="font-size:18px;">Customer Support</span>', `B360UI.openRelated('customer_support.html')`, k.openTickets > 0 ? 'warning' : ''),
+            this.kpiCard('PENDING FOLLOW-UPS', k.pendingFollowups, '<span style="font-size:18px;">Follow-up Management</span>', `B360UI.openRelated('follow_up.html')`, '20px'),
             this.kpiCard('CUSTOMER HEALTH SCORE', `${k.score}/100`, `${k.scoreGrade || '—'} · View score breakdown`, `B360UI.showScoreBreakdown()`)
         ].join('') : [
-            this.kpiCard('PURCHASE ORDERS', this.lakhs(k.poVal), 'Purchase records', `B360UI.openRelated('purchase.html')`, '20px'),
-            this.kpiCard('TOTAL PAYABLE', this.lakhs(k.payableVal), 'Supplier Ledger', `B360UI.openRelated('ledger.html')`, k.payableVal > 0 ? 'danger' : ''),
-            this.kpiCard('REJECTIONS LOGGED', k.rejectionsCount, 'Rejected / quality records', `B360UI.openRelated('purchase.html')`, k.rejectionsCount > 0 ? 'warning' : ''),
-            this.kpiCard('GRN / RECEIVED VALUE', this.lakhs(k.grnVal), 'Purchase records', `B360UI.openRelated('purchase_dashboard.html')`, '20px'),
+            this.kpiCard('PURCHASE ORDERS', this.lakhs(k.poVal), '<span style="font-size:18px;">Purchase records</span>', `B360UI.openRelated('purchase.html')`, '20px'),
+            this.kpiCard('TOTAL PAYABLE', this.lakhs(k.payableVal), '<span style="font-size:18px;">Supplier Ledger</span>', `B360UI.openRelated('ledger.html')`, k.payableVal > 0 ? 'danger' : ''),
+            this.kpiCard('REJECTIONS LOGGED', k.rejectionsCount, '<span style="font-size:18px;">Rejected / quality records</span>', `B360UI.openRelated('purchase.html')`, k.rejectionsCount > 0 ? 'warning' : ''),
+            this.kpiCard('GRN / RECEIVED VALUE', this.lakhs(k.grnVal), '<span style="font-size:18px;">Purchase records</span>', `B360UI.openRelated('purchase_dashboard.html')`, '20px'),
             this.kpiCard('SUPPLIER QUALITY SCORE', `${k.score}/100`, `${k.scoreGrade || '—'} · View score breakdown`, `B360UI.showScoreBreakdown()`)
         ].join('');
         document.getElementById('kpiStripContainer').innerHTML = html;
