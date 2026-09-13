@@ -8,11 +8,9 @@ const B360UI = {
     currentTab: 'overview',
     activeData: null,
     _bound: false,
-    textScale: 1,
 
     async init() {
         this.readContext();
-        this.applyTextScale();
         await this.syncLiveData();
         this.bindSearch();
 
@@ -85,29 +83,6 @@ const B360UI = {
     },
     lakhs(value) { return `₹${(Number(value || 0) / 100000).toFixed(2)} L`; },
     date(value) { if (!value) return '—'; const d = new Date(value); return isNaN(d) ? this.esc(value) : d.toLocaleDateString('en-GB'); },
-
-    getStoredTextScale() {
-        const value = Number.parseFloat(localStorage.getItem('business360TextScale') || '');
-        if (!Number.isFinite(value)) return 1;
-        return Math.min(1.6, Math.max(0.8, value));
-    },
-
-    applyTextScale(scale = this.getStoredTextScale()) {
-        this.textScale = Math.min(1.6, Math.max(0.8, Number(scale) || 1));
-        const root = document.documentElement || document.body;
-        if (root) root.style.zoom = String(this.textScale);
-        localStorage.setItem('business360TextScale', String(this.textScale));
-        const valueEl = document.getElementById('b360TextScaleValue');
-        if (valueEl) valueEl.textContent = `${this.textScale.toFixed(1)}x`;
-        const reduce = document.getElementById('b360TextReduceBtn');
-        const increase = document.getElementById('b360TextIncreaseBtn');
-        if (reduce) reduce.disabled = this.textScale <= 0.8;
-        if (increase) increase.disabled = this.textScale >= 1.6;
-    },
-
-    changeTextScale(delta) {
-        this.applyTextScale(this.textScale + delta);
-    },
 
     onPartyTypeChange() {
         this.currentType = document.getElementById('partyTypeSelect').value;
@@ -276,19 +251,19 @@ const B360UI = {
         const k = this.activeData.kpis;
         const isCustomer = this.currentType === 'customer';
         const html = isCustomer ? [
-            this.kpiCard('ACTIVE ENQUIRIES', k.enquiriesCount, 'Enquiry Management', `B360UI.openRelated('enquiry.html')`),
-            this.kpiCard('QUOTATION PIPELINE', this.lakhs(k.quotationsVal), 'Quotation records', `B360UI.openRelated('quotation.html')`),
-            this.kpiCard('TOTAL ORDERS / SALES', this.lakhs(k.ordersVal), 'Sales Register', `B360UI.openRelated('sales_report.html')`),
-            this.kpiCard('TOTAL INVOICED', this.lakhs(k.invoicedVal), 'Invoices', `B360UI.openRelated('invoice_dashboard.html')`),
+            this.kpiCard('ACTIVE ENQUIRIES', k.enquiriesCount, 'Enquiry Management', `B360UI.openRelated('enquiry.html')`, '20px'),
+            this.kpiCard('QUOTATION PIPELINE', this.lakhs(k.quotationsVal), 'Quotation records', `B360UI.openRelated('quotation.html')`, '20px'),
+            this.kpiCard('TOTAL ORDERS / SALES', this.lakhs(k.ordersVal), 'Sales Register', `B360UI.openRelated('sales_report.html')`, '20px'),
+            this.kpiCard('TOTAL INVOICED', this.lakhs(k.invoicedVal), 'Invoices', `B360UI.openRelated('invoice_dashboard.html')`, '20px'),
             this.kpiCard('OUTSTANDING RECEIVABLE', this.lakhs(k.outstandingVal), 'Customer Ledger', `B360UI.openRelated('ledger.html')`, k.outstandingVal > 0 ? 'danger' : ''),
             this.kpiCard('OPEN SERVICE TICKETS', k.openTickets, 'Customer Support', `B360UI.openRelated('customer_support.html')`, k.openTickets > 0 ? 'warning' : ''),
-            this.kpiCard('PENDING FOLLOW-UPS', k.pendingFollowups, 'Follow-up Management', `B360UI.openRelated('follow_up.html')`),
+            this.kpiCard('PENDING FOLLOW-UPS', k.pendingFollowups, 'Follow-up Management', `B360UI.openRelated('follow_up.html')`, '20px'),
             this.kpiCard('CUSTOMER HEALTH SCORE', `${k.score}/100`, `${k.scoreGrade || '—'} · View score breakdown`, `B360UI.showScoreBreakdown()`)
         ].join('') : [
-            this.kpiCard('PURCHASE ORDERS', this.lakhs(k.poVal), 'Purchase records', `B360UI.openRelated('purchase.html')`),
+            this.kpiCard('PURCHASE ORDERS', this.lakhs(k.poVal), 'Purchase records', `B360UI.openRelated('purchase.html')`, '20px'),
             this.kpiCard('TOTAL PAYABLE', this.lakhs(k.payableVal), 'Supplier Ledger', `B360UI.openRelated('ledger.html')`, k.payableVal > 0 ? 'danger' : ''),
             this.kpiCard('REJECTIONS LOGGED', k.rejectionsCount, 'Rejected / quality records', `B360UI.openRelated('purchase.html')`, k.rejectionsCount > 0 ? 'warning' : ''),
-            this.kpiCard('GRN / RECEIVED VALUE', this.lakhs(k.grnVal), 'Purchase records', `B360UI.openRelated('purchase_dashboard.html')`),
+            this.kpiCard('GRN / RECEIVED VALUE', this.lakhs(k.grnVal), 'Purchase records', `B360UI.openRelated('purchase_dashboard.html')`, '20px'),
             this.kpiCard('SUPPLIER QUALITY SCORE', `${k.score}/100`, `${k.scoreGrade || '—'} · View score breakdown`, `B360UI.showScoreBreakdown()`)
         ].join('');
         document.getElementById('kpiStripContainer').innerHTML = html;
