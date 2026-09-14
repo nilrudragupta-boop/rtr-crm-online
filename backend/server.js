@@ -140,6 +140,17 @@ const settingSchema = new mongoose.Schema({
 }, { strict: false });
 const Setting = mongoose.model('Setting', settingSchema);
 
+// User-owned navigation definitions for the dynamic Custom Objects workspace.
+const customPageSchema = new mongoose.Schema({
+    pageId: { type: String, required: true },
+    label: { type: String, required: true },
+    icon: String,
+    order: { type: Number, default: 0 },
+    createdBy: { type: String, required: true, index: true }
+}, { timestamps: true, strict: false });
+customPageSchema.index({ pageId: 1, createdBy: 1 }, { unique: true });
+const CustomPage = mongoose.model('CustomPage', customPageSchema);
+
 // --- General App Settings Routes ---
 app.get('/api/settings', async (req, res) => {
     try {
@@ -163,6 +174,46 @@ app.post('/api/settings', async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+// --- User-owned Custom Object Pages ---
+app.get('/api/custom-pages', async (req, res) => {
+    try {
+        const user = req.query.user || 'System';
+        const pages = await CustomPage.find({ createdBy: user }).sort({ order: 1, createdAt: 1 });
+        res.json({ success: true, data: pages });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/custom-pages', async (req, res) => {
+    try {
+        const payload = { ...req.body, createdBy: req.body.createdBy || req.query.user || 'System' };
+        const page = await CustomPage.findOneAndUpdate(
+            { pageId: payload.pageId, createdBy: payload.createdBy },
+            payload,
+            { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+        );
+        res.json({ success: true, data: page });
+    } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+});
+
+app.delete('/api/custom-pages/:pageId', async (req, res) => {
+    try {
+        await CustomPage.findOneAndDelete({ pageId: req.params.pageId, createdBy: req.query.user || 'System' });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/custom-pages/reorder', async (req, res) => {
+    try {
+        const user = req.query.user || 'System';
+        const updates = Array.isArray(req.body) ? req.body : [];
+        await Promise.all(updates.map((page, order) => CustomPage.updateOne(
+            { pageId: page.pageId, createdBy: user },
+            { $set: { order } }
+        )));
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // --- Shadow Ledger / Vault Routes ---
@@ -917,7 +968,7 @@ function crmRoutes(app, Model, basePath) {
         try {
             const payload = { ...req.body };
             if (!payload.createdBy && req.query.user) payload.createdBy = req.query.user;
-            if (!payload.id) payload.id = `${basePath.replace('/api/','').replace(/-/g,'_')}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+            if (!payload.id) payload.id = `${basePath.replace('/api/', '').replace(/-/g, '_')}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const data = await Model.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true, setDefaultsOnInsert: true });
             res.status(200).json({ success: true, data });
         } catch (err) { res.status(400).json({ success: false, message: err.message }); }
@@ -1008,7 +1059,8 @@ app.get('/api/crm/customer/:id/business-360', async (req, res) => {
             amount: money(q.grandTotal), description: 'Quotation created / updated', sourceId: q.id || q.refNo
         }));
         invoices.forEach(i => {
-            timeline.push({ date: i.date || i.createdAt, type: 'Invoice', icon: 'fa-file-invoice',
+            timeline.push({
+                date: i.date || i.createdAt, type: 'Invoice', icon: 'fa-file-invoice',
                 reference: i.invoiceNo || i.invoice_no || i.id || '-', status: i.status || 'UNPAID',
                 amount: money(i.invoiceTotal ?? i.grandTotal), paid: money(i.amountPaid),
                 description: 'Customer invoice', sourceId: i.id || i.invoiceNo
@@ -1019,7 +1071,8 @@ app.get('/api/crm/customer/:id/business-360', async (req, res) => {
                 description: 'Payment recorded against invoice', sourceId: i.id || i.invoiceNo
             });
         });
-        notes.forEach(n => timeline.push({ date: n.date || n.createdAt, type: n.type === 'CREDIT' ? 'Credit Note' : 'Debit Note',
+        notes.forEach(n => timeline.push({
+            date: n.date || n.createdAt, type: n.type === 'CREDIT' ? 'Credit Note' : 'Debit Note',
             icon: n.type === 'CREDIT' ? 'fa-file-circle-minus' : 'fa-file-circle-plus', reference: n.noteNo || '-',
             status: n.status || 'ACTIVE', amount: money(n.totalAmount), description: n.reason || 'Credit / Debit note', sourceId: n.id || n.noteNo
         }));
@@ -1305,7 +1358,7 @@ app.post('/api/chatter', async (req, res) => {
     try {
         const Message = mongoose.model('Message');
         const payload = req.body;
-        
+
         // 1. Force target tenant if crossing environments
         const isCrossTenant = req.query.tenant === '7908040851' || (payload && payload.sender === 'DEVELOPER');
         if (isCrossTenant && req.query.tenant) {
