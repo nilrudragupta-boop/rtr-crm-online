@@ -907,17 +907,7 @@
                         }
                     }
 
-                    if (apiClient.getCustomPages) {
-                        const pages = await apiClient.getCustomPages();
-                        if (Array.isArray(pages) && pages.length) {
-                            localStorage.setItem('crmCustomPages', JSON.stringify(pages));
-                        } else if (apiClient.getSettings) {
-                            const legacy = await apiClient.getSettings();
-                            const legacyPages = legacy?.crmCustomPages || [];
-                            const ownPages = legacyPages.filter(p => (p.createdBy || 'System') === currentUser);
-                            localStorage.setItem('crmCustomPages', JSON.stringify(ownPages));
-                        }
-                    } else if (apiClient.getSettings) {
+                    if (apiClient.getSettings) {
                         const res = await apiClient.getSettings();
                         const settings = res?.data || res || {};
                         if (settings && settings.crmCustomPages) {
@@ -1050,9 +1040,7 @@
                         const updatedAllPages = [...otherUsersPages, ...customPages];
                         localStorage.setItem('crmCustomPages', JSON.stringify(updatedAllPages));
 
-                        if (typeof apiClient !== 'undefined' && apiClient.reorderCustomPages) {
-                            await apiClient.reorderCustomPages(customPages);
-                        } else if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
+                        if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
                             try {
                                 const res = await apiClient.getSettings();
                                 const settings = res?.data || res || {};
