@@ -400,6 +400,30 @@ const apiClient = {
     deleteProduction: (id) => apiClient._deleteCollection('production', id),
 
     // --- Custom Fields & Dynamic Schema Records ---
+    getCustomPages: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/custom-pages${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            if (!response.ok) return null;
+            const result = await response.json();
+            return result.success ? result.data : null;
+        } catch (error) {
+            console.error('Error fetching custom pages:', error);
+            return null;
+        }
+    },
+    saveCustomPage: (data) => apiClient._saveCollection('custom-pages', data),
+    deleteCustomPage: (pageId) => apiClient._deleteCollection('custom-pages', pageId),
+    reorderCustomPages: async (data) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/custom-pages/reorder${apiClient._getAuthQuery()}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error reordering custom pages:', error);
+            return { success: false, message: error.message };
+        }
+    },
     getCustomFields: () => apiClient._getCollection('custom-fields'),
     saveCustomField: (data) => apiClient._saveCollection('custom-fields', data),
     deleteCustomField: (id) => apiClient._deleteCollection('custom-fields', id),
