@@ -411,7 +411,7 @@ const B360UI = {
 
     renderPlants(vp) {
         const rows = this.activeData.plants || [];
-        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Operating Plants & Installed Equipment</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Plant</th><th>Code</th><th>Capacity</th><th>Action</th></tr></thead><tbody>${rows.length ? rows.map(p => `<tr><td>${this.esc(p.plantName || p.name || '—')}</td><td>${this.esc(p.code || p.id || '—')}</td><td>${this.esc(p.capacity || '—')}</td><td><button class="b360-link-btn" onclick="B360UI.openRelated('customer.html')">Open Customer ↗</button></td></tr>`).join('') : `<tr><td colspan="4" class="b360-empty-small">No plant records linked.</td></tr>`}</tbody></table></div></div></div>`;
+        vp.innerHTML = `<div class="slds-card"><div class="slds-card-header">Operating Plants & Installed Equipment</div><div class="slds-card-body" style="padding:0"><div class="b360-table-wrap"><table class="slds-table"><thead><tr><th>Plant</th><th>Code</th><th>Capacity</th><th>STATE</th><th>Action</th></tr></thead><tbody>${rows.length ? rows.map(p => `<tr><td>${this.esc(p.plantName || p.name || '—')}</td><td>${this.esc(p.code || p.plantCode || p.id || '—')}</td><td>${this.esc(p.capacity || '—')}</td><td>${this.esc(p.state || p.STATE || '—')}</td><td><button class="b360-link-btn" onclick="B360UI.openRelated('customer.html')">Open Customer ↗</button></td></tr>`).join('') : `<tr><td colspan="5" class="b360-empty-small">No plant records linked.</td></tr>`}</tbody></table></div></div></div>`;
     },
 
     renderService(vp) {
