@@ -117,6 +117,8 @@ const apiClient = {
         }
     },
     deleteCustomer: (id) => apiClient._deleteCollection('customers', id),
+    getDeletedCustomers: () => apiClient._getDeletedCollection('customers'),
+    restoreCustomer: (id) => apiClient._restoreCollection('customers', id),
 
     // --- Quotations ---
     getQuotations: () => apiClient._getCollection('quotations'),
@@ -302,10 +304,35 @@ const apiClient = {
             return { success: false, message: error.message };
         }
     },
+    _getDeletedCollection: async (collectionName) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/${collectionName}/recycle-bin${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            if (!response.ok) return null;
+            const result = await response.json();
+            return result.success ? result.data : null;
+        } catch (error) {
+            console.error(`Error fetching recycle bin for ${collectionName}:`, error);
+            return null;
+        }
+    },
+    _restoreCollection: async (collectionName, id) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/${collectionName}/${encodeURIComponent(id)}/restore${apiClient._getAuthQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            return await response.json();
+        } catch (error) {
+            console.error(`Error restoring ${collectionName}:`, error);
+            return { success: false, message: error.message };
+        }
+    },
 
     getItems: () => apiClient._getCollection('items'),
     saveItem: (data) => apiClient._saveCollection('items', data),
     deleteItem: (id) => apiClient._deleteCollection('items', id),
+    getDeletedItems: () => apiClient._getDeletedCollection('items'),
+    restoreItem: (id) => apiClient._restoreCollection('items', id),
 
     getPurchases: () => apiClient._getCollection('purchases'),
     savePurchase: (data) => apiClient._saveCollection('purchases', data),
@@ -314,6 +341,8 @@ const apiClient = {
     getSuppliers: () => apiClient._getCollection('suppliers'),
     saveSupplier: (data) => apiClient._saveCollection('suppliers', data),
     deleteSupplier: (id) => apiClient._deleteCollection('suppliers', id),
+    getDeletedSuppliers: () => apiClient._getDeletedCollection('suppliers'),
+    restoreSupplier: (id) => apiClient._restoreCollection('suppliers', id),
 
     getBankAccounts: () => apiClient._getCollection('bank-accounts'),
     saveBankAccount: (data) => apiClient._saveCollection('bank-accounts', data),

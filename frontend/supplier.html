@@ -527,6 +527,8 @@
         <input type="file" id="importCsvFile" style="display:none" onchange="importSuppliersCSV(this)" accept=".csv">
 
         <button class="action" onclick="openSettingsModal()" style="background:#607d8b;">⚙️ Table Settings</button>
+        <button class="action" id="supplierRecycleBinBtn" onclick="openSupplierRecycleBin()"
+            style="background:#6f42c1; display:none;">♻️ Recycle Bin</button>
         <button class="action" onclick="deleteSelectedSuppliers()" style="background:#dc3545;"
             data-permission-id="perm_delete_action">Delete Selected</button>
     </div>
@@ -1633,7 +1635,8 @@
                 db.collection('suppliers').onSnapshot(snapshot => {
                     const remoteSuppliers = [];
                     snapshot.forEach(doc => {
-                        remoteSuppliers.push({ id: doc.id, ...doc.data() });
+                        const record = { id: doc.id, ...doc.data() };
+                        if (!record.deletedAt) remoteSuppliers.push(record);
                     });
                     suppliers = remoteSuppliers;
                     localStorage.setItem("suppliers", JSON.stringify(suppliers));
@@ -2202,16 +2205,56 @@
         async function confirmDelete() {
             if (idsToDelete.length === 0) return;
 
+            const recycleBin = JSON.parse(localStorage.getItem('recycleBin_suppliers') || '[]');
+            suppliers.filter(supplier => idsToDelete.includes(String(supplier.id))).forEach(supplier => {
+                recycleBin.unshift({ ...supplier, deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' });
+            });
+            localStorage.setItem('recycleBin_suppliers', JSON.stringify(recycleBin.filter((record, index, records) =>
+                index === records.findIndex(item => String(item.id) === String(record.id))
+            )));
+
             for (let id of idsToDelete) {
                 await apiClient.deleteSupplier(id);
             }
             await fetchSuppliersData();
 
             if (db) {
-                idsToDelete.forEach(id => db.collection('suppliers').doc(id).delete().catch(e => console.error("Firestore delete error", e)));
+                idsToDelete.forEach(id => db.collection('suppliers').doc(id).update({ deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' }).catch(e => console.error("Firestore delete error", e)));
             }
             closeModal();
             openSuccessModal("Supplier deleted successfully.");
+        }
+
+        function applySupplierRecycleBinVisibility() {
+            const button = document.getElementById('supplierRecycleBinBtn');
+            if (button) button.style.display = localStorage.getItem('showRecycleBinButtons') === 'true' ? '' : 'none';
+        }
+
+        async function openSupplierRecycleBin() {
+            let records = typeof apiClient !== 'undefined' && apiClient.getDeletedSuppliers ? await apiClient.getDeletedSuppliers() : null;
+            if (!Array.isArray(records)) records = JSON.parse(localStorage.getItem('recycleBin_suppliers') || '[]');
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `<div class="modal-content" style="max-width:600px;text-align:left;"><h3>♻️ Supplier Recycle Bin</h3><div>${records.length ? records.map(record => `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ddd;padding:8px 0;"><span><strong>${escapeHtml(record.name || 'Supplier')}</strong><br><small>${record.deletedAt ? new Date(record.deletedAt).toLocaleString() : 'Recently deleted'}</small></span><button class="action" onclick="restoreSupplierFromBin('${String(record.id).replace(/'/g, "\\'")}', this)">Restore</button></div>`).join('') : '<p style="text-align:center;">Recycle Bin is empty.</p>'}</div><div class="modal-buttons"><button class="clear" onclick="this.closest(\'.modal\').remove()">Close</button></div></div>`;
+            document.body.appendChild(modal);
+        }
+
+        async function restoreSupplierFromBin(id, button) {
+            const localRecords = JSON.parse(localStorage.getItem('recycleBin_suppliers') || '[]');
+            const localRecord = localRecords.find(record => String(record.id) === String(id));
+            const result = typeof apiClient !== 'undefined' && apiClient.restoreSupplier ? await apiClient.restoreSupplier(id) : null;
+            const restored = result?.success && result.data ? result.data : localRecord;
+            if (!restored) return showToast('Could not restore supplier.', 'error');
+            delete restored.deletedAt;
+            delete restored.deletedBy;
+            suppliers.push(restored);
+            if (db) db.collection('suppliers').doc(id).update({ deletedAt: null, deletedBy: null }).catch(e => console.error(e));
+            localStorage.setItem('suppliers', JSON.stringify(suppliers));
+            localStorage.setItem('recycleBin_suppliers', JSON.stringify(localRecords.filter(record => String(record.id) !== String(id))));
+            button.closest('.modal').remove();
+            applyFilters();
+            openSuccessModal('Supplier restored successfully.');
         }
 
         function closeModal() { document.getElementById("confirmationModal").style.display = "none"; idToDelete = null; idsToDelete = []; }
@@ -2760,6 +2803,10 @@
 
         // Initial load
         fetchSuppliersData();
+        applySupplierRecycleBinVisibility();
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'showRecycleBinButtons') applySupplierRecycleBinVisibility();
+        });
         renderDynamicFields({});
         initFirebase();
         applyTheme();
@@ -2918,7 +2965,7 @@
         applyStickyHeader();
 
     </script>
-<script src="crm_v2_integration.js"></script>
+    <script src="crm_v2_integration.js"></script>
 </body>
 
 </html>

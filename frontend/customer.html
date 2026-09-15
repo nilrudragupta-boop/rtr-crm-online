@@ -973,6 +973,8 @@
         <button class="action" id="btnReceiptLog" onclick="openReceiptLogModal()" style="background:rgb(28, 14, 219);"
             data-permission-id="perm_payment_receipt_log">Receipt Log</button>
         <button class="action" onclick="openSettingsModal()" style="background:#607d8b;">⚙️ Table Settings</button>
+        <button class="action" id="customerRecycleBinBtn" onclick="openCustomerRecycleBin()"
+            style="background:#6f42c1; display:none;">♻️ Recycle Bin</button>
 
 
         <button class="action" onclick="deleteSelectedCustomers()" style="background:#dc3545;"
@@ -1720,7 +1722,10 @@
 
                 db.collection('customers').onSnapshot(snapshot => {
                     const remote = [];
-                    snapshot.forEach(doc => remote.push({ id: doc.id, ...doc.data() }));
+                    snapshot.forEach(doc => {
+                        const record = { id: doc.id, ...doc.data() };
+                        if (!record.deletedAt) remote.push(record);
+                    });
                     customers = remote;
                     localStorage.setItem("customers", JSON.stringify(customers));
                     applyFilters();
@@ -2151,6 +2156,14 @@
         async function confirmDelete() {
             if (idsToDelete.length === 0) return;
 
+            const recycleBin = JSON.parse(localStorage.getItem('recycleBin_customers') || '[]');
+            customers.filter(c => idsToDelete.includes(String(c.id))).forEach(customer => {
+                recycleBin.unshift({ ...customer, deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' });
+            });
+            localStorage.setItem('recycleBin_customers', JSON.stringify(recycleBin.filter((record, index, records) =>
+                index === records.findIndex(item => String(item.id) === String(record.id))
+            )));
+
             // Delete Backend API
             for (let id of idsToDelete) {
                 if (typeof apiClient !== 'undefined' && apiClient.deleteCustomer) {
@@ -2165,11 +2178,48 @@
 
             // Delete Firestore
             if (db) {
-                idsToDelete.forEach(id => db.collection('customers').doc(id).delete().catch(e => console.error(e)));
+                idsToDelete.forEach(id => db.collection('customers').doc(id).update({ deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' }).catch(e => console.error(e)));
             }
 
             closeModal();
             openSuccessModal("Customer(s) deleted successfully.");
+        }
+
+        function applyCustomerRecycleBinVisibility() {
+            const button = document.getElementById('customerRecycleBinBtn');
+            if (button) button.style.display = localStorage.getItem('showRecycleBinButtons') === 'true' ? '' : 'none';
+        }
+
+        async function openCustomerRecycleBin() {
+            let records = typeof apiClient !== 'undefined' && apiClient.getDeletedCustomers
+                ? await apiClient.getDeletedCustomers() : null;
+            if (!Array.isArray(records)) records = JSON.parse(localStorage.getItem('recycleBin_customers') || '[]');
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            modal.innerHTML = `<div class="modal-content" style="width:600px; text-align:left; max-height:80vh; overflow-y:auto;">
+                <h3>♻️ Customer Recycle Bin</h3>
+                <div>${records.length ? records.map(record => `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ddd;padding:8px 0;"><span><strong>${escapeHtml(record.name || 'Customer')}</strong><br><small>${record.deletedAt ? new Date(record.deletedAt).toLocaleString() : 'Recently deleted'}</small></span><button class="action" onclick="restoreCustomerFromBin('${String(record.id).replace(/'/g, "\\'")}', this)">Restore</button></div>`).join('') : '<p style="text-align:center;">Recycle Bin is empty.</p>'}</div>
+                <div class="modal-buttons"><button class="clear" onclick="this.closest('.modal').remove()">Close</button></div>
+            </div>`;
+            document.body.appendChild(modal);
+        }
+
+        async function restoreCustomerFromBin(id, button) {
+            const localRecords = JSON.parse(localStorage.getItem('recycleBin_customers') || '[]');
+            const localRecord = localRecords.find(record => String(record.id) === String(id));
+            let result = typeof apiClient !== 'undefined' && apiClient.restoreCustomer ? await apiClient.restoreCustomer(id) : null;
+            const restored = result?.success && result.data ? result.data : localRecord;
+            if (!restored) return showToast('Could not restore customer.', 'toast-error');
+            delete restored.deletedAt;
+            delete restored.deletedBy;
+            customers.push(restored);
+            if (db) db.collection('customers').doc(id).update({ deletedAt: null, deletedBy: null }).catch(e => console.error(e));
+            localStorage.setItem('customers', JSON.stringify(customers));
+            localStorage.setItem('recycleBin_customers', JSON.stringify(localRecords.filter(record => String(record.id) !== String(id))));
+            button.closest('.modal').remove();
+            applyFilters();
+            openSuccessModal('Customer restored successfully.');
         }
 
         function openSuccessModal(msg) {
@@ -2908,6 +2958,10 @@
         }
 
         document.addEventListener("DOMContentLoaded", async () => {
+            applyCustomerRecycleBinVisibility();
+            window.addEventListener('storage', (event) => {
+                if (event.key === 'showRecycleBinButtons') applyCustomerRecycleBinVisibility();
+            });
             // Sync Custom Fields definitions from API on startup to map them properly
             if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
                 try {
@@ -3084,7 +3138,7 @@
 
         applyStickyHeader();
     </script>
-<script src="crm_v2_integration.js"></script>
+    <script src="crm_v2_integration.js"></script>
 </body>
 
 </html>
