@@ -957,7 +957,8 @@
                         <div class="cfm-field-group">
                             <label class="cfm-label">Options (comma separated) <span class="req-star">*</span></label>
                             <input type="text" id="cfOptions" class="cfm-input" placeholder="e.g., A+, O+, B-, AB+">
-                            <div class="cfm-hint">Normal format: Opt1, Opt2. Dependent format: Parent1:Opt1,Opt2 | Parent2:Opt3</div>
+                            <div class="cfm-hint">Normal format: Opt1, Opt2. Dependent format: Parent1:Opt1,Opt2 |
+                                Parent2:Opt3</div>
                         </div>
                     </div>
 
@@ -1104,7 +1105,8 @@
                         </div>
                         <div class="cfm-field-group">
                             <label class="cfm-label">Minimum Digits</label>
-                            <input type="number" id="cfAutoDigits" class="cfm-input" value="4" min="1" placeholder="e.g., 4 for 0001">
+                            <input type="number" id="cfAutoDigits" class="cfm-input" value="4" min="1"
+                                placeholder="e.g., 4 for 0001">
                         </div>
                     </div>
 
@@ -1508,38 +1510,38 @@
             const moduleName = document.getElementById('cfLookupModule').value.trim();
             const displaySelect = document.getElementById('cfLookupDisplay');
             if (!displaySelect) return;
-            
+
             const currentVal = displaySelect.value;
             displaySelect.innerHTML = '<option value="">-- Select Display Field --</option>';
-            
+
             let fields = [];
-            
+
             if (moduleName.toLowerCase() === 'customer' || moduleName.toLowerCase() === 'customers') {
-                fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'contact', fieldLabel: 'Contact'}, {fieldName: 'email', fieldLabel: 'Email'}, {fieldName: 'gstin', fieldLabel: 'GSTIN'}];
+                fields = [{ fieldName: 'name', fieldLabel: 'Name' }, { fieldName: 'contact', fieldLabel: 'Contact' }, { fieldName: 'email', fieldLabel: 'Email' }, { fieldName: 'gstin', fieldLabel: 'GSTIN' }];
             } else if (moduleName.toLowerCase() === 'supplier' || moduleName.toLowerCase() === 'suppliers') {
-                fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'contact', fieldLabel: 'Contact'}, {fieldName: 'email', fieldLabel: 'Email'}, {fieldName: 'gstin', fieldLabel: 'GSTIN'}];
+                fields = [{ fieldName: 'name', fieldLabel: 'Name' }, { fieldName: 'contact', fieldLabel: 'Contact' }, { fieldName: 'email', fieldLabel: 'Email' }, { fieldName: 'gstin', fieldLabel: 'GSTIN' }];
             } else if (moduleName.toLowerCase() === 'item' || moduleName.toLowerCase() === 'items') {
-                fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'itemCode', fieldLabel: 'Item Code'}, {fieldName: 'category', fieldLabel: 'Category'}, {fieldName: 'price', fieldLabel: 'Price'}];
+                fields = [{ fieldName: 'name', fieldLabel: 'Name' }, { fieldName: 'itemCode', fieldLabel: 'Item Code' }, { fieldName: 'category', fieldLabel: 'Category' }, { fieldName: 'price', fieldLabel: 'Price' }];
             } else if (moduleName.toLowerCase() === 'invoice' || moduleName.toLowerCase() === 'invoices') {
-                fields = [{fieldName: 'invoice_no', fieldLabel: 'Invoice No'}, {fieldName: 'customer_name', fieldLabel: 'Customer Name'}, {fieldName: 'date', fieldLabel: 'Date'}];
+                fields = [{ fieldName: 'invoice_no', fieldLabel: 'Invoice No' }, { fieldName: 'customer_name', fieldLabel: 'Customer Name' }, { fieldName: 'date', fieldLabel: 'Date' }];
             } else if (moduleName.toLowerCase() === 'quotation' || moduleName.toLowerCase() === 'quotations') {
-                fields = [{fieldName: 'refNo', fieldLabel: 'Ref No'}, {fieldName: 'custName', fieldLabel: 'Customer Name'}, {fieldName: 'date', fieldLabel: 'Date'}, {fieldName: 'grandTotal', fieldLabel: 'Grand Total'}];
+                fields = [{ fieldName: 'refNo', fieldLabel: 'Ref No' }, { fieldName: 'custName', fieldLabel: 'Customer Name' }, { fieldName: 'date', fieldLabel: 'Date' }, { fieldName: 'grandTotal', fieldLabel: 'Grand Total' }];
             } else if (moduleName.toLowerCase() === 'follow-up' || moduleName.toLowerCase() === 'follow-ups') {
-                fields = [{fieldName: 'partyName', fieldLabel: 'Party Name'}, {fieldName: 'date', fieldLabel: 'Date'}, {fieldName: 'status', fieldLabel: 'Status'}];
+                fields = [{ fieldName: 'partyName', fieldLabel: 'Party Name' }, { fieldName: 'date', fieldLabel: 'Date' }, { fieldName: 'status', fieldLabel: 'Status' }];
             } else if (moduleName) {
                 const customFields = customFieldsCache.filter(f => f.moduleName === moduleName);
-                fields = customFields.map(f => ({fieldName: f.fieldName, fieldLabel: f.fieldLabel}));
+                fields = customFields.map(f => ({ fieldName: f.fieldName, fieldLabel: f.fieldLabel }));
             }
-            
-            fields.push({fieldName: 'id', fieldLabel: 'Record ID'});
-            
+
+            fields.push({ fieldName: 'id', fieldLabel: 'Record ID' });
+
             fields.forEach(f => {
                 const opt = document.createElement('option');
                 opt.value = f.fieldName;
                 opt.textContent = `${f.fieldLabel} (${f.fieldName})`;
                 displaySelect.appendChild(opt);
             });
-            
+
             if (currentVal && fields.some(f => f.fieldName === currentVal)) {
                 displaySelect.value = currentVal;
             }
@@ -1592,16 +1594,37 @@
             renderCustomFieldsTable();
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
+        async function loadCustomPagesForUser() {
+            const currentUser = localStorage.getItem('currentUser') || 'System';
             try {
-                if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
-                    const res = await apiClient.getSettings();
-                    const settings = res?.data || res || {};
-                    if (settings && settings.crmCustomPages) {
-                        localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
-                    }
+                const pages = typeof apiClient !== 'undefined' && apiClient.getCustomPages
+                    ? await apiClient.getCustomPages() : null;
+                if (Array.isArray(pages) && pages.length) {
+                    localStorage.setItem('crmCustomPages', JSON.stringify(pages));
+                    return pages;
                 }
-            } catch (e) { console.warn(e); }
+            } catch (e) { console.warn('Custom page API unavailable:', e); }
+
+            try {
+                const settings = typeof apiClient !== 'undefined' && apiClient.getSettings
+                    ? await apiClient.getSettings() : {};
+                const legacy = Array.isArray(settings?.crmCustomPages) ? settings.crmCustomPages : [];
+                const ownPages = legacy.filter(p => (p.createdBy || 'System') === currentUser);
+                if (ownPages.length && apiClient?.saveCustomPage) {
+                    await Promise.all(ownPages.map(page => apiClient.saveCustomPage({ ...page, createdBy: currentUser })));
+                }
+                localStorage.setItem('crmCustomPages', JSON.stringify(ownPages));
+                return ownPages;
+            } catch (e) {
+                const local = JSON.parse(localStorage.getItem('crmCustomPages') || '[]');
+                return local.filter(p => (p.createdBy || 'System') === currentUser);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadCustomPagesForUser();
+            populateCfModuleDatalist();
+            populateCfModuleFilter();
         });
 
         function populateCfModuleFilter() {
@@ -2040,14 +2063,14 @@
             if (draggedFieldItem !== this) {
                 const fromId = draggedFieldItem.dataset.fieldId;
                 const toId = this.dataset.fieldId;
-                    const currentUser = localStorage.getItem('currentUser') || 'System';
-                    let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                const currentUser = localStorage.getItem('currentUser') || 'System';
+                let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
                 const fi = customFieldsCache.findIndex(f => f._id === fromId);
                 const ti = customFieldsCache.findIndex(f => f._id === toId);
                 const [item] = customFieldsCache.splice(fi, 1);
                 customFieldsCache.splice(ti, 0, item);
-                    let newMyFields = customFieldsCache.filter(f => f.createdBy === currentUser);
-                    newMyFields.forEach((f, i) => f.order = i);
+                let newMyFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                newMyFields.forEach((f, i) => f.order = i);
                 renderCustomFieldsTable();
                 saveFieldOrder();
             }
@@ -2168,8 +2191,13 @@
             if (!label || !pageId) return cfmToast('Page Label is required', 'error');
             let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             if (allPages.some(p => p.pageId === pageId)) return cfmToast('A page with this API name already exists.', 'error');
-            allPages.push({ pageId, label, icon, createdBy: currentUser });
+            const page = { pageId, label, icon, order: allPages.length, createdBy: currentUser };
+            allPages.push(page);
             localStorage.setItem('crmCustomPages', JSON.stringify(allPages));
+            if (typeof apiClient !== 'undefined' && apiClient.saveCustomPage) {
+                const result = await apiClient.saveCustomPage(page);
+                if (!result?.success) return cfmToast(result?.message || 'Could not save page.', 'error');
+            }
             await syncCustomPagesToBackend(allPages);
             cfmToast('Custom page created! It will now appear as a Target Module.', 'success');
             closePageModal();
@@ -2223,6 +2251,7 @@
                     myPages.splice(evt.newIndex, 0, movedItem);
                     const updatedAllPages = [...otherUsersPages, ...myPages];
                     localStorage.setItem('crmCustomPages', JSON.stringify(updatedAllPages));
+                    if (apiClient?.reorderCustomPages) await apiClient.reorderCustomPages(myPages);
                     await syncCustomPagesToBackend(updatedAllPages);
                     renderCustomPageList(); // Refresh indices
                     populateCfModuleDatalist();
@@ -2232,11 +2261,12 @@
         async function editCustomPage(pageId) {
             let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             const index = allPages.findIndex(p => p.pageId === pageId);
-            if(index === -1) return;
+            if (index === -1) return;
             const newLabel = prompt("Enter new label for custom page:", allPages[index].label);
             if (newLabel && newLabel.trim() !== "" && newLabel !== allPages[index].label) {
                 allPages[index].label = newLabel.trim();
                 localStorage.setItem('crmCustomPages', JSON.stringify(allPages));
+                if (apiClient?.saveCustomPage) await apiClient.saveCustomPage(allPages[index]);
                 await syncCustomPagesToBackend(allPages);
                 cfmToast('Custom page label updated.', 'success');
                 renderCustomPageList();
@@ -2247,10 +2277,11 @@
         async function deleteCustomPage(pageId) {
             let allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
             const index = allPages.findIndex(p => p.pageId === pageId);
-            if(index === -1) return;
+            if (index === -1) return;
             if (confirm(`Are you sure you want to delete the custom page "${allPages[index].label}"? Existing records mapped to this page will become inaccessible.`)) {
                 allPages.splice(index, 1);
                 localStorage.setItem('crmCustomPages', JSON.stringify(allPages));
+                if (apiClient?.deleteCustomPage) await apiClient.deleteCustomPage(pageId);
                 await syncCustomPagesToBackend(allPages);
                 cfmToast('Custom page deleted.', 'success');
                 renderCustomPageList();

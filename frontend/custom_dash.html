@@ -907,7 +907,17 @@
                         }
                     }
 
-                    if (apiClient.getSettings) {
+                    if (apiClient.getCustomPages) {
+                        const pages = await apiClient.getCustomPages();
+                        if (Array.isArray(pages) && pages.length) {
+                            localStorage.setItem('crmCustomPages', JSON.stringify(pages));
+                        } else if (apiClient.getSettings) {
+                            const legacy = await apiClient.getSettings();
+                            const legacyPages = legacy?.crmCustomPages || [];
+                            const ownPages = legacyPages.filter(p => (p.createdBy || 'System') === currentUser);
+                            localStorage.setItem('crmCustomPages', JSON.stringify(ownPages));
+                        }
+                    } else if (apiClient.getSettings) {
                         const res = await apiClient.getSettings();
                         const settings = res?.data || res || {};
                         if (settings && settings.crmCustomPages) {
@@ -1040,7 +1050,9 @@
                         const updatedAllPages = [...otherUsersPages, ...customPages];
                         localStorage.setItem('crmCustomPages', JSON.stringify(updatedAllPages));
 
-                        if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
+                        if (typeof apiClient !== 'undefined' && apiClient.reorderCustomPages) {
+                            await apiClient.reorderCustomPages(customPages);
+                        } else if (typeof apiClient !== 'undefined' && apiClient.getSettings && apiClient.saveSettings) {
                             try {
                                 const res = await apiClient.getSettings();
                                 const settings = res?.data || res || {};
@@ -1444,13 +1456,44 @@
             });
         }
 
-        function openCustomRecordModal(recordData = null) {
+        async function getLookupSourceData(targetModule) {
+            const moduleName = String(targetModule || '').trim();
+            const normalized = moduleName.toLowerCase();
+            const localKey = normalized === 'customer' || normalized === 'customers' ? 'customers'
+                : normalized === 'supplier' || normalized === 'suppliers' ? 'suppliers'
+                    : normalized === 'item' || normalized === 'items' ? 'items'
+                        : normalized === 'invoice' || normalized === 'invoices' ? 'invoices'
+                            : normalized === 'follow-up' || normalized === 'follow-ups' ? 'follow_ups'
+                                : 'data_' + moduleName;
+            let localData = [];
+            try {
+                const parsed = JSON.parse(localStorage.getItem(localKey) || '[]');
+                if (Array.isArray(parsed)) localData = parsed;
+            } catch (e) { }
+            if (typeof apiClient === 'undefined') return localData;
+            try {
+                let remoteData = null;
+                if (normalized === 'customer' || normalized === 'customers') remoteData = await apiClient.getCustomers();
+                else if (normalized === 'supplier' || normalized === 'suppliers') remoteData = await apiClient.getSuppliers();
+                else if (normalized === 'item' || normalized === 'items') remoteData = await apiClient.getItems();
+                else if (normalized === 'invoice' || normalized === 'invoices') remoteData = await apiClient.getInvoices();
+                else if (normalized === 'follow-up' || normalized === 'follow-ups') remoteData = await apiClient.getFollowUps();
+                else if (apiClient.getCustomRecords) remoteData = await apiClient.getCustomRecords(moduleName);
+                if (Array.isArray(remoteData)) {
+                    localStorage.setItem(localKey, JSON.stringify(remoteData));
+                    return remoteData;
+                }
+            } catch (e) { console.warn('Lookup source unavailable:', moduleName, e); }
+            return localData;
+        }
+
+        async function openCustomRecordModal(recordData = null) {
             editCustomRecordId = recordData && recordData.id ? recordData.id : null;
             document.getElementById('customModalTitle').innerText = editCustomRecordId ? "Edit Record" : "New Record";
             const container = document.getElementById('customFormContainer');
             container.innerHTML = '';
 
-            currentCustomFields.forEach(f => {
+            for (const f of currentCustomFields) {
                 const reqHtml = f.isRequired ? '<span style="color:red">*</span>' : '';
                 const val = recordData ? (recordData[f.fieldName] || '') : '';
                 let inputHtml = '';
@@ -1510,34 +1553,19 @@
                                  <input type="hidden" id="${f.fieldName}" value="${val ? String(val).replace(/"/g, '&quot;') : ''}" />
                                  <div id="${f.fieldName}_preview" style="margin-top:5px;">${previewHtml}</div>`;
                 } else if (f.fieldType === 'lookup') {
-                    let lookupOptions = [];
-                    try {
-                        const targetModule = f.lookupModule;
-                        const displayField = f.lookupDisplay;
-
-                        if (targetModule) {
-                            if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
-                                const customers = JSON.parse(localStorage.getItem('customers')) || [];
-                                lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
-                            } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
-                                const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
-                                lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
-                            } else if (targetModule.toLowerCase() === 'item' || targetModule.toLowerCase() === 'items') {
-                                const items = JSON.parse(localStorage.getItem('items')) || [];
-                                lookupOptions = items.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.name || i.id) }));
-                            } else if (targetModule.toLowerCase() === 'invoice' || targetModule.toLowerCase() === 'invoices') {
-                                const invoices = JSON.parse(localStorage.getItem('invoices')) || [];
-                                lookupOptions = invoices.map(i => ({ id: i.id, label: (displayField && i[displayField] !== undefined) ? i[displayField] : (i.invoice_no || i.invoiceNo || i.id) }));
-                            } else if (targetModule.toLowerCase() === 'follow-up' || targetModule.toLowerCase() === 'follow-ups') {
-                                const followUps = JSON.parse(localStorage.getItem('follow_ups')) || [];
-                                lookupOptions = followUps.map(f => ({ id: f.id, label: (displayField && f[displayField] !== undefined) ? f[displayField] : (f.partyName || f.id) }));
-                            } else {
-                                const customData = JSON.parse(localStorage.getItem('data_' + targetModule)) || [];
-                                lookupOptions = customData.map(r => ({ id: r.id, label: (displayField && r[displayField] !== undefined) ? r[displayField] : r.id }));
-                            }
-                        }
-                        lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
-                    } catch (e) { console.warn("Error loading lookup options", e); }
+                    const lookupOptions = [];
+                    const targetModule = f.lookupModule;
+                    const displayField = f.lookupDisplay;
+                    const sourceData = await getLookupSourceData(targetModule);
+                    sourceData.forEach(source => {
+                        if (!source) return;
+                        const sourceId = source.id || source._id || source.invoice_no || source.invoiceNo;
+                        if (!sourceId) return;
+                        const label = displayField && source[displayField] !== undefined
+                            ? source[displayField]
+                            : (source.name || source.title || source.label || source.partyName || source.invoice_no || source.invoiceNo || sourceId);
+                        lookupOptions.push({ id: String(sourceId), label: String(label) });
+                    });
 
                     const uniqueOps = [];
                     const seen = new Set();
@@ -1551,7 +1579,7 @@
                     inputHtml = `<select id="${f.fieldName}" onchange="updateCalculatedFieldsInModal()" style="width:100%; padding:8px; border:1px solid var(--slds-border); border-radius:4px;">
                         <option value="">-- Select --</option>`;
                     uniqueOps.forEach(o => {
-                        inputHtml += `<option value="${String(o.id).replace(/"/g, '&quot;')}" ${o.id === val ? 'selected' : ''}>${String(o.label).replace(/</g, '&lt;')}</option>`;
+                        inputHtml += `<option value="${String(o.id).replace(/"/g, '&quot;')}" ${String(o.id) === String(val) ? 'selected' : ''}>${String(o.label).replace(/</g, '&lt;')}</option>`;
                     });
                     inputHtml += `</select>`;
                 } else {
@@ -1563,7 +1591,7 @@
                 }
                 const fullWidth = f.fieldType === 'textarea' ? 'style="grid-column: 1 / -1;"' : '';
                 container.innerHTML += `<div ${fullWidth}><label style="display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:#444;">${f.fieldLabel} ${reqHtml}</label>${inputHtml}</div>`;
-            });
+            }
             document.getElementById('customRecordModal').style.display = 'block';
             updateCalculatedFieldsInModal();
             currentCustomFields.filter(f => !f.dependsOn).forEach(f => handleDependentFields(f.fieldName));
