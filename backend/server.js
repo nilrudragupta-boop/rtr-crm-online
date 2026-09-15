@@ -246,7 +246,8 @@ app.post('/api/shadow_ledger', async (req, res) => {
 // Fetch all customers
 app.get('/api/customers', async (req, res) => {
     try {
-        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
         const customers = await Customer.find(query).sort({ createdAt: -1 }); // Newest first
         res.json({ success: true, data: customers });
     } catch (err) {
@@ -279,11 +280,32 @@ app.post('/api/customers', async (req, res) => {
 
 app.delete('/api/customers/:id', async (req, res) => {
     try {
-        await Customer.findOneAndDelete({ id: req.params.id });
-        res.json({ success: true });
+        const query = { id: req.params.id, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await Customer.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
+        if (!deleted) return res.status(404).json({ success: false, message: 'Customer not found.' });
+        res.json({ success: true, data: deleted });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+app.get('/api/customers/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        res.json({ success: true, data: await Customer.find(query).sort({ deletedAt: -1 }) });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/customers/:id/restore', async (req, res) => {
+    try {
+        const query = { id: req.params.id, deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const restored = await Customer.findOneAndUpdate(query, { $set: { deletedAt: null, deletedBy: null, updatedAt: new Date() } }, { new: true, strict: false });
+        if (!restored) return res.status(404).json({ success: false, message: 'Deleted customer not found.' });
+        res.json({ success: true, data: restored });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // --- Quotation Routes ---
@@ -368,7 +390,8 @@ app.delete('/api/invoices/:id', async (req, res) => {
 // --- Supplier Routes ---
 app.get('/api/suppliers', async (req, res) => {
     try {
-        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
         const suppliers = await Supplier.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: suppliers });
     } catch (err) {
@@ -400,11 +423,32 @@ app.post('/api/suppliers', async (req, res) => {
 
 app.delete('/api/suppliers/:id', async (req, res) => {
     try {
-        await Supplier.findOneAndDelete({ id: req.params.id });
-        res.json({ success: true });
+        const query = { id: req.params.id, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await Supplier.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
+        if (!deleted) return res.status(404).json({ success: false, message: 'Supplier not found.' });
+        res.json({ success: true, data: deleted });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+app.get('/api/suppliers/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        res.json({ success: true, data: await Supplier.find(query).sort({ deletedAt: -1 }) });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/suppliers/:id/restore', async (req, res) => {
+    try {
+        const query = { id: req.params.id, deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const restored = await Supplier.findOneAndUpdate(query, { $set: { deletedAt: null, deletedBy: null, updatedAt: new Date() } }, { new: true, strict: false });
+        if (!restored) return res.status(404).json({ success: false, message: 'Deleted supplier not found.' });
+        res.json({ success: true, data: restored });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // --- Medicine Routes ---
@@ -496,7 +540,8 @@ app.post('/api/cleanup-anonymous', async (req, res) => {
 // --- Item Routes ---
 app.get('/api/items', async (req, res) => {
     try {
-        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
         const items = await Item.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: items });
     } catch (err) {
@@ -522,11 +567,32 @@ app.post('/api/items', async (req, res) => {
 
 app.delete('/api/items/:id', async (req, res) => {
     try {
-        await Item.findOneAndDelete({ id: req.params.id });
-        res.json({ success: true });
+        const query = { id: req.params.id, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await Item.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
+        if (!deleted) return res.status(404).json({ success: false, message: 'Item not found.' });
+        res.json({ success: true, data: deleted });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+app.get('/api/items/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        res.json({ success: true, data: await Item.find(query).sort({ deletedAt: -1 }) });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/items/:id/restore', async (req, res) => {
+    try {
+        const query = { id: req.params.id, deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const restored = await Item.findOneAndUpdate(query, { $set: { deletedAt: null, deletedBy: null, updatedAt: new Date() } }, { new: true, strict: false });
+        if (!restored) return res.status(404).json({ success: false, message: 'Deleted item not found.' });
+        res.json({ success: true, data: restored });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // --- Purchase Routes ---
