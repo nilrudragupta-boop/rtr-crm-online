@@ -1180,7 +1180,11 @@ app.post('/api/custom-fields/reorder', async (req, res) => {
 // --- Generic Custom Records Routes (For entirely new UI Pages) ---
 app.get('/api/custom-records/:module', async (req, res) => {
     try {
-        const query = req.query.user ? { moduleName: req.params.module, createdBy: req.query.user } : { moduleName: req.params.module };
+        const query = {
+            moduleName: req.params.module,
+            deletedAt: null
+        };
+        if (req.query.user) query.createdBy = req.query.user;
         const records = await CustomRecord.find(query).sort({ createdAt: -1 });
         res.json({ success: true, data: records });
     } catch (err) {
@@ -1210,8 +1214,42 @@ app.post('/api/custom-records', async (req, res) => {
 
 app.delete('/api/custom-records/:id', async (req, res) => {
     try {
-        await CustomRecord.findByIdAndDelete(req.params.id);
-        res.json({ success: true });
+        const query = { _id: req.params.id, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const updated = await CustomRecord.findOneAndUpdate(
+            query,
+            { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } },
+            { new: true, strict: false }
+        );
+        if (!updated) return res.status(404).json({ success: false, message: 'Record not found.' });
+        res.json({ success: true, data: updated });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/custom-records/:module/recycle-bin', async (req, res) => {
+    try {
+        const query = { moduleName: req.params.module, deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const records = await CustomRecord.find(query).sort({ deletedAt: -1 });
+        res.json({ success: true, data: records });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/custom-records/:id/restore', async (req, res) => {
+    try {
+        const query = { _id: req.params.id, deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const restored = await CustomRecord.findOneAndUpdate(
+            query,
+            { $set: { deletedAt: null, deletedBy: null, updatedAt: new Date() } },
+            { new: true, strict: false }
+        );
+        if (!restored) return res.status(404).json({ success: false, message: 'Deleted record not found.' });
+        res.json({ success: true, data: restored });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

@@ -360,7 +360,9 @@ const chatterGroupSchema = new mongoose.Schema({
 // --- Generic Custom Record Schema (For entirely new UI Pages) ---
 const customRecordSchema = new mongoose.Schema({
     _id: { type: String },
-    moduleName: { type: String, required: true, index: true }
+    moduleName: { type: String, required: true, index: true },
+    deletedAt: { type: Date, default: null, index: true },
+    deletedBy: { type: String, default: null }
 }, { timestamps: true, strict: false });
 
 module.exports = {
