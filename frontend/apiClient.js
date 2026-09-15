@@ -453,6 +453,29 @@ const apiClient = {
     },
     saveCustomRecord: (data) => apiClient._saveCollection('custom-records', data),
     deleteCustomRecord: (id) => apiClient._deleteCollection('custom-records', id),
+    getDeletedCustomRecords: async (moduleName) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/custom-records/${encodeURIComponent(moduleName)}/recycle-bin${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            if (!response.ok) return null;
+            const result = await response.json();
+            return result.success ? result.data : null;
+        } catch (error) {
+            console.error(`Error fetching recycle bin for ${moduleName}:`, error);
+            return null;
+        }
+    },
+    restoreCustomRecord: async (id) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/custom-records/${encodeURIComponent(id)}/restore${apiClient._getAuthQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Error restoring custom record:', error);
+            return { success: false, message: error.message };
+        }
+    },
 
     // --- Shadow Ledger / Vault ---
     getShadowLedger: async () => {

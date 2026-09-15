@@ -469,6 +469,7 @@
                     style="background: #f39c12; color: white; border: none; display: none;">✏️ Edit Selected</button>
                 <button onclick="openTableSettingsModal()"><i class="fas fa-cog"></i> ⚙️ Settings</button>
                 <button onclick="openFieldOrderModal()"><i class="fas fa-sort"></i> ↕️ Field Order</button>
+                <button onclick="openRecycleBinModal()">♻️ Recycle Bin</button>
                 <button onclick="printTableReport()"><i class="fas fa-print"></i> 🖨️ Print Report</button>
                 <button onclick="exportData()" style="background: #27ae60; color: white; border: none;">Export
                     Excel</button>
@@ -622,6 +623,22 @@
             <div class="modal-footer">
                 <button onclick="closeBulkEditModal()">Cancel</button>
                 <button class="primary" onclick="applyBulkEdit()">Apply Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recycle Bin Modal -->
+    <div id="recycleBinModal" class="modal">
+        <div class="modal-content" style="max-width: 760px;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 1.1rem;">Recycle Bin</h3>
+                <span style="font-size:24px; cursor:pointer;" onclick="closeRecycleBinModal()">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 16px;">
+                <div id="recycleBinList" style="font-size:13px;">Loading deleted records...</div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeRecycleBinModal()">Close</button>
             </div>
         </div>
     </div>
@@ -1966,6 +1983,15 @@
             const currentUser = localStorage.getItem('currentUser') || 'System';
             let data = allData.filter(r => r.createdBy === currentUser);
             const otherUsersData = allData.filter(r => r.createdBy !== currentUser);
+            const deletedRecord = data.find(r => r.id === id || r._id === id);
+            if (deletedRecord) {
+                const recycleKey = 'recycleBin_' + currentActivePageId;
+                const recycleBin = JSON.parse(localStorage.getItem(recycleKey) || '[]');
+                recycleBin.unshift({ ...deletedRecord, deletedAt: new Date().toISOString(), deletedBy: currentUser });
+                localStorage.setItem(recycleKey, JSON.stringify(recycleBin.filter((r, index, records) =>
+                    index === records.findIndex(item => (item.id || item._id) === (r.id || r._id))
+                )));
+            }
             data = data.filter(r => r.id !== id && r._id !== id);
 
             if (typeof apiClient !== 'undefined' && apiClient.deleteCustomRecord) {
@@ -1974,6 +2000,65 @@
 
             localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...otherUsersData, ...data]));
             if (!skipConfirm) renderCustomTable();
+        }
+
+        function closeRecycleBinModal() {
+            document.getElementById('recycleBinModal').style.display = 'none';
+        }
+
+        async function openRecycleBinModal() {
+            document.getElementById('recycleBinModal').style.display = 'block';
+            await renderRecycleBin();
+        }
+
+        async function renderRecycleBin() {
+            const list = document.getElementById('recycleBinList');
+            if (!list) return;
+            let records = null;
+            if (typeof apiClient !== 'undefined' && apiClient.getDeletedCustomRecords) {
+                records = await apiClient.getDeletedCustomRecords(currentActivePageId);
+            }
+            if (!Array.isArray(records)) {
+                records = JSON.parse(localStorage.getItem('recycleBin_' + currentActivePageId) || '[]');
+            }
+
+            if (records.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:30px; color:#666;">Recycle Bin is empty.</div>';
+                return;
+            }
+
+            list.innerHTML = records.map(record => {
+                const title = escapeHtml(getRecordTitle(record));
+                const deletedAt = record.deletedAt ? new Date(record.deletedAt).toLocaleString() : 'Recently';
+                const id = escapeAttr(record.id || record._id);
+                return `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px; border-bottom:1px solid var(--slds-border);">
+                    <div><strong>${title}</strong><div style="color:#777; font-size:11px; margin-top:3px;">Deleted ${escapeHtml(deletedAt)}</div></div>
+                    <button class="primary" onclick="restoreCustomRecord('${id}')">Restore</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function restoreCustomRecord(id) {
+            const recycleKey = 'recycleBin_' + currentActivePageId;
+            const localRecords = JSON.parse(localStorage.getItem(recycleKey) || '[]');
+            const localRecord = localRecords.find(record => String(record.id || record._id) === String(id));
+            let restoredRecord = localRecord;
+
+            if (typeof apiClient !== 'undefined' && apiClient.restoreCustomRecord) {
+                const result = await apiClient.restoreCustomRecord(id);
+                if (result?.success && result.data) restoredRecord = result.data;
+                else if (!localRecord) return alert(result?.message || 'Could not restore this record.');
+            }
+            if (!restoredRecord) return alert('Could not find this deleted record.');
+
+            delete restoredRecord.deletedAt;
+            delete restoredRecord.deletedBy;
+            const allData = JSON.parse(localStorage.getItem('data_' + currentActivePageId) || '[]');
+            const withoutDuplicate = allData.filter(record => String(record.id || record._id) !== String(id));
+            localStorage.setItem('data_' + currentActivePageId, JSON.stringify([...withoutDuplicate, restoredRecord]));
+            localStorage.setItem(recycleKey, JSON.stringify(localRecords.filter(record => String(record.id || record._id) !== String(id))));
+            await renderRecycleBin();
+            renderCustomTable();
         }
 
         function toggleSelectAllRecords(source) {
