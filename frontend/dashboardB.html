@@ -6774,6 +6774,222 @@
         });
     </script>
 
+    <!-- RISE AI Floating Assistant -->
+
+    <style>
+        #riseAiButton {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 9998;
+            background: #123f73;
+            color: #fff;
+            border: 0;
+            border-radius: 50px;
+            padding: 15px 22px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 20px #0003;
+        }
+
+        #riseAiPanel {
+            display: none;
+            position: fixed;
+            right: 20px;
+            bottom: 90px;
+            width: 380px;
+            max-width: calc(100vw - 30px);
+            height: 500px;
+            max-height: 75vh;
+            z-index: 9999;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 16px;
+            box-shadow: 0 8px 35px #0003;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #riseAiHeader {
+            background: #123f73;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #riseAiMessages {
+            height: calc(100% - 145px);
+            overflow-y: auto;
+            padding: 14px;
+            background: #f5f7fa;
+        }
+
+        .riseAiBubble {
+            padding: 11px 13px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            max-width: 90%;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+
+        .riseAiUser {
+            background: #dcecff;
+            margin-left: auto;
+        }
+
+        .riseAiBot {
+            background: #fff;
+            border: 1px solid #e3e3e3;
+        }
+
+        #riseAiControls {
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        #riseAiInput {
+            flex: 1;
+            min-width: 0;
+            padding: 11px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        #riseAiSend {
+            background: #123f73;
+            color: white;
+            border: 0;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+    </style>
+
+    <button id="riseAiButton" type="button">
+        ✨ RTR-CRM AI
+    </button>
+
+    <div id="riseAiPanel">
+        <div id="riseAiHeader">
+            <strong>RTR-CRM AI Assistant 'NANCY'</strong>
+            <button id="riseAiClose" type="button" style="background:none;border:0;color:white;
+      font-size:22px;cursor:pointer;">
+                ×
+            </button>
+        </div>
+
+        <div id="riseAiMessages">
+            <div class="riseAiBubble riseAiBot">
+                Hello! I am <strong>NANCY</strong>, your AI assistant.
+
+                Ask me about invoices, stock management,
+                GST, reports, or business operations.
+            </div>
+        </div>
+
+        <form id="riseAiControls">
+            <input id="riseAiInput" type="text" maxlength="4000" placeholder="Ask RTR-CRM AI..." autocomplete="off"
+                required>
+
+            <button id="riseAiSend" type="submit">
+                Send
+            </button>
+        </form>
+    </div>
+
+    <script>
+        (function () {
+            const button = document.getElementById("riseAiButton");
+            const panel = document.getElementById("riseAiPanel");
+            const close = document.getElementById("riseAiClose");
+            const form = document.getElementById("riseAiControls");
+            const input = document.getElementById("riseAiInput");
+            const messages = document.getElementById("riseAiMessages");
+            const send = document.getElementById("riseAiSend");
+
+            button.addEventListener("click", () => {
+                panel.style.display =
+                    panel.style.display === "block" ? "none" : "block";
+
+                if (panel.style.display === "block") {
+                    input.focus();
+                }
+            });
+
+            close.addEventListener("click", () => {
+                panel.style.display = "none";
+            });
+
+            function addMessage(text, type) {
+                const bubble = document.createElement("div");
+
+                bubble.className =
+                    "riseAiBubble " +
+                    (type === "user" ? "riseAiUser" : "riseAiBot");
+
+                // Use textContent, not innerHTML, to avoid
+                // interpreting AI output as executable HTML.
+                bubble.textContent = text;
+
+                messages.appendChild(bubble);
+                messages.scrollTop = messages.scrollHeight;
+
+                return bubble;
+            }
+
+            form.addEventListener("submit", async (event) => {
+                event.preventDefault();
+
+                const message = input.value.trim();
+
+                if (!message || send.disabled) return;
+
+                addMessage(message, "user");
+                input.value = "";
+                send.disabled = true;
+
+                const loading = addMessage("RTR-CRM AI is thinking...", "bot");
+
+                try {
+                    const response = await fetch("/api/ai/chat", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        credentials: "same-origin",
+                        body: JSON.stringify({ message })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            data.error || "Unable to get an AI response."
+                        );
+                    }
+
+                    loading.textContent = data.reply ||
+                        "No response was generated.";
+
+                } catch (error) {
+                    loading.textContent = error.message ||
+                        "Unable to connect to RTR-CRM AI.";
+                } finally {
+                    send.disabled = false;
+                    input.focus();
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            });
+        })();
+    </script>
+
 </body>
 
 </html>
