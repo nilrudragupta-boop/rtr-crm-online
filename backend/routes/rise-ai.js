@@ -165,5 +165,3 @@ module.exports = {
   router,
   initializeRiseAI
 };
-
-AQ.Ab8RN6LeyH6OfJVFBds-vpVpBptw3q-HLBs0N-IHjPn9dQn5_Qmongodb+srv;//nilrudragupta2018_db_user:DimmYqbSRgP98tES@cluster0.ygxjpp3.mongodb.net/rtr_database
