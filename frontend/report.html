@@ -1563,18 +1563,28 @@
 
         function applyToolbarBtnVisibility() {
             const map = {
-                exportCsv: 'btnExportCsv',
-                importCsv: 'btnImportCsv',
-                receiptLog: 'btnReceiptLog',
-                print: 'btnPrintReport',
-                analytics: 'btnSaleAnalytics'
+                exportCsv: '#btnExportCsv',
+                importCsv: '#btnImportCsv',
+                receiptLog: '#btnReceiptLog',
+                print: '#btnPrintReport',
+                analytics: '#btnSaleAnalytics'
             };
-            Object.keys(map).forEach(key => {
-                const el = document.getElementById(map[key]);
-                if (el) el.style.display = toolbarBtnState[key] ? '' : 'none';
-            });
-        }
 
+            let style = document.getElementById('dynamicToolbarBtnStyles');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'dynamicToolbarBtnStyles';
+                document.head.appendChild(style);
+            }
+
+            let css = '';
+            Object.keys(map).forEach(key => {
+                if (!toolbarBtnState[key]) {
+                    css += `${map[key]} { display: none !important; }\n`;
+                }
+            });
+            style.textContent = css;
+        }
 
 
         // --- utility helpers ---
@@ -5887,12 +5897,13 @@
         // --- init ---
         document.addEventListener("DOMContentLoaded", () => {
             // Load Brand Name
+            applyToolbarBtnVisibility(); // Apply before permissions or loader scripts finish
             updateColumnStyles();
             applyCompactView();
             applyTheme();
             applyGreyButtons();
             applyFreezePanes();
-            applyToolbarBtnVisibility();
+                        
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;
 
