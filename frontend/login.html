@@ -558,11 +558,9 @@
         <div class="modal-content">
             <span class="close" onclick="closeForgotEmailModal()">&times;</span>
             <h3 style="color: #0313f3;">📧 Password Recovery</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
-                Enter your registered User ID and registered Admin Email to receive the verification OTP.
-            </p>
-            <input type="text" id="forgotUserIdInput" placeholder="👤 Registered User ID" style="margin-bottom: 8px;">
-            <input type="email" id="forgotEmailInput" placeholder="✉️ Admin Email (name@example.com)">
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Enter your registered USER ID and Admin email address to receive the verification OTP.</p>
+            <input type="text" id="forgotUserIdInput" placeholder="👤 Registered USER ID" style="margin-bottom: 10px;">
+            <input type="email" id="forgotEmailInput" placeholder="✉️ Registered Admin email">
             <button onclick="sendForgotOtp()" style="background: #0313f3; width: 100%; margin-top: 10px;">Send OTP</button>
         </div>
     </div>
@@ -1670,15 +1668,18 @@
             const email = document.getElementById('forgotEmailInput').value.trim();
 
             if (!userId) {
-                showToast("Please enter your registered User ID.", "#dc3545");
+                showToast("Please enter your registered USER ID.", "#dc3545");
                 return;
             }
             if (!email || !email.includes('@')) {
-                showToast("Please enter a valid registered Admin email address.", "#dc3545");
+                showToast("Please enter a valid email address.", "#dc3545");
                 return;
             }
+            
+            // Store the verified username for later password update
+            localStorage.setItem('adminUser', userId);
+            
             closeForgotEmailModal();
-            // Pass User ID as the identifier
             initiateSecureAction('Forgot Password', null, email, userId);
         }
 
@@ -1791,10 +1792,11 @@
         }
 
         // --- SECURE OTP LOGIC ---
-        async function initiateSecureAction(actionName, callback, emailOverride = null, userId = null) {
+        async function initiateSecureAction(actionName, callback, emailOverride = null, usernameOverride = null) {
             currentOtpAction = actionName;
             currentOtpCallback = callback;
             currentOtpEmail = emailOverride;
+            currentOtpUsername = usernameOverride;
 
             const userEmail = emailOverride;
             if (!userEmail) {
