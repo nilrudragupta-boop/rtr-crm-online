@@ -558,11 +558,12 @@
         <div class="modal-content">
             <span class="close" onclick="closeForgotEmailModal()">&times;</span>
             <h3 style="color: #0313f3;">📧 Password Recovery</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Enter your registered Admin email address to
-                receive the verification OTP.</p>
-            <input type="email" id="forgotEmailInput" placeholder="name@example.com">
-            <button onclick="sendForgotOtp()" style="background: #0313f3; width: 100%; margin-top: 10px;">Send
-                OTP</button>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">
+                Enter your registered User ID and registered Admin Email to receive the verification OTP.
+            </p>
+            <input type="text" id="forgotUserIdInput" placeholder="👤 Registered User ID" style="margin-bottom: 8px;">
+            <input type="email" id="forgotEmailInput" placeholder="✉️ Admin Email (name@example.com)">
+            <button onclick="sendForgotOtp()" style="background: #0313f3; width: 100%; margin-top: 10px;">Send OTP</button>
         </div>
     </div>
 
@@ -1665,13 +1666,20 @@
         }
 
         function sendForgotOtp() {
-            const email = document.getElementById('forgotEmailInput').value;
+            const userId = document.getElementById('forgotUserIdInput').value.trim();
+            const email = document.getElementById('forgotEmailInput').value.trim();
+
+            if (!userId) {
+                showToast("Please enter your registered User ID.", "#dc3545");
+                return;
+            }
             if (!email || !email.includes('@')) {
-                showToast("Please enter a valid email address.", "#dc3545");
+                showToast("Please enter a valid registered Admin email address.", "#dc3545");
                 return;
             }
             closeForgotEmailModal();
-            initiateSecureAction('Forgot Password', null, email);
+            // Pass User ID as the identifier
+            initiateSecureAction('Forgot Password', null, email, userId);
         }
 
         // --- Utilities Flow ---
@@ -1783,7 +1791,7 @@
         }
 
         // --- SECURE OTP LOGIC ---
-        async function initiateSecureAction(actionName, callback, emailOverride = null) {
+        async function initiateSecureAction(actionName, callback, emailOverride = null, userId = null) {
             currentOtpAction = actionName;
             currentOtpCallback = callback;
             currentOtpEmail = emailOverride;
@@ -1801,6 +1809,8 @@
                     // Use specific handler for Developer Login to bypass local SMTP check
                     if (actionName === 'Developer Login') {
                         res = await window.electronAPI.requestDevLoginOtp("NANCY@2012");
+                    } else if (actionName === 'Forgot Password' && window.electronAPI.requestForgotOtp) {
+                        res = await window.electronAPI.requestForgotOtp(userId, userEmail);
                     } else {
                         res = await window.electronAPI.requestOtp(actionName, userEmail);
                     }
@@ -1831,7 +1841,14 @@
                         if (actionName === 'Developer Login') {
                             payload = { method: "send_dev_login_otp", otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "Developer Admin", expiryDate: localStorage.getItem("licenseExpiry") || "N/A" };
                         } else if (actionName === 'Forgot Password') {
-                            payload = { method: "send_forgot_otp", email: userEmail, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
+                            payload = { 
+                                method: "send_forgot_otp", 
+                                username: userId, 
+                                email: userEmail, 
+                                otp: tempOtp, 
+                                machineId: secureMachineId, 
+                                companyName: localStorage.getItem("companyName") || "User" 
+                            };
                         } else {
                             payload = { method: "send_generic_otp", email: userEmail, action: actionName, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
                         }
