@@ -1574,7 +1574,7 @@
             if (!style) {
                 style = document.createElement('style');
                 style.id = 'dynamicToolbarBtnStyles';
-                document.head.appendChild(style);
+                (document.head || document.documentElement).appendChild(style);
             }
 
             let css = '';
@@ -1585,6 +1585,9 @@
             });
             style.textContent = css;
         }
+
+        // Apply immediately upon parsing script
+        applyToolbarBtnVisibility();
 
 
         // --- utility helpers ---
@@ -5768,14 +5771,14 @@
             actionBtnState = { view: true, edit: true, delete: true, copy: true, printSmart: true, printStd: false };
             localStorage.removeItem("reportActionBtnState");
             applyActionBtnVisibility();
+
+
             if (document.getElementById("settingsModal").style.display === 'block') openSettingsModal();
 
             showToast("Settings reset to default", "#27ae60");
         }
 
-        toolbarBtnState = { exportCsv: true, importCsv: true, receiptLog: true, print: true, analytics: true };
-        localStorage.removeItem("reportToolbarBtnState");
-        applyToolbarBtnVisibility();
+
 
         function updateColumnStyles() {
             let style = document.getElementById('dynamicColumnStyles');
@@ -5903,7 +5906,7 @@
             applyTheme();
             applyGreyButtons();
             applyFreezePanes();
-                        
+
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;
 
