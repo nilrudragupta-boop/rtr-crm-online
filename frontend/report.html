@@ -649,8 +649,8 @@
             <button id="btnSearch" class="secondary small" onclick="applySearch()">Search</button>
             <button id="btnClear" class="danger small" onclick="resetSearch()">Reset</button>
             <button onclick="loadInvoices()" class="small secondary">Refresh</button>
-            <button onclick="openWindow('invoice_dashboard.html', 1400, 800)" class="small secondary"
-                style="background:#8e44ad;">📈 Sale Analytics</button>
+            <button id="btnSaleAnalytics" onclick="openWindow('invoice_dashboard.html', 1400, 800)"
+                class="small secondary" style="background:#8e44ad;">📈 Sale Analytics</button>
             <div style="display:inline-flex; gap:0; margin-left:10px;">
                 <button id="btnTableView" class="small secondary" style="border-radius:6px 0 0 6px; opacity:1;"
                     onclick="setView('table')">Table View</button>
@@ -679,7 +679,8 @@
             <button id="btnReceiptLog" class="small secondary" style="background:rgb(28, 14, 219);"
                 onclick="openReceiptLogModal()" data-permission-id="perm_payment_receipt_log">Receipt Log</button>
 
-            <button onclick="window.print()" class="small" data-permission-id="perm_print">Print</button>
+            <button id="btnPrintReport" onclick="window.print()" class="small"
+                data-permission-id="perm_print">Print</button>
         </div>
     </div>
 
@@ -1080,6 +1081,32 @@
             </label>
         </div>
         <div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #eee;">
+
+            <div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #eee;">
+                <h4 style="margin:0 0 10px 0; font-size:14px; color:#555;">Toolbar Buttons</h4>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                        <input type="checkbox" id="showBtnExportCsv" onchange="toggleToolbarBtn('exportCsv')"> Export
+                        CSV
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                        <input type="checkbox" id="showBtnImportCsv" onchange="toggleToolbarBtn('importCsv')"> Import
+                        CSV
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                        <input type="checkbox" id="showBtnReceiptLog" onchange="toggleToolbarBtn('receiptLog')"> Receipt
+                        Log
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                        <input type="checkbox" id="showBtnPrint" onchange="toggleToolbarBtn('print')"> Print
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                        <input type="checkbox" id="showBtnAnalytics" onchange="toggleToolbarBtn('analytics')"> Sale
+                        Analytics
+                    </label>
+                </div>
+            </div>
+
             <h4 style="margin:0 0 10px 0; font-size:14px; color:#555;">Action Buttons</h4>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
                 <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
@@ -1516,6 +1543,39 @@
                 else table.classList.add(`hide-${key}`);
             });
         }
+
+
+        // --- Toolbar Buttons Visibility Logic ---
+        let toolbarBtnState = JSON.parse(localStorage.getItem("reportToolbarBtnState")) || {
+            exportCsv: true,
+            importCsv: true,
+            receiptLog: true,
+            print: true,
+            analytics: true
+        };
+
+        function toggleToolbarBtn(type) {
+            const isChecked = document.getElementById(`showBtn${type.charAt(0).toUpperCase() + type.slice(1)}`).checked;
+            toolbarBtnState[type] = isChecked;
+            localStorage.setItem("reportToolbarBtnState", JSON.stringify(toolbarBtnState));
+            applyToolbarBtnVisibility();
+        }
+
+        function applyToolbarBtnVisibility() {
+            const map = {
+                exportCsv: 'btnExportCsv',
+                importCsv: 'btnImportCsv',
+                receiptLog: 'btnReceiptLog',
+                print: 'btnPrintReport',
+                analytics: 'btnSaleAnalytics'
+            };
+            Object.keys(map).forEach(key => {
+                const el = document.getElementById(map[key]);
+                if (el) el.style.display = toolbarBtnState[key] ? '' : 'none';
+            });
+        }
+
+
 
         // --- utility helpers ---
         function getCustomerNameFrom(inv) {
@@ -5293,6 +5353,12 @@
             const mergeInvoicePdfToggle = document.getElementById("mergeInvoicePdfToggle");
             if (mergeInvoicePdfToggle) mergeInvoicePdfToggle.checked = mergeInvoicePdf;
 
+            // Set Toolbar Button Toggles
+            Object.keys(toolbarBtnState).forEach(key => {
+                const cb = document.getElementById(`showBtn${key.charAt(0).toUpperCase() + key.slice(1)}`);
+                if (cb) cb.checked = toolbarBtnState[key];
+            });
+
             // Set Action Button Toggles
             Object.keys(actionBtnState).forEach(key => {
                 const cb = document.getElementById(`showAction${key.charAt(0).toUpperCase() + key.slice(1)}`);
@@ -5697,6 +5763,10 @@
             showToast("Settings reset to default", "#27ae60");
         }
 
+        toolbarBtnState = { exportCsv: true, importCsv: true, receiptLog: true, print: true, analytics: true };
+        localStorage.removeItem("reportToolbarBtnState");
+        applyToolbarBtnVisibility();
+
         function updateColumnStyles() {
             let style = document.getElementById('dynamicColumnStyles');
             if (!style) {
@@ -5822,6 +5892,7 @@
             applyTheme();
             applyGreyButtons();
             applyFreezePanes();
+            applyToolbarBtnVisibility();
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;
 
