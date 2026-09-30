@@ -8,6 +8,8 @@ const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
 const registerCrmV2 = require('./routes/crm_v2');
+const { router: riseAiRouter, initializeRiseAI } = require('./rise-ai');
+
 
 const app = express();
 
@@ -45,6 +47,14 @@ mongoose.connect(process.env.MONGO_URI)
     .catch(err => {
         console.error('❌ MongoDB Connection Error:', err);
     });
+
+
+// Initialize RISE AI and Gemini client
+initializeRiseAI().catch(err => {
+    console.error('❌ RISE AI Initialization Error:', err.message);
+});
+
+
 
 // --- Admin Credentials Model ---
 const adminCredsSchema = new mongoose.Schema({
@@ -1783,6 +1793,10 @@ app.post('/api/emails/mark-read', async (req, res) => {
         await client.logout(); res.json({ success: true });
     } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
+
+
+// --- RISE AI Endpoint ---
+app.use('/api/ai', riseAiRouter);
 
 // --- Start Server ---
 app.listen(PORT, () => {
