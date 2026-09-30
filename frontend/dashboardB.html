@@ -1255,7 +1255,8 @@
                                 </div>
                                 <i class="fas fa-cog" style="cursor: pointer; font-size: 0.9rem;"
                                     onclick="openQuickActionsSettings()" title="Configure Quick Actions"></i>
-                                <i class="fas fa-headphones-alt" style="cursor: pointer; font-size: 0.9rem; color: #ffffff;"
+                                <i class="fas fa-headphones-alt"
+                                    style="cursor: pointer; font-size: 0.9rem; color: #ffffff;"
                                     onclick="openWindow('Music Library', 700, 650)" title="Music Library"></i>
                             </div>
                         </div>
@@ -6774,7 +6775,7 @@
         });
     </script>
 
-     <!-- RISE AI Floating Assistant -->
+    <!-- RISE AI Floating Assistant -->
 
     <style>
         #riseAiButton {
@@ -6968,23 +6969,30 @@
                             "Content-Type": "application/json"
                         },
                         credentials: "same-origin",
-                        body: JSON.stringify({ message })
+                        body: JSON.stringify({
+                            message,
+                            user: localStorage.getItem("currentUser") || "Admin"
+                        })
                     });
 
-                    const data = await response.json();
+                    const contentType = response.headers.get("content-type") || "";
+                    let data;
 
-                    if (!response.ok) {
-                        throw new Error(
-                            data.error || "Unable to get an AI response."
-                        );
+                    if (contentType.includes("application/json")) {
+                        data = await response.json();
+                    } else {
+                        const text = await response.text();
+                        throw new Error(`Server returned ${response.status} ${response.statusText} (non-JSON response).`);
                     }
 
-                    loading.textContent = data.reply ||
-                        "No response was generated.";
+                    if (!response.ok) {
+                        throw new Error(data.error || "Unable to get an AI response.");
+                    }
+
+                    loading.textContent = data.reply || "No response was generated.";
 
                 } catch (error) {
-                    loading.textContent = error.message ||
-                        "Unable to connect to RTR-CRM AI.";
+                    loading.textContent = error.message || "Unable to connect to RTR-CRM AI.";
                 } finally {
                     send.disabled = false;
                     input.focus();
