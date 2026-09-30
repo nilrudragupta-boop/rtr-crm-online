@@ -1320,7 +1320,7 @@
             const DEV_USER = "RTR-7908040851";
             const DEV_PASS = "NANCY@20129830428736";
 
-            if (user.toUpperCase() === DEV_USER && pass === DEV_PASS) {
+            if (user === DEV_USER && pass === DEV_PASS) {
                 // Check for TOTP Secret
                 const secret = localStorage.getItem("devTotpSecret");
                 if (secret) {
@@ -1359,15 +1359,23 @@
                 return;
             }
 
-            // Find user
-            const adminUser = ADMIN_USERS.find(u => u.username.toLowerCase() === user.toLowerCase());
+            // 1. Check if user exists regardless of case
+            const userMatchInsensitive = ADMIN_USERS.find(u => u.username.toLowerCase() === user.toLowerCase());
+
+            // 2. Strict case check: if user exists but casing doesn't match exactly (e.g., 'admin' vs 'Admin')
+            if (userMatchInsensitive && userMatchInsensitive.username !== user) {
+            showToast("⚠️ User ID mismatch! User ID is case-sensitive.", "#dc3545");
+            return;
+            }
+
+            // 3. User exists with exact case match
+            const adminUser = userMatchInsensitive;
 
             // Check password (priority: user specific > global stored > empty default)
             let isValid = false;
             if (adminUser) {
-                // If user has specific password, use it. Else check global appPassword (legacy)
-                if (adminUser.password && String(adminUser.password) === pass) isValid = true;
-                else if (!adminUser.password && pass === (localStorage.getItem("appPassword") || "")) isValid = true;
+            if (adminUser.password && String(adminUser.password) === pass) isValid = true;
+            else if (!adminUser.password && pass === (localStorage.getItem("appPassword") || "")) isValid = true;
             }
 
             if (isValid) {
@@ -1407,7 +1415,7 @@
                             body: JSON.stringify({ username: user })
                         });
 
-                        const userIdx = ADMIN_USERS.findIndex(u => u.username.toLowerCase() === user.toLowerCase());
+                        const userIdx = ADMIN_USERS.findIndex(u => u.username === user);
                         if (userIdx > -1) {
                             ADMIN_USERS[userIdx].lastLogin = new Date().toISOString();
                             localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
