@@ -423,8 +423,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_follow_up', label: 'Follow-ups' },
     { id: 'perm_custom_sheet', label: 'Custom Sheet' },
     { id: 'perm_cheque_print', label: 'Cheque Print' },
-    { id: 'perm_chatter', label: 'Chatter' },
-    { id: 'perm_tour_expense', label: 'Tour Expense Management' }
+    { id: 'perm_chatter', label: 'Chatter' }
 ];
 
 function getCurrentUser() {
