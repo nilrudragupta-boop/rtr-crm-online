@@ -248,6 +248,8 @@ const apiClient = {
         }
     },
     deleteInvoice: (id) => apiClient._deleteCollection('invoices', id),
+    getDeletedInvoices: () => apiClient._getDeletedCollection('invoices'),
+    restoreInvoice: (id) => apiClient._restoreCollection('invoices', id),
     deleteSale: async (id) => apiClient.deleteInvoice(id),
 
     // --- Credit/Debit Notes ---
@@ -337,6 +339,8 @@ const apiClient = {
     getPurchases: () => apiClient._getCollection('purchases'),
     savePurchase: (data) => apiClient._saveCollection('purchases', data),
     deletePurchase: (id) => apiClient._deleteCollection('purchases', id),
+    getDeletedPurchases: () => apiClient._getDeletedCollection('purchases'),
+    restorePurchase: (id) => apiClient._restoreCollection('purchases', id),
 
     getSuppliers: () => apiClient._getCollection('suppliers'),
     saveSupplier: (data) => apiClient._saveCollection('suppliers', data),

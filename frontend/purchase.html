@@ -957,6 +957,8 @@
 
         <button onclick="deleteSelectedPurchases()" style="background:#dc3545; color: white;"
             data-permission-id="perm_delete_action">Delete Selected</button>
+        <button id="purchaseRecycleBinBtn" onclick="openPurchaseRecycleBin()"
+            style="background:#6f42c1; color:#fff; display:none;">♻️ Recycle Bin</button>
         <button onclick="window.print()" style="background:#607d8b; color: white;" data-permission-id="perm_print">🖨️
             Print</button>
 
@@ -3104,6 +3106,13 @@
         async function confirmDelete() {
             if (idsToDelete.length === 0) return;
             let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            const recycleBin = JSON.parse(localStorage.getItem('recycleBin_purchases') || '[]');
+            purchases.filter(purchase => idsToDelete.includes(String(purchase.id))).forEach(purchase => {
+                recycleBin.unshift({ ...purchase, deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' });
+            });
+            localStorage.setItem('recycleBin_purchases', JSON.stringify(recycleBin.filter((record, index, records) =>
+                index === records.findIndex(item => String(item.id) === String(record.id))
+            )));
             const deletePromises = [];
             for (let id of idsToDelete) {
                 purchases = purchases.filter(p => String(p.id) !== String(id));
@@ -3123,6 +3132,82 @@
             openSuccessModal("Purchase deleted successfully.");
             await loadPurchases();
         }
+
+        function applyPurchaseRecycleBinVisibility() {
+            const button = document.getElementById('purchaseRecycleBinBtn');
+            if (button) button.style.display = localStorage.getItem('showRecycleBinButtons') === 'true' ? '' : 'none';
+        }
+
+        async function openPurchaseRecycleBin() {
+            let records = typeof apiClient !== 'undefined' && apiClient.getDeletedPurchases
+                ? await apiClient.getDeletedPurchases() : null;
+            if (!Array.isArray(records)) records = JSON.parse(localStorage.getItem('recycleBin_purchases') || '[]');
+
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            const content = document.createElement('div');
+            content.className = 'modal-content';
+            content.style.cssText = 'width:min(600px,90vw);text-align:left;max-height:80vh;overflow-y:auto;';
+            const title = document.createElement('h3');
+            title.textContent = '♻️ Purchase Recycle Bin';
+            content.appendChild(title);
+
+            if (records.length) {
+                records.forEach(record => {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #ddd;padding:8px 0;';
+                    const description = document.createElement('span');
+                    description.textContent = `${record.itemName || record.purchaseNo || 'Purchase'}${record.supplierName ? ` - ${record.supplierName}` : ''} · ${record.deletedAt ? new Date(record.deletedAt).toLocaleString() : 'Recently deleted'}`;
+                    row.appendChild(description);
+                    const restoreButton = document.createElement('button');
+                    restoreButton.className = 'btn-save';
+                    restoreButton.textContent = 'Restore';
+                    restoreButton.addEventListener('click', () => restorePurchaseFromBin(record.id, modal));
+                    row.appendChild(restoreButton);
+                    content.appendChild(row);
+                });
+            } else {
+                const emptyMessage = document.createElement('p');
+                emptyMessage.style.textAlign = 'center';
+                emptyMessage.textContent = 'Recycle Bin is empty.';
+                content.appendChild(emptyMessage);
+            }
+
+            const closeButton = document.createElement('button');
+            closeButton.className = 'btn-search';
+            closeButton.textContent = 'Close';
+            closeButton.addEventListener('click', () => modal.remove());
+            const actions = document.createElement('div');
+            actions.className = 'modal-buttons';
+            actions.appendChild(closeButton);
+            content.appendChild(actions);
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
+
+        async function restorePurchaseFromBin(id, modal) {
+            const localRecords = JSON.parse(localStorage.getItem('recycleBin_purchases') || '[]');
+            const localRecord = localRecords.find(record => String(record.id) === String(id));
+            const result = typeof apiClient !== 'undefined' && apiClient.restorePurchase ? await apiClient.restorePurchase(id) : null;
+            const restored = result?.success && result.data ? result.data : localRecord;
+            if (!restored) return showToast('Could not restore purchase.');
+
+            delete restored.deletedAt;
+            delete restored.deletedBy;
+            const purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
+            if (!purchases.some(purchase => String(purchase.id) === String(restored.id))) purchases.push(restored);
+            localStorage.setItem('purchases', JSON.stringify(purchases));
+            localStorage.setItem('recycleBin_purchases', JSON.stringify(localRecords.filter(record => String(record.id) !== String(id))));
+            modal.remove();
+            await loadPurchases();
+            openSuccessModal('Purchase restored successfully.');
+        }
+
+        applyPurchaseRecycleBinVisibility();
+        window.addEventListener('storage', event => {
+            if (event.key === 'showRecycleBinButtons') applyPurchaseRecycleBinVisibility();
+        });
 
         function closeModal() {
             $("confirmationModal").style.display = "none";

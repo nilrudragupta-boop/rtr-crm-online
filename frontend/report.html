@@ -692,6 +692,8 @@
         <button id="btnDeleteSelected" class="danger small" style="background:#f80202; color:#fff;"
             data-permission-id="perm_delete_action">Delete
             Selected</button>
+        <button id="invoiceRecycleBinBtn" class="small" onclick="openInvoiceRecycleBin()"
+            style="background:#6f42c1; display:none;">♻️ Recycle Bin</button>
     </div>
 
     <div id="splitLayout">
@@ -5027,6 +5029,13 @@
         document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
             const idsToDelete = new Set(pendingDeleteIds);
+            const recycleBin = JSON.parse(localStorage.getItem('recycleBin_invoices') || '[]');
+            invoices.filter(invoice => idsToDelete.has(getInvoiceRecycleId(invoice))).forEach(invoice => {
+                recycleBin.unshift({ ...invoice, deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' });
+            });
+            localStorage.setItem('recycleBin_invoices', JSON.stringify(recycleBin.filter((record, index, records) =>
+                index === records.findIndex(item => getInvoiceRecycleId(item) === getInvoiceRecycleId(record))
+            )));
 
             for (let id of pendingDeleteIds) {
                 if (typeof apiClient !== 'undefined' && apiClient.deleteInvoice) {
@@ -5034,11 +5043,86 @@
                 }
             }
 
-            invoices = invoices.filter(x => !idsToDelete.has(String(x.id || x.invoice_no)));
+            invoices = invoices.filter(x => !idsToDelete.has(getInvoiceRecycleId(x)));
             localStorage.setItem("invoices", JSON.stringify(invoices));
             showToast(`✅ Deleted ${pendingDeleteIds.length} invoice(s).`, "#27ae60");
             renderTable(invoices);
             closeDeleteModal();
+        });
+
+        function getInvoiceRecycleId(invoice) {
+            return String(invoice.id || invoice.invoice_no || invoice.invoiceNo || invoice._id || '');
+        }
+
+        function applyInvoiceRecycleBinVisibility() {
+            const button = document.getElementById('invoiceRecycleBinBtn');
+            if (button) button.style.display = localStorage.getItem('showRecycleBinButtons') === 'true' ? '' : 'none';
+        }
+
+        async function openInvoiceRecycleBin() {
+            let records = typeof apiClient !== 'undefined' && apiClient.getDeletedInvoices
+                ? await apiClient.getDeletedInvoices() : null;
+            if (!Array.isArray(records)) records = JSON.parse(localStorage.getItem('recycleBin_invoices') || '[]');
+
+            const modal = document.createElement('div');
+            modal.className = 'custom-modal';
+            modal.style.cssText = 'display:flex;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;';
+            const content = document.createElement('div');
+            content.style.cssText = 'background:#fff;padding:20px;width:min(600px,90vw);max-height:80vh;overflow-y:auto;border-radius:8px;text-align:left;';
+            const title = document.createElement('h3');
+            title.textContent = '♻️ Invoice Recycle Bin';
+            content.appendChild(title);
+
+            if (records.length) {
+                records.forEach(record => {
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #ddd;padding:8px 0;';
+                    const description = document.createElement('span');
+                    description.textContent = `${record.invoice_no || record.invoiceNo || getInvoiceRecycleId(record)}${record.customerName ? ` - ${record.customerName}` : ''} · ${record.deletedAt ? new Date(record.deletedAt).toLocaleString() : 'Recently deleted'}`;
+                    row.appendChild(description);
+                    const restoreButton = document.createElement('button');
+                    restoreButton.className = 'small';
+                    restoreButton.textContent = 'Restore';
+                    restoreButton.addEventListener('click', () => restoreInvoiceFromBin(getInvoiceRecycleId(record), modal));
+                    row.appendChild(restoreButton);
+                    content.appendChild(row);
+                });
+            } else {
+                const emptyMessage = document.createElement('p');
+                emptyMessage.style.textAlign = 'center';
+                emptyMessage.textContent = 'Recycle Bin is empty.';
+                content.appendChild(emptyMessage);
+            }
+
+            const closeButton = document.createElement('button');
+            closeButton.className = 'small secondary';
+            closeButton.textContent = 'Close';
+            closeButton.addEventListener('click', () => modal.remove());
+            content.appendChild(closeButton);
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
+
+        async function restoreInvoiceFromBin(id, modal) {
+            const localRecords = JSON.parse(localStorage.getItem('recycleBin_invoices') || '[]');
+            const localRecord = localRecords.find(record => getInvoiceRecycleId(record) === String(id));
+            const result = typeof apiClient !== 'undefined' && apiClient.restoreInvoice ? await apiClient.restoreInvoice(id) : null;
+            const restored = result?.success && result.data ? result.data : localRecord;
+            if (!restored) return showToast('Could not restore invoice.', '#ff4d4f');
+
+            delete restored.deletedAt;
+            delete restored.deletedBy;
+            if (!invoices.some(invoice => getInvoiceRecycleId(invoice) === getInvoiceRecycleId(restored))) invoices.push(restored);
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            localStorage.setItem('recycleBin_invoices', JSON.stringify(localRecords.filter(record => getInvoiceRecycleId(record) !== String(id))));
+            modal.remove();
+            renderTable(invoices);
+            showToast('Invoice restored successfully.', '#27ae60');
+        }
+
+        applyInvoiceRecycleBinVisibility();
+        window.addEventListener('storage', event => {
+            if (event.key === 'showRecycleBinButtons') applyInvoiceRecycleBinVisibility();
         });
 
         function exportInvoicesCSV() {
