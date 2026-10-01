@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     verifyRenewalOtp: (otp) => ipcRenderer.invoke('verify-renewal-otp', otp),
     getAppSettings: () => ipcRenderer.invoke('get-app-settings'),
     saveAppSettings: (newState) => ipcRenderer.invoke('save-app-settings', newState),
-    checkRemoteLicense: (username) => ipcRenderer.invoke('check-remote-license', username),
+    checkRemoteLicense: (username, contactNumber) => ipcRenderer.invoke('check-remote-license', username, contactNumber),
 
     // New OTP Methods
     requestOtp: (action, email) => ipcRenderer.invoke('request-otp', action, email),
@@ -40,7 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteSentEmail: (id) => ipcRenderer.invoke('delete-sent-email', id),
     savePaymentReceipt: (data) => ipcRenderer.invoke('save-payment-receipt', data),
     getPaymentReceipts: () => ipcRenderer.invoke('get-payment-receipts'),
-        getInboxEmails: () => ipcRenderer.invoke('get-inbox-emails'),
+    getInboxEmails: () => ipcRenderer.invoke('get-inbox-emails'),
     checkNewEmails: () => ipcRenderer.invoke('check-new-emails'),
     markEmailRead: (uid) => ipcRenderer.invoke('mark-email-read', uid),
     deleteInboxEmail: (id) => ipcRenderer.invoke('delete-inbox-email', id),

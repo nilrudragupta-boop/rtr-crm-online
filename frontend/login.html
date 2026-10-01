@@ -558,10 +558,12 @@
         <div class="modal-content">
             <span class="close" onclick="closeForgotEmailModal()">&times;</span>
             <h3 style="color: #0313f3;">📧 Password Recovery</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Enter your registered USER ID and Admin email address to receive the verification OTP.</p>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Enter your registered USER ID and Admin email
+                address to receive the verification OTP.</p>
             <input type="text" id="forgotUserIdInput" placeholder="👤 Registered USER ID" style="margin-bottom: 10px;">
             <input type="email" id="forgotEmailInput" placeholder="✉️ Registered Admin email">
-            <button onclick="sendForgotOtp()" style="background: #0313f3; width: 100%; margin-top: 10px;">Send OTP</button>
+            <button onclick="sendForgotOtp()" style="background: #0313f3; width: 100%; margin-top: 10px;">Send
+                OTP</button>
         </div>
     </div>
 
@@ -1268,6 +1270,63 @@
             }
         }
 
+        function normalizeDashboardFile(dashboardFile) {
+            const allowedDashboards = {
+                'dashboardb.html': 'dashboardB.html',
+                'dashboardc.html': 'dashboardC.html',
+                'dashboardd.html': 'dashboardD.html'
+            };
+            return allowedDashboards[String(dashboardFile || '').trim().toLowerCase()] || '';
+        }
+
+        async function redirectAfterLogin(username, educationDashboardFile) {
+            const userRecord = ADMIN_USERS.find(account => account.username === username);
+            let contactNumber = (userRecord && userRecord.contactNumber) || localStorage.getItem('contactNumber') || '';
+            let licenseResult = null;
+
+            try {
+                if (window.electronAPI && window.electronAPI.checkRemoteLicense) {
+                    licenseResult = await window.electronAPI.checkRemoteLicense(username, contactNumber);
+                } else {
+                    let scriptUrl = '';
+                    try {
+                        const settingsResponse = await fetch('/api/settings');
+                        const settingsData = await settingsResponse.json();
+                        if (settingsData.success && settingsData.data) {
+                            scriptUrl = settingsData.data.updateServerUrl || settingsData.data.cloudBackupUrl || '';
+                            if (!contactNumber) contactNumber = settingsData.data.contactNumber || '';
+                        }
+                    } catch (e) { }
+
+                    if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
+                    if (scriptUrl && scriptUrl.startsWith('http')) {
+                        const response = await fetch(scriptUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify({ method: 'check_license', username: username, contactNumber: contactNumber })
+                        });
+                        licenseResult = await response.json();
+                    }
+                }
+            } catch (error) {
+                console.warn('Dashboard assignment lookup failed', error);
+            }
+
+            const assignedDashboard = licenseResult && licenseResult.success
+                ? normalizeDashboardFile(licenseResult.dashboardFile)
+                : '';
+            if (assignedDashboard) {
+                window.location.href = assignedDashboard;
+                return;
+            }
+
+            const appMode = localStorage.getItem('appMode');
+            const fallbackDashboard = appMode === 'Educational Institute'
+                ? normalizeDashboardFile(educationDashboardFile)
+                : normalizeDashboardFile(localStorage.getItem('activeDashboard')) || 'dashboardB.html';
+            window.location.href = fallbackDashboard || 'dashboardB.html';
+        }
+
         function selectDashboard(dashboardFile) {
             localStorage.setItem('activeDashboard', dashboardFile);
             window.location.href = dashboardFile;
@@ -1364,8 +1423,8 @@
 
             // 2. Strict case check: if user exists but casing doesn't match exactly (e.g., 'admin' vs 'Admin')
             if (userMatchInsensitive && userMatchInsensitive.username !== user) {
-            showToast("⚠️ User ID mismatch! User ID is case-sensitive.", "#dc3545");
-            return;
+                showToast("⚠️ User ID mismatch! User ID is case-sensitive.", "#dc3545");
+                return;
             }
 
             // 3. User exists with exact case match
@@ -1374,8 +1433,8 @@
             // Check password (priority: user specific > global stored > empty default)
             let isValid = false;
             if (adminUser) {
-            if (adminUser.password && String(adminUser.password) === pass) isValid = true;
-            else if (!adminUser.password && pass === (localStorage.getItem("appPassword") || "")) isValid = true;
+                if (adminUser.password && String(adminUser.password) === pass) isValid = true;
+                else if (!adminUser.password && pass === (localStorage.getItem("appPassword") || "")) isValid = true;
             }
 
             if (isValid) {
@@ -1430,13 +1489,7 @@
                     console.log("Web login history update failed", e);
                 }
 
-                const appMode = localStorage.getItem('appMode');
-                if (appMode === "Educational Institute") {
-                    window.location.href = 'dashboard_Inst.html';
-                } else {
-                    const targetDash = localStorage.getItem('activeDashboard') || 'dashboardB.html';
-                    window.location.href = targetDash;
-                }
+                await redirectAfterLogin(user, 'dashboardC.html');
             } else {
                 // --- CLOUD SYNC FALLBACK FOR NEW DEVICES ---
                 if (!adminUser && user && user.toLowerCase() !== "admin") {
@@ -1683,10 +1736,10 @@
                 showToast("Please enter a valid email address.", "#dc3545");
                 return;
             }
-            
+
             // Store the verified username for later password update
             localStorage.setItem('adminUser', userId);
-            
+
             closeForgotEmailModal();
             initiateSecureAction('Forgot Password', null, email, userId);
         }
@@ -1851,13 +1904,13 @@
                         if (actionName === 'Developer Login') {
                             payload = { method: "send_dev_login_otp", otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "Developer Admin", expiryDate: localStorage.getItem("licenseExpiry") || "N/A" };
                         } else if (actionName === 'Forgot Password') {
-                            payload = { 
-                                method: "send_forgot_otp", 
-                                email: userEmail, 
+                            payload = {
+                                method: "send_forgot_otp",
+                                email: userEmail,
                                 username: usernameOverride || localStorage.getItem('adminUser') || "",
-                                otp: tempOtp, 
-                                machineId: secureMachineId, 
-                                companyName: localStorage.getItem("companyName") || "User" 
+                                otp: tempOtp,
+                                machineId: secureMachineId,
+                                companyName: localStorage.getItem("companyName") || "User"
                             };
                         } else {
                             payload = { method: "send_generic_otp", email: userEmail, action: actionName, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
@@ -1938,7 +1991,7 @@
             initiateSecureAction(currentOtpAction, currentOtpCallback, email);
         }
 
-        function verifyTotpLogin() {
+        async function verifyTotpLogin() {
             const token = document.getElementById('totpInput').value;
             const secret = localStorage.getItem("devTotpSecret");
             const pendingUser = localStorage.getItem("pendingLoginUser");
@@ -1992,13 +2045,7 @@
                         window.electronAPI.saveAdminCreds({ isLoginUpdate: true, usernameToUpdate: pendingUser }).catch(e => console.error(e));
                     }
 
-                    const appMode = localStorage.getItem('appMode');
-                    if (appMode === "Educational Institute") {
-                        window.location.href = 'dashboard_Inst.html';
-                    } else {
-                        const targetDash = localStorage.getItem('activeDashboard') || 'dashboardB.html';
-                        window.location.href = targetDash;
-                    }
+                    await redirectAfterLogin(pendingUser, 'dashboardC.html');
                 } else {
                     // Developer Login
                     localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
