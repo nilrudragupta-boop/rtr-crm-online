@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
+const crypto = require('crypto');
 const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
@@ -86,6 +87,91 @@ const marketingVisitSchema = new mongoose.Schema({
     createdBy: { type: String, default: 'System' }
 }, { timestamps: true });
 const MarketingVisit = mongoose.model('MarketingVisit', marketingVisitSchema);
+
+// --- Tour Expense Models ---
+const tourRepresentativeSchema = new mongoose.Schema({
+    id: { type: String, required: true },
+    adminId: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+    username: { type: String, required: true, lowercase: true },
+    passwordSalt: { type: String, required: true },
+    passwordHash: { type: String, required: true },
+    phone: { type: String, default: '' },
+    email: { type: String, default: '' },
+    zone: { type: String, default: '' },
+    market: { type: String, default: '' },
+    area: { type: String, default: '' },
+    active: { type: Boolean, default: true }
+}, { timestamps: true });
+tourRepresentativeSchema.index({ adminId: 1, username: 1 }, { unique: true });
+const TourRepresentative = mongoose.model('TourRepresentative', tourRepresentativeSchema);
+
+const tourReportSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    adminId: { type: String, required: true, index: true },
+    representativeId: { type: String, required: true, index: true },
+    representativeName: { type: String, required: true },
+    visitDate: { type: String, required: true },
+    zone: { type: String, default: '' },
+    market: { type: String, default: '' },
+    area: { type: String, default: '' },
+    placesVisited: { type: String, default: '' },
+    personsMet: { type: String, default: '' },
+    purpose: { type: String, default: '' },
+    customerDemand: { type: String, default: '' },
+    visitReport: { type: String, default: '' },
+    expenses: { type: Array, default: [] },
+    totalExpense: { type: Number, default: 0 },
+    attachments: { type: Array, default: [] }
+}, { timestamps: true, strict: false });
+const TourReport = mongoose.model('TourReport', tourReportSchema);
+
+const TOUR_AUTH_SECRET = process.env.TOUR_AUTH_SECRET || process.env.MONGO_URI || crypto.randomBytes(32).toString('hex');
+const TOUR_MAX_ATTACHMENTS_BYTES = 8 * 1024 * 1024;
+
+function tourAdminId(req) {
+    return String(req.query.adminId || req.body?.adminId || '').trim().slice(0, 180);
+}
+
+function isTourDeveloper(req) {
+    return String(req.query.user || '').toLowerCase() === 'developer' && req.query.role === 'Developer';
+}
+
+function isTourAdmin(req) {
+    return ['admin', 'developer'].includes(String(req.query.role || '').toLowerCase());
+}
+
+function signTourToken(representative) {
+    const payload = Buffer.from(JSON.stringify({
+        adminId: representative.adminId,
+        representativeId: representative.id,
+        exp: Date.now() + 12 * 60 * 60 * 1000
+    })).toString('base64url');
+    const signature = crypto.createHmac('sha256', TOUR_AUTH_SECRET).update(payload).digest('base64url');
+    return `${payload}.${signature}`;
+}
+
+function getTourSession(req) {
+    const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const [payload, signature] = token.split('.');
+    if (!payload || !signature) return null;
+    const expected = crypto.createHmac('sha256', TOUR_AUTH_SECRET).update(payload).digest();
+    let provided;
+    try { provided = Buffer.from(signature, 'base64url'); } catch (err) { return null; }
+    if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) return null;
+    try {
+        const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
+        if (!data.adminId || !data.representativeId || data.exp < Date.now()) return null;
+        return data;
+    } catch (err) { return null; }
+}
+
+function tourPublicRepresentative(representative) {
+    const data = representative.toObject ? representative.toObject() : representative;
+    delete data.passwordSalt;
+    delete data.passwordHash;
+    return data;
+}
 
 // --- Quotation Schema ---
 const quotationSchema = new mongoose.Schema({
@@ -992,6 +1078,175 @@ app.delete('/api/marketing-visits/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Tour Expense Management Routes ---
+app.post('/api/tour-expenses/login', async (req, res) => {
+    try {
+        const adminId = tourAdminId(req);
+        const username = String(req.body.username || '').trim().toLowerCase();
+        const password = String(req.body.password || '');
+        if (!adminId || !username || !password) return res.status(400).json({ success: false, message: 'Admin workspace, login name and password are required.' });
+        const representative = await TourRepresentative.findOne({ adminId, username, active: true });
+        if (!representative) return res.status(401).json({ success: false, message: 'Invalid login or inactive account.' });
+        const actual = crypto.scryptSync(password, representative.passwordSalt, 64);
+        const expected = Buffer.from(representative.passwordHash, 'hex');
+        if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
+            return res.status(401).json({ success: false, message: 'Invalid login or inactive account.' });
+        }
+        res.json({ success: true, data: {
+            token: signTourToken(representative), adminId, id: representative.id,
+            name: representative.name, username: representative.username,
+            zone: representative.zone, market: representative.market, area: representative.area
+        } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/tour-expenses/reps', async (req, res) => {
+    try {
+        const adminId = tourAdminId(req);
+        if (!adminId || !isTourAdmin(req)) return res.status(403).json({ success: false, message: 'Admin access is required.' });
+        const representatives = await TourRepresentative.find({ adminId }).select('-passwordSalt -passwordHash').sort({ name: 1 }).lean();
+        res.json({ success: true, data: representatives });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/tour-expenses/reps', async (req, res) => {
+    try {
+        const adminId = tourAdminId(req);
+        if (!adminId || !isTourDeveloper(req)) return res.status(403).json({ success: false, message: 'Only the RISE Tech Revolution Developer can manage representative accounts.' });
+        const payload = req.body || {};
+        const name = String(payload.name || '').trim();
+        const username = String(payload.username || '').trim().toLowerCase();
+        const password = String(payload.password || '');
+        if (!name || !username || (!payload.id && password.length < 8)) {
+            return res.status(400).json({ success: false, message: 'Name and login are required; new accounts need a password of at least 8 characters.' });
+        }
+        if (password && password.length < 8) return res.status(400).json({ success: false, message: 'Passwords must be at least 8 characters.' });
+        const id = String(payload.id || crypto.randomUUID());
+        const existing = await TourRepresentative.findOne({ adminId, id });
+        if (!existing && password.length < 8) return res.status(400).json({ success: false, message: 'New accounts need a password of at least 8 characters.' });
+        const fields = {
+            adminId, id, name, username,
+            phone: String(payload.phone || '').trim(), email: String(payload.email || '').trim(),
+            zone: String(payload.zone || '').trim(), market: String(payload.market || '').trim(), area: String(payload.area || '').trim(),
+            active: payload.active !== false
+        };
+        if (password) {
+            const salt = crypto.randomBytes(16).toString('hex');
+            fields.passwordSalt = salt;
+            fields.passwordHash = crypto.scryptSync(password, salt, 64).toString('hex');
+        } else if (existing) {
+            fields.passwordSalt = existing.passwordSalt;
+            fields.passwordHash = existing.passwordHash;
+        }
+        const saved = await TourRepresentative.findOneAndUpdate({ adminId, id }, fields, { new: true, upsert: true, runValidators: true });
+        res.json({ success: true, data: tourPublicRepresentative(saved) });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.code === 11000 ? 'That login name is already used in this Admin workspace.' : err.message });
+    }
+});
+
+app.delete('/api/tour-expenses/reps/:id', async (req, res) => {
+    try {
+        const adminId = tourAdminId(req);
+        if (!adminId || !isTourDeveloper(req)) return res.status(403).json({ success: false, message: 'Only the RISE Tech Revolution Developer can manage representative accounts.' });
+        await TourRepresentative.findOneAndDelete({ adminId, id: req.params.id });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/tour-expenses/reports', async (req, res) => {
+    try {
+        const session = getTourSession(req);
+        let query;
+        if (session) {
+            if (req.query.adminId && req.query.adminId !== session.adminId) return res.status(403).json({ success: false, message: 'Workspace does not match this SR session.' });
+            const representative = await TourRepresentative.findOne({ adminId: session.adminId, id: session.representativeId, active: true }).select('_id');
+            if (!representative) return res.status(401).json({ success: false, message: 'This representative account is no longer active.' });
+            query = { adminId: session.adminId, representativeId: session.representativeId };
+        } else if (isTourAdmin(req) && tourAdminId(req)) {
+            query = { adminId: tourAdminId(req) };
+            if (req.query.representativeId) query.representativeId = req.query.representativeId;
+        } else {
+            return res.status(403).json({ success: false, message: 'Sign in as a sales representative or Admin.' });
+        }
+        if (req.query.startDate || req.query.endDate) {
+            query.visitDate = {};
+            if (req.query.startDate) query.visitDate.$gte = req.query.startDate;
+            if (req.query.endDate) query.visitDate.$lte = req.query.endDate;
+        }
+        const reports = await TourReport.find(query).sort({ visitDate: -1, createdAt: -1 }).lean();
+        res.json({ success: true, data: reports });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/tour-expenses/reports', async (req, res) => {
+    try {
+        const session = getTourSession(req);
+        if (!session) return res.status(401).json({ success: false, message: 'A valid sales representative session is required.' });
+        if (req.query.adminId && req.query.adminId !== session.adminId) return res.status(403).json({ success: false, message: 'Workspace does not match this SR session.' });
+        const payload = req.body || {};
+        const visitDate = String(payload.visitDate || '');
+        const zone = String(payload.zone || '').trim();
+        const market = String(payload.market || '').trim();
+        const area = String(payload.area || '').trim();
+        const purpose = String(payload.purpose || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(visitDate) || !zone || !market || !area || !purpose) {
+            return res.status(400).json({ success: false, message: 'Date, zone, market, area and purpose are required.' });
+        }
+        const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+        const allowedTourFileTypes = new Set(['.zip', '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv']);
+        let attachmentBytes = 0;
+        for (const file of attachments) {
+            if (!file || typeof file.name !== 'string' || typeof file.data !== 'string' || !file.data.startsWith('data:')) {
+                return res.status(400).json({ success: false, message: 'One or more attachments are invalid.' });
+            }
+            if (file.name.length > 180 || !allowedTourFileTypes.has(path.extname(file.name).toLowerCase())) {
+                return res.status(400).json({ success: false, message: 'Attachment type is not supported.' });
+            }
+            const base64 = file.data.split(',')[1] || '';
+            attachmentBytes += Buffer.from(base64, 'base64').length;
+        }
+        if (attachments.length > 20 || attachmentBytes > TOUR_MAX_ATTACHMENTS_BYTES) {
+            return res.status(413).json({ success: false, message: 'Keep attachments to 20 files and 8 MB total or less.' });
+        }
+        const representative = await TourRepresentative.findOne({ adminId: session.adminId, id: session.representativeId, active: true });
+        if (!representative) return res.status(401).json({ success: false, message: 'This representative account is no longer active.' });
+        const expenses = Array.isArray(payload.expenses) ? payload.expenses.slice(0, 100).map(item => ({
+            category: String(item.category || '').slice(0, 60),
+            description: String(item.description || '').slice(0, 180),
+            amount: Math.max(0, Number(item.amount) || 0)
+        })) : [];
+        const fields = {
+            id: String(payload.id || crypto.randomUUID()), adminId: session.adminId,
+            representativeId: representative.id, representativeName: representative.name,
+            visitDate, zone, market, area,
+            placesVisited: String(payload.placesVisited || '').slice(0, 2000),
+            personsMet: String(payload.personsMet || '').slice(0, 2000), purpose,
+            customerDemand: String(payload.customerDemand || '').slice(0, 3000),
+            visitReport: String(payload.visitReport || '').slice(0, 5000),
+            expenses, totalExpense: expenses.reduce((total, item) => total + item.amount, 0), attachments
+        };
+        const existing = await TourReport.findOne({ id: fields.id, adminId: session.adminId });
+        if (existing && existing.representativeId !== representative.id) return res.status(403).json({ success: false, message: 'You can only edit your own reports.' });
+        const saved = await TourReport.findOneAndUpdate(
+            { id: fields.id, adminId: session.adminId, representativeId: representative.id },
+            fields,
+            { new: true, upsert: true, runValidators: true }
+        );
+        res.json({ success: true, data: saved });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
     }
 });
 
