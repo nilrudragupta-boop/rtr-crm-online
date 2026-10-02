@@ -317,6 +317,18 @@ const apiClient = {
             return null;
         }
     },
+    getRecycleBinRecords: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/recycle-bin${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            if (!response.ok) return null;
+            const result = await response.json();
+            return result.success ? result.data : null;
+        } catch (error) {
+            console.error('Error fetching recycle bin:', error);
+            return null;
+        }
+    },
+    restoreRecycleBinRecord: (collectionName, id) => apiClient._restoreCollection(collectionName, id),
     _restoreCollection: async (collectionName, id) => {
         try {
             const response = await fetch(`${API_BASE_URL}/${collectionName}/${encodeURIComponent(id)}/restore${apiClient._getAuthQuery()}`, {

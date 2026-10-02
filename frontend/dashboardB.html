@@ -1255,6 +1255,10 @@
                                 </div>
                                 <i class="fas fa-cog" style="cursor: pointer; font-size: 0.9rem;"
                                     onclick="openQuickActionsSettings()" title="Configure Quick Actions"></i>
+                                <button class="btn-icon" onclick="openRecycleBinModal()" title="Recycle Bin"
+                                    aria-label="Recycle Bin">
+                                    <i class="fas fa-trash-restore"></i>
+                                </button>
                                 <i class="fas fa-headphones-alt"
                                     style="cursor: pointer; font-size: 0.9rem; color: #ffffff;"
                                     onclick="openWindow('Music Library', 700, 650)" title="Music Library"></i>
@@ -1915,6 +1919,54 @@
 
 
 
+    <div id="featureLocksAccessModal" class="modal" style="z-index:2300;">
+        <div class="modal-content" style="width:380px; max-width:94%;">
+            <span class="close-modal" onclick="closeFeatureLocksAccessModal()">&times;</span>
+            <h3 id="featureLocksAccessTitle" style="color:var(--primary-color); margin-top:0;">Feature Locks</h3>
+            <p id="featureLocksAccessMessage" style="font-size:13px; color:var(--dark-color);"></p>
+            <div id="featureLocksUnlockPanel">
+                <input type="password" id="featureLocksAccessInput" placeholder="Feature Locks password"
+                    style="width:100%; padding:10px; margin:8px 0; box-sizing:border-box;">
+                <button onclick="unlockFeatureLocks()" style="width:100%; padding:10px;">Unlock</button>
+                <button onclick="openFeatureLocksRecovery()"
+                    style="width:100%; padding:8px; background:transparent; color:var(--primary-color); border:0; cursor:pointer;">Forgot
+                    password?</button>
+            </div>
+            <div id="featureLocksSetupPanel" style="display:none; text-align:left;">
+                <label for="featureLocksAdminPass" style="font-weight:bold; font-size:13px;">Current Admin
+                    password</label>
+                <input type="password" id="featureLocksAdminPass" autocomplete="current-password"
+                    style="width:100%; padding:9px; margin:5px 0 10px; box-sizing:border-box;">
+                <label for="featureLocksNewPass" style="font-weight:bold; font-size:13px;">New Feature Locks
+                    password</label>
+                <input type="password" id="featureLocksNewPass" autocomplete="new-password"
+                    style="width:100%; padding:9px; margin:5px 0 10px; box-sizing:border-box;">
+                <label for="featureLocksConfirmPass" style="font-weight:bold; font-size:13px;">Confirm password</label>
+                <input type="password" id="featureLocksConfirmPass" autocomplete="new-password"
+                    style="width:100%; padding:9px; margin:5px 0 10px; box-sizing:border-box;">
+                <button onclick="createFeatureLocksAccessPassword()" style="width:100%; padding:10px;">Set
+                    password</button>
+            </div>
+            <p id="featureLocksAccessError" style="display:none; color:var(--danger-color); font-size:13px;"></p>
+        </div>
+    </div>
+
+    <div id="featureLocksRecoveryModal" class="modal" style="z-index:2400;">
+        <div class="modal-content" style="width:380px; max-width:94%;">
+            <span class="close-modal" onclick="closeFeatureLocksRecovery()">&times;</span>
+            <h3 style="color:var(--primary-color); margin-top:0;">Reset Feature Locks Password</h3>
+            <p style="font-size:13px; color:var(--dark-color);">Enter the registered USER ID and Admin email to receive
+                a verification code.</p>
+            <input type="text" id="featureLocksRecoveryUser" placeholder="Registered USER ID" autocomplete="username"
+                style="width:100%; padding:9px; margin:5px 0; box-sizing:border-box;">
+            <input type="email" id="featureLocksRecoveryEmail" placeholder="Registered Admin email" autocomplete="email"
+                style="width:100%; padding:9px; margin:5px 0 10px; box-sizing:border-box;">
+            <button id="featureLocksRecoverySendButton" onclick="sendFeatureLocksRecoveryOtp()"
+                style="width:100%; padding:10px;">Send verification code</button>
+            <p id="featureLocksRecoveryError" style="display:none; color:var(--danger-color); font-size:13px;"></p>
+        </div>
+    </div>
+
     <!-- Feature Locks Modal -->
     <div id="featureLocksModal" class="modal">
         <!-- max-height: 85vh limits height to 85% of screen -->
@@ -1924,13 +1976,23 @@
                 onclick="document.getElementById('featureLocksModal').style.display='none'">&times;</span>
             <h3 style="color: #673ab7; text-align: center; margin-top: 0;">🔒 Feature Passwords</h3>
             <p style="font-size: 13px; color: #666; text-align: center;">Set specific passwords for sensitive features.
-                Leave empty to use default Admin Password.</p>
+                Leave empty to use default Admin Password. The Backup Data Password also encrypts backup files and is
+                required to restore them.</p>
 
             <input type="text" id="featureLockSearch" placeholder="Search features..." oninput="filterFeatureLocks()"
                 autocomplete="off" data-lpignore="true"
                 style="width:100%; padding:8px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
 
             <div id="featureLocksList">
+                <div class="lock-item">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Feature Locks Access
+                        Password:</label>
+                    <input type="password" id="setFeatureLocksPass" autocomplete="new-password"
+                        style="width:100%; padding:8px; margin-bottom:5px; box-sizing:border-box;">
+                    <input type="password" id="confirmFeatureLocksPass" autocomplete="new-password"
+                        placeholder="Confirm password"
+                        style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
+                </div>
                 <div class="lock-item">
                     <label style="display:block; margin-bottom:5px; font-weight:bold;">Profit & Loss Password:</label>
                     <div style="position:relative; margin-bottom:10px;">
@@ -2026,7 +2088,7 @@
                     </div>
                 </div>
                 <div class="lock-item">
-                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Backup Data Password:</label>
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Backup File Password:</label>
                     <div style="position:relative; margin-bottom:10px;">
                         <input type="password" id="setBackupPass" placeholder="Default: Admin Pass"
                             style="width:100%; padding:8px; padding-right:30px; box-sizing:border-box;">
@@ -2386,6 +2448,40 @@
             <div id="cloudBackupList"
                 style="max-height: 300px; overflow-y: auto; margin-top: 15px; border: 1px solid var(--border-color); border-radius: 4px;">
                 <p style="padding: 10px; text-align: center;">Loading backups...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="recycleBinModal" class="modal">
+        <div class="modal-content"
+            style="width: 900px; max-width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:15px;">
+                <h3 style="color:var(--primary-color); margin:0;"><i class="fas fa-trash-restore"></i> Recycle Bin</h3>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <select id="recycleBinModuleFilter" aria-label="Filter by module"
+                        onchange="renderRecycleBinRecords()"
+                        style="padding:7px; border:1px solid var(--border-color); border-radius:4px; background:var(--card-bg); color:var(--text-color);">
+                        <option value="">All modules</option>
+                    </select>
+                    <button class="btn-icon" onclick="closeRecycleBinModal()" title="Close"
+                        aria-label="Close Recycle Bin"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div id="recycleBinStatus" style="padding:20px; text-align:center; color:var(--dark-color);">Loading deleted
+                records...</div>
+            <div style="overflow:auto; min-height:0;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <thead>
+                        <tr style="text-align:left; background:rgba(0,0,0,0.04);">
+                            <th style="padding:10px;">Module</th>
+                            <th style="padding:10px;">Record</th>
+                            <th style="padding:10px;">Deleted</th>
+                            <th style="padding:10px;">Deleted By</th>
+                            <th style="padding:10px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recycleBinRows"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -4231,6 +4327,7 @@
             { id: 'qa_restore', label: 'Restore Data', icon: 'fa-upload', action: 'triggerRestore', perm: 'perm_restore_data' },
             { id: 'qa_cloud_backup', label: 'Cloud Backup', icon: 'fa-cloud-upload-alt', action: 'performCloudBackup', perm: 'perm_cloud_backup' },
             { id: 'qa_cloud_restore', label: 'Cloud Restore', icon: 'fa-cloud-download-alt', action: 'openCloudRestoreModal', perm: 'perm_cloud_restore' },
+            { id: 'qa_recycle_bin', label: 'Recycle Bin', icon: 'fa-trash-restore', action: 'openRecycleBinModal' },
             { id: 'qa_close_all', label: 'Close All', icon: 'fa-window-close', action: 'closeAllWindows', perm: 'perm_close_all_windows' },
             { id: 'qa_team', label: 'Team Credits', icon: 'fa-users-cog', url: 'Team_Credits.html', width: 600, height: 500 },
             { id: 'qa_whats_new', label: 'What\'s New', icon: 'fa-gift', action: 'showWhatsNewModal' },
@@ -4253,7 +4350,7 @@
                 actionsToShow = saved.map(id => QUICK_ACTION_ITEMS.find(i => i.id === id)).filter(i => i);
             } else {
                 // Default defaults if nothing saved
-                const defaultIds = ['fav_customer', 'fav_supplier', 'fav_item', 'fav_scrap', 'fav_bom', 'fav_production', 'fav_pos', 'fav_kds', 'qa_returns_log', 'qa_update', 'qa_help'];
+                const defaultIds = ['fav_customer', 'fav_supplier', 'fav_item', 'fav_scrap', 'fav_bom', 'fav_production', 'fav_pos', 'fav_kds', 'qa_returns_log', 'qa_recycle_bin', 'qa_update', 'qa_help'];
                 actionsToShow = QUICK_ACTION_ITEMS.filter(i => defaultIds.includes(i.id));
             }
 
@@ -4295,6 +4392,93 @@
                     container.appendChild(div);
                 }
             });
+        }
+
+        let recycleBinRecords = [];
+
+        async function openRecycleBinModal() {
+            const modal = document.getElementById('recycleBinModal');
+            const status = document.getElementById('recycleBinStatus');
+            const filter = document.getElementById('recycleBinModuleFilter');
+            modal.style.display = 'flex';
+            status.style.display = 'block';
+            status.innerText = 'Loading deleted records...';
+            document.getElementById('recycleBinRows').innerHTML = '';
+
+            const records = typeof apiClient !== 'undefined' && apiClient.getRecycleBinRecords
+                ? await apiClient.getRecycleBinRecords() : null;
+            if (!Array.isArray(records)) {
+                status.innerText = 'Could not load deleted records from the backend.';
+                return;
+            }
+
+            recycleBinRecords = records;
+            filter.innerHTML = '<option value="">All modules</option>';
+            [...new Set(records.map(record => record.collection))].sort().forEach(collection => {
+                const option = document.createElement('option');
+                option.value = collection;
+                option.textContent = collection.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+                filter.appendChild(option);
+            });
+            renderRecycleBinRecords();
+        }
+
+        function renderRecycleBinRecords() {
+            const filterValue = document.getElementById('recycleBinModuleFilter').value;
+            const rows = document.getElementById('recycleBinRows');
+            const status = document.getElementById('recycleBinStatus');
+            const records = recycleBinRecords.filter(record => !filterValue || record.collection === filterValue);
+            rows.innerHTML = '';
+            status.style.display = records.length ? 'none' : 'block';
+            if (!records.length) {
+                status.innerText = recycleBinRecords.length ? 'No deleted records in this module.' : 'Recycle Bin is empty.';
+                return;
+            }
+
+            records.forEach(record => {
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid var(--border-color)';
+                const values = [
+                    record.collection.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
+                    record.reference && record.reference !== record.label ? `${record.label} (${record.reference})` : record.label,
+                    record.deletedAt ? new Date(record.deletedAt).toLocaleString() : 'Unknown',
+                    record.deletedBy || 'System'
+                ];
+                values.forEach(value => {
+                    const cell = document.createElement('td');
+                    cell.style.padding = '10px';
+                    cell.textContent = value || '-';
+                    row.appendChild(cell);
+                });
+
+                const actionCell = document.createElement('td');
+                actionCell.style.padding = '10px';
+                const restoreButton = document.createElement('button');
+                restoreButton.type = 'button';
+                restoreButton.className = 'btn-icon';
+                restoreButton.title = 'Restore record';
+                restoreButton.setAttribute('aria-label', 'Restore record');
+                restoreButton.innerHTML = '<i class="fas fa-undo"></i>';
+                restoreButton.addEventListener('click', async () => {
+                    restoreButton.disabled = true;
+                    const result = await apiClient.restoreRecycleBinRecord(record.collection, record.id);
+                    if (result && result.success) {
+                        recycleBinRecords = recycleBinRecords.filter(item => item !== record);
+                        renderRecycleBinRecords();
+                    } else {
+                        restoreButton.disabled = false;
+                        status.style.display = 'block';
+                        status.innerText = result?.message || 'Could not restore this record.';
+                    }
+                });
+                actionCell.appendChild(restoreButton);
+                row.appendChild(actionCell);
+                rows.appendChild(row);
+            });
+        }
+
+        function closeRecycleBinModal() {
+            document.getElementById('recycleBinModal').style.display = 'none';
         }
 
         function handleDragStart(e) {
@@ -5320,7 +5504,18 @@
             const otp = document.getElementById('secureOtpInput').value;
             if (otp.length !== 6) return alert("Please enter valid 6-digit OTP");
 
-            if (window.electronAPI && window.electronAPI.verifyOtp) {
+            if (currentOtpAction === 'Feature Locks Password Reset') {
+                const storedOtp = sessionStorage.getItem('featureLocksRecoveryOtp');
+                if (storedOtp === otp) {
+                    const callback = currentOtpCallback;
+                    sessionStorage.removeItem('featureLocksRecoveryOtp');
+                    closeSecureOtpModal();
+                    if (callback) callback();
+                } else {
+                    alert('Invalid verification code.');
+                    document.getElementById('secureOtpInput').value = '';
+                }
+            } else if (window.electronAPI && window.electronAPI.verifyOtp) {
                 const res = await window.electronAPI.verifyOtp(currentOtpAction, otp);
                 if (res.success) {
                     const callback = currentOtpCallback;
@@ -5331,11 +5526,11 @@
                     document.getElementById('secureOtpInput').value = '';
                 }
             } else {
-                const stored = sessionStorage.getItem("browser_temp_otp");
+                const stored = sessionStorage.getItem('browser_temp_otp');
                 if (stored && stored === otp) {
                     const callback = currentOtpCallback;
                     closeSecureOtpModal();
-                    sessionStorage.removeItem("browser_temp_otp");
+                    sessionStorage.removeItem('browser_temp_otp');
                     showToast("Verification Successful ✅", "#27ae60");
                     if (callback) callback();
                 } else {
@@ -5346,6 +5541,12 @@
         }
 
         async function resendSecureOtp() {
+            if (currentOtpAction === 'Feature Locks Password Reset') {
+                closeSecureOtpModal();
+                openFeatureLocksRecovery();
+                return;
+            }
+
             const overlay = document.getElementById('loadingOverlay');
             if (overlay) { overlay.style.display = 'flex'; overlay.querySelector('p').innerText = "Resending OTP..."; }
 
@@ -5499,36 +5700,204 @@
 
         // --- Feature Locks ---
         function openFeatureLocksModal() {
-            initiateSecureAction('Feature Locks', () => {
-                document.getElementById('setPlPass').value = localStorage.getItem('pass_profitLoss') || '';
-                document.getElementById('setSumPass').value = localStorage.getItem('pass_summary') || '';
-                document.getElementById('setLockPass').value = localStorage.getItem('pass_dashboard') || '';
-                document.getElementById('setBsPass').value = localStorage.getItem('pass_balance_sheet') || '';
-                document.getElementById('setEmpPass').value = localStorage.getItem('pass_employee') || '';
-                document.getElementById('setExpPass').value = localStorage.getItem('pass_expense') || '';
-                document.getElementById('setCdPass').value = localStorage.getItem('pass_credit_debit') || '';
-                document.getElementById('setBankingPass').value = localStorage.getItem('pass_banking') || '';
-                document.getElementById('setTallyPass').value = localStorage.getItem('pass_tally_gateway') || '';
-                document.getElementById('setSupplierPass').value = localStorage.getItem('pass_supplier') || '';
-                document.getElementById('setBackupPass').value = localStorage.getItem('pass_backup') || '';
-                document.getElementById('setRestorePass').value = localStorage.getItem('pass_restore') || '';
-                document.getElementById('setCashLimit').value = localStorage.getItem('cashLimit') || '';
-                document.getElementById('applyCashLimitToPurchase').checked = localStorage.getItem('applyCashLimitToPurchase') === 'true';
-                document.getElementById('setPurchaseBackDateLimit').value = localStorage.getItem('purchaseBackDateLimit') || '';
-                document.getElementById('setCashFlowPass').value = localStorage.getItem('pass_cash_flow') || '';
-                document.getElementById('setDayBookPass').value = localStorage.getItem('pass_day_book') || '';
-                document.getElementById('setDataAnalysisPass').value = localStorage.getItem('pass_data_analysis') || '';
+            const hasAccessPassword = !!localStorage.getItem('pass_feature_locks_access');
+            const accessModal = document.getElementById('featureLocksAccessModal');
+            const unlockPanel = document.getElementById('featureLocksUnlockPanel');
+            const setupPanel = document.getElementById('featureLocksSetupPanel');
+            const title = document.getElementById('featureLocksAccessTitle');
+            const message = document.getElementById('featureLocksAccessMessage');
+            const error = document.getElementById('featureLocksAccessError');
 
-                // Reset search
-                if (document.getElementById('featureLockSearch')) {
-                    document.getElementById('featureLockSearch').value = '';
-                    filterFeatureLocks();
-                }
-                document.getElementById('featureLocksModal').style.display = 'flex';
-            });
+            error.style.display = 'none';
+            unlockPanel.style.display = hasAccessPassword ? 'block' : 'none';
+            setupPanel.style.display = hasAccessPassword ? 'none' : 'block';
+            title.innerText = hasAccessPassword ? 'Unlock Feature Locks' : 'Set Feature Locks Password';
+            message.innerText = hasAccessPassword
+                ? 'Enter the Feature Locks password to manage protected settings.'
+                : 'Verify with the current Admin password before setting a separate password for Feature Locks.';
+            document.getElementById('featureLocksAccessInput').value = '';
+            document.getElementById('featureLocksAdminPass').value = '';
+            document.getElementById('featureLocksNewPass').value = '';
+            document.getElementById('featureLocksConfirmPass').value = '';
+            accessModal.style.display = 'flex';
+            document.getElementById(hasAccessPassword ? 'featureLocksAccessInput' : 'featureLocksAdminPass').focus();
+        }
+
+        function closeFeatureLocksAccessModal() {
+            document.getElementById('featureLocksAccessModal').style.display = 'none';
+        }
+
+        function showFeatureLocksEditor() {
+            document.getElementById('setFeatureLocksPass').value = localStorage.getItem('pass_feature_locks_access') || '';
+            document.getElementById('confirmFeatureLocksPass').value = localStorage.getItem('pass_feature_locks_access') || '';
+            document.getElementById('setPlPass').value = localStorage.getItem('pass_profitLoss') || '';
+            document.getElementById('setSumPass').value = localStorage.getItem('pass_summary') || '';
+            document.getElementById('setLockPass').value = localStorage.getItem('pass_dashboard') || '';
+            document.getElementById('setBsPass').value = localStorage.getItem('pass_balance_sheet') || '';
+            document.getElementById('setEmpPass').value = localStorage.getItem('pass_employee') || '';
+            document.getElementById('setExpPass').value = localStorage.getItem('pass_expense') || '';
+            document.getElementById('setCdPass').value = localStorage.getItem('pass_credit_debit') || '';
+            document.getElementById('setBankingPass').value = localStorage.getItem('pass_banking') || '';
+            document.getElementById('setTallyPass').value = localStorage.getItem('pass_tally_gateway') || '';
+            document.getElementById('setSupplierPass').value = localStorage.getItem('pass_supplier') || '';
+            document.getElementById('setBackupPass').value = localStorage.getItem('pass_backup') || '';
+            document.getElementById('setRestorePass').value = localStorage.getItem('pass_restore') || '';
+            document.getElementById('setCashLimit').value = localStorage.getItem('cashLimit') || '';
+            document.getElementById('applyCashLimitToPurchase').checked = localStorage.getItem('applyCashLimitToPurchase') === 'true';
+            document.getElementById('setPurchaseBackDateLimit').value = localStorage.getItem('purchaseBackDateLimit') || '';
+            document.getElementById('setCashFlowPass').value = localStorage.getItem('pass_cash_flow') || '';
+            document.getElementById('setDayBookPass').value = localStorage.getItem('pass_day_book') || '';
+            document.getElementById('setDataAnalysisPass').value = localStorage.getItem('pass_data_analysis') || '';
+
+            // Reset search
+            if (document.getElementById('featureLockSearch')) {
+                document.getElementById('featureLockSearch').value = '';
+                filterFeatureLocks();
+            }
+            document.getElementById('featureLocksModal').style.display = 'flex';
+        }
+
+        function unlockFeatureLocks() {
+            const entered = document.getElementById('featureLocksAccessInput').value;
+            if (entered !== localStorage.getItem('pass_feature_locks_access')) {
+                const error = document.getElementById('featureLocksAccessError');
+                error.innerText = 'Incorrect Feature Locks password.';
+                error.style.display = 'block';
+                return;
+            }
+            closeFeatureLocksAccessModal();
+            showFeatureLocksEditor();
+        }
+
+        function createFeatureLocksAccessPassword() {
+            const adminPassword = localStorage.getItem('appPassword');
+            const enteredAdminPassword = document.getElementById('featureLocksAdminPass').value;
+            const newPassword = document.getElementById('featureLocksNewPass').value;
+            const confirmPassword = document.getElementById('featureLocksConfirmPass').value;
+            const error = document.getElementById('featureLocksAccessError');
+
+            if (!adminPassword || enteredAdminPassword !== adminPassword) {
+                error.innerText = 'Incorrect Admin password. Feature Locks password was not set.';
+                error.style.display = 'block';
+                return;
+            }
+            if (newPassword.length < 4) {
+                error.innerText = 'Choose a password with at least 4 characters.';
+                error.style.display = 'block';
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                error.innerText = 'The passwords do not match.';
+                error.style.display = 'block';
+                return;
+            }
+
+            localStorage.setItem('pass_feature_locks_access', newPassword);
+            closeFeatureLocksAccessModal();
+            showFeatureLocksEditor();
+        }
+
+        function openFeatureLocksRecovery() {
+            document.getElementById('featureLocksRecoveryUser').value = localStorage.getItem('currentUser') || '';
+            document.getElementById('featureLocksRecoveryEmail').value = localStorage.getItem('adminEmail') || '';
+            document.getElementById('featureLocksRecoveryError').style.display = 'none';
+            document.getElementById('featureLocksRecoveryModal').style.display = 'flex';
+            document.getElementById('featureLocksRecoveryUser').focus();
+        }
+
+        function closeFeatureLocksRecovery() {
+            document.getElementById('featureLocksRecoveryModal').style.display = 'none';
+        }
+
+        async function sendFeatureLocksRecoveryOtp() {
+            const username = document.getElementById('featureLocksRecoveryUser').value.trim();
+            const email = document.getElementById('featureLocksRecoveryEmail').value.trim();
+            const error = document.getElementById('featureLocksRecoveryError');
+            const button = document.getElementById('featureLocksRecoverySendButton');
+            if (!username || !email || !email.includes('@')) {
+                error.innerText = 'Enter the registered USER ID and a valid Admin email.';
+                error.style.display = 'block';
+                return;
+            }
+
+            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') ||
+                (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
+            if (window.electronAPI && window.electronAPI.getAppSettings) {
+                try {
+                    const settings = await window.electronAPI.getAppSettings();
+                    scriptUrl = settings?.googleScriptUrl || settings?.updateServerUrl || settings?.cloudBackupUrl || scriptUrl;
+                } catch (e) { }
+            }
+            if (!scriptUrl || !scriptUrl.startsWith('http')) {
+                error.innerText = 'Password recovery is unavailable: no recovery service is configured.';
+                error.style.display = 'block';
+                return;
+            }
+
+            button.disabled = true;
+            error.style.display = 'none';
+            try {
+                const otp = String(Math.floor(100000 + Math.random() * 900000));
+                const response = await fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        method: 'send_forgot_otp',
+                        username,
+                        email,
+                        otp,
+                        machineId: 'Feature Locks password recovery',
+                        companyName: localStorage.getItem('companyName') || 'User'
+                    })
+                });
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message || 'Verification code could not be sent.');
+
+                sessionStorage.setItem('featureLocksRecoveryOtp', otp);
+                currentOtpAction = 'Feature Locks Password Reset';
+                currentOtpCallback = finishFeatureLocksPasswordReset;
+                closeFeatureLocksRecovery();
+                document.getElementById('secureOtpInput').value = '';
+                document.getElementById('otpInstruction').innerText = 'Enter the 6-digit code sent to your registered email.';
+                document.getElementById('otpEmailDisplay').innerText = maskEmail(email);
+                document.getElementById('secureOtpModal').style.display = 'flex';
+                document.getElementById('secureOtpInput').focus();
+                startSecureOtpTimer(600);
+                startSecureResendTimer();
+            } catch (err) {
+                error.innerText = err.message || 'Could not send verification code.';
+                error.style.display = 'block';
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function finishFeatureLocksPasswordReset() {
+            const newPassword = prompt('Enter a new Feature Locks password (at least 4 characters):');
+            if (newPassword === null) return;
+            if (newPassword.length < 4) {
+                alert('Choose a password with at least 4 characters. Start password recovery again to retry.');
+                return;
+            }
+            const confirmPassword = prompt('Confirm the new Feature Locks password:');
+            if (confirmPassword !== newPassword) {
+                alert('The passwords do not match. Start password recovery again to retry.');
+                return;
+            }
+            localStorage.setItem('pass_feature_locks_access', newPassword);
+            closeFeatureLocksAccessModal();
+            showToast('Feature Locks password reset successfully.', 'success');
+            showFeatureLocksEditor();
         }
 
         function saveFeatureLocks() {
+            const featureLocksPassword = document.getElementById('setFeatureLocksPass').value;
+            const confirmFeatureLocksPassword = document.getElementById('confirmFeatureLocksPass').value;
+            if (featureLocksPassword.length < 4 || featureLocksPassword !== confirmFeatureLocksPassword) {
+                alert('Feature Locks password must be at least 4 characters and both entries must match.');
+                return;
+            }
+
             const pl = document.getElementById('setPlPass').value;
             const sum = document.getElementById('setSumPass').value;
             const lock = document.getElementById('setLockPass').value;
@@ -5551,6 +5920,7 @@
             if (pl) localStorage.setItem('pass_profitLoss', pl); else localStorage.removeItem('pass_profitLoss');
             if (sum) localStorage.setItem('pass_summary', sum); else localStorage.removeItem('pass_summary');
             if (lock) localStorage.setItem('pass_dashboard', lock); else localStorage.removeItem('pass_dashboard');
+            localStorage.setItem('pass_feature_locks_access', featureLocksPassword);
 
             if (bs) localStorage.setItem('pass_balance_sheet', bs); else localStorage.removeItem('pass_balance_sheet');
             if (emp) localStorage.setItem('pass_employee', emp); else localStorage.removeItem('pass_employee');
@@ -5727,7 +6097,7 @@
 
         async function backupData() {
             const backupPassword = verifyDataOperationPassword("Backup", localStorage.getItem('pass_backup'));
-            if (backupPassword === null) return;
+            if (!backupPassword) return;
             if (!confirm("This will export all application data to a JSON file. Proceed?")) return;
 
             const overlay = document.getElementById('loadingOverlay');
@@ -5741,7 +6111,8 @@
                     backupData[key] = localStorage.getItem(key);
                 }
                 const jsonString = JSON.stringify(backupData, null, 2);
-                const encrypted = CryptoJS.AES.encrypt(jsonString, backupPassword).toString();
+                const filePassword = localStorage.getItem('pass_backup') || backupPassword;
+                const encrypted = CryptoJS.AES.encrypt(jsonString, filePassword).toString();
                 const now = new Date();
 
                 const brandEl = document.querySelector('[data-brand="name"]');
@@ -5797,7 +6168,12 @@
                     backupData[key] = localStorage.getItem(key);
                 }
                 const jsonString = JSON.stringify(backupData, null, 2);
-                const encrypted = CryptoJS.AES.encrypt(jsonString, '983042').toString();
+                const backupPassword = localStorage.getItem('pass_backup') || localStorage.getItem('appPassword');
+                if (!backupPassword) {
+                    console.warn("Automatic backup skipped: configure a Backup Data or Admin password first.");
+                    return;
+                }
+                const encrypted = CryptoJS.AES.encrypt(jsonString, backupPassword).toString();
                 const now = new Date();
                 const datePart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
                 const timePart = String(now.getHours()).padStart(2, '0') + '-' + String(now.getMinutes()).padStart(2, '0') + '-' + String(now.getSeconds()).padStart(2, '0');
@@ -5815,7 +6191,7 @@
             const file = input.files[0];
             if (!file) return;
             const restorePassword = verifyDataOperationPassword("Restore", localStorage.getItem('pass_restore'));
-            if (restorePassword === null) {
+            if (!restorePassword) {
                 input.value = "";
                 return;
             }
@@ -5852,16 +6228,21 @@
                         return;
                     }
 
+                    const backupFilePassword = prompt("Enter the password used to encrypt this backup file:");
+                    if (backupFilePassword === null) {
+                        if (overlay) overlay.style.display = 'none';
+                        input.value = '';
+                        return;
+                    }
+                    if (!backupFilePassword) throw new Error("Backup file password cannot be empty.");
+
                     let backupData = null;
                     if (overlay) overlay.querySelector('p').innerText = "Decrypting & Parsing Data...";
-                    for (const password of [restorePassword, '983042']) {
-                        try {
-                            const decrypted = CryptoJS.AES.decrypt(fileContent, password).toString(CryptoJS.enc.Utf8);
-                            if (decrypted) backupData = JSON.parse(decrypted);
-                            if (backupData) break;
-                        } catch (err) { }
-                    }
-                    if (!backupData) throw new Error("Unable to decrypt backup. Select a valid encrypted backup file.");
+                    try {
+                        const decrypted = CryptoJS.AES.decrypt(fileContent, backupFilePassword).toString(CryptoJS.enc.Utf8);
+                        if (decrypted) backupData = JSON.parse(decrypted);
+                    } catch (err) { }
+                    if (!backupData) throw new Error("Incorrect backup file password or invalid backup file.");
 
                     if (typeof API_BASE_URL !== 'undefined') {
                         try {
@@ -5889,7 +6270,7 @@
                 } catch (error) {
                     if (overlay) overlay.style.display = 'none';
                     console.error(error);
-                    alert("Restore failed. Invalid file.");
+                    alert("Restore failed: " + (error.message || "Invalid file."));
                 }
             };
             reader.readAsText(file);

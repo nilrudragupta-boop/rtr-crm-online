@@ -929,13 +929,25 @@
         function backupData() {
             if (!confirm("Export all data to JSON?")) return;
             try {
+                let backupPassword = localStorage.getItem('pass_backup') || localStorage.getItem('appPassword');
+                if (!backupPassword) {
+                    backupPassword = prompt("Set a password to encrypt this backup file:");
+                    if (backupPassword === null || !backupPassword) return;
+                    const confirmPassword = prompt("Confirm the backup file password:");
+                    if (confirmPassword !== backupPassword) {
+                        alert("Passwords do not match. Backup cancelled.");
+                        return;
+                    }
+                    localStorage.setItem('pass_backup', backupPassword);
+                }
+
                 const backupData = {};
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
                     backupData[key] = localStorage.getItem(key);
                 }
                 const jsonString = JSON.stringify(backupData, null, 2);
-                const encrypted = CryptoJS.AES.encrypt(jsonString, '983042').toString();
+                const encrypted = CryptoJS.AES.encrypt(jsonString, backupPassword).toString();
                 const now = new Date();
                 const fileName = `ServiceData-${now.toISOString().slice(0, 10)}.json`;
 
