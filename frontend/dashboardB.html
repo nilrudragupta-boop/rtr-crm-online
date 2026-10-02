@@ -5709,16 +5709,25 @@
             } catch (e) { console.warn("Could not sync all remote data before backup", e); }
         }
 
-        async function backupData() {
+        function verifyDataOperationPassword(operation, specificPass) {
             const adminPass = localStorage.getItem("appPassword");
-            const specificPass = localStorage.getItem('pass_backup');
-            if (specificPass) {
-                const entered = prompt("Enter Backup Password:");
-                if (entered !== specificPass && entered !== adminPass && entered !== "88937") {
-                    alert("Incorrect Password!");
-                    return;
-                }
+            if (!specificPass && !adminPass) {
+                alert("Set an application password or a feature password before using " + operation + ".");
+                return false;
             }
+
+            const entered = prompt("Enter " + operation + " Password:");
+            if (entered === null) return null;
+            if (entered !== specificPass && entered !== adminPass) {
+                alert("Incorrect Password!");
+                return null;
+            }
+            return entered;
+        }
+
+        async function backupData() {
+            const backupPassword = verifyDataOperationPassword("Backup", localStorage.getItem('pass_backup'));
+            if (backupPassword === null) return;
             if (!confirm("This will export all application data to a JSON file. Proceed?")) return;
 
             const overlay = document.getElementById('loadingOverlay');
@@ -5732,7 +5741,7 @@
                     backupData[key] = localStorage.getItem(key);
                 }
                 const jsonString = JSON.stringify(backupData, null, 2);
-                const encrypted = CryptoJS.AES.encrypt(jsonString, '983042').toString();
+                const encrypted = CryptoJS.AES.encrypt(jsonString, backupPassword).toString();
                 const now = new Date();
 
                 const brandEl = document.querySelector('[data-brand="name"]');
@@ -5805,6 +5814,11 @@
         function handleImportBackup(input) {
             const file = input.files[0];
             if (!file) return;
+            const restorePassword = verifyDataOperationPassword("Restore", localStorage.getItem('pass_restore'));
+            if (restorePassword === null) {
+                input.value = "";
+                return;
+            }
             if (!confirm("This will ERASE all current data and replace it with the backup. Proceed?")) return;
             const isDbBackup = file.name.startsWith("DB_Backup");
 
@@ -5840,12 +5854,14 @@
 
                     let backupData = null;
                     if (overlay) overlay.querySelector('p').innerText = "Decrypting & Parsing Data...";
-                    try {
-                        const bytes = CryptoJS.AES.decrypt(fileContent, '983042');
-                        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-                        if (decrypted) backupData = JSON.parse(decrypted);
-                    } catch (err) { console.log("Not encrypted, trying plain JSON..."); }
-                    if (!backupData) backupData = JSON.parse(fileContent);
+                    for (const password of [restorePassword, '983042']) {
+                        try {
+                            const decrypted = CryptoJS.AES.decrypt(fileContent, password).toString(CryptoJS.enc.Utf8);
+                            if (decrypted) backupData = JSON.parse(decrypted);
+                            if (backupData) break;
+                        } catch (err) { }
+                    }
+                    if (!backupData) throw new Error("Unable to decrypt backup. Select a valid encrypted backup file.");
 
                     if (typeof API_BASE_URL !== 'undefined') {
                         try {
@@ -5881,15 +5897,6 @@
         }
 
         function triggerRestore() {
-            const adminPass = localStorage.getItem("appPassword");
-            const specificPass = localStorage.getItem('pass_restore');
-            if (specificPass) {
-                const entered = prompt("Enter Restore Password:");
-                if (entered !== specificPass && entered !== adminPass && entered !== "88937") {
-                    alert("Incorrect Password!");
-                    return;
-                }
-            }
             document.getElementById('importBackupInput').click();
         }
 
