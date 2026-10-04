@@ -109,6 +109,16 @@
             z-index: 5;
         }
 
+        .table-responsive:not(.sticky-header) #purchaseTable thead th:not(.frozen) {
+            position: static;
+            top: auto;
+            z-index: auto;
+        }
+
+        .table-responsive:not(.sticky-header) #purchaseTable thead th.frozen {
+            top: auto;
+        }
+
         tfoot td {
             font-weight: bold;
         }
@@ -339,8 +349,8 @@
         }
 
         .table-responsive {
-            overflow: visible;
-            max-height: none;
+            overflow: auto;
+            max-height: 70vh;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
@@ -1134,7 +1144,11 @@
     <!-- Table Settings Modal -->
     <div id="settingsModal" class="modal">
         <div class="modal-content" style="width: 400px; max-height: 85vh; overflow-y: auto;">
-            <h3 style="color: #607d8b; text-align: center; margin-top: 0;">⚙️ Table Settings</h3>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <h3 style="color: #607d8b; text-align: left; margin: 0;">⚙️ Table Settings</h3>
+                <button type="button" class="btn-close" onclick="closeSettingsModal()" aria-label="Close Table Settings"
+                    title="Close" style="padding:2px 7px; font-size:16px; line-height:1;">&times;</button>
+            </div>
             <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; text-align: left;">
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px;">
@@ -1169,6 +1183,10 @@
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
                     <input type="checkbox" id="showFetchItemCodeToggle" onchange="toggleShowFetchItemCode()"> Show Fetch
                     by Item Code
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
+                    <input type="checkbox" id="stickyHeaderToggle" onchange="toggleStickyHeader()"> Sticky Table Header
                 </label>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; font-size: 14px; margin-top: 5px;">
@@ -1305,6 +1323,7 @@
         let showExtraFields = localStorage.getItem("purchaseShowExtraFields") === "true";
         let isGreyButtons = localStorage.getItem("purchaseGreyButtons") === "true";
         let isFreezePanes = localStorage.getItem("purchaseFreezePanes") === "true";
+        let isStickyHeader = localStorage.getItem("purchaseStickyHeader") !== "false";
         let allowDuplicateItems = localStorage.getItem("purchaseAllowDuplicateItems") === "true";
         let numFreezeCols = parseInt(localStorage.getItem("purchaseFreezeCols")) || 3;
         let showFetchItemCode = localStorage.getItem("purchaseShowFetchItemCode") !== "false";
@@ -1344,6 +1363,19 @@
             isFreezePanes = document.getElementById("freezePanesToggle").checked;
             localStorage.setItem("purchaseFreezePanes", isFreezePanes);
             applyFreezePanes();
+        }
+
+        function toggleStickyHeader() {
+            isStickyHeader = document.getElementById("stickyHeaderToggle").checked;
+            localStorage.setItem("purchaseStickyHeader", isStickyHeader);
+            applyStickyHeader();
+        }
+
+        function applyStickyHeader() {
+            const tableContainer = document.querySelector(".table-responsive");
+            const stickyToggle = document.getElementById("stickyHeaderToggle");
+            if (tableContainer) tableContainer.classList.toggle("sticky-header", isStickyHeader);
+            if (stickyToggle) stickyToggle.checked = isStickyHeader;
         }
 
         function updateFreezePanesCount() {
@@ -3735,6 +3767,9 @@
             const fetchToggle = document.getElementById("showFetchItemCodeToggle");
             if (fetchToggle) fetchToggle.checked = showFetchItemCode;
 
+            const stickyToggle = document.getElementById("stickyHeaderToggle");
+            if (stickyToggle) stickyToggle.checked = isStickyHeader;
+
             const freezeCount = document.getElementById("freezePanesCount");
             if (freezeCount) freezeCount.value = numFreezeCols;
 
@@ -3911,6 +3946,11 @@
             localStorage.removeItem("purchaseShowFetchItemCode");
             if (document.getElementById("showFetchItemCodeToggle")) document.getElementById("showFetchItemCodeToggle").checked = true;
             applyFetchItemCodeVisibility();
+
+            isStickyHeader = true;
+            localStorage.removeItem("purchaseStickyHeader");
+            if (document.getElementById("stickyHeaderToggle")) document.getElementById("stickyHeaderToggle").checked = true;
+            applyStickyHeader();
 
             isFreezePanes = false;
             numFreezeCols = 3;
@@ -4192,6 +4232,7 @@
             applyTheme();
             applyCompactView();
             applyGreyButtons();
+            applyStickyHeader();
             loadColumnWidths();
             enableColumnResizing();
             applyPurchaseFormVisibility();
