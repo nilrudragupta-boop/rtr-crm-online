@@ -392,6 +392,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_return_management', label: 'Returns Management' },
     { id: 'perm_scrap_inventory', label: 'Scrap Inventory', feature: 'inventory' },
     { id: 'perm_change_password', label: 'Change Password' },
+    { id: 'perm_email_sender', label: 'Email Sender' },
     { id: 'perm_feature_locks', label: 'Feature Locks' },
     { id: 'perm_bank_details', label: 'Bank Details' },
     { id: 'perm_check_updates', label: 'Check Updates' },
@@ -428,7 +429,6 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_business360', label: 'Business 360' }
 
 ];
-
 function getCurrentUser() {
     return localStorage.getItem('currentUser') || (APP_SETTINGS.ADMIN_USERS[0] ? APP_SETTINGS.ADMIN_USERS[0].username : 'admin');
 }
