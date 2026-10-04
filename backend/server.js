@@ -64,6 +64,73 @@ const adminCredsSchema = new mongoose.Schema({
 });
 const AdminCreds = mongoose.model('AdminCreds', adminCredsSchema);
 
+let adminUsersCache = { users: [], expiresAt: 0 };
+
+function normalizeAccountContacts(value) {
+    return String(value || '').split(',')
+        .map(contact => contact.replace(/\D/g, '').slice(-10))
+        .filter(Boolean);
+}
+
+async function getConfiguredAdminUsers() {
+    if (Date.now() < adminUsersCache.expiresAt) return adminUsersCache.users;
+
+    const creds = await AdminCreds.findOne({ id: 'global_creds' }).select('adminUsers').lean();
+    adminUsersCache = {
+        users: creds && Array.isArray(creds.adminUsers) ? creds.adminUsers : [],
+        expiresAt: Date.now() + 30000
+    };
+    return adminUsersCache.users;
+}
+
+app.use('/api', async (req, res, next) => {
+    const bodyActor = req.body && !Array.isArray(req.body) ? req.body.createdBy : '';
+    const actorUsername = String(req.query.user || bodyActor || '').trim();
+    if (!actorUsername) return next();
+
+    try {
+        const users = await getConfiguredAdminUsers();
+        const actor = users.find(account => String(account.username || '').trim() === actorUsername);
+        if (!actor) return next();
+
+        const actorContacts = normalizeAccountContacts(actor.contactNumber);
+        if (actorContacts.length === 0) return next();
+
+        const teamUsers = users.filter(account => {
+            const contacts = normalizeAccountContacts(account.contactNumber);
+            return actorContacts.some(contact => contacts.includes(contact));
+        });
+        if (teamUsers.length < 2) return next();
+
+        const owner = teamUsers.find(account => account.isLicensedAdmin === true) ||
+            teamUsers.find(account => String(account.role || '').trim().toLowerCase() === 'admin') ||
+            teamUsers[0];
+        const ownerUsername = String(owner.username || '').trim();
+        if (!ownerUsername) return next();
+
+        Object.defineProperty(req, 'query', {
+            configurable: true,
+            enumerable: true,
+            writable: true,
+            value: { ...req.query, user: ownerUsername }
+        });
+
+        const normalizePayload = payload => {
+            if (Array.isArray(payload)) {
+                payload.forEach(normalizePayload);
+            } else if (payload && typeof payload === 'object' && payload.createdBy) {
+                payload.lastModifiedBy = actorUsername;
+                payload.createdBy = ownerUsername;
+            }
+        };
+        normalizePayload(req.body);
+        next();
+    } catch (err) {
+        console.error('Failed to resolve shared account data scope:', err.message);
+        next();
+    }
+});
+
 // --- Marketing Visit Schema ---
 const marketingVisitSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
@@ -129,6 +196,7 @@ app.post('/api/admin-creds', async (req, res) => {
     try {
         const payload = req.body;
         const updated = await AdminCreds.findOneAndUpdate({ id: 'global_creds' }, payload, { new: true, upsert: true });
+        adminUsersCache.expiresAt = 0;
         res.status(200).json({ success: true, data: updated });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
