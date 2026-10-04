@@ -423,7 +423,10 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_follow_up', label: 'Follow-ups' },
     { id: 'perm_custom_sheet', label: 'Custom Sheet' },
     { id: 'perm_cheque_print', label: 'Cheque Print' },
-    { id: 'perm_chatter', label: 'Chatter' }
+    { id: 'perm_chatter', label: 'Chatter' },
+    { id: 'perm_crm_v2', label: 'CRM V2' },
+    { id: 'perm_business360', label: 'Business 360' }
+
 ];
 
 function getCurrentUser() {
@@ -666,14 +669,14 @@ async function checkChatterNotifications() {
         if (apiClient.getChatterGroups) {
             groups = await apiClient.getChatterGroups() || [];
         }
-        
+
         if (messages && messages.length > 0) {
             const currUsr = getCurrentUser();
             const myGroupIds = groups.filter(g => g.members && g.members.includes(currUsr)).map(g => g.id);
             myGroupIds.push('global');
-            
+
             const allowedMessages = messages.filter(m => myGroupIds.includes(m.groupId || 'global'));
-            
+
             const unreadMsgs = allowedMessages.filter(m => m.sender !== currUsr && (!m.readBy || !m.readBy.includes(currUsr)));
             if (unreadMsgs.length > 0) {
                 const lastMsg = unreadMsgs[unreadMsgs.length - 1];
@@ -681,21 +684,21 @@ async function checkChatterNotifications() {
 
                 if (lastMsg.id !== lastNotifiedId) {
                     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                        const groupInfo = lastMsg.groupId && lastMsg.groupId !== 'global' ? 
+                        const groupInfo = lastMsg.groupId && lastMsg.groupId !== 'global' ?
                             ` (Group: ${groups.find(g => g.id === lastMsg.groupId)?.name || 'Private'})` : '';
-                        
+
                         new Notification(`New message from ${lastMsg.sender}${groupInfo}`, {
                             body: lastMsg.text || 'Sent an attachment',
                             icon: 'logo.png'
                         });
                     }
-                    
+
                     localStorage.setItem('lastNotifiedMsgId', lastMsg.id);
                 }
             }
         }
-        }
     }
+}
 
 
 // --- STEP 4: Safety Logic ---
