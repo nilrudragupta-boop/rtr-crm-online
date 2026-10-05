@@ -246,6 +246,35 @@ app.post('/api/settings', async (req, res) => {
     }
 });
 
+// --- Per-user Quick Notes ---
+app.get('/api/quick-notes', async (req, res) => {
+    try {
+        const user = req.query.user || 'System';
+        const note = await Setting.findOne({ id: `quick_notes_${user}` }).lean();
+        res.json({ success: true, exists: Boolean(note), data: note ? note.data : { notes: '', updatedAt: null } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/quick-notes', async (req, res) => {
+    try {
+        const user = req.query.user || 'System';
+        const data = {
+            notes: typeof req.body.notes === 'string' ? req.body.notes : '',
+            updatedAt: new Date().toISOString()
+        };
+        const updated = await Setting.findOneAndUpdate(
+            { id: `quick_notes_${user}` },
+            { $set: { data } },
+            { new: true, upsert: true }
+        ).lean();
+        res.json({ success: true, data: updated.data });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- User-owned Custom Object Pages ---
 app.get('/api/custom-pages', async (req, res) => {
     try {
