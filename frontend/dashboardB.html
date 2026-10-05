@@ -975,7 +975,7 @@
                     </button>
                     <button class="nav-item" onclick="openNotesModal()" title="Notes">
                         <i class="fas fa-sticky-note"></i>
-                        <span class="nav-text">Notes</span>
+                        <span class="nav-text">Quick Notes</span>
                     </button>
 
                     <button class="nav-item" onclick="openChangePasswordModal()"
@@ -1266,7 +1266,8 @@
                                     <i class="fas fa-trash-restore"></i>
                                 </button>
                                 <i class="fas fa-file" style="cursor: pointer; font-size: 0.9rem; color: #6cc705;"
-                                    onclick="document.getElementById('notesModal').style.display = 'block';" title="Notes"></i>
+                                    onclick="document.getElementById('notesModal').style.display = 'block';"
+                                    title="Notes"></i>
                             </div>
                         </div>
                         <div class="panel-body actions-grid" id="quickActionsGrid">
@@ -5102,16 +5103,78 @@
         }
 
         // --- Notes Logic ---
-        function openNotesModal() {
-            const notes = localStorage.getItem("quickNotes") || "";
-            document.getElementById('quickNotesArea').value = notes;
+        let quickNotesRevision = 0;
+        let quickNotesSaveTimer = null;
+        let quickNotesSaveInProgress = false;
+        let quickNotesSaveRequested = false;
 
-            const ts = localStorage.getItem("quickNotesTimestamp");
-            if (ts) {
-                document.getElementById('notesTimestamp').innerText = "Last saved: " + ts;
-            } else {
-                document.getElementById('notesTimestamp').innerText = "";
+        async function loadQuickNotes() {
+            const revision = quickNotesRevision;
+            const localNotes = localStorage.getItem("quickNotes") || "";
+            const result = await apiClient.getQuickNotes();
+            if (!result || !result.success) {
+                document.getElementById('notesStatus').innerText = 'Offline; saved on this device';
+                document.getElementById('notesStatus').style.display = 'inline';
+                return;
             }
+            if (revision !== quickNotesRevision) return;
+
+            const notes = result.data && typeof result.data.notes === 'string' ? result.data.notes : '';
+            const area = document.getElementById('quickNotesArea');
+            area.value = notes;
+            localStorage.setItem("quickNotes", notes);
+
+            const savedAt = result.data && result.data.updatedAt;
+            document.getElementById('notesTimestamp').innerText = savedAt
+                ? "Last saved: " + new Date(savedAt).toLocaleString()
+                : "";
+
+            if (!result.exists && localNotes) {
+                area.value = localNotes;
+                await saveQuickNotesToBackend();
+            }
+        }
+
+        async function saveQuickNotesToBackend() {
+            if (quickNotesSaveInProgress) {
+                quickNotesSaveRequested = true;
+                return;
+            }
+
+            quickNotesSaveInProgress = true;
+            const area = document.getElementById('quickNotesArea');
+            const notes = area.value;
+            const result = await apiClient.saveQuickNotes(notes);
+            quickNotesSaveInProgress = false;
+
+            if (result && result.success) {
+                const savedAt = result.data && result.data.updatedAt;
+                const now = savedAt ? new Date(savedAt).toLocaleString() : new Date().toLocaleString();
+                localStorage.setItem("quickNotes", notes);
+                localStorage.setItem("quickNotesTimestamp", now);
+                document.getElementById('notesTimestamp').innerText = "Last saved: " + now;
+                const status = document.getElementById('notesStatus');
+                status.innerText = 'Saved to database';
+                status.style.display = 'inline';
+                setTimeout(() => { status.style.display = 'none'; }, 1500);
+            } else {
+                const status = document.getElementById('notesStatus');
+                status.innerText = 'Not synced; saved on this device';
+                status.style.display = 'inline';
+            }
+
+            if (quickNotesSaveRequested) {
+                quickNotesSaveRequested = false;
+                if (area.value !== notes) saveQuickNotesToBackend();
+            }
+        }
+
+        function openNotesModal() {
+            const area = document.getElementById('quickNotesArea');
+            area.value = localStorage.getItem("quickNotes") || "";
+            const ts = localStorage.getItem("quickNotesTimestamp");
+            document.getElementById('notesTimestamp').innerText = ts ? "Last saved: " + ts : "";
+            loadQuickNotes();
 
             const modal = document.getElementById('notesModal');
             const content = document.getElementById('notesContent');
@@ -5127,14 +5190,12 @@
 
         document.getElementById('quickNotesArea').addEventListener('input', function () {
             localStorage.setItem("quickNotes", this.value);
-
-            const now = new Date().toLocaleString();
-            localStorage.setItem("quickNotesTimestamp", now);
-            document.getElementById('notesTimestamp').innerText = "Last saved: " + now;
-
+            quickNotesRevision++;
             const status = document.getElementById('notesStatus');
+            status.innerText = 'Saving...';
             status.style.display = 'inline';
-            setTimeout(() => { status.style.display = 'none'; }, 1000);
+            clearTimeout(quickNotesSaveTimer);
+            quickNotesSaveTimer = setTimeout(saveQuickNotesToBackend, 500);
         });
 
         // --- Calculator Logic ---

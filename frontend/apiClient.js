@@ -63,6 +63,33 @@ const apiClient = {
         }
     },
 
+    getQuickNotes: async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/quick-notes${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching Quick Notes:', error);
+            return null;
+        }
+    },
+
+    saveQuickNotes: async (notes) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/quick-notes${apiClient._getAuthQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                keepalive: true,
+                body: JSON.stringify({ notes })
+            });
+            if (!response.ok) return { success: false, message: `HTTP ${response.status}` };
+            return await response.json();
+        } catch (error) {
+            console.error('Error saving Quick Notes:', error);
+            return { success: false, message: error.message };
+        }
+    },
+
     getAdminCreds: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`, { cache: 'no-store' });
