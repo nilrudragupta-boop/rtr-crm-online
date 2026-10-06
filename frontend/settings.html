@@ -455,7 +455,8 @@
                                 onclick="openCustomFieldModal()">
                                 <i class="fas fa-sliders-h"></i> Open Custom Field Settings (Modal)
                             </button>
-                            <button class="btn-save" style="background:#0275d8; color:white; width: auto; margin-left: 10px;"
+                            <button class="btn-save"
+                                style="background:#0275d8; color:white; width: auto; margin-left: 10px;"
                                 onclick="window.location.href='settings_builder.html'">
                                 <i class="fas fa-external-link-alt"></i> Open Object Manager (Standalone Page)
                             </button>
@@ -1535,7 +1536,8 @@
                                     <div class="cfm-field-group">
                                         <label class="cfm-label">Source Module <span class="req-star">*</span></label>
                                         <input type="text" id="cfLookupModule" class="cfm-input" list="cfModuleList"
-                                            placeholder="e.g., Customer, Supplier" oninput="populateLookupDisplayFields()">
+                                            placeholder="e.g., Customer, Supplier"
+                                            oninput="populateLookupDisplayFields()">
                                         <div class="cfm-hint">Which module's records will appear in the popup list.
                                         </div>
                                     </div>
@@ -2461,9 +2463,18 @@
                 let tempTotpSecret = null;
                 let pendingTotpUserIndex = null;
 
-                function openTotpSetup() {
+                async function isValidDeveloperId(devId) {
+                    if (!devId) return false;
+                    if (window.electronAPI && window.electronAPI.verifyDevId) {
+                        const result = await window.electronAPI.verifyDevId(devId);
+                        return !!(result && result.success);
+                    }
+                    return devId === "NANCY@20129830428736";
+                }
+
+                async function openTotpSetup() {
                     const devId = document.getElementById('devId').value;
-                    if (devId !== "NANCY@20129830428736") {
+                    if (!await isValidDeveloperId(devId)) {
                         alert("Please enter valid Developer ID to setup Authenticator.");
                         return;
                     }
@@ -2490,9 +2501,16 @@
                     document.getElementById('totpSetupModal').style.display = 'flex';
                 }
 
-                function setupUserTotp(index) {
+                async function setupUserTotp(index) {
+                    const devId = document.getElementById('devIdForUsers').value || document.getElementById('devId').value;
+                    if (!await isValidDeveloperId(devId)) {
+                        alert("Please enter a valid Developer ID in the Save Users section to setup Authenticator.");
+                        return;
+                    }
+
                     pendingTotpUserIndex = index;
                     const user = window.currentAdminUsers[index];
+                    if (!user) return;
 
                     // Generate Secret
                     const secret = new OTPAuth.Secret({ size: 20 });
@@ -2526,7 +2544,10 @@
                     const token = document.getElementById('totpVerifyInput').value;
                     if (!token || token.length !== 6) { alert("Please enter valid code."); return; }
 
-                    const totp = new OTPAuth.TOTP({ issuer: "Your Company Name", label: "Developer Admin", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(tempTotpSecret) });
+                    const label = pendingTotpUserIndex !== null && window.currentAdminUsers[pendingTotpUserIndex]
+                        ? window.currentAdminUsers[pendingTotpUserIndex].username
+                        : "Developer Admin";
+                    const totp = new OTPAuth.TOTP({ issuer: "Your Company Name", label, algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(tempTotpSecret) });
                     const delta = totp.validate({ token: token, window: 1 });
 
                     if (delta !== null) {
@@ -2860,34 +2881,34 @@ function createResponse(obj) {
                     const moduleName = document.getElementById('cfLookupModule').value.trim();
                     const displaySelect = document.getElementById('cfLookupDisplay');
                     if (!displaySelect) return;
-                    
+
                     const currentVal = displaySelect.value;
                     displaySelect.innerHTML = '<option value="">-- Select Display Field --</option>';
-                    
+
                     let fields = [];
-                    
+
                     if (moduleName.toLowerCase() === 'customer' || moduleName.toLowerCase() === 'customers') {
-                        fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'contact', fieldLabel: 'Contact'}, {fieldName: 'email', fieldLabel: 'Email'}, {fieldName: 'gstin', fieldLabel: 'GSTIN'}];
+                        fields = [{ fieldName: 'name', fieldLabel: 'Name' }, { fieldName: 'contact', fieldLabel: 'Contact' }, { fieldName: 'email', fieldLabel: 'Email' }, { fieldName: 'gstin', fieldLabel: 'GSTIN' }];
                     } else if (moduleName.toLowerCase() === 'supplier' || moduleName.toLowerCase() === 'suppliers') {
-                        fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'contact', fieldLabel: 'Contact'}, {fieldName: 'email', fieldLabel: 'Email'}, {fieldName: 'gstin', fieldLabel: 'GSTIN'}];
+                        fields = [{ fieldName: 'name', fieldLabel: 'Name' }, { fieldName: 'contact', fieldLabel: 'Contact' }, { fieldName: 'email', fieldLabel: 'Email' }, { fieldName: 'gstin', fieldLabel: 'GSTIN' }];
                     } else if (moduleName.toLowerCase() === 'item' || moduleName.toLowerCase() === 'items') {
-                        fields = [{fieldName: 'name', fieldLabel: 'Name'}, {fieldName: 'itemCode', fieldLabel: 'Item Code'}, {fieldName: 'category', fieldLabel: 'Category'}, {fieldName: 'price', fieldLabel: 'Price'}];
+                        fields = [{ fieldName: 'name', fieldLabel: 'Name' }, { fieldName: 'itemCode', fieldLabel: 'Item Code' }, { fieldName: 'category', fieldLabel: 'Category' }, { fieldName: 'price', fieldLabel: 'Price' }];
                     } else if (moduleName.toLowerCase() === 'invoice' || moduleName.toLowerCase() === 'invoices') {
-                        fields = [{fieldName: 'invoice_no', fieldLabel: 'Invoice No'}, {fieldName: 'customer_name', fieldLabel: 'Customer Name'}, {fieldName: 'date', fieldLabel: 'Date'}];
+                        fields = [{ fieldName: 'invoice_no', fieldLabel: 'Invoice No' }, { fieldName: 'customer_name', fieldLabel: 'Customer Name' }, { fieldName: 'date', fieldLabel: 'Date' }];
                     } else if (moduleName) {
                         const customFields = customFieldsCache.filter(f => f.moduleName === moduleName);
-                        fields = customFields.map(f => ({fieldName: f.fieldName, fieldLabel: f.fieldLabel}));
+                        fields = customFields.map(f => ({ fieldName: f.fieldName, fieldLabel: f.fieldLabel }));
                     }
-                    
-                    fields.push({fieldName: 'id', fieldLabel: 'Record ID'});
-                    
+
+                    fields.push({ fieldName: 'id', fieldLabel: 'Record ID' });
+
                     fields.forEach(f => {
                         const opt = document.createElement('option');
                         opt.value = f.fieldName;
                         opt.textContent = `${f.fieldLabel} (${f.fieldName})`;
                         displaySelect.appendChild(opt);
                     });
-                    
+
                     if (currentVal && fields.some(f => f.fieldName === currentVal)) {
                         displaySelect.value = currentVal;
                     }
@@ -2935,22 +2956,22 @@ function createResponse(obj) {
                     const cur = filter.value;
                     filter.innerHTML = '<option value="">All Modules</option>';
 
-            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
-            const currentUser = localStorage.getItem('currentUser') || 'System';
-            const customPages = allPages.filter(p => p.createdBy === currentUser);
-            const customPageIds = customPages.map(p => p.pageId);
-            const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                    const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const customPages = allPages.filter(p => p.createdBy === currentUser);
+                    const customPageIds = customPages.map(p => p.pageId);
+                    const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
 
-            const allModules = [...new Set([
-                ...myFields.map(f => f.moduleName),
-                ...customPageIds
-            ])].filter(Boolean).sort();
+                    const allModules = [...new Set([
+                        ...myFields.map(f => f.moduleName),
+                        ...customPageIds
+                    ])].filter(Boolean).sort();
 
-            allModules.forEach(m => {
-                const pageDef = customPages.find(p => p.pageId === m);
-                const display = pageDef ? `${pageDef.label} (${m})` : m;
-                filter.innerHTML += `<option value="${m}">${display}</option>`;
-            });
+                    allModules.forEach(m => {
+                        const pageDef = customPages.find(p => p.pageId === m);
+                        const display = pageDef ? `${pageDef.label} (${m})` : m;
+                        filter.innerHTML += `<option value="${m}">${display}</option>`;
+                    });
 
                     if (cur) filter.value = cur;
                 }
@@ -2958,25 +2979,25 @@ function createResponse(obj) {
                 function populateCfModuleDatalist() {
                     const dl = document.getElementById('cfModuleList');
                     if (!dl) return;
-            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
-            const currentUser = localStorage.getItem('currentUser') || 'System';
-            const customPages = allPages.filter(p => p.createdBy === currentUser);
-            const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                    const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const customPages = allPages.filter(p => p.createdBy === currentUser);
+                    const myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
                     const all = [...new Set([
                         'Customer', 'Invoice', 'Item', 'Supplier',
-                ...customPages.map(p => p.pageId),
-                ...myFields.map(f => f.moduleName)
+                        ...customPages.map(p => p.pageId),
+                        ...myFields.map(f => f.moduleName)
                     ].filter(Boolean))].sort();
 
-            dl.innerHTML = all.map(m => {
-                const pageDef = customPages.find(p => p.pageId === m);
-                const display = pageDef ? `${pageDef.label} (${m})` : m;
-                return `<option value="${m}">${display}</option>`;
-            }).join('');
+                    dl.innerHTML = all.map(m => {
+                        const pageDef = customPages.find(p => p.pageId === m);
+                        const display = pageDef ? `${pageDef.label} (${m})` : m;
+                        return `<option value="${m}">${display}</option>`;
+                    }).join('');
 
                     const secDl = document.getElementById('cfSectionList');
                     if (secDl) {
-                const secs = [...new Set(myFields.map(f => f.section))].filter(Boolean);
+                        const secs = [...new Set(myFields.map(f => f.section))].filter(Boolean);
                         secDl.innerHTML = secs.map(s => `<option value="${s}">`).join('');
                     }
                 }
@@ -2986,12 +3007,12 @@ function createResponse(obj) {
                     if (!tbody) return;
                     const search = (document.getElementById('cfSearch')?.value || '').trim().toLowerCase();
                     const modFil = document.getElementById('cfModuleFilter')?.value || '';
-            const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
-            const currentUser = localStorage.getItem('currentUser') || 'System';
-            const customPages = allPages.filter(p => p.createdBy === currentUser);
+                    const allPages = JSON.parse(localStorage.getItem('crmCustomPages')) || [];
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const customPages = allPages.filter(p => p.createdBy === currentUser);
 
-            let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
-            let fields = myFields;
+                    let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                    let fields = myFields;
                     if (modFil) fields = fields.filter(f => f.moduleName === modFil);
                     if (search) fields = fields.filter(f =>
                         (f.fieldLabel || '').toLowerCase().includes(search) ||
@@ -3001,10 +3022,10 @@ function createResponse(obj) {
                     fields.sort((a, b) => (a.order || 0) - (b.order || 0));
 
                     // Update stats
-            document.getElementById('cfmStatTotal').textContent = myFields.length;
+                    document.getElementById('cfmStatTotal').textContent = myFields.length;
                     document.getElementById('cfmStatShowing').textContent = fields.length;
                     document.getElementById('cfmStatModules').textContent =
-                new Set(myFields.map(f => f.moduleName)).size;
+                        new Set(myFields.map(f => f.moduleName)).size;
 
                     tbody.innerHTML = '';
                     if (!fields.length) {
@@ -3126,7 +3147,7 @@ function createResponse(obj) {
                         suffix: document.getElementById('cfSuffix').value.trim(),
                         order: parseInt(document.getElementById('cfOrder').value) || 0,
                         gridWidth: document.getElementById('cfGridWidth').value,
-                createdBy: localStorage.getItem('currentUser') || 'System'
+                        createdBy: localStorage.getItem('currentUser') || 'System'
                     };
 
                     if (id) payload._id = id;
@@ -3266,10 +3287,10 @@ function createResponse(obj) {
                 // ── Delete entire module ──
                 async function deleteEntireModule() {
                     const mod = document.getElementById('cfModuleFilter')?.value;
-            const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
                     if (!mod) { cfmToast('Select a specific module first.', 'error'); return; }
                     if (!confirm(`Delete ALL fields in module "${mod}"? This cannot be undone.`)) return;
-            const toDelete = customFieldsCache.filter(f => f.moduleName === mod && f.createdBy === currentUser);
+                    const toDelete = customFieldsCache.filter(f => f.moduleName === mod && f.createdBy === currentUser);
                     try {
                         for (const f of toDelete) {
                             await apiClient.deleteCustomField(f._id);
@@ -3339,14 +3360,14 @@ function createResponse(obj) {
                     if (draggedFieldItem !== this) {
                         const fromId = draggedFieldItem.dataset.fieldId;
                         const toId = this.dataset.fieldId;
-                const currentUser = localStorage.getItem('currentUser') || 'System';
-                let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                        const currentUser = localStorage.getItem('currentUser') || 'System';
+                        let myFields = customFieldsCache.filter(f => f.createdBy === currentUser);
                         const fi = customFieldsCache.findIndex(f => f._id === fromId);
                         const ti = customFieldsCache.findIndex(f => f._id === toId);
                         const [item] = customFieldsCache.splice(fi, 1);
                         customFieldsCache.splice(ti, 0, item);
-                let newMyFields = customFieldsCache.filter(f => f.createdBy === currentUser);
-                newMyFields.forEach((f, i) => f.order = i);
+                        let newMyFields = customFieldsCache.filter(f => f.createdBy === currentUser);
+                        newMyFields.forEach((f, i) => f.order = i);
                         renderCustomFieldsTable();
                         saveFieldOrder();
                     }
@@ -3354,8 +3375,8 @@ function createResponse(obj) {
                 }
 
                 async function saveFieldOrder() {
-            const currentUser = localStorage.getItem('currentUser') || 'System';
-            const payload = customFieldsCache.filter(f => f.createdBy === currentUser).map((f) => ({ _id: f._id, order: f.order }));
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const payload = customFieldsCache.filter(f => f.createdBy === currentUser).map((f) => ({ _id: f._id, order: f.order }));
                     try {
                         const res = await fetch(`${API_BASE_URL}/custom-fields/reorder`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
