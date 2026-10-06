@@ -2038,8 +2038,10 @@
                             document.getElementById('adminEmailPass').value = '';
 
                             triggerBackgroundSync();
+                            return true;
                         } else {
                             alert("Failed: " + result.message);
+                            return false;
                         }
                     } else {
                         // Web Browser Fallback
@@ -2047,23 +2049,33 @@
                             alert("Failed: Invalid Developer ID.");
                             return;
                         }
+                        try {
+                            const response = await fetch('/api/admin-creds', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                            });
+                            const result = await response.json();
+                            if (!response.ok || !result.success) {
+                                throw new Error(result.message || `HTTP ${response.status}`);
+                            }
+                        } catch (error) {
+                            alert("Failed to save security credentials: " + error.message);
+                            return false;
+                        }
+
                         localStorage.setItem('adminUser', data.adminUser);
                         if (data.adminPass) localStorage.setItem('adminPass', data.adminPass);
                         localStorage.setItem('adminEmail', data.adminEmail);
                         if (data.adminEmailPass) localStorage.setItem('adminEmailPass', data.adminEmailPass);
                         localStorage.setItem('ADMIN_USERS', JSON.stringify(data.adminUsers));
 
-                        fetch('/api/admin-creds', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(data)
-                        }).catch(console.error);
-
                         alert("Security credentials updated successfully!");
                         document.getElementById('devId').value = '';
                         document.getElementById('adminPass').value = '';
                         document.getElementById('adminEmailPass').value = '';
                         triggerBackgroundSync();
+                        return true;
                     }
                 }
 
@@ -2143,7 +2155,8 @@
 
                     // Reuse saveSecuritySettings logic but triggered from here
                     document.getElementById('devId').value = devId; // Set hidden devId
-                    await saveSecuritySettings();
+                    const saved = await saveSecuritySettings();
+                    if (!saved) return;
                     document.getElementById('devIdForUsers').value = '';
                     document.getElementById('devId').value = '';
 
