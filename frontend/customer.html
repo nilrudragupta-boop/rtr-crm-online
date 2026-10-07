@@ -99,6 +99,13 @@
             background: #eee;
         }
 
+        .table-responsive.sticky-grand-total #customerTable tfoot td {
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+            background: #f0f0f0;
+        }
+
         th {
             background: #eee;
         }
@@ -1203,6 +1210,11 @@
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
                     <input type="checkbox" id="stickyHeaderToggle" onchange="toggleStickyHeader()"> Sticky Table Header
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
+                    <input type="checkbox" id="stickyGrandTotalToggle" onchange="toggleStickyGrandTotal()"> Sticky Grand
+                    Total Row
                 </label>
 
 
@@ -2831,12 +2843,15 @@
             for (const btnId in buttonVisibility) {
                 const toggleId = `show${btnId.charAt(0).toUpperCase() + btnId.slice(1)}Toggle`;
                 const toggle = document.getElementById(toggleId);
-                const stickyToggle = document.getElementById("stickyHeaderToggle");
-                if (stickyToggle) stickyToggle.checked = isStickyHeader;
                 if (toggle) {
                     toggle.checked = buttonVisibility[btnId];
                 }
             }
+
+            const stickyToggle = document.getElementById("stickyHeaderToggle");
+            if (stickyToggle) stickyToggle.checked = isStickyHeader;
+            const stickyGrandTotalToggle = document.getElementById("stickyGrandTotalToggle");
+            if (stickyGrandTotalToggle) stickyGrandTotalToggle.checked = isStickyGrandTotal;
 
             document.getElementById("showActionView").checked = actionButtonVisibility.view;
             document.getElementById("showActionInvoice").checked = actionButtonVisibility.invoice;
@@ -3107,11 +3122,18 @@
 
         // Sticky Header Logic (defaults to true)
         let isStickyHeader = localStorage.getItem("customerStickyHeader") !== "false";
+        let isStickyGrandTotal = localStorage.getItem("customerStickyGrandTotal") === "true";
 
         function toggleStickyHeader() {
             isStickyHeader = document.getElementById("stickyHeaderToggle").checked;
             localStorage.setItem("customerStickyHeader", isStickyHeader);
             applyStickyHeader();
+        }
+
+        function toggleStickyGrandTotal() {
+            isStickyGrandTotal = document.getElementById("stickyGrandTotalToggle").checked;
+            localStorage.setItem("customerStickyGrandTotal", isStickyGrandTotal);
+            applyStickyGrandTotal();
         }
 
         function applyStickyHeader() {
@@ -3122,6 +3144,13 @@
                 } else {
                     tableContainer.classList.remove("sticky-header");
                 }
+            }
+        }
+
+        function applyStickyGrandTotal() {
+            const tableContainer = document.querySelector(".table-responsive");
+            if (tableContainer) {
+                tableContainer.classList.toggle("sticky-grand-total", isStickyGrandTotal);
             }
         }
 
@@ -3151,6 +3180,7 @@
         window.addEventListener('scroll', function () { document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active')); }, true);
 
         applyStickyHeader();
+        applyStickyGrandTotal();
     </script>
     <script src="crm_v2_integration.js"></script>
 </body>
