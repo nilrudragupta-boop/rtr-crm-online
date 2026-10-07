@@ -271,6 +271,16 @@
             border-color: #444;
         }
 
+        body.dark-mode .summary-box {
+            background-color: #2c2c2c !important;
+            border-color: #444 !important;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .summary-box strong {
+            color: #e0e0e0 !important;
+        }
+
         /* Compact View */
         table.compact-table th,
         table.compact-table td {
@@ -992,6 +1002,15 @@
             data-permission-id="perm_delete_action">Delete Selected</button>
         <button id="salesBtn" class="btn btn-outline-success"
             onclick="window.location.href = 'customer_support.html'">Customer Support</button>
+    </div>
+
+    <div id="customerSummary" class="summary-box"
+        style="background:#fff; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px; display:flex; gap:20px; align-items:center; font-size:14px; flex-wrap:wrap;">
+        <strong style="color:#2c3e50;">Summary:</strong>
+        <span style="color:#0d6efd; font-weight:bold;">Total Customers: <span id="summaryCustomerCount">0</span></span>
+        <span style="color:#6f42c1; font-weight:bold;">Opening Balance: ₹ <span id="summaryOpeningBalance">0.00 Dr</span></span>
+        <span style="color:#e67e22; font-weight:bold;">Total Outstanding: ₹ <span id="summaryOutstanding">0.00</span></span>
+        <span style="color:#c0392b; font-weight:bold;">Customers with Due: <span id="summaryCustomersWithDue">0</span></span>
     </div>
 
     <div class="table-responsive">
@@ -2394,6 +2413,14 @@
                 c.outstanding = calculateOutstanding(c);
                 totalOutstanding += c.outstanding;
             });
+
+            document.getElementById("summaryCustomerCount").textContent = filtered.length;
+            document.getElementById("summaryOpeningBalance").textContent =
+                `${Math.abs(totalOpBal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${totalOpBal >= 0 ? 'Dr' : 'Cr'}`;
+            document.getElementById("summaryOutstanding").textContent =
+                totalOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById("summaryCustomersWithDue").textContent =
+                filtered.filter(c => c.outstanding > 0.01).length;
 
             // 2. Sort
             filtered.sort((a, b) => {
