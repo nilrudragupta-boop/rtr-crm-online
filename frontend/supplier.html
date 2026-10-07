@@ -108,6 +108,17 @@
             color: rgb(10, 10, 10);
         }
 
+        .table-responsive.sticky-grand-total #mainSupplierTable tfoot td {
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+            background: #f8f9fa;
+        }
+
+        body.dark-mode .table-responsive.sticky-grand-total #mainSupplierTable tfoot td {
+            background: #2c2c2c;
+        }
+
         .table-responsive table {
             border-collapse: separate;
             border-spacing: 0;
@@ -658,6 +669,11 @@
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
                     <input type="checkbox" id="stickyHeaderToggle" onchange="toggleStickyHeader()"> Sticky Table Header
+                </label>
+                <label
+                    style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 10px;">
+                    <input type="checkbox" id="stickyGrandTotalToggle" onchange="toggleStickyGrandTotal()"> Sticky Grand
+                    Total Row
                 </label>
 
             </div>
@@ -1436,6 +1452,9 @@
 
             const greyToggle = document.getElementById("greyButtonsToggle");
             if (greyToggle) greyToggle.checked = isGreyButtons;
+
+            const stickyGrandTotalToggle = document.getElementById("stickyGrandTotalToggle");
+            if (stickyGrandTotalToggle) stickyGrandTotalToggle.checked = isStickyGrandTotal;
 
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;
@@ -2961,11 +2980,18 @@
 
         // Sticky Header Logic (defaults to true)
         let isStickyHeader = localStorage.getItem("supplierStickyHeader") !== "false";
+        let isStickyGrandTotal = localStorage.getItem("supplierStickyGrandTotal") === "true";
 
         function toggleStickyHeader() {
             isStickyHeader = document.getElementById("stickyHeaderToggle").checked;
             localStorage.setItem("supplierStickyHeader", isStickyHeader);
             applyStickyHeader();
+        }
+
+        function toggleStickyGrandTotal() {
+            isStickyGrandTotal = document.getElementById("stickyGrandTotalToggle").checked;
+            localStorage.setItem("supplierStickyGrandTotal", isStickyGrandTotal);
+            applyStickyGrandTotal();
         }
 
         function applyStickyHeader() {
@@ -2978,7 +3004,16 @@
                 }
             }
         }
+
+        function applyStickyGrandTotal() {
+            const tableContainer = document.querySelector(".table-responsive");
+            if (tableContainer) {
+                tableContainer.classList.toggle("sticky-grand-total", isStickyGrandTotal);
+            }
+        }
+
         applyStickyHeader();
+        applyStickyGrandTotal();
 
     </script>
     <script src="crm_v2_integration.js"></script>
