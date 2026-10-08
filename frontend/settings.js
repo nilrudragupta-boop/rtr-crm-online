@@ -518,7 +518,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 window.addEventListener('storage', (e) => {
     const user = getCurrentUser();
-    if (e.key === `ui_permissions_${user}`) applyUIPermissions();
+    if (e.key === `ui_permissions_${user}` || e.key === `remotePermissions_${user}`) applyUIPermissions();
 });
 
 // Listen for Developer Override (Step 7)
