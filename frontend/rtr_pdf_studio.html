@@ -886,9 +886,7 @@
                     </button>
                 </div>
                 <p id="directory-empty" class="directory-empty hidden">No matching tools. Try a different search.</p>
-                <div class="directory-privacy"><i data-lucide="lock-keyhole" aria-hidden="true"></i> Your files are
-                    processed locally and never uploaded to server.</div>
-            </div>
+
         </section>
 
         <!-- Toast Notification Element -->
@@ -1585,11 +1583,11 @@
             class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <div class="flex items-center gap-2">
                 <i data-lucide="lock" class="w-4 h-4 text-emerald-600"></i>
-                <span><strong>Client-Side Engine:</strong> Your documents are processed purely inside your browser
-                    memory. No telemetry or server uploads.</span>
+                <span><strong>Declaration:</strong> Your documents are processed purely inside your browser
+                    memory only and never uploads to server.</span>
             </div>
             <div>
-                <span>Built by RTR-CRM</span>
+                <strong><span>Built by RTR-CRM</span></strong>
             </div>
         </div>
     </footer>
@@ -1785,6 +1783,22 @@
 
         function safeFileBaseName(file) {
             return file.name.replace(/\.pdf$/i, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_') || 'document';
+        }
+
+        function triggerDownloadBlob(blob, fileName) {
+            if (!blob || !fileName) return;
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = fileName;
+            anchor.style.display = 'none';
+            anchor.rel = 'noopener';
+            document.body.appendChild(anchor);
+            anchor.click();
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                anchor.remove();
+            }, 1500);
         }
 
         // Drag and drop helper registration
@@ -2793,9 +2807,13 @@
 
         function activateRotateDocument(id) {
             const previous = rotDocuments.find(item => item.id === rotActiveId);
-            if (previous) previous.pages = rotPagesState;
             const next = rotDocuments.find(item => item.id === id);
             if (!next) return;
+
+            if (previous && previous.id !== next.id) {
+                previous.pages = rotPagesState;
+            }
+
             rotActiveId = id;
             rotFile = next.file;
             rotPagesState = next.pages;
@@ -2892,14 +2910,14 @@
                     if (zip) {
                         zip.file(`${String(fileIndex + 1).padStart(2, '0')}_${outputName}`, outBytes);
                     } else {
-                        saveAs(new Blob([outBytes], { type: 'application/pdf' }), outputName);
+                        triggerDownloadBlob(new Blob([outBytes], { type: 'application/pdf' }), outputName);
                     }
                 }
                 if (zip) {
                     const zipBlob = await zip.generateAsync({ type: 'blob' }, metadata => {
                         updateProgress(85 + metadata.percent * 0.15);
                     });
-                    saveAs(zipBlob, 'rotated_pdfs.zip');
+                    triggerDownloadBlob(zipBlob, 'rotated_pdfs.zip');
                 }
 
                 hideProgress();
@@ -2936,7 +2954,7 @@
 
         async function downloadPdfOutputs(outputs, archiveName) {
             if (outputs.length === 1) {
-                saveAs(new Blob([outputs[0].bytes], { type: 'application/pdf' }), outputs[0].name);
+                triggerDownloadBlob(new Blob([outputs[0].bytes], { type: 'application/pdf' }), outputs[0].name);
                 return;
             }
             const zip = new JSZip();
@@ -2946,7 +2964,7 @@
             const blob = await zip.generateAsync({ type: 'blob' }, metadata => {
                 updateProgress(90 + metadata.percent * 0.1);
             });
-            saveAs(blob, archiveName);
+            triggerDownloadBlob(blob, archiveName);
         }
 
         function getWatermarkColor(hex) {
