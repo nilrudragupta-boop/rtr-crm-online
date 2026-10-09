@@ -1762,6 +1762,82 @@
             });
         }
 
+
+        async function syncInvoiceCustomerDetails(customerRecords, persistRemote = true) {
+            if (!Array.isArray(customerRecords) || !Array.isArray(invoices)) return false;
+
+            const byId = new Map(customerRecords.filter(c => c && c.id).map(c => [String(c.id), c]));
+            const byName = new Map(customerRecords.filter(c => c && c.name)
+                .map(c => [String(c.name).trim().toLowerCase(), c]));
+            let changedInvoices = [];
+
+            invoices.forEach(invoice => {
+                const name = getCustomerNameFrom(invoice).trim().toLowerCase();
+                const customerId = invoice.customerId || invoice.customer_id ||
+                    invoice.customer?.id || invoice.customer?.customerId;
+                const customer = (customerId && byId.get(String(customerId))) || byName.get(name);
+                if (!customer) return;
+
+                let changed = false;
+                const setIfChanged = (object, key, value) => {
+                    if (value !== undefined && object[key] !== value) {
+                        object[key] = value;
+                        changed = true;
+                    }
+                };
+
+                setIfChanged(invoice, 'customerId', customer.id);
+                setIfChanged(invoice, 'customer_name', customer.name);
+                setIfChanged(invoice, 'customerName', customer.name);
+                ['address', 'contact', 'pin', 'district', 'state', 'stateCode', 'email'].forEach(key =>
+                    setIfChanged(invoice, key, customer[key])
+                );
+                setIfChanged(invoice, 'gst_no', customer.gst);
+                setIfChanged(invoice, 'gst', customer.gst);
+
+                invoice.customer = { ...(invoice.customer || {}), ...customer };
+                if (changed) changedInvoices.push(invoice);
+            });
+
+            if (!changedInvoices.length) return false;
+
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+
+            if (persistRemote && typeof apiClient?.saveInvoice === 'function') {
+                await Promise.allSettled(changedInvoices.map(invoice => apiClient.saveInvoice(invoice)));
+            }
+            return true;
+        }
+
+        async function refreshReportCustomerDetails() {
+            try {
+                const remoteCustomers = await apiClient.getCustomers();
+                const localCustomers = JSON.parse(localStorage.getItem('customers')) || [];
+                const records = Array.isArray(remoteCustomers) ? [...remoteCustomers] : [...localCustomers];
+                const indexById = new Map(records.map((c, i) => [String(c.id), i]));
+
+                localCustomers.forEach(localCustomer => {
+                    if (!localCustomer?.id) return;
+                    const index = indexById.get(String(localCustomer.id));
+                    if (index === undefined) {
+                        records.push(localCustomer);
+                    } else if (new Date(localCustomer.updatedAt || 0) >
+                        new Date(records[index].updatedAt || 0)) {
+                        records[index] = localCustomer;
+                    }
+                });
+
+                const changed = await syncInvoiceCustomerDetails(records);
+                if (changed) {
+                    populateDistrictFilter();
+                    populateStateFilter();
+                    applySearch();
+                }
+            } catch (error) {
+                console.warn('Failed to refresh report customer details:', error);
+            }
+        }
+
         // --- load invoices ---
         async function loadInvoices() {
             let localInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
@@ -1798,6 +1874,7 @@
             } catch (e) { console.warn("Failed to fetch remote invoices, using local data."); }
 
             invoices = localInvoices;
+            await refreshReportCustomerDetails();
             populateDistrictFilter();
             populateInvoiceTypeFilter();
             populateStateFilter();
@@ -6037,6 +6114,14 @@
             enableColumnResizing();
 
             loadInvoices();
+
+
+            window.addEventListener('storage', event => {
+                if (event.key === 'customers') refreshReportCustomerDetails();
+            });
+            window.addEventListener('focus', refreshReportCustomerDetails);
+            setInterval(refreshReportCustomerDetails, 30000);
+
 
             if (window.electronAPI && window.electronAPI.getAppSettings) {
 

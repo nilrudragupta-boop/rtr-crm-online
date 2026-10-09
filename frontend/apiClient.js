@@ -116,7 +116,10 @@ const apiClient = {
     // --- Customers ---
     getCustomers: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/customers${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            const response = await fetch(
+                `${API_BASE_URL}/customers${apiClient._getAuthQuery()}&_t=${Date.now()}`,
+                { cache: 'no-store' }
+            );
             if (!response.ok) return null;
             const result = await response.json();
             if (Array.isArray(result)) return result;
@@ -130,13 +133,16 @@ const apiClient = {
 
     saveCustomer: async (customerData) => {
         try {
-            if (!customerData.createdBy) customerData.createdBy = localStorage.getItem('currentUser') || 'System';
-            const response = await fetch(`${API_BASE_URL}/customers`, {
+            if (!customerData.createdBy) {
+                customerData.createdBy = localStorage.getItem('currentUser') || 'System';
+            }
+            const response = await fetch(`${API_BASE_URL}/customers${apiClient._getAuthQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 keepalive: true,
                 body: JSON.stringify(customerData)
             });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return await response.json();
         } catch (error) {
             console.error('Error saving customer:', error);
@@ -229,8 +235,10 @@ const apiClient = {
 
     saveInvoice: async (invoiceData) => {
         try {
-            if (!invoiceData.createdBy) invoiceData.createdBy = localStorage.getItem('currentUser') || 'System';
-            const response = await fetch(`${API_BASE_URL}/invoices`, {
+            if (!invoiceData.createdBy) {
+                invoiceData.createdBy = localStorage.getItem('currentUser') || 'System';
+            }
+            const response = await fetch(`${API_BASE_URL}/invoices${apiClient._getAuthQuery()}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 keepalive: true,
