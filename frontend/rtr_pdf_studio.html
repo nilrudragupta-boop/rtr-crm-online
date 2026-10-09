@@ -1903,8 +1903,7 @@
         // ==========================================
         let p2jFile = null;
         let p2jFiles = [];
-        let p2jDoc = null;
-        let p2jPageCanvases = [];
+        let p2jDocuments = [];
 
         setupDropzone('dropzone-p2j', 'file-p2j', async (files) => {
             const selectedFiles = getValidPdfFiles(files);
@@ -1924,71 +1923,98 @@
         }
 
         async function loadPdfToJpg() {
-            showProgress('Loading PDF for Conversion', 'Rendering preview thumbnails...');
+            showProgress('Loading PDFs for Conversion', 'Rendering preview thumbnails...');
+            const documents = [];
             try {
-                const arrayBuffer = await p2jFile.arrayBuffer();
-                p2jDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                const total = p2jDoc.numPages;
+                await Promise.all(p2jDocuments.map(({ doc }) => doc.destroy()));
+                p2jDocuments = [];
+                document.getElementById('ctrl-p2j').classList.add('hidden');
+                document.getElementById('p2j-grid').innerHTML = '';
+
+                for (const file of p2jFiles) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    documents.push({ file, doc });
+                }
+                p2jDocuments = documents;
 
                 document.getElementById('ctrl-p2j').classList.remove('hidden');
                 const fileSummary = p2jFiles.length > 1
-                    ? `${p2jFiles.length} PDFs selected; previewing ${p2jFile.name}`
-                    : `${p2jFile.name} (${total} pages - ${(p2jFile.size / (1024 * 1024)).toFixed(2)} MB)`;
+                    ? `${p2jFiles.length} PDFs selected; previewing all pages`
+                    : `${p2jFile.name} (${p2jDocuments[0].doc.numPages} pages - ${(p2jFile.size / (1024 * 1024)).toFixed(2)} MB)`;
                 document.getElementById('p2j-file-info').innerText = fileSummary;
 
                 const grid = document.getElementById('p2j-grid');
                 grid.innerHTML = '';
-                p2jPageCanvases = [];
 
-                // Render thumbnails in parallel batches
-                for (let i = 1; i <= total; i++) {
-                    updateProgress((i / total) * 90);
-                    const page = await p2jDoc.getPage(i);
-                    const viewport = page.getViewport({ scale: 0.35 });
+                const totalPages = p2jDocuments.reduce((total, item) => total + item.doc.numPages, 0);
+                let completedPages = 0;
+                for (let fileIndex = 0; fileIndex < p2jDocuments.length; fileIndex++) {
+                    const { file, doc } = p2jDocuments[fileIndex];
+                    if (p2jDocuments.length > 1) {
+                        const fileHeading = document.createElement('h4');
+                        fileHeading.className = 'col-span-full text-sm font-semibold text-slate-700 pt-2';
+                        fileHeading.textContent = `${file.name} (${doc.numPages} pages)`;
+                        grid.appendChild(fileHeading);
+                    }
 
-                    const card = document.createElement('div');
-                    card.className = 'page-card bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center';
+                    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+                        completedPages++;
+                        updateProgress((completedPages / totalPages) * 90);
+                        const page = await doc.getPage(pageNum);
+                        const viewport = page.getViewport({ scale: 0.35 });
 
-                    const canvas = document.createElement('canvas');
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    canvas.className = 'rounded border border-slate-100 w-full object-contain mb-2 bg-slate-50';
+                        const card = document.createElement('div');
+                        card.className = 'page-card bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center';
 
-                    const renderContext = {
-                        canvasContext: canvas.getContext('2d'),
-                        viewport: viewport
-                    };
-                    await page.render(renderContext).promise;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        canvas.className = 'rounded border border-slate-100 w-full object-contain mb-2 bg-slate-50';
 
-                    card.innerHTML = `
-            <div class="w-full flex justify-between items-center text-xs font-semibold text-slate-600 mb-1 px-1">
-              <span>Page ${i}</span>
-              <button onclick="downloadSingleJpg(${i})" class="text-indigo-600 hover:text-indigo-800 p-1 hover:bg-indigo-50 rounded" title="Download JPG">
-                <i data-lucide="download" class="w-3.5 h-3.5"></i>
-              </button>
-            </div>
-          `;
-                    card.insertBefore(canvas, card.children[1]);
-                    grid.appendChild(card);
+                        await page.render({
+                            canvasContext: canvas.getContext('2d'),
+                            viewport: viewport
+                        }).promise;
+
+                        const header = document.createElement('div');
+                        header.className = 'w-full flex justify-between items-center text-xs font-semibold text-slate-600 mb-1 px-1';
+                        const pageLabel = document.createElement('span');
+                        pageLabel.textContent = `Page ${pageNum}`;
+                        const downloadButton = document.createElement('button');
+                        downloadButton.className = 'text-indigo-600 hover:text-indigo-800 p-1 hover:bg-indigo-50 rounded';
+                        downloadButton.title = 'Download JPG';
+                        downloadButton.setAttribute('aria-label', `Download page ${pageNum} from ${file.name} as JPG`);
+                        downloadButton.innerHTML = '<i data-lucide="download" class="w-3.5 h-3.5"></i>';
+                        downloadButton.addEventListener('click', () => downloadSingleJpg(fileIndex, pageNum));
+                        header.append(pageLabel, downloadButton);
+                        card.append(header, canvas);
+                        grid.appendChild(card);
+                    }
                 }
 
                 updateProgress(100);
                 setTimeout(hideProgress, 300);
                 refreshIcons();
-                showToast(`Loaded ${total} pages ready for conversion`);
+                showToast(`Loaded ${totalPages} pages from ${p2jDocuments.length} PDF${p2jDocuments.length === 1 ? '' : 's'} ready for conversion`);
             } catch (err) {
+                await Promise.all(documents.map(({ doc }) => doc.destroy()));
+                p2jDocuments = [];
+                document.getElementById('ctrl-p2j').classList.add('hidden');
+                document.getElementById('p2j-grid').innerHTML = '';
                 hideProgress();
                 console.error(err);
-                showToast('Failed to parse PDF document', true);
+                showToast('Failed to parse one or more PDF documents', true);
             }
         }
 
-        async function downloadSingleJpg(pageNum) {
-            if (!p2jDoc) return;
-            showProgress(`Rendering Page ${pageNum}`, 'Exporting high quality image...');
+        async function downloadSingleJpg(fileIndex, pageNum) {
+            const documentItem = p2jDocuments[fileIndex];
+            if (!documentItem) return;
+            showProgress(`Rendering Page ${pageNum}`, `Exporting ${documentItem.file.name} as a high quality image...`);
             try {
                 const scale = parseFloat(document.getElementById('p2j-scale').value) || 1.5;
-                const page = await p2jDoc.getPage(pageNum);
+                const page = await documentItem.doc.getPage(pageNum);
                 const viewport = page.getViewport({ scale: scale });
 
                 const canvas = document.createElement('canvas');
@@ -2003,9 +2029,14 @@
                 await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
                 canvas.toBlob((blob) => {
-                    saveAs(blob, `${p2jFile.name.replace(/\.pdf$/i, '')}_page_${pageNum}.jpg`);
+                    if (!blob) {
+                        hideProgress();
+                        showToast('Error exporting single page', true);
+                        return;
+                    }
+                    saveAs(blob, `${safeFileBaseName(documentItem.file)}_page_${String(pageNum).padStart(3, '0')}.jpg`);
                     hideProgress();
-                    showToast(`Downloaded Page ${pageNum} as JPG`);
+                    showToast(`Downloaded Page ${pageNum} from ${documentItem.file.name} as JPG`);
                 }, 'image/jpeg', 0.92);
             } catch (err) {
                 hideProgress();
@@ -2015,7 +2046,7 @@
         }
 
         async function convertPdfToJpg() {
-            if (!p2jDoc) return;
+            if (p2jDocuments.length === 0) return;
             const mode = document.getElementById('p2j-range-mode').value;
             const customVal = document.getElementById('p2j-custom-input').value;
             const scale = parseFloat(document.getElementById('p2j-scale').value) || 1.5;
@@ -2026,10 +2057,7 @@
             let totalPages = 0;
 
             try {
-                for (const file of p2jFiles) {
-                    const doc = file === p2jFile && p2jDoc
-                        ? p2jDoc
-                        : await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                for (const { file, doc } of p2jDocuments) {
                     const pages = mode === 'custom'
                         ? parsePageRange(customVal, doc.numPages)
                         : Array.from({ length: doc.numPages }, (_, i) => i + 1);
@@ -2062,8 +2090,13 @@
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-                        zip.file(`${folder}page_${String(pageNum).padStart(3, '0')}.jpg`, dataUrl.split(',')[1], { base64: true });
+                        const imageBlob = await new Promise((resolve, reject) => {
+                            canvas.toBlob(blob => {
+                                if (blob) resolve(blob);
+                                else reject(new Error(`Could not export page ${pageNum} from ${file.name}`));
+                            }, 'image/jpeg', 0.92);
+                        });
+                        zip.file(`${folder}${safeFileBaseName(file)}_page_${String(pageNum).padStart(3, '0')}.jpg`, imageBlob);
                         completedPages++;
                         updateProgress((completedPages / totalPages) * 80);
                     }
@@ -2074,9 +2107,10 @@
                     updateProgress(90 + (metadata.percent * 0.1));
                 });
 
-                saveAs(zipBlob, p2jFiles.length === 1
+                const archiveName = p2jFiles.length === 1
                     ? `${safeFileBaseName(p2jFile)}_jpg_images.zip`
-                    : 'converted_pdfs_jpg_images.zip');
+                    : `${safeFileBaseName(p2jFile)}_and_${p2jFiles.length - 1}_more_jpg_images.zip`;
+                saveAs(zipBlob, archiveName);
                 hideProgress();
                 showToast(`Successfully exported ${totalPages} pages from ${documents.length} PDF${documents.length === 1 ? '' : 's'} into ZIP`);
             } catch (err) {
