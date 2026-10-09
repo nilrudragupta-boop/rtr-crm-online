@@ -1100,6 +1100,10 @@
                             <button onclick="document.getElementById('file-merge').click()"
                                 class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium">Add
                                 More PDFs</button>
+                            <button id="merge-preview" type="button"
+                                class="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold">
+                                Preview
+                            </button>
                             <button onclick="mergeAllPdfs()"
                                 class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm">
                                 <i data-lucide="arrow-down-to-line" class="w-4 h-4"></i> Merge & Download PDF
@@ -1114,6 +1118,24 @@
                 </div>
             </div>
         </section>
+
+        <div id="merge-preview-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4"
+            role="dialog" aria-modal="true" aria-labelledby="merge-preview-title">
+            <div class="w-full max-w-6xl max-h-[90vh] overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+                <div class="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                        <h3 id="merge-preview-title" class="text-lg font-bold text-slate-900">Merged PDF preview</h3>
+                        <p class="text-sm text-slate-500">Pages are shown in the current merge order.</p>
+                    </div>
+                    <button id="merge-preview-close" type="button" aria-label="Close preview"
+                        class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+                <p id="merge-preview-status" class="mb-3 text-sm text-slate-500" role="status"></p>
+                <div id="merge-preview-grid" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"></div>
+            </div>
+        </div>
 
         <!-- ========================================== -->
         <!-- TAB 4: PROTECT PDF                         -->
@@ -2506,6 +2528,89 @@
             mergePdfsList = mergePdfsList.filter(item => item.id !== id);
             renderMergeList();
         }
+
+        let mergePreviewRequest = 0;
+        const mergePreviewModal = document.getElementById('merge-preview-modal');
+        const mergePreviewStatus = document.getElementById('merge-preview-status');
+        const mergePreviewGrid = document.getElementById('merge-preview-grid');
+
+        async function openMergePreview() {
+            const items = mergePdfsList.slice();
+            if (items.length === 0) {
+                showToast('Please add PDF files to preview.', true);
+                return;
+            }
+            if (!window.pdfjsLib) {
+                showToast('The PDF preview library is unavailable. Check your connection and reload.', true);
+                return;
+            }
+
+            const requestId = ++mergePreviewRequest;
+            mergePreviewGrid.innerHTML = '';
+            mergePreviewStatus.textContent = 'Rendering merged pages...';
+            mergePreviewModal.classList.remove('hidden');
+
+            try {
+                let mergedPageNumber = 0;
+                for (const item of items) {
+                    const doc = await pdfjsLib.getDocument({ data: await item.file.arrayBuffer() }).promise;
+                    if (requestId !== mergePreviewRequest) return;
+
+                    const heading = document.createElement('h4');
+                    heading.className = 'col-span-full pt-2 text-sm font-semibold text-slate-700';
+                    heading.textContent = `${item.file.name} (${doc.numPages} pages)`;
+                    mergePreviewGrid.appendChild(heading);
+
+                    for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
+                        if (requestId !== mergePreviewRequest) return;
+                        const page = await doc.getPage(pageNumber);
+                        const viewport = page.getViewport({ scale: 0.45 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.ceil(viewport.width);
+                        canvas.height = Math.ceil(viewport.height);
+                        canvas.className = 'mb-2 block w-full rounded border border-slate-200 bg-slate-50 object-contain';
+                        const context = canvas.getContext('2d');
+                        if (!context) throw new Error('Canvas rendering is unavailable.');
+                        await page.render({ canvasContext: context, viewport }).promise;
+                        if (requestId !== mergePreviewRequest) return;
+
+                        const card = document.createElement('div');
+                        card.className = 'page-card flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50 p-2.5 shadow-sm';
+                        const label = document.createElement('div');
+                        label.className = 'mb-1 w-full px-1 text-xs font-semibold text-slate-700';
+                        mergedPageNumber++;
+                        label.textContent = `Merged page ${mergedPageNumber}`;
+                        card.append(label, canvas);
+                        mergePreviewGrid.appendChild(card);
+                    }
+                }
+                if (requestId !== mergePreviewRequest) return;
+                mergePreviewStatus.textContent = `${mergedPageNumber} page${mergedPageNumber === 1 ? '' : 's'} in the current merge order.`;
+            } catch (err) {
+                if (requestId !== mergePreviewRequest) return;
+                console.error('Could not render merged PDF preview', err);
+                mergePreviewGrid.innerHTML = '';
+                mergePreviewStatus.textContent = err instanceof Error
+                    ? err.message
+                    : 'The merged PDF could not be previewed.';
+            }
+        }
+
+        document.getElementById('merge-preview').addEventListener('click', openMergePreview);
+        document.getElementById('merge-preview-close').addEventListener('click', () => {
+            mergePreviewRequest++;
+            mergePreviewModal.classList.add('hidden');
+        });
+        mergePreviewModal.addEventListener('click', event => {
+            if (event.target === mergePreviewModal) {
+                document.getElementById('merge-preview-close').click();
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !mergePreviewModal.classList.contains('hidden')) {
+                document.getElementById('merge-preview-close').click();
+            }
+        });
 
         async function mergeAllPdfs() {
             if (mergePdfsList.length < 2) {
