@@ -1685,7 +1685,7 @@
                                 class="block w-full h-10 mt-1 border border-slate-200 rounded-lg p-1 bg-white">
                         </label>
                     </div>
-                    <p class="mt-3 text-xs text-slate-500">Click and drag on the page to place each shape. Square and circle keep equal sides. Each shape uses the colors and stroke width selected when it is drawn.</p>
+                    <p class="mt-3 text-xs text-slate-500">Click and drag on the page to place each shape. Drag a placed shape to move it, or drag its lower-right handle to resize it. Square and circle keep equal sides. Each shape uses the colors and stroke width selected when it is drawn.</p>
                     <div class="mt-3 flex flex-wrap gap-3">
                         <button id="shapes-undo" type="button" disabled
                             class="px-4 py-2 border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-sm font-semibold">Undo last shape</button>
@@ -3290,6 +3290,8 @@
         let activeShapesPageNumber = 1;
         let shapesRenderRequest = 0;
         let shapesDrawing = null;
+        let shapesSelectionIndex = -1;
+        let shapesInteraction = null;
         let shapesPreviewScale = 1;
 
         function getCurrentShapesPage() {
@@ -3338,6 +3340,25 @@
                     overlay.height,
                     shapesPreviewScale
                 ));
+                const selectedShape = currentPage.shapes[shapesSelectionIndex];
+                if (selectedShape) {
+                    const x = selectedShape.x * overlay.width;
+                    const y = selectedShape.y * overlay.height;
+                    const width = selectedShape.width * overlay.width;
+                    const height = selectedShape.height * overlay.height;
+                    context.save();
+                    context.setLineDash([5, 3]);
+                    context.lineWidth = 1.5;
+                    context.strokeStyle = '#4f46e5';
+                    context.strokeRect(x, y, width, height);
+                    context.setLineDash([]);
+                    context.fillStyle = '#ffffff';
+                    context.strokeStyle = '#4f46e5';
+                    context.lineWidth = 2;
+                    context.fillRect(x + width - 4, y + height - 4, 8, 8);
+                    context.strokeRect(x + width - 4, y + height - 4, 8, 8);
+                    context.restore();
+                }
             }
             if (shapesDrawing) {
                 drawShapeOnCanvas(context, shapesDrawing, overlay.width, overlay.height, shapesPreviewScale);
@@ -3428,6 +3449,9 @@
             shapesDocuments = documents;
             activeShapesDocumentIndex = 0;
             activeShapesPageNumber = 1;
+            shapesSelectionIndex = -1;
+            shapesDrawing = null;
+            shapesInteraction = null;
             const selector = document.getElementById('shapes-file-select');
             selector.innerHTML = '';
             shapesDocuments.forEach((documentState, index) => {
@@ -3451,29 +3475,103 @@
         document.getElementById('shapes-file-select').addEventListener('change', event => {
             activeShapesDocumentIndex = Number(event.target.value);
             activeShapesPageNumber = 1;
+            shapesSelectionIndex = -1;
+            shapesDrawing = null;
+            shapesInteraction = null;
             updateShapesPageSelector();
             renderShapesPage();
         });
         document.getElementById('shapes-page-select').addEventListener('change', event => {
             activeShapesPageNumber = Number(event.target.value);
+            shapesSelectionIndex = -1;
+            shapesDrawing = null;
+            shapesInteraction = null;
             renderShapesPage();
         });
 
         const shapesOverlayCanvas = document.getElementById('shapes-overlay-canvas');
-        shapesOverlayCanvas.addEventListener('pointerdown', event => {
+        function getShapesPointerPosition(event) {
             const bounds = shapesOverlayCanvas.getBoundingClientRect();
-            if (!bounds.width || !bounds.height) return;
+            if (!bounds.width || !bounds.height) return null;
+            return {
+                x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
+                y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
+                bounds
+            };
+        }
+
+        function getShapeAtPosition(shapes, position) {
+            for (let index = shapes.length - 1; index >= 0; index--) {
+                const shape = shapes[index];
+                const relativeX = (position.x - shape.x) / shape.width;
+                const relativeY = (position.y - shape.y) / shape.height;
+                if (relativeX < 0 || relativeX > 1 || relativeY < 0 || relativeY > 1) continue;
+                if (shape.type === 'circle' || shape.type === 'ellipse') {
+                    const x = (relativeX - 0.5) * 2;
+                    const y = (relativeY - 0.5) * 2;
+                    if (x * x + y * y > 1) continue;
+                }
+                return index;
+            }
+            return -1;
+        }
+
+        function isShapesResizeHandleAtPosition(shape, position, bounds) {
+            const handleX = (shape.x + shape.width) * bounds.width;
+            const handleY = (shape.y + shape.height) * bounds.height;
+            const pointerX = position.x * bounds.width;
+            const pointerY = position.y * bounds.height;
+            return Math.abs(pointerX - handleX) <= 10 && Math.abs(pointerY - handleY) <= 10;
+        }
+
+        shapesOverlayCanvas.addEventListener('pointerdown', event => {
+            if (event.button !== 0) return;
+            const position = getShapesPointerPosition(event);
+            if (!position) return;
+            const currentPage = getCurrentShapesPage();
+            if (!currentPage) return;
+
+            const selectedShape = currentPage.shapes[shapesSelectionIndex];
+            if (selectedShape && isShapesResizeHandleAtPosition(selectedShape, position, position.bounds)) {
+                shapesInteraction = {
+                    type: 'resize',
+                    pointerId: event.pointerId,
+                    startX: position.x,
+                    startY: position.y,
+                    shape: { ...selectedShape },
+                    index: shapesSelectionIndex
+                };
+                shapesOverlayCanvas.setPointerCapture(event.pointerId);
+                return;
+            }
+
+            const hitIndex = getShapeAtPosition(currentPage.shapes, position);
+            if (hitIndex !== -1) {
+                shapesSelectionIndex = hitIndex;
+                shapesInteraction = {
+                    type: 'move',
+                    pointerId: event.pointerId,
+                    startX: position.x,
+                    startY: position.y,
+                    shape: { ...currentPage.shapes[hitIndex] },
+                    index: hitIndex
+                };
+                shapesOverlayCanvas.setPointerCapture(event.pointerId);
+                renderShapesOverlay();
+                return;
+            }
+
+            shapesSelectionIndex = -1;
+            renderShapesOverlay();
             const strokeWidth = Number(document.getElementById('shapes-stroke-width').value);
             if (!Number.isFinite(strokeWidth) || strokeWidth < 0 || strokeWidth > 30) {
                 showToast('Choose a stroke width from 0 to 30.', true);
                 return;
             }
-            const startX = (event.clientX - bounds.left) / bounds.width;
-            const startY = (event.clientY - bounds.top) / bounds.height;
             shapesDrawing = {
                 type: document.getElementById('shapes-type').value,
-                x: startX,
-                y: startY,
+                x: position.x,
+                y: position.y,
                 width: 0,
                 height: 0,
                 fillColor: document.getElementById('shapes-fill-color').value,
@@ -3483,10 +3581,51 @@
             shapesOverlayCanvas.setPointerCapture(event.pointerId);
         });
         shapesOverlayCanvas.addEventListener('pointermove', event => {
-            if (!shapesDrawing) return;
-            const bounds = shapesOverlayCanvas.getBoundingClientRect();
-            const currentX = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-            const currentY = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+            const position = getShapesPointerPosition(event);
+            if (!position) return;
+            const currentPage = getCurrentShapesPage();
+            if (shapesInteraction && currentPage) {
+                const interaction = shapesInteraction;
+                const shape = currentPage.shapes[interaction.index];
+                if (!shape) return;
+                const deltaX = position.x - interaction.startX;
+                const deltaY = position.y - interaction.startY;
+                if (interaction.type === 'move') {
+                    shape.x = Math.max(0, Math.min(1 - interaction.shape.width, interaction.shape.x + deltaX));
+                    shape.y = Math.max(0, Math.min(1 - interaction.shape.height, interaction.shape.y + deltaY));
+                } else {
+                    const minWidth = 4 / shapesOverlayCanvas.width;
+                    const minHeight = 4 / shapesOverlayCanvas.height;
+                    const maxWidth = 1 - interaction.shape.x;
+                    const maxHeight = 1 - interaction.shape.y;
+                    if (shape.type === 'square' || shape.type === 'circle') {
+                        const deltaPixelsX = deltaX * position.bounds.width;
+                        const deltaPixelsY = deltaY * position.bounds.height;
+                        const sizeDelta = Math.abs(deltaPixelsX) >= Math.abs(deltaPixelsY)
+                            ? deltaX
+                            : deltaY;
+                        const maxSide = Math.min(maxWidth, maxHeight);
+                        const side = Math.max(Math.max(minWidth, minHeight), Math.min(maxSide, interaction.shape.width + sizeDelta));
+                        shape.width = shape.height = side;
+                    } else {
+                        shape.width = Math.max(minWidth, Math.min(maxWidth, interaction.shape.width + deltaX));
+                        shape.height = Math.max(minHeight, Math.min(maxHeight, interaction.shape.height + deltaY));
+                    }
+                }
+                renderShapesOverlay();
+                return;
+            }
+            if (!shapesDrawing) {
+                const selectedShape = currentPage?.shapes[shapesSelectionIndex];
+                const hitIndex = currentPage ? getShapeAtPosition(currentPage.shapes, position) : -1;
+                shapesOverlayCanvas.style.cursor = selectedShape &&
+                    isShapesResizeHandleAtPosition(selectedShape, position, position.bounds)
+                    ? 'nwse-resize'
+                    : hitIndex !== -1 ? 'move' : 'crosshair';
+                return;
+            }
+            const currentX = position.x;
+            const currentY = position.y;
             let left = Math.min(shapesDrawing.x, currentX);
             let top = Math.min(shapesDrawing.y, currentY);
             let width = Math.abs(currentX - shapesDrawing.x);
@@ -3501,14 +3640,22 @@
             renderShapesOverlay();
         });
         function finishDrawingShape(event) {
-            if (!shapesDrawing) return;
+            if (!shapesDrawing && !shapesInteraction) return;
             if (shapesOverlayCanvas.hasPointerCapture(event.pointerId)) {
                 shapesOverlayCanvas.releasePointerCapture(event.pointerId);
+            }
+            if (shapesInteraction) {
+                shapesInteraction = null;
+                renderShapesOverlay();
+                return;
             }
             if (shapesDrawing.width * shapesOverlayCanvas.width >= 4 &&
                 shapesDrawing.height * shapesOverlayCanvas.height >= 4) {
                 const currentPage = getCurrentShapesPage();
-                if (currentPage) currentPage.shapes.push(shapesDrawing);
+                if (currentPage) {
+                    currentPage.shapes.push(shapesDrawing);
+                    shapesSelectionIndex = currentPage.shapes.length - 1;
+                }
             }
             shapesDrawing = null;
             renderShapesOverlay();
@@ -3517,7 +3664,10 @@
         shapesOverlayCanvas.addEventListener('pointercancel', finishDrawingShape);
         document.getElementById('shapes-undo').addEventListener('click', () => {
             const currentPage = getCurrentShapesPage();
-            if (currentPage) currentPage.shapes.pop();
+            if (currentPage) {
+                currentPage.shapes.pop();
+                shapesSelectionIndex = -1;
+            }
             renderShapesOverlay();
         });
 
