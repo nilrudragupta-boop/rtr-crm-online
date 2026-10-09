@@ -1449,10 +1449,25 @@
                         <select id="watermark-position"
                             class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
                             <option value="center">Center</option>
-                            <option value="diagonal">Diagonal center</option>
                             <option value="top">Top center</option>
                             <option value="bottom">Bottom center</option>
                         </select>
+                    </label>
+                    <label class="text-xs font-semibold text-slate-700">Rotation
+                        <select id="watermark-rotation"
+                            class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
+                            <option value="0">Do not rotate</option>
+                            <option value="45">45 degree</option>
+                            <option value="90">90 degree</option>
+                            <option value="180">180 degree</option>
+                            <option value="270">270 degree</option>
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-slate-700 sm:col-span-2">Page range
+                        <input id="watermark-page-range" type="text" placeholder="All pages (e.g. 1-3,5)"
+                            aria-describedby="watermark-page-range-help"
+                            class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
+                        <span id="watermark-page-range-help" class="mt-1 block font-normal text-slate-500">Leave blank to watermark every page. Use page numbers, ranges, and commas.</span>
                     </label>
                     <label class="text-xs font-semibold text-slate-700">Opacity
                         <input id="watermark-opacity" type="range" min="0.1" max="0.8" step="0.05" value="0.25"
@@ -1467,11 +1482,36 @@
                             class="block w-full h-10 mt-1 border border-slate-200 rounded-lg p-1 bg-white">
                     </label>
                 </div>
-                <button id="watermark-run" type="button" disabled
-                    class="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">Apply
-                    watermark & download</button>
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <button id="watermark-preview" type="button" disabled
+                        class="px-5 py-2.5 border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-sm font-semibold">Preview</button>
+                    <button id="watermark-run" type="button" disabled
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">Apply
+                        watermark & download</button>
+                </div>
             </div>
         </section>
+
+        <div id="watermark-preview-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4"
+            role="dialog" aria-modal="true" aria-labelledby="watermark-preview-title">
+            <div class="w-full max-w-5xl max-h-[90vh] overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+                <div class="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                        <h3 id="watermark-preview-title" class="text-lg font-bold text-slate-900">Watermark preview</h3>
+                        <p id="watermark-preview-description" class="text-sm text-slate-500">First page preview</p>
+                    </div>
+                    <button id="watermark-preview-close" type="button" aria-label="Close preview"
+                        class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+                <p id="watermark-preview-status" class="mb-3 text-sm text-slate-500" role="status"></p>
+                <div id="watermark-preview-page" class="hidden mx-auto relative overflow-hidden rounded border border-slate-200 bg-slate-100 shadow-sm">
+                    <canvas id="watermark-preview-canvas" class="block h-full w-full"></canvas>
+                    <canvas id="watermark-preview-overlay" class="absolute inset-0 h-full w-full"></canvas>
+                </div>
+            </div>
+        </div>
 
         <section id="tab-number-pdf" class="tab-content hidden tool-page space-y-6">
             <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All
@@ -3060,6 +3100,12 @@
                     ? validFiles[0].name
                     : `${validFiles.length} PDF files selected`;
                 document.getElementById(runButtonId).disabled = false;
+                if (key === 'watermark') {
+                    document.getElementById('watermark-preview').disabled = false;
+                    if (!watermarkPreviewModal.classList.contains('hidden')) {
+                        openWatermarkPreview();
+                    }
+                }
             });
         }
 
@@ -3092,6 +3138,167 @@
         registerUtilityPdfTool('number', 'dropzone-number', 'file-number', 'number-selection', 'number-run');
         registerUtilityPdfTool('remove', 'dropzone-remove', 'file-remove', 'remove-selection', 'remove-run');
 
+        let watermarkPreview = null;
+        let watermarkPreviewRequest = 0;
+        const watermarkPreviewModal = document.getElementById('watermark-preview-modal');
+        const watermarkPreviewStatus = document.getElementById('watermark-preview-status');
+
+        function getWatermarkPlacement(font, text, size, width, height, position, rotation) {
+            const textWidth = font.widthOfTextAtSize(text, size);
+            const angle = rotation * Math.PI / 180;
+            const corners = [
+                [0, 0],
+                [textWidth * Math.cos(angle), textWidth * Math.sin(angle)],
+                [-size * Math.sin(angle), size * Math.cos(angle)],
+                [
+                    textWidth * Math.cos(angle) - size * Math.sin(angle),
+                    textWidth * Math.sin(angle) + size * Math.cos(angle)
+                ]
+            ];
+            const minX = Math.min(...corners.map(([x]) => x));
+            const maxX = Math.max(...corners.map(([x]) => x));
+            const minY = Math.min(...corners.map(([, y]) => y));
+            const maxY = Math.max(...corners.map(([, y]) => y));
+            const boxWidth = maxX - minX;
+            const boxHeight = maxY - minY;
+            const x = Math.max(12, (width - boxWidth) / 2 - minX);
+            const y = position === 'top' ? height - 28 - boxHeight - minY
+                : position === 'bottom' ? 24 - minY
+                    : (height - boxHeight) / 2 - minY;
+
+            return { x, y, rotation };
+        }
+
+        function drawWatermarkPreview() {
+            if (!watermarkPreview) return;
+            const overlay = document.getElementById('watermark-preview-overlay');
+            const context = overlay.getContext('2d');
+            if (!context) throw new Error('Canvas rendering is unavailable.');
+
+            context.clearRect(0, 0, overlay.width, overlay.height);
+            const text = document.getElementById('watermark-text').value.trim();
+            if (!text) return;
+
+            const size = Number(document.getElementById('watermark-size').value);
+            const opacity = Number(document.getElementById('watermark-opacity').value);
+            if (!Number.isFinite(size) || size < 8 || size > 120) return;
+
+            const position = document.getElementById('watermark-position').value;
+            const rotation = Number(document.getElementById('watermark-rotation').value);
+            const { viewport, font, applies } = watermarkPreview;
+            if (!applies) return;
+            const pageWidth = viewport.width / viewport.scale;
+            const pageHeight = viewport.height / viewport.scale;
+            const { x, y } = getWatermarkPlacement(font, text, size, pageWidth, pageHeight, position, rotation);
+            const [canvasX, canvasY] = viewport.convertToViewportPoint(x, y);
+            const scale = viewport.scale;
+            const angle = -rotation * Math.PI / 180;
+            const color = document.getElementById('watermark-color').value;
+
+            context.save();
+            context.globalAlpha = opacity;
+            context.fillStyle = color;
+            context.font = `bold ${size * scale}px Helvetica, Arial, sans-serif`;
+            context.textBaseline = 'alphabetic';
+            context.translate(canvasX, canvasY);
+            context.rotate(angle);
+            context.fillText(text, 0, 0);
+            context.restore();
+        }
+
+        function getWatermarkPreviewPageNumber(pageCount) {
+            const selectedPages = parsePageRange(
+                document.getElementById('watermark-page-range').value,
+                pageCount
+            );
+            return selectedPages[0] || 1;
+        }
+
+        async function openWatermarkPreview() {
+            const file = utilityFiles.watermark[0];
+            if (!file) {
+                showToast('Please select a PDF file first.', true);
+                return;
+            }
+            if (!window.pdfjsLib || !window.PDFLib) {
+                showToast('PDF preview libraries are unavailable. Check your connection and reload.', true);
+                return;
+            }
+
+            const requestId = ++watermarkPreviewRequest;
+            watermarkPreview = null;
+            document.getElementById('watermark-preview-page').classList.add('hidden');
+            document.getElementById('watermark-preview-description').textContent = file.name;
+            watermarkPreviewStatus.textContent = 'Rendering the first page...';
+            watermarkPreviewModal.classList.remove('hidden');
+
+            try {
+                const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                const pageNumber = getWatermarkPreviewPageNumber(pdf.numPages);
+                if (requestId !== watermarkPreviewRequest) return;
+                const page = await pdf.getPage(pageNumber);
+                if (requestId !== watermarkPreviewRequest) return;
+                const baseViewport = page.getViewport({ scale: 1 });
+                const scale = Math.min(1.5, 850 / baseViewport.width, 1100 / baseViewport.height);
+                const viewport = page.getViewport({ scale });
+                const canvas = document.getElementById('watermark-preview-canvas');
+                const overlay = document.getElementById('watermark-preview-overlay');
+                canvas.width = overlay.width = Math.ceil(viewport.width);
+                canvas.height = overlay.height = Math.ceil(viewport.height);
+                const context = canvas.getContext('2d');
+                if (!context) throw new Error('Canvas rendering is unavailable.');
+                await page.render({ canvasContext: context, viewport }).promise;
+                if (requestId !== watermarkPreviewRequest) return;
+
+                const previewDocument = await PDFLib.PDFDocument.create();
+                const font = await previewDocument.embedFont(PDFLib.StandardFonts.HelveticaBold);
+                if (requestId !== watermarkPreviewRequest) return;
+                const applies = parsePageRange(
+                    document.getElementById('watermark-page-range').value,
+                    pdf.numPages
+                ).includes(pageNumber);
+                watermarkPreview = { viewport, font, applies };
+                const previewPage = document.getElementById('watermark-preview-page');
+                previewPage.style.width = `${viewport.width}px`;
+                previewPage.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+                previewPage.classList.remove('hidden');
+                drawWatermarkPreview();
+                watermarkPreviewStatus.textContent = `Page ${pageNumber} of ${pdf.numPages}${applies ? '' : ' — no watermark on this page'}`;
+            } catch (err) {
+                if (requestId !== watermarkPreviewRequest) return;
+                console.error('Could not render watermark preview', err);
+                watermarkPreviewStatus.textContent = 'The PDF preview could not be rendered.';
+                showToast('Could not preview this PDF.', true);
+            }
+        }
+
+        document.getElementById('watermark-preview').addEventListener('click', openWatermarkPreview);
+        document.getElementById('watermark-preview-close').addEventListener('click', () => {
+            watermarkPreviewRequest++;
+            watermarkPreview = null;
+            watermarkPreviewModal.classList.add('hidden');
+        });
+        watermarkPreviewModal.addEventListener('click', event => {
+            if (event.target === watermarkPreviewModal) {
+                document.getElementById('watermark-preview-close').click();
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !watermarkPreviewModal.classList.contains('hidden')) {
+                document.getElementById('watermark-preview-close').click();
+            }
+        });
+        ['watermark-text', 'watermark-size', 'watermark-opacity', 'watermark-position', 'watermark-rotation', 'watermark-color']
+            .forEach(id => {
+                document.getElementById(id).addEventListener('input', drawWatermarkPreview);
+                document.getElementById(id).addEventListener('change', drawWatermarkPreview);
+            });
+        document.getElementById('watermark-page-range').addEventListener('input', () => {
+            if (!watermarkPreviewModal.classList.contains('hidden')) openWatermarkPreview();
+        });
+        document.getElementById('watermark-page-range').addEventListener('change', () => {
+            if (!watermarkPreviewModal.classList.contains('hidden')) openWatermarkPreview();
+        });
         document.getElementById('compress-run').addEventListener('click', async () => {
             const files = utilityFiles.compress;
             if (!files.length) return;
@@ -3176,15 +3383,21 @@
                     const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
                     const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
                     const position = document.getElementById('watermark-position').value;
-                    const rotate = position === 'diagonal' ? degrees(-35) : degrees(0);
+                    const rotation = Number(document.getElementById('watermark-rotation').value);
+                    const pages = parsePageRange(
+                        document.getElementById('watermark-page-range').value,
+                        pdfDoc.getPageCount()
+                    );
+                    if (pages.length === 0) {
+                        throw new Error(`Page range does not match any pages in ${file.name}.`);
+                    }
+                    const pagesToWatermark = new Set(pages.map(pageNumber => pageNumber - 1));
+                    const rotate = degrees(rotation);
                     const color = getWatermarkColor(document.getElementById('watermark-color').value);
-                    pdfDoc.getPages().forEach(page => {
+                    pdfDoc.getPages().forEach((page, pageIndex) => {
+                        if (!pagesToWatermark.has(pageIndex)) return;
                         const { width, height } = page.getSize();
-                        const textWidth = font.widthOfTextAtSize(text, size);
-                        const x = Math.max(12, (width - textWidth) / 2);
-                        const y = position === 'top' ? height - size - 28
-                            : position === 'bottom' ? 24
-                                : (height - size) / 2;
+                        const { x, y } = getWatermarkPlacement(font, text, size, width, height, position, rotation);
                         page.drawText(text, { x, y, size, font, color, opacity, rotate });
                     });
                     outputs.push({
@@ -3199,7 +3412,10 @@
             } catch (err) {
                 hideProgress();
                 console.error(err);
-                showToast('Could not add a watermark to one or more PDFs.', true);
+                const message = err instanceof Error ? err.message : '';
+                showToast(message.startsWith('Page range does not match')
+                    ? message
+                    : 'Could not add a watermark to one or more PDFs.', true);
             }
         });
 
