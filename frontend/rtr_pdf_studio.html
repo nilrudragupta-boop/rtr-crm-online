@@ -865,6 +865,12 @@
                         <strong>Remove pages</strong>
                         <span>Delete selected pages from a PDF</span>
                     </button>
+                    <button class="directory-card" type="button" data-tool="shapes-pdf"
+                        data-search="shapes square rectangle circle ellipse draw annotate" style="--tool-color:#7866bd;--tool-tint:#f1effa">
+                        <span class="directory-card-icon"><i data-lucide="shapes" aria-hidden="true"></i></span>
+                        <strong>Add shapes</strong>
+                        <span>Place colored shapes on PDF pages</span>
+                    </button>
                     <button class="directory-card" type="button" data-tool="create-pdf"
                         data-search="create blank empty new pdf page" style="--tool-color:#4388a8;--tool-tint:#eaf5f8">
                         <span class="directory-card-icon"><i data-lucide="file-plus-2" aria-hidden="true"></i></span>
@@ -1609,6 +1615,71 @@
                 <div id="remove-preview-grid" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"></div>
             </div>
         </div>
+
+        <section id="tab-shapes-pdf" class="tab-content hidden tool-page space-y-6">
+            <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All
+                tools</button>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <div class="tool-content-heading mb-4">
+                    <h2 class="text-xl font-bold text-slate-900">Add shapes to PDF</h2>
+                    <p class="text-sm text-slate-500">Draw squares, rectangles, circles, or ellipses on your PDF pages. Files are processed in your browser.</p>
+                </div>
+                <div id="dropzone-shapes"
+                    class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer bg-slate-50/50">
+                    <input type="file" id="file-shapes" accept="application/pdf,.pdf" multiple class="hidden">
+                    <i data-lucide="shapes" class="w-8 h-8 mx-auto mb-3 text-violet-600"></i>
+                    <p class="font-semibold text-slate-800">Select or drop PDF files</p>
+                    <p id="shapes-selection" class="text-xs text-slate-500 mt-1">Files stay on your device.</p>
+                </div>
+                <div id="shapes-controls" class="hidden mt-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <label class="text-xs font-semibold text-slate-700">PDF
+                            <select id="shapes-file-select"
+                                class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border"></select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-700">Page
+                            <select id="shapes-page-select"
+                                class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border"></select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-700">Shape
+                            <select id="shapes-type"
+                                class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
+                                <option value="square">Square</option>
+                                <option value="rectangle">Rectangle</option>
+                                <option value="circle">Circle</option>
+                                <option value="ellipse">Ellipse</option>
+                            </select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-700">Stroke width
+                            <input id="shapes-stroke-width" type="number" min="0" max="30" step="0.5" value="2"
+                                class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
+                        </label>
+                        <label class="text-xs font-semibold text-slate-700">Fill color
+                            <input id="shapes-fill-color" type="color" value="#60a5fa"
+                                class="block w-full h-10 mt-1 border border-slate-200 rounded-lg p-1 bg-white">
+                        </label>
+                        <label class="text-xs font-semibold text-slate-700">Stroke color
+                            <input id="shapes-stroke-color" type="color" value="#1d4ed8"
+                                class="block w-full h-10 mt-1 border border-slate-200 rounded-lg p-1 bg-white">
+                        </label>
+                    </div>
+                    <p class="mt-3 text-xs text-slate-500">Click and drag on the page to place each shape. Square and circle keep equal sides. Each shape uses the colors and stroke width selected when it is drawn.</p>
+                    <div class="mt-3 flex flex-wrap gap-3">
+                        <button id="shapes-undo" type="button" disabled
+                            class="px-4 py-2 border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-sm font-semibold">Undo last shape</button>
+                        <button id="shapes-run" type="button" disabled
+                            class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">Apply shapes & download</button>
+                    </div>
+                    <div class="mt-5 overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4">
+                        <div id="shapes-page-wrap" class="relative mx-auto hidden w-fit shadow-sm">
+                            <canvas id="shapes-page-canvas" class="block"></canvas>
+                            <canvas id="shapes-overlay-canvas" class="absolute inset-0 touch-none"></canvas>
+                        </div>
+                        <p id="shapes-preview-status" class="py-6 text-center text-sm text-slate-500">Select a PDF to begin placing shapes.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <section id="tab-create-pdf" class="tab-content hidden tool-page space-y-6">
             <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All
@@ -3108,6 +3179,312 @@
             number: [],
             remove: []
         };
+
+        let shapesDocuments = [];
+        let activeShapesDocumentIndex = 0;
+        let activeShapesPageNumber = 1;
+        let shapesRenderRequest = 0;
+        let shapesDrawing = null;
+        let shapesPreviewScale = 1;
+
+        function getCurrentShapesPage() {
+            return shapesDocuments[activeShapesDocumentIndex]?.pages[activeShapesPageNumber - 1] || null;
+        }
+
+        function drawShapeOnCanvas(context, shape, width, height, scale = 1) {
+            const x = shape.x * width;
+            const y = shape.y * height;
+            const shapeWidth = shape.width * width;
+            const shapeHeight = shape.height * height;
+            context.beginPath();
+            if (shape.type === 'circle' || shape.type === 'ellipse') {
+                context.ellipse(
+                    x + shapeWidth / 2,
+                    y + shapeHeight / 2,
+                    shapeWidth / 2,
+                    shapeHeight / 2,
+                    0,
+                    0,
+                    Math.PI * 2
+                );
+            } else {
+                context.rect(x, y, shapeWidth, shapeHeight);
+            }
+            context.fillStyle = shape.fillColor;
+            context.fill();
+            if (shape.strokeWidth > 0) {
+                context.lineWidth = shape.strokeWidth * scale;
+                context.strokeStyle = shape.strokeColor;
+                context.stroke();
+            }
+        }
+
+        function renderShapesOverlay() {
+            const overlay = document.getElementById('shapes-overlay-canvas');
+            const context = overlay.getContext('2d');
+            if (!context) throw new Error('Canvas rendering is unavailable.');
+            context.clearRect(0, 0, overlay.width, overlay.height);
+            const currentPage = getCurrentShapesPage();
+            if (currentPage) {
+                currentPage.shapes.forEach(shape => drawShapeOnCanvas(
+                    context,
+                    shape,
+                    overlay.width,
+                    overlay.height,
+                    shapesPreviewScale
+                ));
+            }
+            if (shapesDrawing) {
+                drawShapeOnCanvas(context, shapesDrawing, overlay.width, overlay.height, shapesPreviewScale);
+            }
+            document.getElementById('shapes-undo').disabled = !currentPage || currentPage.shapes.length === 0;
+            document.getElementById('shapes-run').disabled = !shapesDocuments.length ||
+                !shapesDocuments.some(documentState => documentState.pages.some(page => page.shapes.length));
+        }
+
+        async function renderShapesPage() {
+            const requestId = ++shapesRenderRequest;
+            const documentState = shapesDocuments[activeShapesDocumentIndex];
+            const wrap = document.getElementById('shapes-page-wrap');
+            const status = document.getElementById('shapes-preview-status');
+            if (!documentState) {
+                wrap.classList.add('hidden');
+                status.textContent = 'Select a PDF to begin placing shapes.';
+                return;
+            }
+
+            status.textContent = `Rendering page ${activeShapesPageNumber}...`;
+            wrap.classList.add('hidden');
+            try {
+                const page = await documentState.pdf.getPage(activeShapesPageNumber);
+                const baseViewport = page.getViewport({ scale: 1 });
+                const scale = Math.min(1.35, 850 / baseViewport.width, 1100 / baseViewport.height);
+                const viewport = page.getViewport({ scale });
+                shapesPreviewScale = scale;
+                const canvas = document.getElementById('shapes-page-canvas');
+                const overlay = document.getElementById('shapes-overlay-canvas');
+                canvas.width = overlay.width = Math.ceil(viewport.width);
+                canvas.height = overlay.height = Math.ceil(viewport.height);
+                const context = canvas.getContext('2d');
+                if (!context) throw new Error('Canvas rendering is unavailable.');
+                await page.render({ canvasContext: context, viewport }).promise;
+                if (requestId !== shapesRenderRequest) return;
+
+                wrap.classList.remove('hidden');
+                status.textContent = `Page ${activeShapesPageNumber} of ${documentState.pages.length} — draw on the page to add a shape.`;
+                renderShapesOverlay();
+            } catch (err) {
+                if (requestId !== shapesRenderRequest) return;
+                console.error(`Could not render page ${activeShapesPageNumber} of ${documentState.file.name}`, err);
+                status.textContent = 'This PDF page could not be previewed.';
+                showToast('Could not render the selected PDF page.', true);
+            }
+        }
+
+        function updateShapesPageSelector() {
+            const pageSelect = document.getElementById('shapes-page-select');
+            const documentState = shapesDocuments[activeShapesDocumentIndex];
+            pageSelect.innerHTML = '';
+            if (!documentState) return;
+            documentState.pages.forEach((_, index) => {
+                const option = document.createElement('option');
+                option.value = String(index + 1);
+                option.textContent = `Page ${index + 1}`;
+                pageSelect.appendChild(option);
+            });
+            pageSelect.value = String(activeShapesPageNumber);
+        }
+
+        setupDropzone('dropzone-shapes', 'file-shapes', async files => {
+            const selectedFiles = getValidPdfFiles(files);
+            if (selectedFiles.length === 0) {
+                showToast('Please select at least one valid PDF file.', true);
+                return;
+            }
+            showProgress('Loading PDFs', 'Preparing pages for shape placement...');
+            const documents = [];
+            const failures = [];
+            for (let index = 0; index < selectedFiles.length; index++) {
+                const file = selectedFiles[index];
+                try {
+                    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                    documents.push({
+                        file,
+                        pdf,
+                        pages: Array.from({ length: pdf.numPages }, () => ({ shapes: [] }))
+                    });
+                } catch (err) {
+                    console.error(`Could not load ${file.name} for shape placement`, err);
+                    failures.push(file.name);
+                }
+                updateProgress(((index + 1) / selectedFiles.length) * 90);
+            }
+            hideProgress();
+            shapesDocuments = documents;
+            activeShapesDocumentIndex = 0;
+            activeShapesPageNumber = 1;
+            const selector = document.getElementById('shapes-file-select');
+            selector.innerHTML = '';
+            shapesDocuments.forEach((documentState, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = `${index + 1}. ${documentState.file.name}`;
+                selector.appendChild(option);
+            });
+            document.getElementById('shapes-selection').textContent = shapesDocuments.length === 1
+                ? shapesDocuments[0].file.name
+                : `${shapesDocuments.length} PDF files selected`;
+            document.getElementById('shapes-controls').classList.toggle('hidden', shapesDocuments.length === 0);
+            updateShapesPageSelector();
+            renderShapesPage();
+            showToast(failures.length
+                ? `${documents.length} PDFs ready; ${failures.length} unreadable file${failures.length === 1 ? '' : 's'} skipped`
+                : `${documents.length} PDF${documents.length === 1 ? '' : 's'} ready for shape placement`,
+                failures.length > 0);
+        });
+
+        document.getElementById('shapes-file-select').addEventListener('change', event => {
+            activeShapesDocumentIndex = Number(event.target.value);
+            activeShapesPageNumber = 1;
+            updateShapesPageSelector();
+            renderShapesPage();
+        });
+        document.getElementById('shapes-page-select').addEventListener('change', event => {
+            activeShapesPageNumber = Number(event.target.value);
+            renderShapesPage();
+        });
+
+        const shapesOverlayCanvas = document.getElementById('shapes-overlay-canvas');
+        shapesOverlayCanvas.addEventListener('pointerdown', event => {
+            const bounds = shapesOverlayCanvas.getBoundingClientRect();
+            if (!bounds.width || !bounds.height) return;
+            const strokeWidth = Number(document.getElementById('shapes-stroke-width').value);
+            if (!Number.isFinite(strokeWidth) || strokeWidth < 0 || strokeWidth > 30) {
+                showToast('Choose a stroke width from 0 to 30.', true);
+                return;
+            }
+            const startX = (event.clientX - bounds.left) / bounds.width;
+            const startY = (event.clientY - bounds.top) / bounds.height;
+            shapesDrawing = {
+                type: document.getElementById('shapes-type').value,
+                x: startX,
+                y: startY,
+                width: 0,
+                height: 0,
+                fillColor: document.getElementById('shapes-fill-color').value,
+                strokeColor: document.getElementById('shapes-stroke-color').value,
+                strokeWidth
+            };
+            shapesOverlayCanvas.setPointerCapture(event.pointerId);
+        });
+        shapesOverlayCanvas.addEventListener('pointermove', event => {
+            if (!shapesDrawing) return;
+            const bounds = shapesOverlayCanvas.getBoundingClientRect();
+            const currentX = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+            const currentY = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+            let left = Math.min(shapesDrawing.x, currentX);
+            let top = Math.min(shapesDrawing.y, currentY);
+            let width = Math.abs(currentX - shapesDrawing.x);
+            let height = Math.abs(currentY - shapesDrawing.y);
+            if (shapesDrawing.type === 'square' || shapesDrawing.type === 'circle') {
+                const side = Math.min(width, height);
+                left = currentX < shapesDrawing.x ? shapesDrawing.x - side : shapesDrawing.x;
+                top = currentY < shapesDrawing.y ? shapesDrawing.y - side : shapesDrawing.y;
+                width = height = side;
+            }
+            shapesDrawing = { ...shapesDrawing, x: left, y: top, width, height };
+            renderShapesOverlay();
+        });
+        function finishDrawingShape(event) {
+            if (!shapesDrawing) return;
+            if (shapesOverlayCanvas.hasPointerCapture(event.pointerId)) {
+                shapesOverlayCanvas.releasePointerCapture(event.pointerId);
+            }
+            if (shapesDrawing.width * shapesOverlayCanvas.width >= 4 &&
+                shapesDrawing.height * shapesOverlayCanvas.height >= 4) {
+                const currentPage = getCurrentShapesPage();
+                if (currentPage) currentPage.shapes.push(shapesDrawing);
+            }
+            shapesDrawing = null;
+            renderShapesOverlay();
+        }
+        shapesOverlayCanvas.addEventListener('pointerup', finishDrawingShape);
+        shapesOverlayCanvas.addEventListener('pointercancel', finishDrawingShape);
+        document.getElementById('shapes-undo').addEventListener('click', () => {
+            const currentPage = getCurrentShapesPage();
+            if (currentPage) currentPage.shapes.pop();
+            renderShapesOverlay();
+        });
+
+        document.getElementById('shapes-run').addEventListener('click', async () => {
+            if (!shapesDocuments.some(documentState => documentState.pages.some(page => page.shapes.length))) {
+                showToast('Draw at least one shape before downloading.', true);
+                return;
+            }
+            if (!window.PDFLib || !window.JSZip) {
+                showToast('PDF processing libraries are unavailable. Check your connection and reload.', true);
+                return;
+            }
+            showProgress('Applying shapes', 'Adding shapes to the selected PDF pages...');
+            try {
+                const { PDFDocument } = PDFLib;
+                const outputs = [];
+                let completedFiles = 0;
+                for (const documentState of shapesDocuments) {
+                    const pagesWithShapes = documentState.pages
+                        .map((page, index) => ({ page, index }))
+                        .filter(item => item.page.shapes.length);
+                    if (pagesWithShapes.length) {
+                        const pdfDoc = await PDFDocument.load(await documentState.file.arrayBuffer());
+                        for (const { page: pageState, index } of pagesWithShapes) {
+                            const page = pdfDoc.getPage(index);
+                            const { width, height } = page.getSize();
+                            pageState.shapes.forEach(shape => {
+                                const x = shape.x * width;
+                                const shapeWidth = shape.width * width;
+                                const shapeHeight = shape.height * height;
+                                const y = height - (shape.y + shape.height) * height;
+                                const options = {
+                                    x,
+                                    y,
+                                    width: shapeWidth,
+                                    height: shapeHeight,
+                                    color: getWatermarkColor(shape.fillColor),
+                                    borderColor: getWatermarkColor(shape.strokeColor),
+                                    borderWidth: shape.strokeWidth
+                                };
+                                if (shape.type === 'circle' || shape.type === 'ellipse') {
+                                    page.drawEllipse({
+                                        x: x + shapeWidth / 2,
+                                        y: y + shapeHeight / 2,
+                                        xScale: shapeWidth / 2,
+                                        yScale: shapeHeight / 2,
+                                        color: options.color,
+                                        borderColor: options.borderColor,
+                                        borderWidth: options.borderWidth
+                                    });
+                                } else {
+                                    page.drawRectangle(options);
+                                }
+                            });
+                        }
+                        outputs.push({
+                            name: `${safeFileBaseName(documentState.file)}_with_shapes.pdf`,
+                            bytes: await pdfDoc.save()
+                        });
+                    }
+                    completedFiles++;
+                    updateProgress((completedFiles / shapesDocuments.length) * 85);
+                }
+                await downloadPdfOutputs(outputs, 'pdfs_with_shapes.zip');
+                hideProgress();
+                showToast(`Shapes added to ${outputs.length} PDF${outputs.length === 1 ? '' : 's'}.`);
+            } catch (err) {
+                hideProgress();
+                console.error('Could not apply shapes to the selected PDFs', err);
+                showToast('Could not add shapes to one or more PDFs.', true);
+            }
+        });
 
         function registerUtilityPdfTool(key, zoneId, inputId, selectionId, runButtonId) {
             setupDropzone(zoneId, inputId, files => {
