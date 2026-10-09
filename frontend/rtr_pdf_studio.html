@@ -1582,11 +1582,33 @@
                     <input id="remove-range" type="text" placeholder="e.g. 2, 4-6"
                         class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
                 </label>
-                <button id="remove-run" type="button" disabled
-                    class="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">Remove
-                    pages & download</button>
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <button id="remove-preview" type="button" disabled
+                        class="px-5 py-2.5 border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-sm font-semibold">Preview</button>
+                    <button id="remove-run" type="button" disabled
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">Remove
+                        pages & download</button>
+                </div>
             </div>
         </section>
+
+        <div id="remove-preview-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4"
+            role="dialog" aria-modal="true" aria-labelledby="remove-preview-title">
+            <div class="w-full max-w-6xl max-h-[90vh] overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+                <div class="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                        <h3 id="remove-preview-title" class="text-lg font-bold text-slate-900">Pages to remove</h3>
+                        <p class="text-sm text-slate-500">Preview of the pages selected by the current page range.</p>
+                    </div>
+                    <button id="remove-preview-close" type="button" aria-label="Close preview"
+                        class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+                <p id="remove-preview-status" class="mb-3 text-sm text-slate-500" role="status"></p>
+                <div id="remove-preview-grid" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"></div>
+            </div>
+        </div>
 
         <section id="tab-create-pdf" class="tab-content hidden tool-page space-y-6">
             <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All
@@ -3105,6 +3127,8 @@
                     if (!watermarkPreviewModal.classList.contains('hidden')) {
                         openWatermarkPreview();
                     }
+                } else if (key === 'remove') {
+                    document.getElementById('remove-preview').disabled = false;
                 }
             });
         }
@@ -3298,6 +3322,112 @@
         });
         document.getElementById('watermark-page-range').addEventListener('change', () => {
             if (!watermarkPreviewModal.classList.contains('hidden')) openWatermarkPreview();
+        });
+        let removePreviewRequest = 0;
+        const removePreviewModal = document.getElementById('remove-preview-modal');
+        const removePreviewStatus = document.getElementById('remove-preview-status');
+        const removePreviewGrid = document.getElementById('remove-preview-grid');
+
+        async function openRemovePreview() {
+            const files = utilityFiles.remove;
+            const range = document.getElementById('remove-range').value.trim();
+            if (!files.length) {
+                showToast('Please select at least one PDF file.', true);
+                return;
+            }
+            if (!range) {
+                showToast('Enter the page numbers to remove, for example 2, 4-6.', true);
+                return;
+            }
+            if (!window.pdfjsLib) {
+                showToast('The PDF preview library is unavailable. Check your connection and reload.', true);
+                return;
+            }
+
+            const requestId = ++removePreviewRequest;
+            removePreviewGrid.innerHTML = '';
+            removePreviewStatus.textContent = 'Rendering selected pages...';
+            removePreviewModal.classList.remove('hidden');
+
+            try {
+                let renderedPages = 0;
+                for (const file of files) {
+                    const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                    if (requestId !== removePreviewRequest) return;
+                    const removedPages = parsePageRange(range, doc.numPages);
+                    if (removedPages.length === 0) {
+                        removePreviewGrid.innerHTML = '';
+                        removePreviewStatus.textContent = `No matching pages found in ${file.name}.`;
+                        return;
+                    }
+                    if (removedPages.length === doc.numPages) {
+                        removePreviewGrid.innerHTML = '';
+                        removePreviewStatus.textContent = `Cannot remove every page from ${file.name}.`;
+                        return;
+                    }
+
+                    if (files.length > 1) {
+                        const heading = document.createElement('h4');
+                        heading.className = 'col-span-full pt-2 text-sm font-semibold text-slate-700';
+                        heading.textContent = file.name;
+                        removePreviewGrid.appendChild(heading);
+                    }
+
+                    for (const pageNumber of removedPages) {
+                        if (requestId !== removePreviewRequest) return;
+                        const page = await doc.getPage(pageNumber);
+                        const viewport = page.getViewport({ scale: 0.45 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.ceil(viewport.width);
+                        canvas.height = Math.ceil(viewport.height);
+                        canvas.className = 'mb-2 block w-full rounded border border-slate-200 bg-slate-50 object-contain';
+                        const context = canvas.getContext('2d');
+                        if (!context) throw new Error('Canvas rendering is unavailable.');
+                        await page.render({ canvasContext: context, viewport }).promise;
+
+                        const card = document.createElement('div');
+                        card.className = 'page-card flex flex-col items-center rounded-xl border border-rose-200 bg-rose-50 p-2.5 shadow-sm';
+                        const label = document.createElement('div');
+                        label.className = 'mb-1 flex w-full items-center justify-between px-1 text-xs font-semibold text-rose-700';
+                        const pageLabel = document.createElement('span');
+                        pageLabel.textContent = `Page ${pageNumber}`;
+                        const removedLabel = document.createElement('span');
+                        removedLabel.textContent = 'Will be removed';
+                        label.append(pageLabel, removedLabel);
+                        card.append(label, canvas);
+                        removePreviewGrid.appendChild(card);
+                        renderedPages++;
+                    }
+                }
+                if (requestId !== removePreviewRequest) return;
+                removePreviewStatus.textContent = `${renderedPages} page${renderedPages === 1 ? '' : 's'} selected for removal.`;
+            } catch (err) {
+                if (requestId !== removePreviewRequest) return;
+                console.error('Could not render pages to remove', err);
+                removePreviewGrid.innerHTML = '';
+                removePreviewStatus.textContent = err instanceof Error
+                    ? err.message
+                    : 'The selected pages could not be previewed.';
+            }
+        }
+
+        document.getElementById('remove-preview').addEventListener('click', openRemovePreview);
+        document.getElementById('remove-preview-close').addEventListener('click', () => {
+            removePreviewRequest++;
+            removePreviewModal.classList.add('hidden');
+        });
+        removePreviewModal.addEventListener('click', event => {
+            if (event.target === removePreviewModal) {
+                document.getElementById('remove-preview-close').click();
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !removePreviewModal.classList.contains('hidden')) {
+                document.getElementById('remove-preview-close').click();
+            }
+        });
+        document.getElementById('remove-range').addEventListener('input', () => {
+            if (!removePreviewModal.classList.contains('hidden')) openRemovePreview();
         });
         document.getElementById('compress-run').addEventListener('click', async () => {
             const files = utilityFiles.compress;
