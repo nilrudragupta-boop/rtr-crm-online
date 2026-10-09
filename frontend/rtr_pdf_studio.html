@@ -796,8 +796,8 @@
 
                 <label class="directory-search">
                     <i data-lucide="search" aria-hidden="true"></i>
-                    <input id="tool-search" name="pdf-tool-search" type="search" placeholder="Search PDF tools"
-                        autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore
+                    <input id="tool-search" type="text" placeholder="Search PDF tools"
+                        autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true"
                         aria-label="Search PDF tools">
                 </label>
 
@@ -1257,6 +1257,14 @@
                             class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors">
                             <i data-lucide="scissors" class="w-4 h-4"></i> Execute Split & Download
                         </button>
+                    </div>
+
+                    <div class="mt-6">
+                        <h3 class="text-sm font-bold text-slate-800 mb-3">Page Previews & Individual Downloads</h3>
+                        <div id="split-preview-grid"
+                            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            <!-- Page previews are rendered dynamically -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2429,21 +2437,25 @@
                 showToast('Please select at least one valid PDF file', true);
                 return;
             }
-            showProgress('Checking PDFs', 'Reading page counts...');
+            showProgress('Loading PDFs', 'Reading page counts and rendering previews...');
             const readableFiles = [];
             const failures = [];
             for (const file of selectedFiles) {
                 try {
                     const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-                    readableFiles.push({ file, numPages: doc.numPages });
+                    readableFiles.push({ file, numPages: doc.numPages, doc });
                 } catch (err) {
                     console.error(`Could not read ${file.name}`, err);
                     failures.push(file.name);
                 }
             }
-            hideProgress();
+
+            await Promise.all(splitFiles.map(item => item.doc.destroy()));
             splitFiles = readableFiles;
+            document.getElementById('split-preview-grid').innerHTML = '';
             if (readableFiles.length === 0) {
+                hideProgress();
+                document.getElementById('ctrl-split').classList.add('hidden');
                 showToast('Failed to load the selected PDFs for splitting', true);
                 return;
             }
@@ -2455,11 +2467,94 @@
             document.getElementById('split-filepages').innerText = readableFiles
                 .map(item => `${item.file.name}: ${item.numPages} pages`)
                 .join(' • ');
+            const previewsRendered = await renderSplitPagePreviews();
+            hideProgress();
+            if (!previewsRendered) return;
             showToast(failures.length
                 ? `${readableFiles.length} PDFs ready; ${failures.length} unreadable file${failures.length === 1 ? '' : 's'} skipped`
                 : `${readableFiles.length} PDF${readableFiles.length === 1 ? '' : 's'} loaded for splitting`,
                 failures.length > 0);
         });
+
+        async function renderSplitPagePreviews() {
+            const grid = document.getElementById('split-preview-grid');
+            const totalPages = splitFiles.reduce((total, item) => total + item.numPages, 0);
+            let completedPages = 0;
+
+            try {
+                for (let fileIndex = 0; fileIndex < splitFiles.length; fileIndex++) {
+                    const { file, numPages, doc } = splitFiles[fileIndex];
+                    if (splitFiles.length > 1) {
+                        const fileHeading = document.createElement('h4');
+                        fileHeading.className = 'col-span-full text-sm font-semibold text-slate-700 pt-2';
+                        fileHeading.textContent = `${file.name} (${numPages} pages)`;
+                        grid.appendChild(fileHeading);
+                    }
+
+                    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                        completedPages++;
+                        updateProgress((completedPages / totalPages) * 90);
+                        const page = await doc.getPage(pageNum);
+                        const viewport = page.getViewport({ scale: 0.35 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        canvas.className = 'rounded border border-slate-100 w-full object-contain mb-2 bg-slate-50';
+                        await page.render({
+                            canvasContext: canvas.getContext('2d'),
+                            viewport
+                        }).promise;
+
+                        const card = document.createElement('div');
+                        card.className = 'page-card bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center';
+                        const header = document.createElement('div');
+                        header.className = 'w-full flex justify-between items-center text-xs font-semibold text-slate-600 mb-1 px-1';
+                        const pageLabel = document.createElement('span');
+                        pageLabel.textContent = `Page ${pageNum}`;
+                        const downloadButton = document.createElement('button');
+                        downloadButton.className = 'text-indigo-600 hover:text-indigo-800 p-1 hover:bg-indigo-50 rounded';
+                        downloadButton.title = 'Download page as PDF';
+                        downloadButton.setAttribute('aria-label', `Download page ${pageNum} from ${file.name} as PDF`);
+                        downloadButton.innerHTML = '<i data-lucide="download" class="w-3.5 h-3.5"></i>';
+                        downloadButton.addEventListener('click', () => downloadSplitPage(fileIndex, pageNum));
+                        header.append(pageLabel, downloadButton);
+                        card.append(header, canvas);
+                        grid.appendChild(card);
+                    }
+                }
+                updateProgress(100);
+                refreshIcons();
+                return true;
+            } catch (err) {
+                console.error('Failed to render split PDF page previews', err);
+                grid.innerHTML = '';
+                showToast('Failed to render page previews for one or more PDFs', true);
+                return false;
+            }
+        }
+
+        async function downloadSplitPage(fileIndex, pageNum) {
+            const item = splitFiles[fileIndex];
+            if (!item) return;
+
+            showProgress(`Extracting Page ${pageNum}`, `Creating a single-page PDF from ${item.file.name}...`);
+            try {
+                const { PDFDocument } = PDFLib;
+                const sourcePdf = await PDFDocument.load(await item.file.arrayBuffer());
+                const pagePdf = await PDFDocument.create();
+                const [copiedPage] = await pagePdf.copyPages(sourcePdf, [pageNum - 1]);
+                pagePdf.addPage(copiedPage);
+                const outputBytes = await pagePdf.save();
+                const outputName = `${safeFileBaseName(item.file)}_page_${String(pageNum).padStart(3, '0')}.pdf`;
+                triggerDownloadBlob(new Blob([outputBytes], { type: 'application/pdf' }), outputName);
+                hideProgress();
+                showToast(`Downloaded Page ${pageNum} from ${item.file.name}`);
+            } catch (err) {
+                hideProgress();
+                console.error(err);
+                showToast(`Failed to download page ${pageNum} from ${item.file.name}`, true);
+            }
+        }
 
         async function executeSplitPdf() {
             if (splitFiles.length === 0) return;
