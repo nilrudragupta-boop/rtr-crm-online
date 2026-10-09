@@ -1008,9 +1008,12 @@
         style="background:#fff; padding:10px; margin-bottom:10px; border:1px solid #ccc; border-radius:6px; display:flex; gap:20px; align-items:center; font-size:14px; flex-wrap:wrap;">
         <strong style="color:#2c3e50;">Summary:</strong>
         <span style="color:#0d6efd; font-weight:bold;">Total Customers: <span id="summaryCustomerCount">0</span></span>
-        <span style="color:#6f42c1; font-weight:bold;">Opening Balance: ₹ <span id="summaryOpeningBalance">0.00 Dr</span></span>
-        <span style="color:#e67e22; font-weight:bold;">Total Outstanding: ₹ <span id="summaryOutstanding">0.00</span></span>
-        <span style="color:#c0392b; font-weight:bold;">Customers with Due: <span id="summaryCustomersWithDue">0</span></span>
+        <span style="color:#6f42c1; font-weight:bold;">Opening Balance: ₹ <span id="summaryOpeningBalance">0.00
+                Dr</span></span>
+        <span style="color:#e67e22; font-weight:bold;">Total Outstanding: ₹ <span
+                id="summaryOutstanding">0.00</span></span>
+        <span style="color:#c0392b; font-weight:bold;">Customers with Due: <span
+                id="summaryCustomersWithDue">0</span></span>
     </div>
 
     <div class="table-responsive">
@@ -2165,11 +2168,17 @@
             }
             localStorage.setItem("customers", JSON.stringify(customers));
 
-            if (db) {
-                try { await db.collection('customers').doc(payload.id).set(payload, { merge: true }); } catch (e) { console.error("Firestore save error", e); }
+            try {
+                await apiClient.saveCustomer(payload);
+            } catch (e) {
+                console.warn("API sync failed", e);
+                showToast("Customer saved locally, but remote sync failed.", "warning");
             }
 
-            apiClient.saveCustomer(payload).catch(e => console.warn("API sync failed", e));
+            window.dispatchEvent(new CustomEvent("customer:updated", {
+                detail: { id: payload.id, updatedAt: payload.updatedAt }
+            }));
+
             openSuccessModal(id ? "Customer updated successfully!" : "Customer added successfully!");
             applyFilters();
             clearForm();
