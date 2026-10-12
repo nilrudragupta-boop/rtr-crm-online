@@ -271,3 +271,16 @@
             return false;
         }
     }, true); // <-- The `true` sets capture phase so it runs before browser defaults
+
+    // Inside frontend/command-palette.js
+    window.openCommandPalette = openPalette;
+    window.closeCommandPalette = closePalette;
+
+    // Auto-detect Mac and update key badge if present
+    document.addEventListener('DOMContentLoaded', () => {
+        const keyBadge = document.getElementById('topbarShortcutKey');
+        if (keyBadge && navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
+            keyBadge.textContent = '⌘';
+        }
+    });
+})();
