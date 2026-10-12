@@ -40,13 +40,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteSentEmail: (id) => ipcRenderer.invoke('delete-sent-email', id),
     savePaymentReceipt: (data) => ipcRenderer.invoke('save-payment-receipt', data),
     getPaymentReceipts: () => ipcRenderer.invoke('get-payment-receipts'),
-        getInboxEmails: () => ipcRenderer.invoke('get-inbox-emails'),
+    getInboxEmails: () => ipcRenderer.invoke('get-inbox-emails'),
     checkNewEmails: () => ipcRenderer.invoke('check-new-emails'),
     markEmailRead: (uid) => ipcRenderer.invoke('mark-email-read', uid),
     deleteInboxEmail: (id) => ipcRenderer.invoke('delete-inbox-email', id),
 });
 
+// Load command palette CSS and JS
 window.addEventListener('DOMContentLoaded', () => {
+    // Avoid mounting inside login page
+    if (window.location.pathname.includes('login.html')) return;
+
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'css/command-palette.css';
