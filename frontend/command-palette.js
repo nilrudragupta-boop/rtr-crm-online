@@ -1,26 +1,24 @@
 (function () {
     // 1. Static Module Routes mapped to UI_PERMISSION_REGISTRY IDs
     const SYSTEM_MODULES = [
-        { id: 'mod-invoice', title: 'Invoices Reports', group: 'Modules', type: 'module', icon: '🧾', url: 'report.html', permission: 'perm_invoice_report' },
-        { id: 'mod-customer', title: 'Customer Directory', group: 'Modules', type: 'module', icon: '👥', url: 'customer.html', permission: 'perm_manage_customers' },
+        { id: 'mod-crm', title: 'CRM v2 Dashboard', group: 'Modules', type: 'module', icon: '📊', url: 'crm_v2.html', permission: 'perm_crm_v2' },
+        { id: 'mod-customer', title: 'Customer Master / Directory', group: 'Modules', type: 'module', icon: '👥', url: 'customer.html', permission: 'perm_manage_customers' },
         { id: 'mod-contacts', title: 'Contacts Directory', group: 'Modules', type: 'module', icon: '📇', url: 'contacts.html', permission: 'perm_manage_customers' },
+        { id: 'mod-enquiry', title: 'Lead Enquiries & Follow Up', group: 'Modules', type: 'module', icon: '🎯', url: 'enquiry.html', permission: 'perm_follow_up' },
+        { id: 'mod-followup', title: 'Follow-Up Schedule', group: 'Modules', type: 'module', icon: '📅', url: 'follow_up.html', permission: 'perm_follow_up' },
+        { id: 'mod-invoice', title: 'Invoices & Billing', group: 'Modules', type: 'module', icon: '🧾', url: 'invoice.html', permission: 'perm_make_invoice' },
+        { id: 'mod-daybook', title: 'Day Book', group: 'Modules', type: 'module', icon: '📖', url: 'day_book.html', permission: 'perm_day_book' },
+        { id: 'mod-ledger', title: 'Account Ledger', group: 'Modules', type: 'module', icon: '⚖️', url: 'ledger.html', permission: 'perm_ledger_report' },
+        { id: 'mod-balancesheet', title: 'Balance Sheet', group: 'Modules', type: 'module', icon: '📈', url: 'balance_sheet.html', permission: 'perm_balance_sheet' },
+        { id: 'mod-cashflow', title: 'Cash Flow Statement', group: 'Modules', type: 'module', icon: '💵', url: 'cash_flow.html', permission: 'perm_cash_flow' },
         { id: 'mod-purchase', title: 'Purchase Orders & Inward', group: 'Modules', type: 'module', icon: '🛒', url: 'purchase.html', permission: 'perm_purchase_entries' },
-        { id: 'mod-bom', title: 'Bill of Materials (BOM)', group: 'Modules', type: 'module', icon: '⚙️', url: 'bom.html', permission: 'perm_manage_bom' },
-        { id: 'mod-production', title: 'Production & Manufacturing', group: 'Modules', type: 'module', icon: '🏭', url: 'production.html', permission: 'perm_production_entry' },
         { id: 'mod-stockreport', title: 'Stock Report & Inventory', group: 'Modules', type: 'module', icon: '📦', url: 'stock_report.html', permission: 'perm_stock_report' },
         { id: 'mod-stockjournal', title: 'Stock Journal', group: 'Modules', type: 'module', icon: '🔄', url: 'stock_journal.html', permission: 'perm_stock_journal' },
-        { id: 'mod-balancesheet', title: 'Balance Sheet', group: 'Modules', type: 'module', icon: '📈', url: 'balance_sheet.html', permission: 'perm_balance_sheet' },
+        { id: 'mod-production', title: 'Production & Manufacturing', group: 'Modules', type: 'module', icon: '🏭', url: 'production.html', permission: 'perm_production_entry' },
+        { id: 'mod-bom', title: 'Bill of Materials (BOM)', group: 'Modules', type: 'module', icon: '⚙️', url: 'bom.html', permission: 'perm_manage_bom' },
         { id: 'mod-gst', title: 'GST Return Report', group: 'Modules', type: 'module', icon: '📑', url: 'gst_return_report.html', permission: 'perm_gst_report' },
-        { id: 'mod-ledger', title: 'Account Ledger', group: 'Modules', type: 'module', icon: '⚖️', url: 'ledger.html', permission: 'perm_ledger_report' },
-        { id: 'mod-settings', title: 'System Settings', group: 'System', type: 'action', icon: '⚙️', url: 'settings.html', permission: 'perm_settings' },
-        { id: 'mod-backup', title: 'Database Backup', group: 'System', type: 'action', icon: '💾', url: 'dashboardB.html', permission: 'perm_backup_data' },
-        { id: 'mod-restore', title: 'Database Restore', group: 'System', type: 'action', icon: '♻️', url: 'dashboardB.html', permission: 'perm_restore_data' },
-        { id: 'mod-daybook', title: 'Day Book', group: 'Modules', type: 'module', icon: '📖', url: 'day_book.html', permission: 'perm_day_book' },
-        { id: 'mod-cashflow', title: 'Cash Flow Statement', group: 'Modules', type: 'module', icon: '💵', url: 'cash_flow.html', permission: 'perm_cash_flow' },
-        { id: 'mod-enquiry', title: 'Lead Enquiries', group: 'Modules', type: 'module', icon: '🎯', url: 'enquiry.html', permission: 'perm_follow_up' },
-        { id: 'mod-followup', title: 'Follow-Up Schedule', group: 'Modules', type: 'module', icon: '📅', url: 'follow_up.html', permission: 'perm_follow_up' },
-        { id: 'mod-crm', title: 'CRM v2 Dashboard', group: 'Modules', type: 'module', icon: '📊', url: 'crm_v2.html', permission: 'perm_crm_v2' },
-        { id: 'mod-pdf', title: 'RTR PDF Studio', group: 'Tools', type: 'action', icon: '🖨️', url: 'rtr_pdf_studio.html', permission: 'perm_rtr_pdf_studio' }
+        { id: 'mod-pdf', title: 'RTR PDF Studio', group: 'Tools', type: 'action', icon: '🖨️', url: 'rtr_pdf_studio.html', permission: 'perm_rtr_pdf_studio' },
+        { id: 'mod-settings', title: 'System Settings', group: 'System', type: 'action', icon: '⚙️', url: 'settings.html', permission: 'perm_settings' }
     ];
 
     // Permission Verification Engine matching settings.js
@@ -117,7 +115,7 @@
                     dynamicInvoices = results[idx].value?.data || dynamicInvoices;
                 }
             }
-        } catch (_) { }
+        } catch (_) {}
     }
 
     // 3. Inject Palette DOM
@@ -184,7 +182,7 @@
                         group: 'Invoices',
                         type: 'invoice',
                         icon: '🧾',
-                        url: `report.html?id=${encodeURIComponent(inv.id || inv.invoice_no)}`
+                        url: `invoice.html?id=${encodeURIComponent(inv.id || inv.invoice_no)}`
                     });
                 }
             });
