@@ -45,3 +45,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     markEmailRead: (uid) => ipcRenderer.invoke('mark-email-read', uid),
     deleteInboxEmail: (id) => ipcRenderer.invoke('delete-inbox-email', id),
 });
+
+window.addEventListener('DOMContentLoaded', () => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'css/command-palette.css';
+    document.head.appendChild(link);
+
+    const script = document.createElement('script');
+    script.src = 'command-palette.js';
+    document.body.appendChild(script);
+});
