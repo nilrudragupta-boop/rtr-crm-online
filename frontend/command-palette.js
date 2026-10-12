@@ -184,7 +184,7 @@
                         group: 'Invoices',
                         type: 'invoice',
                         icon: '🧾',
-                        url: `invoice.html?id=${encodeURIComponent(inv.id || inv.invoice_no)}`
+                        url: `report.html?id=${encodeURIComponent(inv.id || inv.invoice_no)}`
                     });
                 }
             });
