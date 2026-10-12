@@ -1,72 +1,25 @@
 (function () {
-    // 1. Static Module Routes mapped to UI_PERMISSION_REGISTRY IDs
+    // 1. Static Module Routes
     const SYSTEM_MODULES = [
-        { id: 'mod-crm', title: 'CRM v2 Dashboard', group: 'Modules', type: 'module', icon: '📊', url: 'crm_v2.html', permission: 'perm_crm_v2' },
-        { id: 'mod-customer', title: 'Customer Master / Directory', group: 'Modules', type: 'module', icon: '👥', url: 'customer.html', permission: 'perm_manage_customers' },
-        { id: 'mod-contacts', title: 'Contacts Directory', group: 'Modules', type: 'module', icon: '📇', url: 'contacts.html', permission: 'perm_manage_customers' },
-        { id: 'mod-enquiry', title: 'Lead Enquiries & Follow Up', group: 'Modules', type: 'module', icon: '🎯', url: 'enquiry.html', permission: 'perm_follow_up' },
-        { id: 'mod-followup', title: 'Follow-Up Schedule', group: 'Modules', type: 'module', icon: '📅', url: 'follow_up.html', permission: 'perm_follow_up' },
-        { id: 'mod-invoice', title: 'Invoices & Billing', group: 'Modules', type: 'module', icon: '🧾', url: 'invoice.html', permission: 'perm_make_invoice' },
-        { id: 'mod-daybook', title: 'Day Book', group: 'Modules', type: 'module', icon: '📖', url: 'day_book.html', permission: 'perm_day_book' },
-        { id: 'mod-ledger', title: 'Account Ledger', group: 'Modules', type: 'module', icon: '⚖️', url: 'ledger.html', permission: 'perm_ledger_report' },
-        { id: 'mod-balancesheet', title: 'Balance Sheet', group: 'Modules', type: 'module', icon: '📈', url: 'balance_sheet.html', permission: 'perm_balance_sheet' },
-        { id: 'mod-cashflow', title: 'Cash Flow Statement', group: 'Modules', type: 'module', icon: '💵', url: 'cash_flow.html', permission: 'perm_cash_flow' },
-        { id: 'mod-purchase', title: 'Purchase Orders & Inward', group: 'Modules', type: 'module', icon: '🛒', url: 'purchase.html', permission: 'perm_purchase_entries' },
-        { id: 'mod-stockreport', title: 'Stock Report & Inventory', group: 'Modules', type: 'module', icon: '📦', url: 'stock_report.html', permission: 'perm_stock_report' },
-        { id: 'mod-stockjournal', title: 'Stock Journal', group: 'Modules', type: 'module', icon: '🔄', url: 'stock_journal.html', permission: 'perm_stock_journal' },
-        { id: 'mod-production', title: 'Production & Manufacturing', group: 'Modules', type: 'module', icon: '🏭', url: 'production.html', permission: 'perm_production_entry' },
-        { id: 'mod-bom', title: 'Bill of Materials (BOM)', group: 'Modules', type: 'module', icon: '⚙️', url: 'bom.html', permission: 'perm_manage_bom' },
-        { id: 'mod-gst', title: 'GST Return Report', group: 'Modules', type: 'module', icon: '📑', url: 'gst_return_report.html', permission: 'perm_gst_report' },
-        { id: 'mod-pdf', title: 'RTR PDF Studio', group: 'Tools', type: 'action', icon: '🖨️', url: 'rtr_pdf_studio.html', permission: 'perm_rtr_pdf_studio' },
-        { id: 'mod-settings', title: 'System Settings', group: 'System', type: 'action', icon: '⚙️', url: 'settings.html', permission: 'perm_settings' }
+        { id: 'mod-crm', title: 'CRM v2 Dashboard', group: 'Modules', type: 'module', icon: '📊', url: 'crm_v2.html' },
+        { id: 'mod-customer', title: 'Customer Master / Directory', group: 'Modules', type: 'module', icon: '👥', url: 'customer.html' },
+        { id: 'mod-contacts', title: 'Contacts Directory', group: 'Modules', type: 'module', icon: '📇', url: 'contacts.html' },
+        { id: 'mod-enquiry', title: 'Lead Enquiries & Follow Up', group: 'Modules', type: 'module', icon: '🎯', url: 'enquiry.html' },
+        { id: 'mod-followup', title: 'Follow-Up Schedule', group: 'Modules', type: 'module', icon: '📅', url: 'follow_up.html' },
+        { id: 'mod-invoice', title: 'Invoices & Billing', group: 'Modules', type: 'module', icon: '🧾', url: 'invoice.html' },
+        { id: 'mod-daybook', title: 'Day Book', group: 'Modules', type: 'module', icon: '📖', url: 'day_book.html' },
+        { id: 'mod-ledger', title: 'Account Ledger', group: 'Modules', type: 'module', icon: '⚖️', url: 'ledger.html' },
+        { id: 'mod-balancesheet', title: 'Balance Sheet', group: 'Modules', type: 'module', icon: '📈', url: 'balance_sheet.html' },
+        { id: 'mod-cashflow', title: 'Cash Flow Statement', group: 'Modules', type: 'module', icon: '💵', url: 'cash_flow.html' },
+        { id: 'mod-purchase', title: 'Purchase Orders & Inward', group: 'Modules', type: 'module', icon: '🛒', url: 'purchase.html' },
+        { id: 'mod-stockreport', title: 'Stock Report & Inventory', group: 'Modules', type: 'module', icon: '📦', url: 'stock_report.html' },
+        { id: 'mod-stockjournal', title: 'Stock Journal', group: 'Modules', type: 'module', icon: '🔄', url: 'stock_journal.html' },
+        { id: 'mod-production', title: 'Production & Manufacturing', group: 'Modules', type: 'module', icon: '🏭', url: 'production.html' },
+        { id: 'mod-bom', title: 'Bill of Materials (BOM)', group: 'Modules', type: 'module', icon: '⚙️', url: 'bom.html' },
+        { id: 'mod-gst', title: 'GST Return Report', group: 'Modules', type: 'module', icon: '📑', url: 'gst_return_report.html' },
+        { id: 'mod-pdf', title: 'RTR PDF Studio', group: 'Tools', type: 'action', icon: '🖨️', url: 'rtr_pdf_studio.html' },
+        { id: 'mod-settings', title: 'System Settings', group: 'System', type: 'action', icon: '⚙️', url: 'settings.html' }
     ];
-
-    // Permission Verification Engine matching settings.js
-    function hasModulePermission(permId) {
-        if (!permId) return true;
-
-        // 1. If settings.js is loaded, use its native functions
-        if (typeof getUIPermissions === 'function') {
-            const userPerms = getUIPermissions();
-            if (userPerms && userPerms[permId] === false) return false;
-
-            if (typeof FeatureManager !== 'undefined' && typeof FeatureManager.getFlags === 'function' && typeof UI_PERMISSION_REGISTRY !== 'undefined') {
-                const flags = FeatureManager.getFlags();
-                const permDef = UI_PERMISSION_REGISTRY.find(p => p.id === permId);
-                if (permDef && permDef.feature && flags[permDef.feature] === false) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // 2. Fallback directly to localStorage if settings.js is not present on the current page
-        const currentUser = localStorage.getItem('currentUser') || 'admin';
-        try {
-            // Check remote permissions first (enforced in settings.js)
-            const remoteStr = localStorage.getItem(`remotePermissions_${currentUser}`);
-            if (remoteStr) {
-                const remote = JSON.parse(remoteStr);
-                if (remote[permId] === false) return false;
-            }
-
-            // Check user-specific or legacy permissions
-            const userPermStr = localStorage.getItem(`ui_permissions_${currentUser}`) || localStorage.getItem('ui_permissions');
-            if (userPermStr) {
-                const perms = JSON.parse(userPermStr);
-                if (perms[permId] === false) return false;
-            }
-        } catch (e) {
-            console.error('[CommandPalette] Error validating permissions:', e);
-        }
-
-        return true;
-    }
-
-    // Returns only modules the user has active permission to access
-    function getAllowedModules() {
-        return SYSTEM_MODULES.filter(mod => hasModulePermission(mod.permission));
-    }
 
     let dynamicCustomers = [];
     let dynamicInvoices = [];
@@ -76,24 +29,13 @@
 
     // 2. Fetch or load customer and invoice index from Storage/API
     async function refreshSearchIndexes() {
-        // Respect module permissions for search record types
-        const canViewCustomers = hasModulePermission('perm_manage_customers');
-        const canViewInvoices = hasModulePermission('perm_make_invoice');
-
+        // Try local storage caches first (standard in RTR CRM clients)
         try {
-            if (canViewCustomers) {
-                const cachedCust = localStorage.getItem('rtr_customers') || localStorage.getItem('customers');
-                if (cachedCust) dynamicCustomers = JSON.parse(cachedCust);
-            } else {
-                dynamicCustomers = [];
-            }
+            const cachedCust = localStorage.getItem('rtr_customers') || localStorage.getItem('customers');
+            if (cachedCust) dynamicCustomers = JSON.parse(cachedCust);
 
-            if (canViewInvoices) {
-                const cachedInv = localStorage.getItem('rtr_invoices') || localStorage.getItem('invoices');
-                if (cachedInv) dynamicInvoices = JSON.parse(cachedInv);
-            } else {
-                dynamicInvoices = [];
-            }
+            const cachedInv = localStorage.getItem('rtr_invoices') || localStorage.getItem('invoices');
+            if (cachedInv) dynamicInvoices = JSON.parse(cachedInv);
         } catch (e) {
             console.warn('[CommandPalette] Local cache read skipped:', e);
         }
@@ -101,21 +43,14 @@
         // Fetch latest from backend API if online
         try {
             if (window.apiClient && typeof window.apiClient.get === 'function') {
-                const promises = [];
-                if (canViewCustomers) promises.push(window.apiClient.get('/api/customers'));
-                if (canViewInvoices) promises.push(window.apiClient.get('/api/invoices'));
-
-                const results = await Promise.allSettled(promises);
-                let idx = 0;
-                if (canViewCustomers && results[idx]?.status === 'fulfilled') {
-                    dynamicCustomers = results[idx].value?.data || dynamicCustomers;
-                    idx++;
-                }
-                if (canViewInvoices && results[idx]?.status === 'fulfilled') {
-                    dynamicInvoices = results[idx].value?.data || dynamicInvoices;
-                }
+                const [custRes, invRes] = await Promise.allSettled([
+                    window.apiClient.get('/api/customers'),
+                    window.apiClient.get('/api/invoices')
+                ]);
+                if (custRes.status === 'fulfilled' && custRes.value?.data) dynamicCustomers = custRes.value.data;
+                if (invRes.status === 'fulfilled' && invRes.value?.data) dynamicInvoices = invRes.value.data;
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     // 3. Inject Palette DOM
@@ -155,13 +90,12 @@
         input.addEventListener('keydown', handleKeyDown);
     }
 
-    // 4. Combined Search Filter: Filter only authorized routes & records
+    // 4. Combined Search Filter: Modules + Invoices + Customers
     function filterAll(query) {
         const q = (query || '').trim().toLowerCase();
-        const allowedModules = getAllowedModules();
 
         if (!q) {
-            filteredItems = [...allowedModules.slice(0, 8)];
+            filteredItems = [...SYSTEM_MODULES.slice(0, 8)];
             activeIndex = 0;
             renderList();
             return;
@@ -169,53 +103,49 @@
 
         const results = [];
 
-        // (A) Matches in Invoices (only if permitted)
-        if (hasModulePermission('perm_make_invoice')) {
-            dynamicInvoices.forEach(inv => {
-                const invNo = String(inv.invoice_no || inv.id || inv.number || '').toLowerCase();
-                const custName = String(inv.customer_name || inv.party_name || '').toLowerCase();
-                if (invNo.includes(q) || custName.includes(q)) {
-                    results.push({
-                        id: `inv-${inv.id || inv.invoice_no}`,
-                        title: `Invoice #${inv.invoice_no || inv.id}`,
-                        subtitle: `${inv.customer_name || inv.party_name || 'Customer'} • ₹${inv.total_amount || inv.grand_total || '0'}`,
-                        group: 'Invoices',
-                        type: 'invoice',
-                        icon: '🧾',
-                        url: `invoice.html?id=${encodeURIComponent(inv.id || inv.invoice_no)}`
-                    });
-                }
-            });
-        }
+        // (A) Matches in Invoices (e.g. INV-1002, customer name, amount)
+        dynamicInvoices.forEach(inv => {
+            const invNo = String(inv.invoice_no || inv.id || inv.number || '').toLowerCase();
+            const custName = String(inv.customer_name || inv.party_name || '').toLowerCase();
+            if (invNo.includes(q) || custName.includes(q)) {
+                results.push({
+                    id: `inv-${inv.id || inv.invoice_no}`,
+                    title: `Invoice #${inv.invoice_no || inv.id}`,
+                    subtitle: `${inv.customer_name || inv.party_name || 'Customer'} • ₹${inv.total_amount || inv.grand_total || '0'}`,
+                    group: 'Invoices',
+                    type: 'invoice',
+                    icon: '🧾',
+                    url: `invoice.html?id=${encodeURIComponent(inv.id || inv.invoice_no)}`
+                });
+            }
+        });
 
-        // (B) Matches in Customers (only if permitted)
-        if (hasModulePermission('perm_manage_customers')) {
-            dynamicCustomers.forEach(cust => {
-                const name = String(cust.name || cust.company_name || '').toLowerCase();
-                const phone = String(cust.phone || cust.mobile || '').toLowerCase();
-                const gstin = String(cust.gstin || cust.gst_number || '').toLowerCase();
-                if (name.includes(q) || phone.includes(q) || gstin.includes(q)) {
-                    results.push({
-                        id: `cust-${cust.id || cust._id}`,
-                        title: cust.name || cust.company_name || 'Unnamed Customer',
-                        subtitle: [cust.phone || cust.mobile, cust.city].filter(Boolean).join(' • '),
-                        group: 'Customers',
-                        type: 'customer',
-                        icon: '👤',
-                        url: `customer.html?id=${encodeURIComponent(cust.id || cust._id)}`
-                    });
-                }
-            });
-        }
+        // (B) Matches in Customers (e.g. name, phone, email, GSTIN)
+        dynamicCustomers.forEach(cust => {
+            const name = String(cust.name || cust.company_name || '').toLowerCase();
+            const phone = String(cust.phone || cust.mobile || '').toLowerCase();
+            const gstin = String(cust.gstin || cust.gst_number || '').toLowerCase();
+            if (name.includes(q) || phone.includes(q) || gstin.includes(q)) {
+                results.push({
+                    id: `cust-${cust.id || cust._id}`,
+                    title: cust.name || cust.company_name || 'Unnamed Customer',
+                    subtitle: [cust.phone || cust.mobile, cust.city].filter(Boolean).join(' • '),
+                    group: 'Customers',
+                    type: 'customer',
+                    icon: '👤',
+                    url: `customer.html?id=${encodeURIComponent(cust.id || cust._id)}`
+                });
+            }
+        });
 
-        // (C) Matches in Allowed System Modules
-        allowedModules.forEach(mod => {
+        // (C) Matches in System Modules
+        SYSTEM_MODULES.forEach(mod => {
             if (mod.title.toLowerCase().includes(q) || mod.group.toLowerCase().includes(q)) {
                 results.push(mod);
             }
         });
 
-        filteredItems = results.slice(0, 30);
+        filteredItems = results.slice(0, 30); // Cap list at 30 items for smooth rendering
         activeIndex = 0;
         renderList();
     }
@@ -226,7 +156,7 @@
         if (!list) return;
 
         if (filteredItems.length === 0) {
-            list.innerHTML = `<li class="cmd-empty-state">No matching accessible modules, customers, or invoices found.</li>`;
+            list.innerHTML = `<li class="cmd-empty-state">No matching modules, customers, or invoices found.</li>`;
             return;
         }
 
@@ -261,7 +191,7 @@
         if (activeElem) activeElem.scrollIntoView({ block: 'nearest' });
     }
 
-    // 6. Navigation & Execution Guards
+    // 6. Navigation & Selection Controls
     function handleKeyDown(e) {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
@@ -294,9 +224,23 @@
         }
 
         closePalette();
-        if (item.url) {
-            window.location.href = item.url;
+
+        if (!item.url) return;
+
+        // 1. If currently inside dashboardB with openWindow available, load via SPA
+        if (typeof window.openWindow === 'function') {
+            window.openWindow(item.url, 1200, 800);
+            return;
         }
+
+        // 2. If inside an iframe on dashboardB, tell the parent dashboard to open it in SPA mode
+        if (window.parent && window.parent !== window && typeof window.parent.openWindow === 'function') {
+            window.parent.openWindow(item.url, 1200, 800);
+            return;
+        }
+
+        // 3. If on a standalone screen, route to dashboardB with the target SPA URL
+        window.location.href = `dashboardB.html?spa=${encodeURIComponent(item.url)}`;
     }
 
     window._cmdPaletteSelect = function (index) {
@@ -320,16 +264,20 @@
         if (backdrop) backdrop.classList.remove('open');
     }
 
-    // 7. Global Keyboard Shortcut Listener (Capture Phase Prevents Chrome Defaults)
+    // 7. Global Keyboard Shortcut Listener (Prevents Chrome default search)
     window.addEventListener('keydown', function (e) {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         const isModifier = isMac ? e.metaKey : e.ctrlKey;
         const key = e.key.toLowerCase();
 
+        // Check for Ctrl+K (or Cmd+K)
         const isCmdK = isModifier && key === 'k';
+
+        // Optional convenience: also allow 'Ctrl + /' if preferred
         const isSlashShortcut = isModifier && key === '/';
 
         if (isCmdK || isSlashShortcut) {
+            // Stop Chrome from focusing the URL omnibox / search
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
@@ -342,21 +290,17 @@
             }
             return false;
         }
-    }, true);
+    }, true); // <-- The `true` sets capture phase so it runs before browser defaults
 
+    // Inside frontend/command-palette.js
     window.openCommandPalette = openPalette;
     window.closeCommandPalette = closePalette;
 
+    // Auto-detect Mac and update key badge if present
     document.addEventListener('DOMContentLoaded', () => {
         const keyBadge = document.getElementById('topbarShortcutKey');
         if (keyBadge && navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
             keyBadge.textContent = '⌘';
         }
     });
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', injectPaletteDOM);
-    } else {
-        injectPaletteDOM();
-    }
 })();

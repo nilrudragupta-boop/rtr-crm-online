@@ -10,6 +10,8 @@
             window.location.replace('login.html');
         }
     </script>
+    <script src="command-palette.js"></script>
+    <link rel="stylesheet" href="css/command-palette.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -22,6 +24,63 @@
     <script src="global_urgent_notice.js"></script>
 
     <style>
+        /* Fixed / Aligned Topbar Search Trigger */
+        .topbar-global-search {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 12px;
+            min-width: 280px;
+            max-width: 380px;
+            height: 36px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s ease-in-out;
+            box-sizing: border-box;
+        }
+
+        .topbar-global-search:hover {
+            background: #ffffff;
+            border-color: #cbd5e1;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .topbar-global-search .search-icon {
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        .topbar-global-search .search-placeholder {
+            font-size: 13px;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-grow: 1;
+        }
+
+        .topbar-global-search .search-shortcut-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .topbar-global-search .search-shortcut-badge kbd {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: 600;
+            box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+        }
+
         :root {
             --primary-color: #3c5481;
             --secondary-color: #3945b4;
@@ -1229,6 +1288,20 @@
                     <h4 style="margin: 0; color: var(--primary-color); cursor: pointer; user-select: none;"
                         data-brand="name" onclick="handleSecretTap()">Company Name</h4>
                 </div>
+
+                <!-- Global Search Bar (Cmd/Ctrl + K Trigger) -->
+                <div class="topbar-global-search" onclick="if(window.openCommandPalette) window.openCommandPalette();">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <span class="search-placeholder">Search customers, invoices, modules...</span>
+                    <span class="search-shortcut-badge">
+                        <kbd id="topbarShortcutKey">Ctrl</kbd> + <kbd>K</kbd>
+                    </span>
+                </div>
+
                 <div class="topbar-right">
                     <div id="userDisplay"
                         style="font-weight: bold; color: var(--primary-color); margin-right: 15px; display: flex; align-items: center; gap: 5px;">
@@ -3207,6 +3280,18 @@
             });
 
             intro.start();
+        }
+
+        // Check for incoming SPA module parameter (from command palette)
+        const urlParams = new URLSearchParams(window.location.search);
+        const spaTarget = urlParams.get('spa');
+        if (spaTarget) {
+            // Remove parameter from address bar without reloading
+            window.history.replaceState({}, document.title, window.location.pathname);
+            // Open target page directly in SPA mode
+            setTimeout(() => {
+                openWindow(decodeURIComponent(spaTarget), 1200, 800);
+            }, 100);
         }
 
         // --- Initialization ---
