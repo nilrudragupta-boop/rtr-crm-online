@@ -244,23 +244,30 @@
         if (backdrop) backdrop.classList.remove('open');
     }
 
-    // 7. Shortcut Listener (Cmd+K / Ctrl+K)
+    // 7. Global Keyboard Shortcut Listener (Prevents Chrome default search)
     window.addEventListener('keydown', function (e) {
-        const isTrigger = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k';
-        if (isTrigger) {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const isModifier = isMac ? e.metaKey : e.ctrlKey;
+        const key = e.key.toLowerCase();
+
+        // Check for Ctrl+K (or Cmd+K)
+        const isCmdK = isModifier && key === 'k';
+
+        // Optional convenience: also allow 'Ctrl + /' if preferred
+        const isSlashShortcut = isModifier && key === '/';
+
+        if (isCmdK || isSlashShortcut) {
+            // Stop Chrome from focusing the URL omnibox / search
             e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+
             const backdrop = document.getElementById('cmdPaletteBackdrop');
             if (backdrop && backdrop.classList.contains('open')) {
                 closePalette();
             } else {
                 openPalette();
             }
+            return false;
         }
-    });
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', injectPaletteDOM);
-    } else {
-        injectPaletteDOM();
-    }
-})();
+    }, true); // <-- The `true` sets capture phase so it runs before browser defaults
