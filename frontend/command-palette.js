@@ -2,23 +2,22 @@
     // 1. Static Module Routes
     const SYSTEM_MODULES = [
         { id: 'mod-crm', title: 'CRM v2 Dashboard', group: 'Modules', type: 'module', icon: '📊', url: 'crm_v2.html' },
-        { id: 'mod-customer', title: 'Customer Master / Directory', group: 'Modules', type: 'module', icon: '👥', url: 'customer.html' },
+        { id: 'mod-customer', title: 'Customer Details', group: 'Modules', type: 'module', icon: '👥', url: 'customer.html' },
         { id: 'mod-contacts', title: 'Contacts Directory', group: 'Modules', type: 'module', icon: '📇', url: 'contacts.html' },
-        { id: 'mod-enquiry', title: 'Lead Enquiries & Follow Up', group: 'Modules', type: 'module', icon: '🎯', url: 'enquiry.html' },
+        { id: 'mod-enquiry', title: 'Enquiries', group: 'Modules', type: 'module', icon: '🎯', url: 'enquiry.html' },
         { id: 'mod-followup', title: 'Follow-Up Schedule', group: 'Modules', type: 'module', icon: '📅', url: 'follow_up.html' },
-        { id: 'mod-invoice', title: 'Invoices & Billing', group: 'Modules', type: 'module', icon: '🧾', url: 'invoice.html' },
+        { id: 'mod-invoice', title: 'Invoices & Reports', group: 'Modules', type: 'module', icon: '🧾', url: 'report.html' },
         { id: 'mod-daybook', title: 'Day Book', group: 'Modules', type: 'module', icon: '📖', url: 'day_book.html' },
         { id: 'mod-ledger', title: 'Account Ledger', group: 'Modules', type: 'module', icon: '⚖️', url: 'ledger.html' },
         { id: 'mod-balancesheet', title: 'Balance Sheet', group: 'Modules', type: 'module', icon: '📈', url: 'balance_sheet.html' },
         { id: 'mod-cashflow', title: 'Cash Flow Statement', group: 'Modules', type: 'module', icon: '💵', url: 'cash_flow.html' },
-        { id: 'mod-purchase', title: 'Purchase Orders & Inward', group: 'Modules', type: 'module', icon: '🛒', url: 'purchase.html' },
+        { id: 'mod-purchase', title: 'Purchase Orders', group: 'Modules', type: 'module', icon: '🛒', url: 'purchase.html' },
         { id: 'mod-stockreport', title: 'Stock Report & Inventory', group: 'Modules', type: 'module', icon: '📦', url: 'stock_report.html' },
         { id: 'mod-stockjournal', title: 'Stock Journal', group: 'Modules', type: 'module', icon: '🔄', url: 'stock_journal.html' },
         { id: 'mod-production', title: 'Production & Manufacturing', group: 'Modules', type: 'module', icon: '🏭', url: 'production.html' },
         { id: 'mod-bom', title: 'Bill of Materials (BOM)', group: 'Modules', type: 'module', icon: '⚙️', url: 'bom.html' },
         { id: 'mod-gst', title: 'GST Return Report', group: 'Modules', type: 'module', icon: '📑', url: 'gst_return_report.html' },
-        { id: 'mod-pdf', title: 'RTR PDF Studio', group: 'Tools', type: 'action', icon: '🖨️', url: 'rtr_pdf_studio.html' },
-        { id: 'mod-settings', title: 'System Settings', group: 'System', type: 'action', icon: '⚙️', url: 'settings.html' }
+        { id: 'mod-pdf', title: 'RTR PDF Studio', group: 'Tools', type: 'action', icon: '🖨️', url: 'rtr_pdf_studio.html' }
     ];
 
     let dynamicCustomers = [];
