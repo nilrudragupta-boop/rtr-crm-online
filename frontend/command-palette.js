@@ -41,7 +41,7 @@
         { id: 'mod-gst', title: 'GST Return Report', group: 'Modules', type: 'module', icon: '📑', url: 'gst_return_report.html', permission: 'perm_gst_report' },
         { id: 'mod-dataanalysis', title: 'Data Analysis', group: 'System', type: 'action', icon: '📊', url: 'data_analysis.html', permission: 'perm_data_analysis' },
         { id: 'mod-invoicealysis', title: 'Invoice Analytics', group: 'System', type: 'action', icon: '📊', url: 'invoice_dashboard.html', permission: 'perm_invoice_analytics' },
-        { id: 'mod-purchasealysis', title: 'Purchase Analytics', group: 'System', type: 'action', icon: '📊', url: 'purchase_dashboard.html', permission: 'perm_purchase_analytics' },
+        { id: 'mod-purchasealysis', title: 'Purchase Analytics', group: 'System', type: 'action', icon: '📊', url: 'purchase_dashboard.html', permission: 'perm_purchase_report' },
         { id: 'mod-marketingreport', title: 'Marketing Report', group: 'Modules', type: 'module', icon: '📑', url: 'marketing_report.html', permission: 'perm_marketing_report' },
         { id: 'mod-chatter', title: 'Team Chatter', group: 'Modules', type: 'module', icon: '📖', url: 'chatter.html', permission: 'perm_chatter' },
         { id: 'mod-email', title: 'Email Sender', group: 'Modules', type: 'module', icon: '📖', url: 'email.html', permission: 'perm_email_sender' },

@@ -370,6 +370,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_manage_customers', label: 'Manage Customers' }, // Core feature
     { id: 'perm_manage_items', label: 'Manage Items', feature: 'inventory' },
     { id: 'perm_purchase_entries', label: 'Purchase Entries', feature: 'inventory' },
+    { id: 'perm_purchase_report', label: 'Purchase Analytics', feature: 'inventory' },
     { id: 'perm_manage_bom', label: 'Manage BOM', feature: 'inventory' },
     { id: 'perm_production_entry', label: 'Production Entries', feature: 'inventory' },
     { id: 'perm_order_sheet', label: 'Order Sheet', feature: 'inventory' },
