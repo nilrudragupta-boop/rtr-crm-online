@@ -29,7 +29,7 @@
         { id: 'mod-followup', title: 'Follow-Ups', group: 'Modules', type: 'module', icon: '📅', url: 'follow_up.html', permission: 'perm_follow_up' },
         { id: 'mod-employee', title: 'Employees', group: 'Modules', type: 'module', icon: '👥', url: 'employee.html', permission: 'perm_employee_manager' },
         { id: 'mod-custom', title: 'Custom Sheet', group: 'Modules', type: 'module', icon: '📋', url: 'custom_dash.html', permission: 'perm_custom_sheet' },
-        { id: 'mod-invoicereport', title: 'Invoice Report', group: 'Modules', type: 'module', icon: '🧾', url: 'report.html', permission: 'perm_invoice_report' },        
+        { id: 'mod-invoicereport', title: 'Invoice Report', group: 'Modules', type: 'module', icon: '🧾', url: 'report.html', permission: 'perm_invoice_report' },
         { id: 'mod-stockreport', title: 'Stock Report', group: 'Modules', type: 'module', icon: '📦', url: 'stock_report.html', permission: 'perm_stock_report' },
         { id: 'mod-stockledger', title: 'Stock Ledger', group: 'Modules', type: 'module', icon: '📒', url: 'stock_ledger.html', permission: 'perm_stock_ledger' },
         { id: 'mod-productionstockreport', title: 'Production Stock Report', group: 'Modules', type: 'module', icon: '📦', url: 'production_stock_report.html', permission: 'perm_production_stock_report' },
@@ -37,7 +37,7 @@
         { id: 'mod-ledger', title: 'Account Ledger', group: 'Modules', type: 'module', icon: '⚖️', url: 'ledger.html', permission: 'perm_ledger_report' },
         { id: 'mod-profitloss', title: 'Profit & Loss', group: 'Modules', type: 'module', icon: '⚖️', url: 'profit_loss_report.html', permission: 'perm_profit_loss' },
         { id: 'mod-balancesheet', title: 'Balance Sheet', group: 'Modules', type: 'module', icon: '📈', url: 'balance_sheet.html', permission: 'perm_balance_sheet' },
-        { id: 'mod-cashflow', title: 'Cash Flow Statement', group: 'Modules', type: 'module', icon: '💵', url: 'cash_flow.html', permission: 'perm_cash_flow' },        
+        { id: 'mod-cashflow', title: 'Cash Flow Statement', group: 'Modules', type: 'module', icon: '💵', url: 'cash_flow.html', permission: 'perm_cash_flow' },
         { id: 'mod-gst', title: 'GST Return Report', group: 'Modules', type: 'module', icon: '📑', url: 'gst_return_report.html', permission: 'perm_gst_report' },
         { id: 'mod-dataanalysis', title: 'Data Analysis', group: 'System', type: 'action', icon: '📊', url: 'data_analysis.html', permission: 'perm_data_analysis' },
         { id: 'mod-invoicealysis', title: 'Invoice Analytics', group: 'System', type: 'action', icon: '📊', url: 'invoice_dashboard.html', permission: 'perm_invoice_analytics' },
@@ -45,7 +45,7 @@
         { id: 'mod-marketingreport', title: 'Marketing Report', group: 'Modules', type: 'module', icon: '📑', url: 'marketing_report.html', permission: 'perm_marketing_report' },
         { id: 'mod-chatter', title: 'Team Chatter', group: 'Modules', type: 'module', icon: '📖', url: 'chatter.html', permission: 'perm_chatter' },
         { id: 'mod-email', title: 'Email Sender', group: 'Modules', type: 'module', icon: '📖', url: 'email.html', permission: 'perm_email_sender' },
-        { id: 'mod-imagetotext', title: 'PDF to Text', group: 'Modules', type: 'module', icon: '📖', url: 'image_to_text.html', permission: 'perm_image_to_text' },
+        { id: 'mod-imagetotext', title: 'PDF to Text', group: 'Modules', type: 'module', icon: '📖', url: 'image-to-text.html', permission: 'perm_image-to-text' },
         { id: 'mod-pdf', title: 'RTR PDF Studio', group: 'Tools', type: 'action', icon: '🖨️', url: 'rtr_pdf_studio.html', permission: 'perm_rtr_pdf_studio' },
         { id: 'mod-daybook', title: 'Day Book', group: 'Modules', type: 'module', icon: '📖', url: 'day_book.html', permission: 'perm_day_book' }
     ];
