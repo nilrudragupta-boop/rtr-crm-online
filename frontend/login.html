@@ -692,7 +692,14 @@
             <input type="text" id="totpInput" class="otp-input-field" maxlength="6" placeholder="------"
                 style="margin: 15px 0; width: 100%; text-align: center; letter-spacing: 5px; font-size: 24px; font-weight: bold; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"
                 onkeydown="if(event.key==='Enter') verifyTotpLogin()">
-            <button onclick="verifyTotpLogin()" style="width: 100%; background: #28a745;">Verify</button>
+            <button id="totpVerifyBtn" onclick="verifyTotpLogin()"
+                style="width: 100%; background: #28a745;">Verify</button>
+            <p id="totpVerifyStatus" role="status" aria-live="polite"
+                style="display: none; margin: 10px 0; color: #0313f3; font-size: 13px;">
+                <span class="btn-spinner"
+                    style="border: 2px solid rgba(3, 19, 243, 0.2); border-top-color: #0313f3;"></span>
+                Verifying authenticator code...
+            </p>
             <p style="margin-top: 15px; font-size: 12px;"><a href="javascript:void(0)" onclick="fallbackToEmailOtp()"
                     style="color: #0313f3;">Lost device? Use Email OTP</a></p>
         </div>
@@ -2007,6 +2014,28 @@
         }
 
         async function verifyTotpLogin() {
+            const verifyButton = document.getElementById('totpVerifyBtn');
+            if (verifyButton && verifyButton.disabled) return;
+
+            setTotpVerificationBusy(true);
+            try {
+                await new Promise(resolve => setTimeout(resolve, 0));
+                await completeTotpLoginVerification();
+            } finally {
+                setTotpVerificationBusy(false);
+            }
+        }
+
+        function setTotpVerificationBusy(isBusy) {
+            const verifyButton = document.getElementById('totpVerifyBtn');
+            const totpInput = document.getElementById('totpInput');
+            const status = document.getElementById('totpVerifyStatus');
+            if (verifyButton) verifyButton.disabled = isBusy;
+            if (totpInput) totpInput.disabled = isBusy;
+            if (status) status.style.display = isBusy ? 'block' : 'none';
+        }
+
+        async function completeTotpLoginVerification() {
             const token = document.getElementById('totpInput').value.trim();
             const pendingUser = localStorage.getItem("pendingLoginUser");
             let userSecret = "";
