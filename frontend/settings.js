@@ -640,6 +640,15 @@ function getPreserved2FA(username) {
     return null;
 }
 
+function mergePreservedUser2FA(users) {
+    if (!Array.isArray(users)) return [];
+    return users.map(user => {
+        if (!user || !user.username) return user;
+        const preserved = getPreserved2FA(user.username);
+        return preserved ? { ...user, ...preserved } : user;
+    });
+}
+
 // Auto-apply on load and sync across windows
 window.addEventListener('DOMContentLoaded', async () => {
     applyUIPermissions();

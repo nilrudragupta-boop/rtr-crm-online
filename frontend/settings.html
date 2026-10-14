@@ -1864,7 +1864,7 @@
                             if (window.userListInterval) clearInterval(window.userListInterval);
                             window.userListInterval = setInterval(renderUserList, 30000);
 
-                            window.currentAdminUsers = creds.adminUsers || [];
+                            window.currentAdminUsers = mergePreservedUser2FA(creds.adminUsers || []);
                             renderUserList();
                         }
                     } catch (error) {
@@ -1979,7 +1979,7 @@
                                 });
                                 const dataConfig = await resConfig.json();
                                 if (dataConfig.success && dataConfig.config && dataConfig.config.users && dataConfig.config.users.length > 0) {
-                                    window.currentAdminUsers = dataConfig.config.users;
+                                    window.currentAdminUsers = mergePreservedUser2FA(dataConfig.config.users);
                                     localStorage.setItem('ADMIN_USERS', JSON.stringify(window.currentAdminUsers));
                                     if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                                         window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: window.currentAdminUsers }).catch(console.error);
@@ -2013,6 +2013,8 @@
                         alert("Developer ID is required to modify security settings.");
                         return;
                     }
+
+                    window.currentAdminUsers = mergePreservedUser2FA(window.currentAdminUsers || []);
 
                     const data = {
                         devId: devId,
@@ -2565,8 +2567,13 @@
 
                     if (delta !== null) {
                         if (pendingTotpUserIndex !== null) {
-                            window.currentAdminUsers[pendingTotpUserIndex].totpSecret = tempTotpSecret;
-                            alert(`Authenticator Enabled for user: ${window.currentAdminUsers[pendingTotpUserIndex].username}. Please click 'Save Users' to persist changes.`);
+                            const user = window.currentAdminUsers[pendingTotpUserIndex];
+                            user.totpSecret = tempTotpSecret;
+                            user.authenticatorEnabled = true;
+                            user.twoFactorEnabled = true;
+                            user.is2FA = true;
+                            setAuthenticatorState(user.username, tempTotpSecret, true);
+                            alert(`Authenticator Enabled for user: ${user.username}. Please click 'Save Users' to persist changes.`);
                             renderUserList();
                         } else {
                             localStorage.setItem("devTotpSecret", tempTotpSecret);
@@ -2580,6 +2587,10 @@
                     const user = window.currentAdminUsers[index];
                     if (confirm(`Are you sure you want to disable 2FA for user "${user.username}"?`)) {
                         delete user.totpSecret;
+                        user.authenticatorEnabled = false;
+                        user.twoFactorEnabled = false;
+                        user.is2FA = false;
+                        setAuthenticatorState(user.username, "", false);
                         renderUserList();
                         alert("2FA disabled for this user. Remember to click 'Save Users' to persist changes.");
                     }

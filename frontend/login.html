@@ -1532,7 +1532,7 @@
                     const data = await response.json();
 
                     if (data.success && data.config && data.config.users && data.config.users.length > 0) {
-                        ADMIN_USERS = data.config.users;
+                        ADMIN_USERS = attachPreserved2FA(data.config.users);
                         if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                             window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                         } else {
@@ -2294,21 +2294,30 @@
             if (!Array.isArray(users)) return users;
             return users.map(u => {
                 if (!u || !u.username) return u;
-                const uUpper = u.username.toUpperCase().trim();
-                let secret = u.totpSecret || "";
-                if (!secret) {
-                    try {
-                        const saved = JSON.parse(localStorage.getItem(`2fa_${uUpper}`) || "{}");
-                        if (saved && saved.totpSecret) {
-                            secret = saved.totpSecret;
-                        }
-                    } catch (e) { }
-                }
+                const username = String(u.username).trim();
+                const uUpper = username.toUpperCase();
+                const existingUser = ADMIN_USERS.find(existing =>
+                    existing && existing.username && String(existing.username).trim().toUpperCase() === uUpper
+                );
+                let secret = u.totpSecret || (existingUser && existingUser.totpSecret) || "";
+                let saved = null;
+                try {
+                    const savedValue = localStorage.getItem(`2fa_${uUpper}`) || localStorage.getItem(`2fa_${username}`);
+                    if (savedValue) saved = JSON.parse(savedValue);
+                } catch (e) { }
+
+                const hasSavedState = saved && Object.prototype.hasOwnProperty.call(saved, "totpSecret");
+                if (hasSavedState) secret = saved.totpSecret || "";
+                const isEnabled = hasSavedState
+                    ? !!(secret || saved.authenticatorEnabled || saved.twoFactorEnabled || saved.is2FA)
+                    : !!(secret || u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA ||
+                        (existingUser && (existingUser.authenticatorEnabled || existingUser.twoFactorEnabled || existingUser.is2FA)));
                 return {
                     ...u,
                     totpSecret: secret,
-                    authenticatorEnabled: !!secret || !!u.authenticatorEnabled,
-                    twoFactorEnabled: !!secret || !!u.twoFactorEnabled
+                    authenticatorEnabled: isEnabled,
+                    twoFactorEnabled: isEnabled,
+                    is2FA: isEnabled
                 };
             });
         }
