@@ -1060,8 +1060,8 @@
                 try {
                     const creds = await window.electronAPI.getAdminCreds();
                     if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
-                        ADMIN_USERS = creds.adminUsers;
-                    }
+    ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
+}
                     if (creds.success && creds.adminPass) {
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
@@ -1071,9 +1071,9 @@
                     const res = await fetch('/api/admin-creds');
                     const creds = await res.json();
                     if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
-                        ADMIN_USERS = creds.adminUsers;
-                        localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
-                    }
+    ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
+    localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+}
                     if (creds.success && creds.adminPass) {
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
@@ -1093,6 +1093,7 @@
             }
             checkRenewButtonVisibility();
             applyTheme();
+            
 
             // Sync remote license and check for cloud alerts upon launching the app
             syncRemoteLicense();
@@ -1207,7 +1208,7 @@
                     if (data.success && data.config) {
                         // 1. Sync Users
                         if (data.config.users && data.config.users.length > 0) {
-                            ADMIN_USERS = data.config.users;
+    ADMIN_USERS = attachPreserved2FA(data.config.users);
                             if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                                 window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                             } else {
@@ -1441,15 +1442,26 @@
             }
 
             if (isValid) {
-                // Check for User TOTP
-                if (adminUser && adminUser.totpSecret) {
-                    localStorage.setItem("pendingLoginUser", user);
-                    localStorage.setItem("pendingLoginPass", pass); // Temporary store for 2FA step
-                    document.getElementById('totpModal').style.display = 'block';
-                    document.getElementById('totpInput').value = '';
-                    document.getElementById('totpInput').focus();
-                    return;
-                }
+                // Check for User TOTP (check both in-memory and persisted storage)
+let userTotpSecret = adminUser ? adminUser.totpSecret : "";
+if (!userTotpSecret && adminUser) {
+    try {
+        const saved2fa = JSON.parse(localStorage.getItem(`2fa_${user.toUpperCase()}`) || "{}");
+        if (saved2fa && saved2fa.totpSecret) {
+            userTotpSecret = saved2fa.totpSecret;
+            adminUser.totpSecret = userTotpSecret;
+        }
+    } catch (e) {}
+}
+
+if (adminUser && userTotpSecret) {
+    localStorage.setItem("pendingLoginUser", user);
+    localStorage.setItem("pendingLoginPass", pass);
+    document.getElementById('totpModal').style.display = 'block';
+    document.getElementById('totpInput').value = '';
+    document.getElementById('totpInput').focus();
+    return;
+}
 
                 setSpinning();
                 localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
@@ -2003,12 +2015,20 @@
             let isRegularUser = false;
 
             if (pendingUser) {
-                const u = ADMIN_USERS.find(u => u.username === pendingUser);
-                if (u && u.totpSecret) {
-                    userSecret = u.totpSecret;
-                    isRegularUser = true;
-                }
+    const u = ADMIN_USERS.find(u => u.username.toLowerCase() === pendingUser.toLowerCase());
+    if (u && u.totpSecret) {
+        userSecret = u.totpSecret;
+        isRegularUser = true;
+    } else {
+        try {
+            const saved2fa = JSON.parse(localStorage.getItem(`2fa_${pendingUser.toUpperCase()}`) || "{}");
+            if (saved2fa && saved2fa.totpSecret) {
+                userSecret = saved2fa.totpSecret;
+                isRegularUser = true;
             }
+        } catch (e) {}
+    }
+}
 
             if (!userSecret) {
                 if (!pendingUser) alert("Authenticator not configured.");
@@ -2255,6 +2275,30 @@
                 setTimeout(() => window.location.reload(), 1500);
             }
         }
+
+
+        function attachPreserved2FA(users) {
+    if (!Array.isArray(users)) return users;
+    return users.map(u => {
+        if (!u || !u.username) return u;
+        const uUpper = u.username.toUpperCase().trim();
+        let secret = u.totpSecret || "";
+        if (!secret) {
+            try {
+                const saved = JSON.parse(localStorage.getItem(`2fa_${uUpper}`) || "{}");
+                if (saved && saved.totpSecret) {
+                    secret = saved.totpSecret;
+                }
+            } catch (e) {}
+        }
+        return {
+            ...u,
+            totpSecret: secret,
+            authenticatorEnabled: !!secret || !!u.authenticatorEnabled,
+            twoFactorEnabled: !!secret || !!u.twoFactorEnabled
+        };
+    });
+}
     </script>
 </body>
 
