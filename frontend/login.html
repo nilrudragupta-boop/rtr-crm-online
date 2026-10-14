@@ -1060,8 +1060,8 @@
                 try {
                     const creds = await window.electronAPI.getAdminCreds();
                     if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
-    ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
-}
+                        ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
+                    }
                     if (creds.success && creds.adminPass) {
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
@@ -1071,9 +1071,9 @@
                     const res = await fetch('/api/admin-creds');
                     const creds = await res.json();
                     if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
-    ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
-    localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
-}
+                        ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
+                        localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+                    }
                     if (creds.success && creds.adminPass) {
                         localStorage.setItem("appPassword", creds.adminPass);
                     }
@@ -1093,7 +1093,7 @@
             }
             checkRenewButtonVisibility();
             applyTheme();
-            
+
 
             // Sync remote license and check for cloud alerts upon launching the app
             syncRemoteLicense();
@@ -1208,7 +1208,7 @@
                     if (data.success && data.config) {
                         // 1. Sync Users
                         if (data.config.users && data.config.users.length > 0) {
-    ADMIN_USERS = attachPreserved2FA(data.config.users);
+                            ADMIN_USERS = attachPreserved2FA(data.config.users);
                             if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                                 window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                             } else {
@@ -1443,25 +1443,25 @@
 
             if (isValid) {
                 // Check for User TOTP (check both in-memory and persisted storage)
-let userTotpSecret = adminUser ? adminUser.totpSecret : "";
-if (!userTotpSecret && adminUser) {
-    try {
-        const saved2fa = JSON.parse(localStorage.getItem(`2fa_${user.toUpperCase()}`) || "{}");
-        if (saved2fa && saved2fa.totpSecret) {
-            userTotpSecret = saved2fa.totpSecret;
-            adminUser.totpSecret = userTotpSecret;
-        }
-    } catch (e) {}
-}
+                let userTotpSecret = adminUser ? adminUser.totpSecret : "";
+                if (!userTotpSecret && adminUser) {
+                    try {
+                        const saved2fa = JSON.parse(localStorage.getItem(`2fa_${user.toUpperCase()}`) || "{}");
+                        if (saved2fa && saved2fa.totpSecret) {
+                            userTotpSecret = saved2fa.totpSecret;
+                            adminUser.totpSecret = userTotpSecret;
+                        }
+                    } catch (e) { }
+                }
 
-if (adminUser && userTotpSecret) {
-    localStorage.setItem("pendingLoginUser", user);
-    localStorage.setItem("pendingLoginPass", pass);
-    document.getElementById('totpModal').style.display = 'block';
-    document.getElementById('totpInput').value = '';
-    document.getElementById('totpInput').focus();
-    return;
-}
+                if (adminUser && userTotpSecret) {
+                    localStorage.setItem("pendingLoginUser", user);
+                    localStorage.setItem("pendingLoginPass", pass);
+                    document.getElementById('totpModal').style.display = 'block';
+                    document.getElementById('totpInput').value = '';
+                    document.getElementById('totpInput').focus();
+                    return;
+                }
 
                 setSpinning();
                 localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
@@ -2006,75 +2006,111 @@ if (adminUser && userTotpSecret) {
             initiateSecureAction(currentOtpAction, currentOtpCallback, email);
         }
 
-        async function verifyTotpLogin() {
-            const token = document.getElementById('totpInput').value;
-            const secret = localStorage.getItem("devTotpSecret");
-            const pendingUser = localStorage.getItem("pendingLoginUser");
 
-            let userSecret = secret;
+        // 1. In validateLogin():
+        let userTotpSecret = adminUser ? (adminUser.totpSecret || "") : "";
+        if (!userTotpSecret && adminUser) {
+            try {
+                const saved2fa = JSON.parse(localStorage.getItem(`2fa_${user.toUpperCase()}`) || localStorage.getItem(`2fa_${user}`) || "{}");
+                if (saved2fa && saved2fa.totpSecret) {
+                    userTotpSecret = saved2fa.totpSecret;
+                    adminUser.totpSecret = userTotpSecret;
+                }
+            } catch (e) { }
+        }
+
+        if (adminUser && userTotpSecret) {
+            localStorage.setItem("pendingLoginUser", user);
+            localStorage.setItem("pendingLoginPass", pass);
+            document.getElementById('totpModal').style.display = 'block';
+            document.getElementById('totpInput').value = '';
+            document.getElementById('totpInput').focus();
+            return;
+        }
+
+        // 2. In verifyTotpLogin():
+        async function verifyTotpLogin() {
+            const token = document.getElementById('totpInput').value.trim();
+            const pendingUser = localStorage.getItem("pendingLoginUser");
+            let userSecret = "";
             let isRegularUser = false;
 
             if (pendingUser) {
-    const u = ADMIN_USERS.find(u => u.username.toLowerCase() === pendingUser.toLowerCase());
-    if (u && u.totpSecret) {
-        userSecret = u.totpSecret;
-        isRegularUser = true;
-    } else {
-        try {
-            const saved2fa = JSON.parse(localStorage.getItem(`2fa_${pendingUser.toUpperCase()}`) || "{}");
-            if (saved2fa && saved2fa.totpSecret) {
-                userSecret = saved2fa.totpSecret;
-                isRegularUser = true;
+                // Individual User Login
+                const u = ADMIN_USERS.find(x => x.username.toLowerCase() === pendingUser.toLowerCase());
+                if (u && u.totpSecret) {
+                    userSecret = u.totpSecret;
+                    isRegularUser = true;
+                } else {
+                    try {
+                        const saved2fa = JSON.parse(localStorage.getItem(`2fa_${pendingUser.toUpperCase()}`) || localStorage.getItem(`2fa_${pendingUser}`) || "{}");
+                        if (saved2fa && saved2fa.totpSecret) {
+                            userSecret = saved2fa.totpSecret;
+                            isRegularUser = true;
+                        }
+                    } catch (e) { }
+                }
+            } else {
+                // Developer Backdoor Login
+                userSecret = localStorage.getItem("devTotpSecret") || "";
+                if (!userSecret) {
+                    try {
+                        const dev2fa = JSON.parse(localStorage.getItem("2fa_DEVELOPER") || localStorage.getItem("2fa_RTR-7908040851") || "{}");
+                        if (dev2fa && dev2fa.totpSecret) userSecret = dev2fa.totpSecret;
+                    } catch (e) { }
+                }
             }
-        } catch (e) {}
-    }
-}
 
             if (!userSecret) {
-                if (!pendingUser) alert("Authenticator not configured.");
                 fallbackToEmailOtp();
                 return;
             }
 
-            const totp = new OTPAuth.TOTP({ issuer: "Your Company Name", label: isRegularUser ? pendingUser : "Developer Admin", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(userSecret) });
-            const delta = totp.validate({ token: token, window: 1 });
+            try {
+                const totp = new OTPAuth.TOTP({
+                    issuer: "RTR CRM",
+                    label: isRegularUser ? pendingUser : "Developer Admin",
+                    algorithm: "SHA1",
+                    digits: 6,
+                    period: 30,
+                    secret: OTPAuth.Secret.fromBase32(userSecret)
+                });
+                const delta = totp.validate({ token: token, window: 1 });
 
-            if (delta !== null) {
-                closeTotpModal();
-                if (isRegularUser) {
-                    // Complete Regular Login
-                    const pass = localStorage.getItem("pendingLoginPass");
-                    localStorage.removeItem("pendingLoginUser");
-                    localStorage.removeItem("pendingLoginPass");
+                if (delta !== null) {
+                    closeTotpModal();
+                    if (isRegularUser) {
+                        const pass = localStorage.getItem("pendingLoginPass");
+                        localStorage.removeItem("pendingLoginUser");
+                        localStorage.removeItem("pendingLoginPass");
 
-                    localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
-                    localStorage.removeItem("isDevLogin");
-                    localStorage.setItem("currentUser", pendingUser);
+                        localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
+                        localStorage.removeItem("isDevLogin");
+                        localStorage.setItem("currentUser", pendingUser);
 
-                    if (document.getElementById("rememberMe").checked) {
-                        localStorage.setItem("rememberMe", "true");
-                        localStorage.setItem("savedUsername", pendingUser);
-                        localStorage.setItem("savedPassword", pass);
+                        if (document.getElementById("rememberMe").checked) {
+                            localStorage.setItem("rememberMe", "true");
+                            localStorage.setItem("savedUsername", pendingUser);
+                            localStorage.setItem("savedPassword", pass);
+                        }
+
+                        if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+                            window.electronAPI.saveAdminCreds({ isLoginUpdate: true, usernameToUpdate: pendingUser }).catch(e => console.error(e));
+                        }
+
+                        await redirectAfterLogin(pendingUser, 'dashboardC.html');
                     } else {
-                        localStorage.removeItem("rememberMe");
-                        localStorage.removeItem("savedUsername");
-                        localStorage.removeItem("savedPassword");
+                        localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
+                        localStorage.setItem("isDevLogin", "true");
+                        localStorage.setItem("currentUser", "developer");
+                        window.location.href = 'settings.html';
                     }
-
-                    if (window.electronAPI && window.electronAPI.saveAdminCreds) {
-                        window.electronAPI.saveAdminCreds({ isLoginUpdate: true, usernameToUpdate: pendingUser }).catch(e => console.error(e));
-                    }
-
-                    await redirectAfterLogin(pendingUser, 'dashboardC.html');
                 } else {
-                    // Developer Login
-                    localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
-                    localStorage.setItem("isDevLogin", "true");
-                    localStorage.setItem("currentUser", "developer");
-                    window.location.href = 'settings.html';
+                    showToast("Invalid Authenticator Code", "#dc3545");
                 }
-            } else {
-                showToast("Invalid Authenticator Code", "#dc3545");
+            } catch (err) {
+                console.error("TOTP validation error:", err);
+                showToast("Error verifying Authenticator code", "#dc3545");
             }
         }
 
@@ -2278,27 +2314,27 @@ if (adminUser && userTotpSecret) {
 
 
         function attachPreserved2FA(users) {
-    if (!Array.isArray(users)) return users;
-    return users.map(u => {
-        if (!u || !u.username) return u;
-        const uUpper = u.username.toUpperCase().trim();
-        let secret = u.totpSecret || "";
-        if (!secret) {
-            try {
-                const saved = JSON.parse(localStorage.getItem(`2fa_${uUpper}`) || "{}");
-                if (saved && saved.totpSecret) {
-                    secret = saved.totpSecret;
+            if (!Array.isArray(users)) return users;
+            return users.map(u => {
+                if (!u || !u.username) return u;
+                const uUpper = u.username.toUpperCase().trim();
+                let secret = u.totpSecret || "";
+                if (!secret) {
+                    try {
+                        const saved = JSON.parse(localStorage.getItem(`2fa_${uUpper}`) || "{}");
+                        if (saved && saved.totpSecret) {
+                            secret = saved.totpSecret;
+                        }
+                    } catch (e) { }
                 }
-            } catch (e) {}
+                return {
+                    ...u,
+                    totpSecret: secret,
+                    authenticatorEnabled: !!secret || !!u.authenticatorEnabled,
+                    twoFactorEnabled: !!secret || !!u.twoFactorEnabled
+                };
+            });
         }
-        return {
-            ...u,
-            totpSecret: secret,
-            authenticatorEnabled: !!secret || !!u.authenticatorEnabled,
-            twoFactorEnabled: !!secret || !!u.twoFactorEnabled
-        };
-    });
-}
     </script>
 </body>
 
