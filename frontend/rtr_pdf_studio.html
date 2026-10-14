@@ -1690,10 +1690,28 @@
                             <input id="shapes-stroke-width" type="number" min="0" max="30" step="0.5" value="2"
                                 class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
                         </label>
-                        <label class="text-xs font-semibold text-slate-700">Fill color
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <label for="shapes-fill-color" class="text-xs font-semibold text-slate-700">Fill color</label>
+                                <button id="shapes-pick-fill" type="button" title="Pick color from page"
+                                    class="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+                                    <i data-lucide="pipette" class="w-3.5 h-3.5"></i> Pick from page
+                                </button>
+                            </div>
                             <input id="shapes-fill-color" type="color" value="#60a5fa"
                                 class="block w-full h-10 mt-1 border border-slate-200 rounded-lg p-1 bg-white">
-                        </label>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <label for="shapes-stroke-color" class="text-xs font-semibold text-slate-700">Stroke color</label>
+                                <button id="shapes-pick-stroke" type="button" title="Pick color from page"
+                                    class="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+                                    <i data-lucide="pipette" class="w-3.5 h-3.5"></i> Pick from page
+                                </button>
+                            </div>
+                            <input id="shapes-stroke-color" type="color" value="#1d4ed8"
+                                class="block w-full h-10 mt-1 border border-slate-200 rounded-lg p-1 bg-white">
+                        </div>
                         <label class="text-xs font-semibold text-slate-700">Stroke color
                             <input id="shapes-stroke-color" type="color" value="#1d4ed8"
                                 class="block w-full h-10 mt-1 border border-slate-200 rounded-lg p-1 bg-white">
@@ -3435,6 +3453,7 @@
         let shapesSelectionIndex = -1;
         let shapesInteraction = null;
         let shapesPreviewScale = 1;
+        let shapesEyedropperTarget = null; // 'fill' | 'stroke' | null
 
         function getCurrentShapesPage() {
             return shapesDocuments[activeShapesDocumentIndex]?.pages[activeShapesPageNumber - 1] || null;
@@ -3548,6 +3567,42 @@
                 showToast('Could not render the selected PDF page.', true);
             }
         }
+
+
+        async function activateEyedropper(target) {
+            // Use native browser EyeDropper API when supported
+            if (window.EyeDropper) {
+                try {
+                    const eyeDropper = new EyeDropper();
+                    const result = await eyeDropper.open();
+                    if (result && result.sRGBHex) {
+                        const hex = result.sRGBHex;
+                        if (target === 'fill') {
+                            document.getElementById('shapes-fill-color').value = hex;
+                            showToast(`Fill color set to ${hex}`);
+                        } else {
+                            document.getElementById('shapes-stroke-color').value = hex;
+                            showToast(`Stroke color set to ${hex}`);
+                        }
+                    }
+                    return;
+                } catch (e) {
+                    // User canceled the eyedropper, do nothing
+                    return;
+                }
+            }
+
+            // Fallback: click directly on the PDF preview canvas
+            shapesEyedropperTarget = target;
+            shapesOverlayCanvas.style.cursor = 'copy';
+            showToast(`Click anywhere on the PDF page to sample ${target} color`);
+        }
+
+        document.getElementById('shapes-pick-fill').addEventListener('click', () => activateEyedropper('fill'));
+        document.getElementById('shapes-pick-stroke').addEventListener('click', () => activateEyedropper('stroke'));
+
+
+        
 
         const shapesPreviewModal = document.getElementById('shapes-preview-modal');
         async function openShapesPreview() {
@@ -3736,6 +3791,34 @@
 
         shapesOverlayCanvas.addEventListener('pointerdown', event => {
             if (event.button !== 0) return;
+
+
+            // Handle picking color directly from canvas if eyedropper mode is active
+            if (shapesEyedropperTarget) {
+                const pageCanvas = document.getElementById('shapes-page-canvas');
+                const rect = pageCanvas.getBoundingClientRect();
+                const scaleX = pageCanvas.width / rect.width;
+                const scaleY = pageCanvas.height / rect.height;
+                const x = Math.floor((event.clientX - rect.left) * scaleX);
+                const y = Math.floor((event.clientY - rect.top) * scaleY);
+
+                const ctx = pageCanvas.getContext('2d');
+                const pixel = ctx.getImageData(Math.max(0, Math.min(pageCanvas.width - 1, x)), Math.max(0, Math.min(pageCanvas.height - 1, y)), 1, 1).data;
+                const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+
+                if (shapesEyedropperTarget === 'fill') {
+                    document.getElementById('shapes-fill-color').value = hex;
+                    showToast(`Fill color set to ${hex}`);
+                } else if (shapesEyedropperTarget === 'stroke') {
+                    document.getElementById('shapes-stroke-color').value = hex;
+                    showToast(`Stroke color set to ${hex}`);
+                }
+
+                shapesEyedropperTarget = null;
+                shapesOverlayCanvas.style.cursor = 'crosshair';
+                return;
+            }
+
             const position = getShapesPointerPosition(event);
             if (!position) return;
             const currentPage = getCurrentShapesPage();
