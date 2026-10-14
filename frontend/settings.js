@@ -260,7 +260,6 @@ var UNIT_MASTER_LIST = [
     "Rack", "Set", "Sheet", "SqrFt", "SqrMtr", "Ton", "Unit", "Yard", "OTH"
 ];
 
-
 var DISTRICTS_MASTER_LIST = {
     "West Bengal": ["Alipurduar", "Bankura", "Birbhum", "Cooch Behar", "Dakshin Dinajpur", "Darjeeling", "Hooghly", "Howrah", "Jalpaiguri", "Jhargram", "Kalimpong", "Kolkata", "Malda", "Murshidabad", "Nadia", "North 24 Parganas", "Paschim Bardhaman", "Paschim Medinipur", "Purba Bardhaman", "Purba Medinipur", "Purulia", "South 24 Parganas", "Uttar Dinajpur"],
     "Bihar": ["Araria", "Arwal", "Aurangabad", "Banka", "Begusarai", "Bhagalpur", "Bhojpur", "Buxar", "Darbhanga", "East Champaran", "Gaya", "Gopalganj", "Jamui", "Jehanabad", "Kaimur", "Katihar", "Khagaria", "Kishanganj", "Lakhisarai", "Madhepura", "Madhubani", "Munger", "Muzaffarpur", "Nalanda", "Nawada", "Patna", "Purnia", "Rohtas", "Saharsa", "Samastipur", "Saran", "Sheikhpura", "Sheohar", "Sitamarhi", "Siwan", "Supaul", "Vaishali", "West Champaran"],
@@ -432,8 +431,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_image-to-text', label: 'Image to Text' },
     { id: 'perm_rtr_pdf_studio', label: 'PDF Studio' },
     { id: 'perm_business360', label: 'Business 360' }
-
 ];
+
 function getCurrentUser() {
     return localStorage.getItem('currentUser') || (APP_SETTINGS.ADMIN_USERS[0] ? APP_SETTINGS.ADMIN_USERS[0].username : 'admin');
 }
@@ -502,6 +501,131 @@ function applyUIPermissions() {
     });
 }
 
+// ============================================================================
+// --- TWO-FACTOR AUTHENTICATION (2FA) & PERSISTENCE HELPERS ---
+// ============================================================================
+
+// Memory Registry to store 2FA status pending Save Users button click
+window._twoFactorPendingRegistry = window._twoFactorPendingRegistry || {};
+
+/**
+ * Call this when Authenticator is successfully set up and verified
+ */
+function setAuthenticatorState(username, secret, isEnabled = true) {
+    if (!username) return;
+    const uUpper = username.toUpperCase().trim();
+
+    // 1. Save in temporary pending registry
+    window._twoFactorPendingRegistry[uUpper] = {
+        authenticatorEnabled: !!isEnabled,
+        totpSecret: secret || "",
+        twoFactorEnabled: !!isEnabled,
+        is2FA: !!isEnabled
+    };
+
+    // 2. Save in APP_SETTINGS.ADMIN_USERS
+    if (Array.isArray(APP_SETTINGS.ADMIN_USERS)) {
+        const target = APP_SETTINGS.ADMIN_USERS.find(u => (u.username || "").toUpperCase().trim() === uUpper);
+        if (target) {
+            target.authenticatorEnabled = !!isEnabled;
+            target.totpSecret = secret || "";
+            target.twoFactorEnabled = !!isEnabled;
+            target.is2FA = !!isEnabled;
+        }
+    }
+
+    // 3. Keep in localStorage so page refresh doesn't lose verified secret
+    try {
+        const storedUsers = JSON.parse(localStorage.getItem("adminUsers") || localStorage.getItem("crm_users") || "[]");
+        if (Array.isArray(storedUsers)) {
+            const userObj = storedUsers.find(u => (u.username || "").toUpperCase().trim() === uUpper);
+            if (userObj) {
+                userObj.authenticatorEnabled = !!isEnabled;
+                userObj.totpSecret = secret || "";
+                userObj.twoFactorEnabled = !!isEnabled;
+                userObj.is2FA = !!isEnabled;
+                localStorage.setItem("adminUsers", JSON.stringify(storedUsers));
+                localStorage.setItem("crm_users", JSON.stringify(storedUsers));
+            }
+        }
+        localStorage.setItem(`2fa_${uUpper}`, JSON.stringify({
+            authenticatorEnabled: !!isEnabled,
+            totpSecret: secret || "",
+            twoFactorEnabled: !!isEnabled,
+            is2FA: !!isEnabled
+        }));
+    } catch (e) {
+        console.warn("Could not save 2FA state to localStorage:", e);
+    }
+
+    // 4. Update the user row attribute in DOM if present
+    const rows = document.querySelectorAll("#usersTable tbody tr, #adminUsersTable tbody tr, tr[data-username]");
+    rows.forEach(r => {
+        const rowUser = (r.getAttribute("data-username") || r.querySelector(".user-name-input")?.value || "").toUpperCase().trim();
+        if (rowUser === uUpper) {
+            r.dataset.authenticatorEnabled = String(!!isEnabled);
+            r.dataset.totpSecret = secret || "";
+            r.dataset.twoFactorEnabled = String(!!isEnabled);
+        }
+    });
+}
+
+/**
+ * Retrieve preserved 2FA credentials for a user
+ */
+function getPreserved2FA(username) {
+    if (!username) return null;
+    const uUpper = username.toUpperCase().trim();
+
+    // Priority 1: Pending memory registry
+    if (window._twoFactorPendingRegistry[uUpper]) {
+        return window._twoFactorPendingRegistry[uUpper];
+    }
+
+    // Priority 2: In-memory APP_SETTINGS.ADMIN_USERS
+    if (Array.isArray(APP_SETTINGS.ADMIN_USERS)) {
+        const u = APP_SETTINGS.ADMIN_USERS.find(x => (x.username || "").toUpperCase().trim() === uUpper);
+        if (u && (u.totpSecret || u.authenticatorEnabled || u.twoFactorEnabled)) {
+            return {
+                authenticatorEnabled: !!(u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA),
+                totpSecret: u.totpSecret || "",
+                twoFactorEnabled: !!(u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA),
+                is2FA: !!(u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA)
+            };
+        }
+    }
+
+    // Priority 3: LocalStorage specific key
+    try {
+        const saved2FA = localStorage.getItem(`2fa_${uUpper}`);
+        if (saved2FA) {
+            return JSON.parse(saved2FA);
+        }
+    } catch (e) {
+        console.warn("Could not parse 2FA localStorage item:", e);
+    }
+
+    // Priority 4: Stored users list in localStorage
+    try {
+        const storedUsers = JSON.parse(localStorage.getItem("adminUsers") || localStorage.getItem("crm_users") || "[]");
+        if (Array.isArray(storedUsers)) {
+            const u = storedUsers.find(x => (x.username || "").toUpperCase().trim() === uUpper);
+            if (u && (u.totpSecret || u.authenticatorEnabled || u.twoFactorEnabled)) {
+                return {
+                    authenticatorEnabled: !!(u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA),
+                    totpSecret: u.totpSecret || "",
+                    twoFactorEnabled: !!(u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA),
+                    is2FA: !!(u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA)
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("Could not query storedUsers for 2FA:", e);
+    }
+
+    return null;
+}
+
 // Auto-apply on load and sync across windows
 window.addEventListener('DOMContentLoaded', async () => {
     applyUIPermissions();
@@ -519,6 +643,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         setInterval(checkChatterNotifications, 15000); // Check every 15 seconds
     }
 });
+
 window.addEventListener('storage', (e) => {
     const user = getCurrentUser();
     if (e.key === `ui_permissions_${user}` || e.key === `remotePermissions_${user}`) applyUIPermissions();
@@ -527,8 +652,6 @@ window.addEventListener('storage', (e) => {
 // Listen for Developer Override (Step 7)
 if (window.electronAPI) {
     window.electronAPI.onForceOpenDevPanel && window.electronAPI.onForceOpenDevPanel(() => {
-        // Logic to open your developer modal here
-        // e.g., $('#developerModal').modal('show');
         alert("Developer Override Activated");
     });
 }
@@ -543,7 +666,20 @@ async function fetchDeveloperSettings() {
                 APP_SETTINGS.ADMIN_USERNAME = data.adminUser;
                 APP_SETTINGS.ADMIN_EMAIL = data.adminEmail;
                 APP_SETTINGS.ADMIN_EMAIL_PASS = data.adminEmailPass;
-                APP_SETTINGS.ADMIN_USERS = data.adminUsers || [];
+                
+                // Preserve existing 2FA secrets if incoming array omits them
+                if (Array.isArray(data.adminUsers)) {
+                    APP_SETTINGS.ADMIN_USERS = data.adminUsers.map(u => {
+                        const existing2FA = getPreserved2FA(u.username);
+                        return {
+                            ...u,
+                            ...(existing2FA || {})
+                        };
+                    });
+                } else {
+                    APP_SETTINGS.ADMIN_USERS = [];
+                }
+
                 updateDeveloperUI();
                 return data;
             }
@@ -558,8 +694,26 @@ async function saveDeveloperSettings(payload) {
     // payload: { devId, adminUser, adminPass, adminEmail, adminEmailPass, adminUsers }
     if (window.electronAPI && window.electronAPI.saveAdminCreds) {
         try {
+            // Guarantee that adminUsers maintains all 2FA parameters
+            if (payload && Array.isArray(payload.adminUsers)) {
+                payload.adminUsers = payload.adminUsers.map(u => {
+                    const preserved = getPreserved2FA(u.username);
+                    return {
+                        ...u,
+                        ...(preserved || {})
+                    };
+                });
+            }
+
             const result = await window.electronAPI.saveAdminCreds(payload);
             if (result.success) {
+                // Keep local storage mirrors up to date
+                if (payload.adminUsers) {
+                    try {
+                        localStorage.setItem("adminUsers", JSON.stringify(payload.adminUsers));
+                        localStorage.setItem("crm_users", JSON.stringify(payload.adminUsers));
+                    } catch (err) {}
+                }
                 // Refresh local settings after save
                 await fetchDeveloperSettings();
                 alert("Developer settings saved successfully.");
@@ -571,6 +725,83 @@ async function saveDeveloperSettings(payload) {
         }
     }
     return { success: false, message: "API unavailable" };
+}
+
+/**
+ * Universal Save Users Handler: preserves 2FA credentials when 'Save Users' is clicked
+ */
+async function saveUsers(usersToSave) {
+    let finalUsers = [];
+
+    if (Array.isArray(usersToSave) && usersToSave.length > 0) {
+        finalUsers = usersToSave;
+    } else {
+        // Collect users from UI table rows if present
+        const rows = document.querySelectorAll("#usersTable tbody tr, #adminUsersTable tbody tr");
+        if (rows.length > 0) {
+            rows.forEach(row => {
+                const username = row.querySelector(".user-name-input, [name='username'], input[type='text']")?.value?.trim() || row.dataset.username;
+                const password = row.querySelector(".user-pass-input, [name='password'], input[type='password']")?.value;
+                const role = row.querySelector(".user-role-select, [name='role'], select")?.value || "User";
+
+                if (username) {
+                    finalUsers.push({
+                        username,
+                        password,
+                        role,
+                        authenticatorEnabled: row.dataset.authenticatorEnabled === "true",
+                        totpSecret: row.dataset.totpSecret || ""
+                    });
+                }
+            });
+        } else if (Array.isArray(APP_SETTINGS.ADMIN_USERS) && APP_SETTINGS.ADMIN_USERS.length > 0) {
+            finalUsers = APP_SETTINGS.ADMIN_USERS;
+        }
+    }
+
+    // Merge in preserved 2FA credentials
+    finalUsers = finalUsers.map(u => {
+        const preserved = getPreserved2FA(u.username);
+        return {
+            ...u,
+            ...(preserved || {})
+        };
+    });
+
+    APP_SETTINGS.ADMIN_USERS = finalUsers;
+
+    // Persist to LocalStorage
+    try {
+        localStorage.setItem("adminUsers", JSON.stringify(finalUsers));
+        localStorage.setItem("crm_users", JSON.stringify(finalUsers));
+    } catch (e) {
+        console.warn("Failed saving users to localStorage:", e);
+    }
+
+    // Persist to Electron / Backend if available
+    let success = false;
+    if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+        try {
+            const res = await window.electronAPI.saveAdminCreds({
+                adminUsers: finalUsers
+            });
+            if (res && res.success) success = true;
+        } catch (err) {
+            console.error("Failed persisting users via electronAPI:", err);
+        }
+    }
+
+    if (typeof apiClient !== "undefined" && apiClient.post) {
+        try {
+            await apiClient.post("/settings/users", { users: finalUsers });
+            success = true;
+        } catch (err) {
+            console.warn("apiClient user save omitted/failed:", err);
+        }
+    }
+
+    alert("Security credentials updated successfully!");
+    return { success: true, users: finalUsers };
 }
 
 async function fetchGeneralAppSettings() {
@@ -617,10 +848,6 @@ function updateDeveloperUI() {
 
 // --- STEP 1 & 8: Developer Panel UI Injection ---
 function renderAppModeControl() {
-    // Locate the container where developer settings are (assuming a specific ID or appending to a known section)
-    // For this implementation, we'll assume there is a container with ID 'developerSettingsContainer'
-    // If not, we append to the body of the developer modal for now.
-
     const container = document.getElementById('developerSettingsContainer') || document.querySelector('.modal-body');
     if (!container) return;
 
@@ -664,7 +891,6 @@ function renderAppModeControl() {
 async function checkChatterNotifications() {
     // Disable alert if currently reading chatter
     if (window.location.pathname.includes('chatter.html')) {
-        // Notifications suppressed automatically because messages are marked as read in chatter.html
         return;
     }
 
@@ -705,7 +931,6 @@ async function checkChatterNotifications() {
     }
 }
 
-
 // --- STEP 4: Safety Logic ---
 async function confirmAndChangeAppMode(newMode) {
     const currentMode = AppConfigManager.getAppMode();
@@ -720,7 +945,6 @@ async function confirmAndChangeAppMode(newMode) {
         const success = await AppConfigManager.setAppMode(newMode);
         if (success) {
             alert("✅ App Mode updated successfully.\n\nThe application needs to restart to apply structural changes.");
-            // Optional: Trigger restart via IPC if available, or just reload
             window.location.reload();
         } else {
             alert("Failed to save App Mode.");
