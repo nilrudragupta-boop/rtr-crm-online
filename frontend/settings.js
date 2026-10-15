@@ -421,6 +421,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_direct_sale', label: 'Sale' },
     { id: 'perm_image-to-text', label: 'Image to Text' },
     { id: 'perm_rtr_pdf_studio', label: 'PDF Studio' },
+    { id: 'perm_finance_and_tools', label: 'Finance & Tools' },
     { id: 'perm_business360', label: 'Business 360' }
 ];
 
