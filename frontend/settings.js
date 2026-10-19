@@ -416,6 +416,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_custom_sheet', label: 'Custom Sheet' },
     { id: 'perm_cheque_print', label: 'Cheque Print' },
     { id: 'perm_chatter', label: 'Chatter' },
+    { id: 'perm_team_credits', label: 'Team Credits' },
     { id: 'perm_crm_v2', label: 'CRM V2' },
     { id: 'perm_sales_report', label: 'Report' },
     { id: 'perm_direct_sale', label: 'Sale' },
