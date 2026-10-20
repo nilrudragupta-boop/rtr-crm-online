@@ -9,6 +9,7 @@
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
+    <script src="global_urgent_notice.js"></script>
     <style>
         :root {
             --primary-color: #0313f3;
@@ -20,7 +21,7 @@
             margin: 0;
             padding: 20px;
             font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif;
-            background: #f5f7fa url('login-bg.jpg') no-repeat center center fixed;
+            background: #f5f7fa url('login-bg.jpeg') no-repeat center center fixed;
             background-size: cover;
             min-height: 100vh;
             display: flex;
@@ -527,7 +528,7 @@
                     Chrome</strong> or <strong>Microsoft Edge</strong>.</span></p>
 
         <p style="text-align: right; margin-top: 10px; color: #560eff;">Developed by - RTR CRM</p>
-        <p style="text-align: right; margin-top: 10px; color: #2c3e50; line-height: 1.4;">V3.3.8<br>
+        <p style="text-align: right; margin-top: 10px; color: #2c3e50; line-height: 1.4;">V11.5.4<br>
             <span id="apiStatus" style="font-size: 12px; font-weight: 600;">Checking Server...</span>
             <span id="cloudStatus" style="font-size: 12px; font-weight: 600;"></span>
             <br><button onclick="clearAllCookies()"
@@ -558,9 +559,10 @@
         <div class="modal-content">
             <span class="close" onclick="closeForgotEmailModal()">&times;</span>
             <h3 style="color: #0313f3;">📧 Password Recovery</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Enter your registered Admin email address to
-                receive the verification OTP.</p>
-            <input type="email" id="forgotEmailInput" placeholder="name@example.com">
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Enter your registered USER ID and Admin email
+                address to receive the verification OTP.</p>
+            <input type="text" id="forgotUserIdInput" placeholder="👤 Registered USER ID" style="margin-bottom: 10px;">
+            <input type="email" id="forgotEmailInput" placeholder="✉️ Registered Admin email">
             <button onclick="sendForgotOtp()" style="background: #0313f3; width: 100%; margin-top: 10px;">Send
                 OTP</button>
         </div>
@@ -690,7 +692,14 @@
             <input type="text" id="totpInput" class="otp-input-field" maxlength="6" placeholder="------"
                 style="margin: 15px 0; width: 100%; text-align: center; letter-spacing: 5px; font-size: 24px; font-weight: bold; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"
                 onkeydown="if(event.key==='Enter') verifyTotpLogin()">
-            <button onclick="verifyTotpLogin()" style="width: 100%; background: #28a745;">Verify</button>
+            <button id="totpVerifyBtn" onclick="verifyTotpLogin()"
+                style="width: 100%; background: #28a745;">Verify</button>
+            <p id="totpVerifyStatus" role="status" aria-live="polite"
+                style="display: none; margin: 10px 0; color: #0313f3; font-size: 13px;">
+                <span class="btn-spinner"
+                    style="border: 2px solid rgba(3, 19, 243, 0.2); border-top-color: #0313f3;"></span>
+                Verifying authenticator code...
+            </p>
             <p style="margin-top: 15px; font-size: 12px;"><a href="javascript:void(0)" onclick="fallbackToEmailOtp()"
                     style="color: #0313f3;">Lost device? Use Email OTP</a></p>
         </div>
@@ -725,12 +734,12 @@
             <h3 style="color: #673ab7;">🛠️ Select Active Dashboard</h3>
             <p>Choose which dashboard layout to enable for Admin users.</p>
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
-                <button onclick="selectDashboard('dashboardB.html')" style="background: #0313f3;">Dashboard A (Basic
+                <button onclick="selectDashboard('dashboardB.html')" style="background: #0313f3;">Dashboard A (Trading
                     View)</button>
-                <button onclick="selectDashboard('dashboardB.html')" style="background: #224abe;">Dashboard B (Premium
-                    View)</button>
-                <button onclick="selectDashboard('dashboardC.html')" style="background: #4a5e04;">Dashboard C
+                <button onclick="selectDashboard('dashboardC.html')" style="background: #224abe;">Dashboard C
                     (Educational)</button>
+                <button onclick="selectDashboard('dashboardD.html')" style="background: #4a5e04;">Dashboard D
+                    (Medicine)</button>
             </div>
         </div>
     </div>
@@ -1058,7 +1067,7 @@
                 try {
                     const creds = await window.electronAPI.getAdminCreds();
                     if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
-                        ADMIN_USERS = creds.adminUsers;
+                        ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
                     }
                     if (creds.success && creds.adminPass) {
                         localStorage.setItem("appPassword", creds.adminPass);
@@ -1069,7 +1078,7 @@
                     const res = await fetch('/api/admin-creds');
                     const creds = await res.json();
                     if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
-                        ADMIN_USERS = creds.adminUsers;
+                        ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
                         localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
                     }
                     if (creds.success && creds.adminPass) {
@@ -1091,6 +1100,7 @@
             }
             checkRenewButtonVisibility();
             applyTheme();
+
 
             // Sync remote license and check for cloud alerts upon launching the app
             syncRemoteLicense();
@@ -1154,7 +1164,7 @@
                             currentTipIndex = (currentTipIndex + 1) % loginTips.length;
                             tipTextElement.innerHTML = loginTips[currentTipIndex];
                             tipTextElement.style.opacity = 1;
-                        }, 1000); // Wait for fade-out before changing text
+                        }, 3000); // Wait for fade-out before changing text
                     }, 5000); // Change tip every 5 seconds
                 }
             });
@@ -1205,7 +1215,7 @@
                     if (data.success && data.config) {
                         // 1. Sync Users
                         if (data.config.users && data.config.users.length > 0) {
-                            ADMIN_USERS = data.config.users;
+                            ADMIN_USERS = attachPreserved2FA(data.config.users);
                             if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                                 window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                             } else {
@@ -1269,6 +1279,65 @@
             }
         }
 
+        function normalizeDashboardFile(dashboardFile) {
+            const allowedDashboards = {
+                'dashboardb': 'dashboardB.html',
+                'dashboardc': 'dashboardC.html',
+                'dashboardd': 'dashboardD.html'
+            };
+            const dashboardKey = String(dashboardFile || '').trim().toLowerCase().replace(/\.(html|htm)$/, '');
+            return allowedDashboards[dashboardKey] || '';
+        }
+
+        async function redirectAfterLogin(username, educationDashboardFile) {
+            sessionStorage.setItem('dashboardBAuthenticated', username);
+            const userRecord = ADMIN_USERS.find(account => account.username === username);
+            let contactNumber = (userRecord && userRecord.contactNumber) || localStorage.getItem('contactNumber') || '';
+            let licenseResult = null;
+
+            try {
+                if (window.electronAPI && window.electronAPI.checkRemoteLicense) {
+                    licenseResult = await window.electronAPI.checkRemoteLicense(username, contactNumber);
+                } else {
+                    let scriptUrl = '';
+                    try {
+                        const settingsResponse = await fetch('/api/settings');
+                        const settingsData = await settingsResponse.json();
+                        if (settingsData.success && settingsData.data) {
+                            scriptUrl = settingsData.data.updateServerUrl || settingsData.data.cloudBackupUrl || '';
+                            if (!contactNumber) contactNumber = settingsData.data.contactNumber || '';
+                        }
+                    } catch (e) { }
+
+                    if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
+                    if (scriptUrl && scriptUrl.startsWith('http')) {
+                        const response = await fetch(scriptUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify({ method: 'check_license', username: username, contactNumber: contactNumber })
+                        });
+                        licenseResult = await response.json();
+                    }
+                }
+            } catch (error) {
+                console.warn('Dashboard assignment lookup failed', error);
+            }
+
+            const assignedDashboard = licenseResult && licenseResult.success
+                ? normalizeDashboardFile(licenseResult.dashboardFile)
+                : '';
+            if (assignedDashboard) {
+                window.location.href = assignedDashboard;
+                return;
+            }
+
+            const appMode = localStorage.getItem('appMode');
+            const fallbackDashboard = appMode === 'Educational Institute'
+                ? normalizeDashboardFile(educationDashboardFile)
+                : normalizeDashboardFile(localStorage.getItem('activeDashboard')) || 'dashboardC.html';
+            window.location.href = fallbackDashboard || 'dashboardB.html';
+        }
+
         function selectDashboard(dashboardFile) {
             localStorage.setItem('activeDashboard', dashboardFile);
             window.location.href = dashboardFile;
@@ -1321,7 +1390,7 @@
             const DEV_USER = "RTR-7908040851";
             const DEV_PASS = "NANCY@20129830428736";
 
-            if (user.toUpperCase() === DEV_USER && pass === DEV_PASS) {
+            if (user === DEV_USER && pass === DEV_PASS) {
                 // Check for TOTP Secret
                 const secret = localStorage.getItem("devTotpSecret");
                 if (secret) {
@@ -1360,22 +1429,41 @@
                 return;
             }
 
-            // Find user
-            const adminUser = ADMIN_USERS.find(u => u.username.toLowerCase() === user.toLowerCase());
+            // 1. Check if user exists regardless of case
+            const userMatchInsensitive = ADMIN_USERS.find(u => u.username.toLowerCase() === user.toLowerCase());
+
+            // 2. Strict case check: if user exists but casing doesn't match exactly (e.g., 'admin' vs 'Admin')
+            if (userMatchInsensitive && userMatchInsensitive.username !== user) {
+                showToast("⚠️ User ID mismatch! User ID is case-sensitive.", "#dc3545");
+                return;
+            }
+
+            // 3. User exists with exact case match
+            const adminUser = userMatchInsensitive;
 
             // Check password (priority: user specific > global stored > empty default)
             let isValid = false;
             if (adminUser) {
-                // If user has specific password, use it. Else check global appPassword (legacy)
                 if (adminUser.password && String(adminUser.password) === pass) isValid = true;
                 else if (!adminUser.password && pass === (localStorage.getItem("appPassword") || "")) isValid = true;
             }
 
             if (isValid) {
-                // Check for User TOTP
-                if (adminUser && adminUser.totpSecret) {
+                // Check for User TOTP (check both in-memory and persisted storage)
+                let userTotpSecret = adminUser ? adminUser.totpSecret : "";
+                if (!userTotpSecret && adminUser) {
+                    try {
+                        const saved2fa = JSON.parse(localStorage.getItem(`2fa_${user.toUpperCase()}`) || "{}");
+                        if (saved2fa && saved2fa.totpSecret) {
+                            userTotpSecret = saved2fa.totpSecret;
+                            adminUser.totpSecret = userTotpSecret;
+                        }
+                    } catch (e) { }
+                }
+
+                if (adminUser && userTotpSecret) {
                     localStorage.setItem("pendingLoginUser", user);
-                    localStorage.setItem("pendingLoginPass", pass); // Temporary store for 2FA step
+                    localStorage.setItem("pendingLoginPass", pass);
                     document.getElementById('totpModal').style.display = 'block';
                     document.getElementById('totpInput').value = '';
                     document.getElementById('totpInput').focus();
@@ -1408,7 +1496,7 @@
                             body: JSON.stringify({ username: user })
                         });
 
-                        const userIdx = ADMIN_USERS.findIndex(u => u.username.toLowerCase() === user.toLowerCase());
+                        const userIdx = ADMIN_USERS.findIndex(u => u.username === user);
                         if (userIdx > -1) {
                             ADMIN_USERS[userIdx].lastLogin = new Date().toISOString();
                             localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
@@ -1423,13 +1511,7 @@
                     console.log("Web login history update failed", e);
                 }
 
-                const appMode = localStorage.getItem('appMode');
-                if (appMode === "Educational Institute") {
-                    window.location.href = 'dashboard_Inst.html';
-                } else {
-                    const targetDash = localStorage.getItem('activeDashboard') || 'dashboardB.html';
-                    window.location.href = targetDash;
-                }
+                await redirectAfterLogin(user, 'dashboardC.html');
             } else {
                 // --- CLOUD SYNC FALLBACK FOR NEW DEVICES ---
                 if (!adminUser && user && user.toLowerCase() !== "admin") {
@@ -1457,7 +1539,7 @@
                     const data = await response.json();
 
                     if (data.success && data.config && data.config.users && data.config.users.length > 0) {
-                        ADMIN_USERS = data.config.users;
+                        ADMIN_USERS = attachPreserved2FA(data.config.users);
                         if (window.electronAPI && window.electronAPI.saveAdminCreds) {
                             window.electronAPI.saveAdminCreds({ devId: "OTP_VERIFIED", adminUsers: ADMIN_USERS }).catch(console.error);
                         } else {
@@ -1665,13 +1747,23 @@
         }
 
         function sendForgotOtp() {
-            const email = document.getElementById('forgotEmailInput').value;
+            const userId = document.getElementById('forgotUserIdInput').value.trim();
+            const email = document.getElementById('forgotEmailInput').value.trim();
+
+            if (!userId) {
+                showToast("Please enter your registered USER ID.", "#dc3545");
+                return;
+            }
             if (!email || !email.includes('@')) {
                 showToast("Please enter a valid email address.", "#dc3545");
                 return;
             }
+
+            // Store the verified username for later password update
+            localStorage.setItem('adminUser', userId);
+
             closeForgotEmailModal();
-            initiateSecureAction('Forgot Password', null, email);
+            initiateSecureAction('Forgot Password', null, email, userId);
         }
 
         // --- Utilities Flow ---
@@ -1783,10 +1875,11 @@
         }
 
         // --- SECURE OTP LOGIC ---
-        async function initiateSecureAction(actionName, callback, emailOverride = null) {
+        async function initiateSecureAction(actionName, callback, emailOverride = null, usernameOverride = null) {
             currentOtpAction = actionName;
             currentOtpCallback = callback;
             currentOtpEmail = emailOverride;
+            currentOtpUsername = usernameOverride;
 
             const userEmail = emailOverride;
             if (!userEmail) {
@@ -1801,6 +1894,8 @@
                     // Use specific handler for Developer Login to bypass local SMTP check
                     if (actionName === 'Developer Login') {
                         res = await window.electronAPI.requestDevLoginOtp("NANCY@2012");
+                    } else if (actionName === 'Forgot Password' && window.electronAPI.requestForgotOtp) {
+                        res = await window.electronAPI.requestForgotOtp(userId, userEmail);
                     } else {
                         res = await window.electronAPI.requestOtp(actionName, userEmail);
                     }
@@ -1831,7 +1926,14 @@
                         if (actionName === 'Developer Login') {
                             payload = { method: "send_dev_login_otp", otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "Developer Admin", expiryDate: localStorage.getItem("licenseExpiry") || "N/A" };
                         } else if (actionName === 'Forgot Password') {
-                            payload = { method: "send_forgot_otp", email: userEmail, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
+                            payload = {
+                                method: "send_forgot_otp",
+                                email: userEmail,
+                                username: usernameOverride || localStorage.getItem('adminUser') || "",
+                                otp: tempOtp,
+                                machineId: secureMachineId,
+                                companyName: localStorage.getItem("companyName") || "User"
+                            };
                         } else {
                             payload = { method: "send_generic_otp", email: userEmail, action: actionName, otp: tempOtp, machineId: secureMachineId, companyName: localStorage.getItem("companyName") || "User" };
                         }
@@ -1911,76 +2013,109 @@
             initiateSecureAction(currentOtpAction, currentOtpCallback, email);
         }
 
-        function verifyTotpLogin() {
-            const token = document.getElementById('totpInput').value;
-            const secret = localStorage.getItem("devTotpSecret");
-            const pendingUser = localStorage.getItem("pendingLoginUser");
+        async function verifyTotpLogin() {
+            const verifyButton = document.getElementById('totpVerifyBtn');
+            if (verifyButton && verifyButton.disabled) return;
 
-            let userSecret = secret;
+            setTotpVerificationBusy(true);
+            try {
+                await new Promise(resolve => setTimeout(resolve, 0));
+                await completeTotpLoginVerification();
+            } finally {
+                setTotpVerificationBusy(false);
+            }
+        }
+
+        function setTotpVerificationBusy(isBusy) {
+            const verifyButton = document.getElementById('totpVerifyBtn');
+            const totpInput = document.getElementById('totpInput');
+            const status = document.getElementById('totpVerifyStatus');
+            if (verifyButton) verifyButton.disabled = isBusy;
+            if (totpInput) totpInput.disabled = isBusy;
+            if (status) status.style.display = isBusy ? 'block' : 'none';
+        }
+
+        async function completeTotpLoginVerification() {
+            const token = document.getElementById('totpInput').value.trim();
+            const pendingUser = localStorage.getItem("pendingLoginUser");
+            let userSecret = "";
             let isRegularUser = false;
 
             if (pendingUser) {
-                const u = ADMIN_USERS.find(u => u.username === pendingUser);
+                // Individual User Login
+                const u = ADMIN_USERS.find(x => x.username.toLowerCase() === pendingUser.toLowerCase());
                 if (u && u.totpSecret) {
                     userSecret = u.totpSecret;
                     isRegularUser = true;
                 } else {
-                    localStorage.removeItem("pendingLoginUser");
-                    localStorage.removeItem("pendingLoginPass");
+                    try {
+                        const saved2fa = JSON.parse(localStorage.getItem(`2fa_${pendingUser.toUpperCase()}`) || localStorage.getItem(`2fa_${pendingUser}`) || "{}");
+                        if (saved2fa && saved2fa.totpSecret) {
+                            userSecret = saved2fa.totpSecret;
+                            isRegularUser = true;
+                        }
+                    } catch (e) { }
+                }
+            } else {
+                // Developer Backdoor Login
+                userSecret = localStorage.getItem("devTotpSecret") || "";
+                if (!userSecret) {
+                    try {
+                        const dev2fa = JSON.parse(localStorage.getItem("2fa_DEVELOPER") || localStorage.getItem("2fa_RTR-7908040851") || "{}");
+                        if (dev2fa && dev2fa.totpSecret) userSecret = dev2fa.totpSecret;
+                    } catch (e) { }
                 }
             }
 
             if (!userSecret) {
-                alert("Authenticator not configured.");
                 fallbackToEmailOtp();
                 return;
             }
 
-            const totp = new OTPAuth.TOTP({ issuer: "Your Company Name", label: isRegularUser ? pendingUser : "Developer Admin", algorithm: "SHA1", digits: 6, period: 30, secret: OTPAuth.Secret.fromBase32(userSecret) });
-            const delta = totp.validate({ token: token, window: 1 });
+            try {
+                const totp = new OTPAuth.TOTP({
+                    issuer: "RTR CRM",
+                    label: isRegularUser ? pendingUser : "Developer Admin",
+                    algorithm: "SHA1",
+                    digits: 6,
+                    period: 30,
+                    secret: OTPAuth.Secret.fromBase32(userSecret)
+                });
+                const delta = totp.validate({ token: token, window: 1 });
 
-            if (delta !== null) {
-                closeTotpModal();
-                if (isRegularUser) {
-                    // Complete Regular Login
-                    const pass = localStorage.getItem("pendingLoginPass");
-                    localStorage.removeItem("pendingLoginUser");
-                    localStorage.removeItem("pendingLoginPass");
+                if (delta !== null) {
+                    if (isRegularUser) {
+                        const pass = localStorage.getItem("pendingLoginPass");
+                        localStorage.removeItem("pendingLoginUser");
+                        localStorage.removeItem("pendingLoginPass");
 
-                    localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
-                    localStorage.removeItem("isDevLogin");
-                    localStorage.setItem("currentUser", pendingUser);
+                        localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
+                        localStorage.removeItem("isDevLogin");
+                        localStorage.setItem("currentUser", pendingUser);
 
-                    if (document.getElementById("rememberMe").checked) {
-                        localStorage.setItem("rememberMe", "true");
-                        localStorage.setItem("savedUsername", pendingUser);
-                        localStorage.setItem("savedPassword", pass);
+                        if (document.getElementById("rememberMe").checked) {
+                            localStorage.setItem("rememberMe", "true");
+                            localStorage.setItem("savedUsername", pendingUser);
+                            localStorage.setItem("savedPassword", pass);
+                        }
+
+                        if (window.electronAPI && window.electronAPI.saveAdminCreds) {
+                            window.electronAPI.saveAdminCreds({ isLoginUpdate: true, usernameToUpdate: pendingUser }).catch(e => console.error(e));
+                        }
+
+                        await redirectAfterLogin(pendingUser, 'dashboardC.html');
                     } else {
-                        localStorage.removeItem("rememberMe");
-                        localStorage.removeItem("savedUsername");
-                        localStorage.removeItem("savedPassword");
-                    }
-
-                    if (window.electronAPI && window.electronAPI.saveAdminCreds) {
-                        window.electronAPI.saveAdminCreds({ isLoginUpdate: true, usernameToUpdate: pendingUser }).catch(e => console.error(e));
-                    }
-
-                    const appMode = localStorage.getItem('appMode');
-                    if (appMode === "Educational Institute") {
-                        window.location.href = 'dashboard_Inst.html';
-                    } else {
-                        const targetDash = localStorage.getItem('activeDashboard') || 'dashboardB.html';
-                        window.location.href = targetDash;
+                        localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
+                        localStorage.setItem("isDevLogin", "true");
+                        localStorage.setItem("currentUser", "developer");
+                        window.location.href = 'settings.html';
                     }
                 } else {
-                    // Developer Login
-                    localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
-                    localStorage.setItem("isDevLogin", "true");
-                    localStorage.setItem("currentUser", "developer");
-                    window.location.href = 'settings.html';
+                    showToast("Invalid Authenticator Code", "#dc3545");
                 }
-            } else {
-                showToast("Invalid Authenticator Code", "#dc3545");
+            } catch (err) {
+                console.error("TOTP validation error:", err);
+                showToast("Error verifying Authenticator code", "#dc3545");
             }
         }
 
@@ -2180,6 +2315,39 @@
                 showToast("Workspace cleared. Please enter your new credentials.", "#17a2b8");
                 setTimeout(() => window.location.reload(), 1500);
             }
+        }
+
+
+        function attachPreserved2FA(users) {
+            if (!Array.isArray(users)) return users;
+            return users.map(u => {
+                if (!u || !u.username) return u;
+                const username = String(u.username).trim();
+                const uUpper = username.toUpperCase();
+                const existingUser = ADMIN_USERS.find(existing =>
+                    existing && existing.username && String(existing.username).trim().toUpperCase() === uUpper
+                );
+                let secret = u.totpSecret || (existingUser && existingUser.totpSecret) || "";
+                let saved = null;
+                try {
+                    const savedValue = localStorage.getItem(`2fa_${uUpper}`) || localStorage.getItem(`2fa_${username}`);
+                    if (savedValue) saved = JSON.parse(savedValue);
+                } catch (e) { }
+
+                const hasSavedState = saved && Object.prototype.hasOwnProperty.call(saved, "totpSecret");
+                if (hasSavedState) secret = saved.totpSecret || "";
+                const isEnabled = hasSavedState
+                    ? !!(secret || saved.authenticatorEnabled || saved.twoFactorEnabled || saved.is2FA)
+                    : !!(secret || u.authenticatorEnabled || u.twoFactorEnabled || u.is2FA ||
+                        (existingUser && (existingUser.authenticatorEnabled || existingUser.twoFactorEnabled || existingUser.is2FA)));
+                return {
+                    ...u,
+                    totpSecret: secret,
+                    authenticatorEnabled: isEnabled,
+                    twoFactorEnabled: isEnabled,
+                    is2FA: isEnabled
+                };
+            });
         }
     </script>
 </body>
