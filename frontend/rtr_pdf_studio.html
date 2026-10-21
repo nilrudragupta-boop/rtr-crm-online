@@ -1785,33 +1785,173 @@
         </div>
 
         <section id="tab-create-pdf" class="tab-content hidden tool-page space-y-6">
-            <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All
-                tools</button>
+            <button class="tool-back" type="button" onclick="showToolDirectory()">
+                <i data-lucide="arrow-left"></i> All tools
+            </button>
             <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
                 <div class="tool-content-heading mb-4">
-                    <h2 class="text-xl font-bold text-slate-900">Create a blank PDF</h2>
-                    <p class="text-sm text-slate-500">Create a new blank PDF document locally in your browser.</p>
+                    <h2 class="text-xl font-bold text-slate-900">Create & Resize PDF</h2>
+                    <p class="text-sm text-slate-500">Generate a blank PDF or drop existing PDF documents to reconfigure
+                        page sizes, margins, and scaling.</p>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label class="text-xs font-semibold text-slate-700">Page size
+
+                <!-- Mode Selection -->
+                <div class="flex items-center gap-6 mb-5 border-b border-slate-100 pb-4">
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                        <input type="radio" name="create-pdf-mode" value="blank" checked
+                            onchange="toggleCreatePdfMode()" class="text-indigo-600 focus:ring-indigo-500">
+                        <span>Create Blank PDF</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                        <input type="radio" name="create-pdf-mode" value="resize" onchange="toggleCreatePdfMode()"
+                            class="text-indigo-600 focus:ring-indigo-500">
+                        <span>Resize Existing PDF</span>
+                    </label>
+                </div>
+
+                <!-- Dropzone for Existing PDF -->
+                <div id="create-dropzone-wrap" class="hidden mb-6">
+                    <div id="dropzone-create"
+                        class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer bg-slate-50/50">
+                        <input type="file" id="file-create" accept="application/pdf,.pdf" class="hidden">
+                        <div
+                            class="w-14 h-14 mx-auto rounded-full bg-sky-100 text-sky-600 flex items-center justify-center mb-3">
+                            <i data-lucide="file-up" class="w-7 h-7"></i>
+                        </div>
+                        <p class="font-semibold text-slate-800 text-base">Select or drop a PDF to resize</p>
+                        <p id="create-file-status" class="text-xs text-slate-500 mt-1">Files are processed locally in
+                            your browser memory</p>
+                    </div>
+                </div>
+
+                <!-- Primary Dimension Controls -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Target Page Size</label>
                         <select id="create-size"
-                            class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
-                            <option value="A4">A4</option>
-                            <option value="Letter">Letter</option>
-                            <option value="Legal">Legal</option>
-                            <option value="A3">A3</option>
+                            class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500"
+                            onchange="toggleCreateCustomSize()">
+                            <option value="A4" selected>A4 (210 × 297 mm)</option>
+                            <option value="Letter">US Letter (8.5 × 11 in)</option>
+                            <option value="Legal">US Legal (8.5 × 14 in)</option>
+                            <option value="A3">A3 (297 × 420 mm)</option>
+                            <option value="A5">A5 (148 × 210 mm)</option>
+                            <option value="Tabloid">Tabloid / Ledger (11 × 17 in)</option>
+                            <option value="Custom">Custom Dimensions...</option>
                         </select>
-                    </label>
-                    <label class="text-xs font-semibold text-slate-700">Number of pages
+                    </div>
+
+                    <div id="create-orientation-wrap">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Orientation</label>
+                        <select id="create-orientation"
+                            class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                            <option value="portrait" selected>Portrait</option>
+                            <option value="landscape">Landscape</option>
+                        </select>
+                    </div>
+
+                    <div id="create-pages-wrap">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Number of Blank Pages</label>
                         <input id="create-pages" type="number" min="1" max="200" value="1"
-                            class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
-                    </label>
+                            class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                    </div>
                 </div>
-                <button id="create-run" type="button"
-                    class="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold">Create
-                    & download PDF</button>
+
+                <!-- Custom Dimensions Input Row -->
+                <div id="create-custom-dims"
+                    class="hidden grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Unit</label>
+                        <select id="create-unit"
+                            class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                            <option value="mm" selected>Millimeters (mm)</option>
+                            <option value="in">Inches (in)</option>
+                            <option value="pt">Points (pt)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Width</label>
+                        <input id="create-width" type="number" min="10" max="5000" step="any" value="210"
+                            class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Height</label>
+                        <input id="create-height" type="number" min="10" max="5000" step="any" value="297"
+                            class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <!-- Scaling & Margin Controls (Only visible in Resize Mode) -->
+                <div id="create-resize-options" class="hidden mt-4 pt-4 border-t border-slate-100">
+                    <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Scaling & Layout Options
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Scaling Mode</label>
+                            <select id="create-scale-mode"
+                                class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                                <option value="fit" selected>Fit to Page (Keep Proportions)</option>
+                                <option value="stretch">Stretch to Fill (Distort to Margins)</option>
+                                <option value="original">Center at 100% (No Rescaling)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Margin Padding</label>
+                            <input id="create-margin" type="number" min="0" max="200" step="any" value="10"
+                                class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Margin Unit</label>
+                            <select id="create-margin-unit"
+                                class="block w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-indigo-500">
+                                <option value="mm" selected>Millimeters (mm)</option>
+                                <option value="in">Inches (in)</option>
+                                <option value="pt">Points (pt)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-6 flex flex-wrap items-center gap-3">
+                    <button id="create-preview-btn" type="button"
+                        class="hidden px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold transition-colors">
+                        <i data-lucide="eye" class="w-4 h-4 inline mr-1"></i> Preview Layout
+                    </button>
+                    <button id="create-run" type="button"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm">
+                        Create & Download PDF
+                    </button>
+                </div>
             </div>
         </section>
+
+        <!-- Create & Resize Preview Modal -->
+        <div id="create-preview-modal"
+            class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4" role="dialog"
+            aria-modal="true">
+            <div
+                class="w-full max-w-4xl max-h-[90vh] overflow-auto rounded-2xl bg-white p-5 shadow-xl flex flex-col items-center">
+                <div class="w-full mb-3 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">Resize Layout Preview</h3>
+                        <p id="create-preview-info" class="text-xs text-slate-500">Showing page 1 placement inside new
+                            page boundaries</p>
+                    </div>
+                    <button id="create-preview-close" type="button"
+                        class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+
+                <div
+                    class="w-full flex justify-center items-center overflow-auto p-4 bg-slate-100 rounded-xl border border-slate-200">
+                    <div id="create-preview-canvas-wrap" class="relative shadow-md bg-white border border-slate-300">
+                        <canvas id="create-preview-canvas" class="block"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- TAB: ADD TEXT TO PDF-->
         <section id="tab-add-text-pdf" class="tab-content hidden tool-page space-y-6">
@@ -4799,534 +4939,277 @@
             }
         });
 
-        document.getElementById('create-run').addEventListener('click', async () => {
-            const pageCount = Number(document.getElementById('create-pages').value);
+
+        // ==========================================
+        // TOOL 8: Create & Resize PDF
+        // ==========================================
+        let createUploadedFile = null;
+        let createPreviewPdfDoc = null;
+
+        // Mode toggle (Blank vs Resize)
+        function toggleCreatePdfMode() {
+            const mode = document.querySelector('input[name="create-pdf-mode"]:checked').value;
+            const isResize = mode === 'resize';
+            document.getElementById('create-dropzone-wrap').classList.toggle('hidden', !isResize);
+            document.getElementById('create-pages-wrap').classList.toggle('hidden', isResize);
+            document.getElementById('create-resize-options').classList.toggle('hidden', !isResize);
+            document.getElementById('create-preview-btn').classList.toggle('hidden', !isResize);
+
+            const runBtn = document.getElementById('create-run');
+            runBtn.innerText = isResize ? 'Resize & Download PDF' : 'Create & Download PDF';
+            refreshIcons();
+        }
+
+        // Toggle custom dimension inputs
+        function toggleCreateCustomSize() {
+            const isCustom = document.getElementById('create-size').value === 'Custom';
+            document.getElementById('create-custom-dims').classList.toggle('hidden', !isCustom);
+            document.getElementById('create-orientation-wrap').classList.toggle('hidden', isCustom);
+        }
+
+        // Dropzone binding for PDF file upload
+        setupDropzone('dropzone-create', 'file-create', async (files) => {
+            const pdfs = getValidPdfFiles(files);
+            if (pdfs.length === 0) return;
+            createUploadedFile = pdfs[0];
+            document.getElementById('create-file-status').innerText =
+                `${createUploadedFile.name} (${(createUploadedFile.size / (1024 * 1024)).toFixed(2)} MB) loaded`;
+
+            try {
+                const arrayBuffer = await createUploadedFile.arrayBuffer();
+                createPreviewPdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                showToast(`Loaded "${createUploadedFile.name}" (${createPreviewPdfDoc.numPages} pages)`);
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to parse uploaded PDF file', true);
+            }
+        });
+
+        // Converts custom dimensions to PDF points (72 pt = 1 inch, 25.4 mm = 1 inch)
+        function calculateTargetPdfDimensions() {
+            const { PageSizes } = PDFLib;
             const sizeName = document.getElementById('create-size').value;
-            if (!Number.isInteger(pageCount) || pageCount < 1 || pageCount > 200) {
-                showToast('Choose a page count from 1 to 200.', true);
+            const orientation = document.getElementById('create-orientation').value;
+
+            if (sizeName === 'Custom') {
+                const unit = document.getElementById('create-unit').value;
+                const customW = parseFloat(document.getElementById('create-width').value);
+                const customH = parseFloat(document.getElementById('create-height').value);
+                if (!customW || !customH || customW <= 0 || customH <= 0) return null;
+
+                const unitMultipliers = { 'pt': 1, 'in': 72, 'mm': 72 / 25.4 };
+                const factor = unitMultipliers[unit] || 1;
+                return { width: customW * factor, height: customH * factor };
+            }
+
+            const standardSizes = {
+                'A4': PageSizes.A4,
+                'Letter': PageSizes.Letter,
+                'Legal': PageSizes.Legal,
+                'A3': PageSizes.A3,
+                'A5': [419.53, 595.28],
+                'Tabloid': [792.0, 1224.0]
+            };
+
+            const [baseW, baseH] = standardSizes[sizeName] || PageSizes.A4;
+            return {
+                width: orientation === 'landscape' ? Math.max(baseW, baseH) : Math.min(baseW, baseH),
+                height: orientation === 'landscape' ? Math.min(baseW, baseH) : Math.max(baseW, baseH)
+            };
+        }
+
+        function calculateTargetMarginInPoints() {
+            const marginVal = parseFloat(document.getElementById('create-margin').value) || 0;
+            const unit = document.getElementById('create-margin-unit').value;
+            const multipliers = { 'pt': 1, 'in': 72, 'mm': 72 / 25.4 };
+            return Math.max(0, marginVal * (multipliers[unit] || 1));
+        }
+
+        // Calculates placement box based on scale mode and margins
+        function computePlacement(contentWidth, contentHeight, targetWidth, targetHeight, margin, mode) {
+            const usableW = Math.max(10, targetWidth - margin * 2);
+            const usableH = Math.max(10, targetHeight - margin * 2);
+
+            let drawW, drawH, scaleX, scaleY;
+
+            if (mode === 'stretch') {
+                drawW = usableW;
+                drawH = usableH;
+                scaleX = usableW / contentWidth;
+                scaleY = usableH / contentHeight;
+            } else if (mode === 'original') {
+                drawW = contentWidth;
+                drawH = contentHeight;
+                scaleX = 1;
+                scaleY = 1;
+            } else {
+                // 'fit' (proportional fit inside margins)
+                const scale = Math.min(usableW / contentWidth, usableH / contentHeight);
+                drawW = contentWidth * scale;
+                drawH = contentHeight * scale;
+                scaleX = scale;
+                scaleY = scale;
+            }
+
+            const x = margin + (usableW - drawW) / 2;
+            const y = margin + (usableH - drawH) / 2;
+
+            return { x, y, drawW, drawH, scaleX, scaleY };
+        }
+
+        // Live Layout Preview Modal Logic
+        const createPreviewModal = document.getElementById('create-preview-modal');
+        document.getElementById('create-preview-close').addEventListener('click', () => {
+            createPreviewModal.classList.add('hidden');
+        });
+
+        document.getElementById('create-preview-btn').addEventListener('click', async () => {
+            if (!createUploadedFile || !createPreviewPdfDoc) {
+                showToast('Please select a PDF file first.', true);
                 return;
             }
+
+            const targetDims = calculateTargetPdfDimensions();
+            if (!targetDims) {
+                showToast('Please enter valid page dimensions.', true);
+                return;
+            }
+
+            createPreviewModal.classList.remove('hidden');
+            const margin = calculateTargetMarginInPoints();
+            const mode = document.getElementById('create-scale-mode').value;
+
+            const page = await createPreviewPdfDoc.getPage(1);
+            const origViewport = page.getViewport({ scale: 1 });
+
+            const maxCanvasW = 550;
+            const viewScale = Math.min(maxCanvasW / targetDims.width, 650 / targetDims.height);
+            const canvas = document.getElementById('create-preview-canvas');
+            canvas.width = Math.ceil(targetDims.width * viewScale);
+            canvas.height = Math.ceil(targetDims.height * viewScale);
+
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Render original page to offscreen canvas
+            const offscreen = document.createElement('canvas');
+            const offScale = 1.5;
+            const renderVp = page.getViewport({ scale: offScale });
+            offscreen.width = renderVp.width;
+            offscreen.height = renderVp.height;
+            await page.render({ canvasContext: offscreen.getContext('2d'), viewport: renderVp }).promise;
+
+            // Calculate layout in destination points
+            const place = computePlacement(origViewport.width, origViewport.height, targetDims.width, targetDims.height, margin, mode);
+
+            // Draw page content onto target preview canvas (converting to top-left coordinate system)
+            const drawX = place.x * viewScale;
+            const drawY = (targetDims.height - (place.y + place.drawH)) * viewScale;
+            const drawW = place.drawW * viewScale;
+            const drawH = place.drawH * viewScale;
+
+            ctx.drawImage(offscreen, drawX, drawY, drawW, drawH);
+
+            // Draw margin guidelines (dashed line)
+            if (margin > 0) {
+                ctx.save();
+                ctx.strokeStyle = '#6366f1';
+                ctx.setLineDash([4, 4]);
+                ctx.lineWidth = 1;
+                ctx.strokeRect(
+                    margin * viewScale,
+                    margin * viewScale,
+                    (targetDims.width - margin * 2) * viewScale,
+                    (targetDims.height - margin * 2) * viewScale
+                );
+                ctx.restore();
+            }
+
+            document.getElementById('create-preview-info').innerText =
+                `Target: ${Math.round(targetDims.width)} × ${Math.round(targetDims.height)} pt | Margin: ${Math.round(margin)} pt | Mode: ${mode}`;
+        });
+
+        // Run & Download Handler
+        document.getElementById('create-run').addEventListener('click', async () => {
             if (!window.PDFLib) {
                 showToast('The PDF library is unavailable. Check your connection and reload.', true);
                 return;
             }
+
+            const mode = document.querySelector('input[name="create-pdf-mode"]:checked').value;
+            const targetDims = calculateTargetPdfDimensions();
+
+            if (!targetDims) {
+                showToast('Please enter valid dimensions.', true);
+                return;
+            }
+
+            const { width: targetWidth, height: targetHeight } = targetDims;
+
             try {
-                const pdfDoc = await PDFLib.PDFDocument.create();
-                for (let i = 0; i < pageCount; i++) {
-                    pdfDoc.addPage(PDFLib.PageSizes[sizeName]);
+                const { PDFDocument } = PDFLib;
+
+                if (mode === 'blank') {
+                    const pageCount = Number(document.getElementById('create-pages').value);
+                    if (!Number.isInteger(pageCount) || pageCount < 1 || pageCount > 200) {
+                        showToast('Choose a page count from 1 to 200.', true);
+                        return;
+                    }
+
+                    const pdfDoc = await PDFDocument.create();
+                    for (let i = 0; i < pageCount; i++) {
+                        pdfDoc.addPage([targetWidth, targetHeight]);
+                    }
+
+                    const bytes = await pdfDoc.save();
+                    saveAs(new Blob([bytes], { type: 'application/pdf' }), 'blank_document.pdf');
+                    showToast(`Created a ${pageCount}-page blank PDF.`);
+                } else {
+                    if (!createUploadedFile) {
+                        showToast('Please drop or select a PDF file to resize.', true);
+                        return;
+                    }
+
+                    const scaleMode = document.getElementById('create-scale-mode').value;
+                    const margin = calculateTargetMarginInPoints();
+
+                    showProgress('Resizing PDF Pages', 'Applying page scaling and margin parameters...');
+
+                    const sourceBytes = await createUploadedFile.arrayBuffer();
+                    const sourceDoc = await PDFDocument.load(sourceBytes);
+                    const targetDoc = await PDFDocument.create();
+                    const totalPages = sourceDoc.getPageCount();
+
+                    for (let i = 0; i < totalPages; i++) {
+                        const [embeddedPage] = await targetDoc.embedPdf(sourceDoc, [i]);
+                        const newPage = targetDoc.addPage([targetWidth, targetHeight]);
+
+                        const place = computePlacement(embeddedPage.width, embeddedPage.height, targetWidth, targetHeight, margin, scaleMode);
+
+                        newPage.drawPage(embeddedPage, {
+                            x: place.x,
+                            y: place.y,
+                            xScale: place.scaleX,
+                            yScale: place.scaleY
+                        });
+
+                        updateProgress(((i + 1) / totalPages) * 90);
+                    }
+
+                    const outBytes = await targetDoc.save();
+                    const outputName = `${safeFileBaseName(createUploadedFile)}_resized.pdf`;
+                    saveAs(new Blob([outBytes], { type: 'application/pdf' }), outputName);
+
+                    hideProgress();
+                    showToast(`Successfully resized all ${totalPages} pages!`);
                 }
-                const bytes = await pdfDoc.save();
-                saveAs(new Blob([bytes], { type: 'application/pdf' }), 'blank_document.pdf');
-                showToast(`Created a ${pageCount}-page ${sizeName} PDF.`);
             } catch (err) {
-                console.error(err);
-                showToast('Could not create the PDF document.', true);
-            }
-        });
-
-        window.addEventListener('DOMContentLoaded', () => {
-            refreshIcons();
-            const initialTab = window.location.hash.slice(1);
-            if (initialTab === 'extract-pages' || document.getElementById(`tab-${initialTab}`)) {
-                switchTab(initialTab);
-            }
-        });
-    </script>
-
-    <script>
-        // ==========================================
-        // EXTENSION MODULE: Add Text to PDF (Draggable & Resizable with Pipette)
-        // ==========================================
-        (function () {
-            let textDocuments = [];
-            let activeDocIndex = 0;
-            let activePageNum = 1;
-            let activeScale = 1;
-            let selectedTextIndex = -1;
-            let textInteraction = null;
-            let textEyedropperActive = false;
-
-            function getActivePage() {
-                return textDocuments[activeDocIndex]?.pages[activePageNum - 1] || null;
-            }
-
-            function hexToRgbPdf(hex) {
-                const h = hex.replace('#', '');
-                return PDFLib.rgb(
-                    parseInt(h.slice(0, 2), 16) / 255,
-                    parseInt(h.slice(2, 4), 16) / 255,
-                    parseInt(h.slice(4, 6), 16) / 255
-                );
-            }
-
-            function getTextItemMetrics(item, ctx, overlay) {
-                const fontSize = item.size * activeScale;
-                ctx.save();
-                ctx.font = `${fontSize}px ${item.font && item.font.includes('Bold') ? 'bold ' : ''}sans-serif`;
-                const textWidth = ctx.measureText(item.text).width;
-                ctx.restore();
-
-                const x = item.x * overlay.width;
-                const y = item.y * overlay.height;
-                const w = textWidth;
-                const h = fontSize * 1.15;
-
-                return { x, y, w, h, fontSize };
-            }
-
-            function isOverResizeHandle(itemMetrics, px, py) {
-                const handleX = itemMetrics.x + itemMetrics.w;
-                const handleY = itemMetrics.y + itemMetrics.h;
-                return Math.abs(px - handleX) <= 12 && Math.abs(py - handleY) <= 12;
-            }
-
-            function renderTextOverlay() {
-                const overlay = document.getElementById('add-text-overlay-canvas');
-                if (!overlay) return;
-                const ctx = overlay.getContext('2d');
-                ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-                const curPage = getActivePage();
-                if (curPage) {
-                    curPage.items.forEach((item, idx) => {
-                        const m = getTextItemMetrics(item, ctx, overlay);
-
-                        ctx.save();
-                        ctx.font = `${m.fontSize}px ${item.font && item.font.includes('Bold') ? 'bold ' : ''}sans-serif`;
-                        ctx.fillStyle = item.color;
-                        ctx.textBaseline = 'top';
-                        ctx.fillText(item.text, m.x, m.y);
-
-                        if (idx === selectedTextIndex) {
-                            // Bounding Box
-                            ctx.strokeStyle = '#4f46e5';
-                            ctx.lineWidth = 1.5;
-                            ctx.setLineDash([4, 2]);
-                            ctx.strokeRect(m.x - 3, m.y - 2, m.w + 6, m.h + 4);
-                            ctx.setLineDash([]);
-
-                            // Resize Handle (bottom-right)
-                            ctx.fillStyle = '#ffffff';
-                            ctx.strokeStyle = '#4f46e5';
-                            ctx.lineWidth = 2;
-                            ctx.fillRect(m.x + m.w - 4, m.y + m.h - 4, 8, 8);
-                            ctx.strokeRect(m.x + m.w - 4, m.y + m.h - 4, 8, 8);
-                        }
-                        ctx.restore();
-                    });
-                }
-
-                document.getElementById('add-text-undo').disabled = !curPage || curPage.items.length === 0;
-                document.getElementById('add-text-run').disabled = !textDocuments.some(d => d.pages.some(p => p.items.length > 0));
-            }
-
-            async function renderTextPdfPage() {
-                const docState = textDocuments[activeDocIndex];
-                const wrap = document.getElementById('add-text-page-wrap');
-                const status = document.getElementById('add-text-status');
-                if (!docState) {
-                    wrap.classList.add('hidden');
-                    status.textContent = 'Select a PDF to begin adding text.';
-                    return;
-                }
-
-                status.textContent = `Rendering page ${activePageNum}...`;
-                wrap.classList.add('hidden');
-
-                try {
-                    const page = await docState.pdf.getPage(activePageNum);
-                    const baseViewport = page.getViewport({ scale: 1 });
-                    const scale = Math.min(1.35, 850 / baseViewport.width, 1100 / baseViewport.height);
-                    const viewport = page.getViewport({ scale });
-                    activeScale = scale;
-
-                    const canvas = document.getElementById('add-text-page-canvas');
-                    const overlay = document.getElementById('add-text-overlay-canvas');
-                    canvas.width = overlay.width = Math.ceil(viewport.width);
-                    canvas.height = overlay.height = Math.ceil(viewport.height);
-
-                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-
-                    wrap.classList.remove('hidden');
-                    status.textContent = `Page ${activePageNum} of ${docState.pages.length} — click to place text, or drag & resize existing text.`;
-                    renderTextOverlay();
-                } catch (err) {
-                    console.error(err);
-                    status.textContent = 'Could not preview page.';
-                    showToast('Failed to preview this page.', true);
-                }
-            }
-
-            function updateTextPageDropdown() {
-                const select = document.getElementById('add-text-page-select');
-                select.innerHTML = '';
-                const doc = textDocuments[activeDocIndex];
-                if (!doc) return;
-                doc.pages.forEach((_, i) => {
-                    const opt = document.createElement('option');
-                    opt.value = i + 1;
-                    opt.textContent = `Page ${i + 1}`;
-                    select.appendChild(opt);
-                });
-                select.value = activePageNum;
-            }
-
-            // Color Pipette / EyeDropper
-            async function activateTextEyedropper() {
-                if (window.EyeDropper) {
-                    try {
-                        const eyeDropper = new EyeDropper();
-                        const result = await eyeDropper.open();
-                        if (result && result.sRGBHex) {
-                            const hex = result.sRGBHex;
-                            document.getElementById('add-text-color').value = hex;
-                            const curPage = getActivePage();
-                            if (curPage && selectedTextIndex !== -1 && curPage.items[selectedTextIndex]) {
-                                curPage.items[selectedTextIndex].color = hex;
-                                renderTextOverlay();
-                            }
-                            showToast(`Text color set to ${hex}`);
-                        }
-                        return;
-                    } catch (e) {
-                        return;
-                    }
-                }
-
-                textEyedropperActive = true;
-                const overlay = document.getElementById('add-text-overlay-canvas');
-                if (overlay) overlay.style.cursor = 'copy';
-                showToast('Click anywhere on the PDF page to sample text color');
-            }
-
-            const pickBtn = document.getElementById('add-text-pick-color');
-            if (pickBtn) {
-                pickBtn.addEventListener('click', activateTextEyedropper);
-            }
-
-            // Setup Dropzone
-            setupDropzone('dropzone-add-text', 'file-add-text', async (files) => {
-                const valid = getValidPdfFiles(files);
-                if (valid.length === 0) {
-                    showToast('Please select valid PDF documents.', true);
-                    return;
-                }
-
-                showProgress('Loading PDFs', 'Preparing document pages for text entry...');
-                const docs = [];
-                for (let i = 0; i < valid.length; i++) {
-                    try {
-                        const pdf = await pdfjsLib.getDocument({ data: await valid[i].arrayBuffer() }).promise;
-                        docs.push({
-                            file: valid[i],
-                            pdf: pdf,
-                            pages: Array.from({ length: pdf.numPages }, () => ({ items: [] }))
-                        });
-                    } catch (e) {
-                        console.error(e);
-                    }
-                    updateProgress(((i + 1) / valid.length) * 90);
-                }
-
                 hideProgress();
-                textDocuments = docs;
-                activeDocIndex = 0;
-                activePageNum = 1;
-                selectedTextIndex = -1;
-
-                const fileSelect = document.getElementById('add-text-file-select');
-                fileSelect.innerHTML = '';
-                textDocuments.forEach((d, i) => {
-                    const opt = document.createElement('option');
-                    opt.value = i;
-                    opt.textContent = `${i + 1}. ${d.file.name}`;
-                    fileSelect.appendChild(opt);
-                });
-
-                document.getElementById('add-text-selection').textContent = `${textDocuments.length} PDF(s) loaded`;
-                document.getElementById('add-text-controls').classList.remove('hidden');
-                updateTextPageDropdown();
-                renderTextPdfPage();
-                showToast(`${textDocuments.length} PDF(s) loaded. You can now add and edit text!`);
-            });
-
-            document.getElementById('add-text-file-select').addEventListener('change', (e) => {
-                activeDocIndex = parseInt(e.target.value, 10);
-                activePageNum = 1;
-                selectedTextIndex = -1;
-                updateTextPageDropdown();
-                renderTextPdfPage();
-            });
-
-            document.getElementById('add-text-page-select').addEventListener('change', (e) => {
-                activePageNum = parseInt(e.target.value, 10);
-                selectedTextIndex = -1;
-                renderTextPdfPage();
-            });
-
-            // Color input change updates selected text
-            document.getElementById('add-text-color').addEventListener('input', (e) => {
-                const curPage = getActivePage();
-                if (curPage && selectedTextIndex !== -1 && curPage.items[selectedTextIndex]) {
-                    curPage.items[selectedTextIndex].color = e.target.value;
-                    renderTextOverlay();
-                }
-            });
-
-            // Font family change updates selected text
-            document.getElementById('add-text-font').addEventListener('change', (e) => {
-                const curPage = getActivePage();
-                if (curPage && selectedTextIndex !== -1 && curPage.items[selectedTextIndex]) {
-                    curPage.items[selectedTextIndex].font = e.target.value;
-                    renderTextOverlay();
-                }
-            });
-
-            // Font size manual input updates selected text
-            document.getElementById('add-text-size').addEventListener('input', (e) => {
-                const curPage = getActivePage();
-                const val = parseInt(e.target.value, 10);
-                if (curPage && selectedTextIndex !== -1 && curPage.items[selectedTextIndex] && val >= 8 && val <= 120) {
-                    curPage.items[selectedTextIndex].size = val;
-                    renderTextOverlay();
-                }
-            });
-
-            // Pointer Events on Overlay Canvas (Pick, Place, Drag & Resize)
-            const overlay = document.getElementById('add-text-overlay-canvas');
-
-            overlay.addEventListener('pointerdown', (e) => {
-                if (e.button !== 0) return;
-
-                // Handle Canvas Fallback Pipette
-                if (textEyedropperActive) {
-                    const pageCanvas = document.getElementById('add-text-page-canvas');
-                    const rect = pageCanvas.getBoundingClientRect();
-                    const scaleX = pageCanvas.width / rect.width;
-                    const scaleY = pageCanvas.height / rect.height;
-                    const clickX = Math.floor((e.clientX - rect.left) * scaleX);
-                    const clickY = Math.floor((e.clientY - rect.top) * scaleY);
-
-                    const ctx = pageCanvas.getContext('2d');
-                    const pixel = ctx.getImageData(Math.max(0, Math.min(pageCanvas.width - 1, clickX)), Math.max(0, Math.min(pageCanvas.height - 1, clickY)), 1, 1).data;
-                    const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(v => v.toString(16).padStart(2, '0')).join('');
-
-                    document.getElementById('add-text-color').value = hex;
-                    const curPage = getActivePage();
-                    if (curPage && selectedTextIndex !== -1 && curPage.items[selectedTextIndex]) {
-                        curPage.items[selectedTextIndex].color = hex;
-                        renderTextOverlay();
-                    }
-
-                    textEyedropperActive = false;
-                    overlay.style.cursor = 'crosshair';
-                    showToast(`Text color sampled: ${hex}`);
-                    return;
-                }
-
-                const bounds = overlay.getBoundingClientRect();
-                const rawPx = e.clientX - bounds.left;
-                const rawPy = e.clientY - bounds.top;
-                const normX = rawPx / bounds.width;
-                const normY = rawPy / bounds.height;
-                const curPage = getActivePage();
-                if (!curPage) return;
-
-                const ctx = overlay.getContext('2d');
-
-                // 1. Check if clicking on the resize handle of the currently selected item
-                if (selectedTextIndex !== -1 && curPage.items[selectedTextIndex]) {
-                    const selItem = curPage.items[selectedTextIndex];
-                    const metrics = getTextItemMetrics(selItem, ctx, overlay);
-                    if (isOverResizeHandle(metrics, rawPx, rawPy)) {
-                        textInteraction = {
-                            type: 'resize',
-                            pointerId: e.pointerId,
-                            startY: rawPy,
-                            initialSize: selItem.size
-                        };
-                        overlay.setPointerCapture(e.pointerId);
-                        return;
-                    }
-                }
-
-                // 2. Check if clicking on an existing text item to select & drag
-                let hitIndex = -1;
-                for (let i = curPage.items.length - 1; i >= 0; i--) {
-                    const item = curPage.items[i];
-                    const m = getTextItemMetrics(item, ctx, overlay);
-                    if (rawPx >= m.x - 4 && rawPx <= m.x + m.w + 4 && rawPy >= m.y - 4 && rawPy <= m.y + m.h + 4) {
-                        hitIndex = i;
-                        break;
-                    }
-                }
-
-                if (hitIndex !== -1) {
-                    selectedTextIndex = hitIndex;
-                    const item = curPage.items[hitIndex];
-                    textInteraction = {
-                        type: 'move',
-                        pointerId: e.pointerId,
-                        startX: normX,
-                        startY: normY,
-                        initialItemX: item.x,
-                        initialItemY: item.y
-                    };
-                    overlay.setPointerCapture(e.pointerId);
-
-                    // Synchronize controls with selected text properties
-                    document.getElementById('add-text-size').value = item.size;
-                    document.getElementById('add-text-color').value = item.color;
-                    if (item.font) document.getElementById('add-text-font').value = item.font;
-
-                    renderTextOverlay();
-                    return;
-                }
-
-                // 3. Otherwise, click on empty area places a new text item
-                const text = document.getElementById('add-text-input').value.trim();
-                if (!text) {
-                    selectedTextIndex = -1;
-                    renderTextOverlay();
-                    showToast('Type some text in the input box, then click anywhere on the page to place it.', false);
-                    return;
-                }
-
-                const size = parseInt(document.getElementById('add-text-size').value, 10) || 16;
-                const font = document.getElementById('add-text-font').value;
-                const color = document.getElementById('add-text-color').value;
-
-                curPage.items.push({ text, size, font, color, x: normX, y: normY });
-                selectedTextIndex = curPage.items.length - 1;
-                renderTextOverlay();
-            });
-
-            overlay.addEventListener('pointermove', (e) => {
-                const bounds = overlay.getBoundingClientRect();
-                const rawPx = e.clientX - bounds.left;
-                const rawPy = e.clientY - bounds.top;
-                const normX = rawPx / bounds.width;
-                const normY = rawPy / bounds.height;
-                const curPage = getActivePage();
-
-                // Handle dragging or resizing
-                if (textInteraction && curPage && selectedTextIndex !== -1) {
-                    const item = curPage.items[selectedTextIndex];
-                    if (!item) return;
-
-                    if (textInteraction.type === 'move') {
-                        item.x = Math.max(0, Math.min(0.95, textInteraction.initialItemX + (normX - textInteraction.startX)));
-                        item.y = Math.max(0, Math.min(0.95, textInteraction.initialItemY + (normY - textInteraction.startY)));
-                        renderTextOverlay();
-                    } else if (textInteraction.type === 'resize') {
-                        const deltaY = rawPy - textInteraction.startY;
-                        const newSize = Math.max(8, Math.min(120, Math.round(textInteraction.initialSize + deltaY / activeScale)));
-                        item.size = newSize;
-                        document.getElementById('add-text-size').value = newSize;
-                        renderTextOverlay();
-                    }
-                    return;
-                }
-
-                // Cursor hover states
-                if (!curPage || textEyedropperActive) return;
-                const ctx = overlay.getContext('2d');
-
-                if (selectedTextIndex !== -1 && curPage.items[selectedTextIndex]) {
-                    const m = getTextItemMetrics(curPage.items[selectedTextIndex], ctx, overlay);
-                    if (isOverResizeHandle(m, rawPx, rawPy)) {
-                        overlay.style.cursor = 'nwse-resize';
-                        return;
-                    }
-                }
-
-                let hovered = false;
-                for (let i = curPage.items.length - 1; i >= 0; i--) {
-                    const m = getTextItemMetrics(curPage.items[i], ctx, overlay);
-                    if (rawPx >= m.x - 4 && rawPx <= m.x + m.w + 4 && rawPy >= m.y - 4 && rawPy <= m.y + m.h + 4) {
-                        hovered = true;
-                        break;
-                    }
-                }
-                overlay.style.cursor = hovered ? 'move' : 'crosshair';
-            });
-
-            const stopInteraction = (e) => {
-                if (textInteraction) {
-                    try { overlay.releasePointerCapture(e.pointerId); } catch (_) { }
-                    textInteraction = null;
-                    renderTextOverlay();
-                }
-            };
-            overlay.addEventListener('pointerup', stopInteraction);
-            overlay.addEventListener('pointercancel', stopInteraction);
-
-            document.getElementById('add-text-undo').addEventListener('click', () => {
-                const curPage = getActivePage();
-                if (curPage && curPage.items.length) {
-                    curPage.items.pop();
-                    selectedTextIndex = -1;
-                    renderTextOverlay();
-                }
-            });
-
-            // Generate and Save Modified PDF
-            document.getElementById('add-text-run').addEventListener('click', async () => {
-                showProgress('Applying text', 'Writing annotations into PDF structure...');
-                try {
-                    const { PDFDocument, StandardFonts } = PDFLib;
-                    const outputs = [];
-
-                    for (let d = 0; d < textDocuments.length; d++) {
-                        const docState = textDocuments[d];
-                        const pdfDoc = await PDFDocument.load(await docState.file.arrayBuffer());
-                        const pages = pdfDoc.getPages();
-
-                        const fonts = {
-                            Helvetica: await pdfDoc.embedFont(StandardFonts.Helvetica),
-                            HelveticaBold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-                            TimesRoman: await pdfDoc.embedFont(StandardFonts.TimesRoman),
-                            Courier: await pdfDoc.embedFont(StandardFonts.Courier)
-                        };
-
-                        docState.pages.forEach((pageState, pIdx) => {
-                            if (!pageState.items.length || pIdx >= pages.length) return;
-                            const page = pages[pIdx];
-                            const { width, height } = page.getSize();
-
-                            pageState.items.forEach(it => {
-                                const fontObj = fonts[it.font] || fonts.Helvetica;
-                                const xPos = it.x * width;
-                                // PDFLib coordinates start from bottom-left
-                                const yPos = height - (it.y * height) - (it.size * 1.05);
-
-                                page.drawText(it.text, {
-                                    x: xPos,
-                                    y: yPos,
-                                    size: it.size,
-                                    font: fontObj,
-                                    color: hexToRgbPdf(it.color)
-                                });
-                            });
-                        });
-
-                        outputs.push({
-                            name: `${safeFileBaseName(docState.file)}_with_text.pdf`,
-                            bytes: await pdfDoc.save()
-                        });
-                        updateProgress(((d + 1) / textDocuments.length) * 85);
-                    }
-
-                    await downloadPdfOutputs(outputs, 'pdfs_with_text.zip');
-                    hideProgress();
-                    showToast(`Applied text to ${outputs.length} PDF(s) successfully!`);
-                } catch (err) {
-                    hideProgress();
-                    console.error(err);
-                    showToast('Failed to apply text to PDF.', true);
-                }
-            });
-        })();
+                console.error(err);
+                showToast('Failed to process the PDF document.', true);
+            }
+        });
     </script>
 
     <script>
