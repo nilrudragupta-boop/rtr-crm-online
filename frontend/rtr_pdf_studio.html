@@ -875,8 +875,8 @@
                     <button class="directory-card" type="button" data-tool="create-pdf"
                         data-search="create blank empty new pdf page" style="--tool-color:#4388a8;--tool-tint:#eaf5f8">
                         <span class="directory-card-icon"><i data-lucide="file-plus-2" aria-hidden="true"></i></span>
-                        <strong>Create PDF</strong>
-                        <span>Create a blank PDF document</span>
+                        <strong>Create & Resize PDF</strong>
+                        <span>Create a blank PDF or resize an existing document</span>
                     </button>
                     <button class="directory-card" type="button" data-tool="extract-pages"
                         data-search="extract export selected pages" style="--tool-color:#9a70bd;--tool-tint:#f4eff9">
@@ -1932,16 +1932,38 @@
             aria-modal="true">
             <div
                 class="w-full max-w-4xl max-h-[90vh] overflow-auto rounded-2xl bg-white p-5 shadow-xl flex flex-col items-center">
-                <div class="w-full mb-3 flex items-center justify-between">
+                <div
+                    class="w-full mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                     <div>
                         <h3 class="text-base font-bold text-slate-900">Resize Layout Preview</h3>
-                        <p id="create-preview-info" class="text-xs text-slate-500">Showing page 1 placement inside new
-                            page boundaries</p>
+                        <p id="create-preview-info" class="text-xs text-slate-500">Preview placement inside new page
+                            boundaries</p>
                     </div>
-                    <button id="create-preview-close" type="button"
-                        class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800">
-                        <i data-lucide="x" class="h-5 w-5"></i>
-                    </button>
+
+                    <!-- Page Chooser Controls -->
+                    <div class="flex items-center gap-2">
+                        <button id="create-prev-page-btn" type="button"
+                            class="p-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs"
+                            title="Previous page">
+                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                        </button>
+                        <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                            <span>Page</span>
+                            <select id="create-preview-page-select"
+                                class="text-xs border border-slate-200 rounded-md py-1 px-2 bg-slate-50 focus:ring-2 focus:ring-indigo-500"></select>
+                            <span id="create-preview-total-pages" class="text-slate-400 font-normal">of 1</span>
+                        </div>
+                        <button id="create-next-page-btn" type="button"
+                            class="p-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs"
+                            title="Next page">
+                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                        <button id="create-preview-close" type="button"
+                            class="ml-2 rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                            aria-label="Close preview">
+                            <i data-lucide="x" class="h-5 w-5"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div
@@ -5059,27 +5081,39 @@
 
         // Live Layout Preview Modal Logic
         const createPreviewModal = document.getElementById('create-preview-modal');
+        let activeCreatePreviewPage = 1;
+
         document.getElementById('create-preview-close').addEventListener('click', () => {
             createPreviewModal.classList.add('hidden');
         });
 
-        document.getElementById('create-preview-btn').addEventListener('click', async () => {
-            if (!createUploadedFile || !createPreviewPdfDoc) {
-                showToast('Please select a PDF file first.', true);
-                return;
+        function populateCreatePreviewPages(totalPages) {
+            const select = document.getElementById('create-preview-page-select');
+            select.innerHTML = '';
+            for (let i = 1; i <= totalPages; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = i;
+                select.appendChild(opt);
             }
+            select.value = activeCreatePreviewPage;
+            document.getElementById('create-preview-total-pages').textContent = `of ${totalPages}`;
+        }
 
+        async function renderCreatePreviewCanvas(pageNum) {
+            if (!createPreviewPdfDoc) return;
             const targetDims = calculateTargetPdfDimensions();
-            if (!targetDims) {
-                showToast('Please enter valid page dimensions.', true);
-                return;
-            }
+            if (!targetDims) return;
 
-            createPreviewModal.classList.remove('hidden');
             const margin = calculateTargetMarginInPoints();
             const mode = document.getElementById('create-scale-mode').value;
 
-            const page = await createPreviewPdfDoc.getPage(1);
+            activeCreatePreviewPage = pageNum;
+            document.getElementById('create-preview-page-select').value = pageNum;
+            document.getElementById('create-prev-page-btn').disabled = pageNum <= 1;
+            document.getElementById('create-next-page-btn').disabled = pageNum >= createPreviewPdfDoc.numPages;
+
+            const page = await createPreviewPdfDoc.getPage(pageNum);
             const origViewport = page.getViewport({ scale: 1 });
 
             const maxCanvasW = 550;
@@ -5100,10 +5134,10 @@
             offscreen.height = renderVp.height;
             await page.render({ canvasContext: offscreen.getContext('2d'), viewport: renderVp }).promise;
 
-            // Calculate layout in destination points
+            // Calculate destination placement
             const place = computePlacement(origViewport.width, origViewport.height, targetDims.width, targetDims.height, margin, mode);
 
-            // Draw page content onto target preview canvas (converting to top-left coordinate system)
+            // Draw onto preview canvas
             const drawX = place.x * viewScale;
             const drawY = (targetDims.height - (place.y + place.drawH)) * viewScale;
             const drawW = place.drawW * viewScale;
@@ -5111,7 +5145,7 @@
 
             ctx.drawImage(offscreen, drawX, drawY, drawW, drawH);
 
-            // Draw margin guidelines (dashed line)
+            // Draw margin guides
             if (margin > 0) {
                 ctx.save();
                 ctx.strokeStyle = '#6366f1';
@@ -5127,7 +5161,42 @@
             }
 
             document.getElementById('create-preview-info').innerText =
-                `Target: ${Math.round(targetDims.width)} × ${Math.round(targetDims.height)} pt | Margin: ${Math.round(margin)} pt | Mode: ${mode}`;
+                `Page ${pageNum} of ${createPreviewPdfDoc.numPages} | Target: ${Math.round(targetDims.width)} × ${Math.round(targetDims.height)} pt | Margin: ${Math.round(margin)} pt`;
+        }
+
+        document.getElementById('create-preview-btn').addEventListener('click', async () => {
+            if (!createUploadedFile || !createPreviewPdfDoc) {
+                showToast('Please select a PDF file first.', true);
+                return;
+            }
+
+            const targetDims = calculateTargetPdfDimensions();
+            if (!targetDims) {
+                showToast('Please enter valid page dimensions.', true);
+                return;
+            }
+
+            activeCreatePreviewPage = 1;
+            populateCreatePreviewPages(createPreviewPdfDoc.numPages);
+            createPreviewModal.classList.remove('hidden');
+            refreshIcons();
+            await renderCreatePreviewCanvas(1);
+        });
+
+        document.getElementById('create-preview-page-select').addEventListener('change', (e) => {
+            renderCreatePreviewCanvas(parseInt(e.target.value, 10));
+        });
+
+        document.getElementById('create-prev-page-btn').addEventListener('click', () => {
+            if (activeCreatePreviewPage > 1) {
+                renderCreatePreviewCanvas(activeCreatePreviewPage - 1);
+            }
+        });
+
+        document.getElementById('create-next-page-btn').addEventListener('click', () => {
+            if (createPreviewPdfDoc && activeCreatePreviewPage < createPreviewPdfDoc.numPages) {
+                renderCreatePreviewCanvas(activeCreatePreviewPage + 1);
+            }
         });
 
         // Run & Download Handler
