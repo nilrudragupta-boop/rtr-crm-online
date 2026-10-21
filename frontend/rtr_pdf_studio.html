@@ -891,6 +891,15 @@
                         <strong>Add text</strong>
                         <span>Type and place text on PDF pages</span>
                     </button>
+                    <button class="directory-card" type="button" data-tool="sign-pdf"
+                        data-search="sign signature draw image stamp sign pdf"
+                        style="--tool-color:#0d9488;--tool-tint:#f0fdfa">
+                        <span class="directory-card-icon"><i data-lucide="pen-tool" aria-hidden="true"></i></span>
+                        <strong>Sign PDF</strong>
+                        <span>Draw or upload a signature to place on pages</span>
+                    </button>
+
+
                 </div>
                 <p id="directory-empty" class="directory-empty hidden">No matching tools. Try a different search.</p>
 
@@ -1891,6 +1900,104 @@
                 </div>
             </div>
         </section>
+
+        <!-- TAB: ADD SIGNATURE TO PDF-->
+
+        <section id="tab-sign-pdf" class="tab-content hidden tool-page space-y-6">
+            <button class="tool-back" type="button" onclick="showToolDirectory()">
+                <i data-lucide="arrow-left"></i> All tools
+            </button>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <div class="tool-content-heading mb-4">
+                    <h2 class="text-xl font-bold text-slate-900">Sign PDF</h2>
+                    <p class="text-sm text-slate-500">Draw a signature or upload a transparent PNG, then position and
+                        resize it on your document.</p>
+                </div>
+
+                <div id="dropzone-sign"
+                    class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer bg-slate-50/50">
+                    <input type="file" id="file-sign" accept="application/pdf,.pdf" multiple class="hidden">
+                    <i data-lucide="pen-tool" class="w-8 h-8 mx-auto mb-3 text-teal-600"></i>
+                    <p class="font-semibold text-slate-800">Select or drop PDF files</p>
+                    <p id="sign-selection" class="text-xs text-slate-500 mt-1">Processed locally on your device.</p>
+                </div>
+
+                <div id="sign-controls" class="hidden mt-5 space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <label class="text-xs font-semibold text-slate-700">PDF
+                            <select id="sign-file-select"
+                                class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border"></select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-700">Page
+                            <select id="sign-page-select"
+                                class="block w-full mt-1 text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border"></select>
+                        </label>
+                        <div class="flex items-end gap-2">
+                            <button id="sign-open-pad-btn" type="button"
+                                class="w-full px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i> Create / Draw Signature
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Page Canvas Workspace -->
+                    <div class="overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4">
+                        <div id="sign-page-wrap" class="relative mx-auto hidden w-fit shadow-sm">
+                            <canvas id="sign-page-canvas" class="block"></canvas>
+                            <canvas id="sign-overlay-canvas"
+                                class="absolute inset-0 touch-none cursor-crosshair"></canvas>
+                        </div>
+                        <p id="sign-status" class="py-6 text-center text-sm text-slate-500">Select a PDF to begin
+                            signing.</p>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button id="sign-undo" type="button" disabled
+                            class="px-4 py-2 border border-slate-300 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-sm font-semibold">Undo</button>
+                        <button id="sign-run" type="button" disabled
+                            class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold">Apply
+                            Signature & Download</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+
+        <div id="sig-pad-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-base font-bold text-slate-900">Draw or Upload Signature</h3>
+                    <button id="sig-pad-close" type="button" class="text-slate-400 hover:text-slate-600"><i
+                            data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+                <div class="border border-slate-200 rounded-xl bg-slate-50 p-1">
+                    <canvas id="sig-pad-canvas" width="460" height="180"
+                        class="w-full bg-white rounded-lg touch-none cursor-crosshair"></canvas>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-semibold text-slate-600">Color:
+                            <input id="sig-pad-color" type="color" value="#0f172a"
+                                class="w-7 h-7 p-0 border-0 rounded cursor-pointer">
+                        </label>
+                        <button id="sig-pad-clear" type="button"
+                            class="text-xs text-rose-600 hover:underline font-semibold ml-2">Clear</button>
+                    </div>
+                    <label
+                        class="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 rounded-lg text-xs font-semibold cursor-pointer">
+                        Upload image file
+                        <input id="sig-pad-upload" type="file" accept="image/png,image/jpeg" class="hidden">
+                    </label>
+                </div>
+                <div class="flex justify-end gap-2 pt-2 border-t">
+                    <button id="sig-pad-use" type="button"
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold">
+                        Use Signature
+                    </button>
+                </div>
+            </div>
+        </div>
 
     </main>
 
@@ -5221,6 +5328,509 @@
             });
         })();
     </script>
+
+    <script>
+        // ==========================================
+        // EXTENSION MODULE: Sign PDF (Draw, Upload, Stamp & Resize)
+        // ==========================================
+        (function () {
+            let signDocuments = [];
+            let activeDocIndex = 0;
+            let activePageNum = 1;
+            let activeScale = 1;
+            let selectedSigIndex = -1;
+            let sigInteraction = null;
+            let activeSignatureDataUrl = null;
+
+            // --- Signature Pad (Drawing Modal) ---
+            const padModal = document.getElementById('sig-pad-modal');
+            const padCanvas = document.getElementById('sig-pad-canvas');
+            const padCtx = padCanvas.getContext('2d');
+            let isDrawingPad = false;
+            let padColor = '#0f172a';
+
+            function clearPad() {
+                padCtx.clearRect(0, 0, padCanvas.width, padCanvas.height);
+            }
+
+            function openPadModal() {
+                clearPad();
+                padModal.classList.remove('hidden');
+            }
+
+            function closePadModal() {
+                padModal.classList.add('hidden');
+            }
+
+            document.getElementById('sign-open-pad-btn').addEventListener('click', openPadModal);
+            document.getElementById('sig-pad-close').addEventListener('click', closePadModal);
+            document.getElementById('sig-pad-clear').addEventListener('click', clearPad);
+
+            document.getElementById('sig-pad-color').addEventListener('input', (e) => {
+                padColor = e.target.value;
+            });
+
+            // Drawing inside pad
+            function getPadPos(e) {
+                const rect = padCanvas.getBoundingClientRect();
+                const scaleX = padCanvas.width / rect.width;
+                const scaleY = padCanvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
+            }
+
+            padCanvas.addEventListener('pointerdown', (e) => {
+                isDrawingPad = true;
+                padCanvas.setPointerCapture(e.pointerId);
+                const pos = getPadPos(e);
+                padCtx.beginPath();
+                padCtx.moveTo(pos.x, pos.y);
+                padCtx.strokeStyle = padColor;
+                padCtx.lineWidth = 3;
+                padCtx.lineCap = 'round';
+                padCtx.lineJoin = 'round';
+            });
+
+            padCanvas.addEventListener('pointermove', (e) => {
+                if (!isDrawingPad) return;
+                const pos = getPadPos(e);
+                padCtx.lineTo(pos.x, pos.y);
+                padCtx.stroke();
+            });
+
+            function stopPadDrawing(e) {
+                if (isDrawingPad) {
+                    try { padCanvas.releasePointerCapture(e.pointerId); } catch (_) { }
+                    isDrawingPad = false;
+                }
+            }
+            padCanvas.addEventListener('pointerup', stopPadDrawing);
+            padCanvas.addEventListener('pointercancel', stopPadDrawing);
+
+            // Upload signature image (PNG / JPG)
+            document.getElementById('sig-pad-upload').addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        clearPad();
+                        // Draw centered in padCanvas
+                        const aspect = img.width / img.height;
+                        let drawW = padCanvas.width * 0.8;
+                        let drawH = drawW / aspect;
+                        if (drawH > padCanvas.height * 0.8) {
+                            drawH = padCanvas.height * 0.8;
+                            drawW = drawH * aspect;
+                        }
+                        const dx = (padCanvas.width - drawW) / 2;
+                        const dy = (padCanvas.height - drawH) / 2;
+                        padCtx.drawImage(img, dx, dy, drawW, drawH);
+                    };
+                    img.src = evt.target.result;
+                };
+                reader.readAsDataURL(file);
+                e.target.value = '';
+            });
+
+            // Use Signature from Pad
+            document.getElementById('sig-pad-use').addEventListener('click', () => {
+                // Trim / capture signature as PNG dataUrl
+                activeSignatureDataUrl = padCanvas.toDataURL('image/png');
+                closePadModal();
+
+                // Pre-load image object and automatically stamp onto center of current page
+                const curPage = getActiveSignPage();
+                if (curPage) {
+                    const img = new Image();
+                    img.onload = () => {
+                        const aspect = img.width / img.height || 2;
+                        const w = 0.28;
+                        const h = w / aspect;
+                        curPage.items.push({
+                            img: img,
+                            dataUrl: activeSignatureDataUrl,
+                            x: 0.36,
+                            y: 0.45,
+                            width: w,
+                            height: h
+                        });
+                        selectedSigIndex = curPage.items.length - 1;
+                        renderSignOverlay();
+                        showToast('Signature placed! Drag to reposition or drag bottom-right handle to resize.');
+                    };
+                    img.src = activeSignatureDataUrl;
+                } else {
+                    showToast('Signature ready. Select a PDF page to place it.');
+                }
+            });
+
+            // --- Document & Overlay Management ---
+            function getActiveSignPage() {
+                return signDocuments[activeDocIndex]?.pages[activePageNum - 1] || null;
+            }
+
+            const overlay = document.getElementById('sign-overlay-canvas');
+
+            function isOverResizeHandle(item, overlayEl, px, py) {
+                const hX = (item.x + item.width) * overlayEl.width;
+                const hY = (item.y + item.height) * overlayEl.height;
+                return Math.abs(px - hX) <= 12 && Math.abs(py - hY) <= 12;
+            }
+
+            function renderSignOverlay() {
+                if (!overlay) return;
+                const ctx = overlay.getContext('2d');
+                ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+                const curPage = getActiveSignPage();
+                if (curPage) {
+                    curPage.items.forEach((item, idx) => {
+                        const x = item.x * overlay.width;
+                        const y = item.y * overlay.height;
+                        const w = item.width * overlay.width;
+                        const h = item.height * overlay.height;
+
+                        ctx.drawImage(item.img, x, y, w, h);
+
+                        if (idx === selectedSigIndex) {
+                            ctx.save();
+                            ctx.strokeStyle = '#0d9488';
+                            ctx.lineWidth = 1.5;
+                            ctx.setLineDash([4, 2]);
+                            ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+                            ctx.setLineDash([]);
+
+                            // Resize handle
+                            ctx.fillStyle = '#ffffff';
+                            ctx.strokeStyle = '#0d9488';
+                            ctx.lineWidth = 2;
+                            ctx.fillRect(x + w - 4, y + h - 4, 8, 8);
+                            ctx.strokeRect(x + w - 4, y + h - 4, 8, 8);
+                            ctx.restore();
+                        }
+                    });
+                }
+
+                document.getElementById('sign-undo').disabled = !curPage || curPage.items.length === 0;
+                document.getElementById('sign-run').disabled = !signDocuments.some(d => d.pages.some(p => p.items.length > 0));
+            }
+
+            async function renderSignPdfPage() {
+                const docState = signDocuments[activeDocIndex];
+                const wrap = document.getElementById('sign-page-wrap');
+                const status = document.getElementById('sign-status');
+                if (!docState) {
+                    wrap.classList.add('hidden');
+                    status.textContent = 'Select a PDF to begin signing.';
+                    return;
+                }
+
+                status.textContent = `Rendering page ${activePageNum}...`;
+                wrap.classList.add('hidden');
+
+                try {
+                    const page = await docState.pdf.getPage(activePageNum);
+                    const baseViewport = page.getViewport({ scale: 1 });
+                    const scale = Math.min(1.35, 850 / baseViewport.width, 1100 / baseViewport.height);
+                    const viewport = page.getViewport({ scale });
+                    activeScale = scale;
+
+                    const canvas = document.getElementById('sign-page-canvas');
+                    canvas.width = overlay.width = Math.ceil(viewport.width);
+                    canvas.height = overlay.height = Math.ceil(viewport.height);
+
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+                    wrap.classList.remove('hidden');
+                    status.textContent = `Page ${activePageNum} of ${docState.pages.length} — click to place or drag/resize your signature.`;
+                    renderSignOverlay();
+                } catch (err) {
+                    console.error(err);
+                    status.textContent = 'Could not preview page.';
+                    showToast('Failed to preview this page.', true);
+                }
+            }
+
+            function updateSignPageDropdown() {
+                const select = document.getElementById('sign-page-select');
+                select.innerHTML = '';
+                const doc = signDocuments[activeDocIndex];
+                if (!doc) return;
+                doc.pages.forEach((_, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = i + 1;
+                    opt.textContent = `Page ${i + 1}`;
+                    select.appendChild(opt);
+                });
+                select.value = activePageNum;
+            }
+
+            // Setup Dropzone
+            setupDropzone('dropzone-sign', 'file-sign', async (files) => {
+                const valid = getValidPdfFiles(files);
+                if (valid.length === 0) {
+                    showToast('Please select valid PDF documents.', true);
+                    return;
+                }
+
+                showProgress('Loading PDFs', 'Preparing document pages for signing...');
+                const docs = [];
+                for (let i = 0; i < valid.length; i++) {
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: await valid[i].arrayBuffer() }).promise;
+                        docs.push({
+                            file: valid[i],
+                            pdf: pdf,
+                            pages: Array.from({ length: pdf.numPages }, () => ({ items: [] }))
+                        });
+                    } catch (e) {
+                        console.error(e);
+                    }
+                    updateProgress(((i + 1) / valid.length) * 90);
+                }
+
+                hideProgress();
+                signDocuments = docs;
+                activeDocIndex = 0;
+                activePageNum = 1;
+                selectedSigIndex = -1;
+
+                const fileSelect = document.getElementById('sign-file-select');
+                fileSelect.innerHTML = '';
+                signDocuments.forEach((d, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = `${i + 1}. ${d.file.name}`;
+                    fileSelect.appendChild(opt);
+                });
+
+                document.getElementById('sign-selection').textContent = `${signDocuments.length} PDF(s) loaded`;
+                document.getElementById('sign-controls').classList.remove('hidden');
+                updateSignPageDropdown();
+                renderSignPdfPage();
+                showToast(`${signDocuments.length} PDF(s) ready for signing.`);
+            });
+
+            document.getElementById('sign-file-select').addEventListener('change', (e) => {
+                activeDocIndex = parseInt(e.target.value, 10);
+                activePageNum = 1;
+                selectedSigIndex = -1;
+                updateSignPageDropdown();
+                renderSignPdfPage();
+            });
+
+            document.getElementById('sign-page-select').addEventListener('change', (e) => {
+                activePageNum = parseInt(e.target.value, 10);
+                selectedSigIndex = -1;
+                renderSignPdfPage();
+            });
+
+            // Overlay Pointer Events (Select, Move, Resize, or Place)
+            overlay.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0) return;
+                const bounds = overlay.getBoundingClientRect();
+                const rawPx = e.clientX - bounds.left;
+                const rawPy = e.clientY - bounds.top;
+                const normX = rawPx / bounds.width;
+                const normY = rawPy / bounds.height;
+                const curPage = getActiveSignPage();
+                if (!curPage) return;
+
+                // 1. Check resize handle on selected signature
+                if (selectedSigIndex !== -1 && curPage.items[selectedSigIndex]) {
+                    const sel = curPage.items[selectedSigIndex];
+                    if (isOverResizeHandle(sel, overlay, rawPx, rawPy)) {
+                        sigInteraction = {
+                            type: 'resize',
+                            pointerId: e.pointerId,
+                            startX: normX,
+                            startY: normY,
+                            aspect: sel.width / sel.height,
+                            initialWidth: sel.width,
+                            initialHeight: sel.height
+                        };
+                        overlay.setPointerCapture(e.pointerId);
+                        return;
+                    }
+                }
+
+                // 2. Check hit on existing signature
+                let hitIndex = -1;
+                for (let i = curPage.items.length - 1; i >= 0; i--) {
+                    const it = curPage.items[i];
+                    if (normX >= it.x && normX <= it.x + it.width && normY >= it.y && normY <= it.y + it.height) {
+                        hitIndex = i;
+                        break;
+                    }
+                }
+
+                if (hitIndex !== -1) {
+                    selectedSigIndex = hitIndex;
+                    const it = curPage.items[hitIndex];
+                    sigInteraction = {
+                        type: 'move',
+                        pointerId: e.pointerId,
+                        startX: normX,
+                        startY: normY,
+                        initialX: it.x,
+                        initialY: it.y
+                    };
+                    overlay.setPointerCapture(e.pointerId);
+                    renderSignOverlay();
+                    return;
+                }
+
+                // 3. Click empty area: if a signature is active, stamp another copy
+                if (activeSignatureDataUrl) {
+                    const img = new Image();
+                    img.onload = () => {
+                        const aspect = img.width / img.height || 2;
+                        const w = 0.25;
+                        const h = w / aspect;
+                        curPage.items.push({
+                            img: img,
+                            dataUrl: activeSignatureDataUrl,
+                            x: Math.max(0, Math.min(0.95 - w, normX - w / 2)),
+                            y: Math.max(0, Math.min(0.95 - h, normY - h / 2)),
+                            width: w,
+                            height: h
+                        });
+                        selectedSigIndex = curPage.items.length - 1;
+                        renderSignOverlay();
+                    };
+                    img.src = activeSignatureDataUrl;
+                } else {
+                    selectedSigIndex = -1;
+                    renderSignOverlay();
+                    openPadModal();
+                }
+            });
+
+            overlay.addEventListener('pointermove', (e) => {
+                const bounds = overlay.getBoundingClientRect();
+                const rawPx = e.clientX - bounds.left;
+                const rawPy = e.clientY - bounds.top;
+                const normX = rawPx / bounds.width;
+                const normY = rawPy / bounds.height;
+                const curPage = getActiveSignPage();
+
+                if (sigInteraction && curPage && selectedSigIndex !== -1) {
+                    const sel = curPage.items[selectedSigIndex];
+                    if (!sel) return;
+
+                    if (sigInteraction.type === 'move') {
+                        sel.x = Math.max(0, Math.min(1 - sel.width, sigInteraction.initialX + (normX - sigInteraction.startX)));
+                        sel.y = Math.max(0, Math.min(1 - sel.height, sigInteraction.initialY + (normY - sigInteraction.startY)));
+                        renderSignOverlay();
+                    } else if (sigInteraction.type === 'resize') {
+                        const deltaX = normX - sigInteraction.startX;
+                        const newW = Math.max(0.05, Math.min(1 - sel.x, sigInteraction.initialWidth + deltaX));
+                        sel.width = newW;
+                        sel.height = newW / sigInteraction.aspect;
+                        renderSignOverlay();
+                    }
+                    return;
+                }
+
+                if (!curPage) return;
+                if (selectedSigIndex !== -1 && curPage.items[selectedSigIndex]) {
+                    if (isOverResizeHandle(curPage.items[selectedSigIndex], overlay, rawPx, rawPy)) {
+                        overlay.style.cursor = 'nwse-resize';
+                        return;
+                    }
+                }
+
+                let hovered = false;
+                for (let i = curPage.items.length - 1; i >= 0; i--) {
+                    const it = curPage.items[i];
+                    if (normX >= it.x && normX <= it.x + it.width && normY >= it.y && normY <= it.y + it.height) {
+                        hovered = true;
+                        break;
+                    }
+                }
+                overlay.style.cursor = hovered ? 'move' : 'crosshair';
+            });
+
+            const stopSigInteraction = (e) => {
+                if (sigInteraction) {
+                    try { overlay.releasePointerCapture(e.pointerId); } catch (_) { }
+                    sigInteraction = null;
+                    renderSignOverlay();
+                }
+            };
+            overlay.addEventListener('pointerup', stopSigInteraction);
+            overlay.addEventListener('pointercancel', stopSigInteraction);
+
+            document.getElementById('sign-undo').addEventListener('click', () => {
+                const curPage = getActiveSignPage();
+                if (curPage && curPage.items.length) {
+                    curPage.items.pop();
+                    selectedSigIndex = -1;
+                    renderSignOverlay();
+                }
+            });
+
+            // --- Save and Download Signed PDF ---
+            document.getElementById('sign-run').addEventListener('click', async () => {
+                showProgress('Applying signatures', 'Embedding transparent signatures into PDF structure...');
+                try {
+                    const { PDFDocument } = PDFLib;
+                    const outputs = [];
+
+                    for (let d = 0; d < signDocuments.length; d++) {
+                        const docState = signDocuments[d];
+                        const pdfDoc = await PDFDocument.load(await docState.file.arrayBuffer());
+                        const pages = pdfDoc.getPages();
+
+                        for (let pIdx = 0; pIdx < docState.pages.length; pIdx++) {
+                            const pageState = docState.pages[pIdx];
+                            if (!pageState.items.length || pIdx >= pages.length) continue;
+                            const page = pages[pIdx];
+                            const { width, height } = page.getSize();
+
+                            for (const it of pageState.items) {
+                                // Extract bytes from base64 dataUrl
+                                const base64Data = it.dataUrl.split(',')[1];
+                                const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+                                const embeddedImg = await pdfDoc.embedPng(imageBytes);
+
+                                const drawWidth = it.width * width;
+                                const drawHeight = it.height * height;
+                                const xPos = it.x * width;
+                                const yPos = height - (it.y * height) - drawHeight;
+
+                                page.drawImage(embeddedImg, {
+                                    x: xPos,
+                                    y: yPos,
+                                    width: drawWidth,
+                                    height: drawHeight
+                                });
+                            }
+                        }
+
+                        outputs.push({
+                            name: `${safeFileBaseName(docState.file)}_signed.pdf`,
+                            bytes: await pdfDoc.save()
+                        });
+                        updateProgress(((d + 1) / signDocuments.length) * 85);
+                    }
+
+                    await downloadPdfOutputs(outputs, 'signed_pdfs.zip');
+                    hideProgress();
+                    showToast(`Applied signatures to ${outputs.length} PDF(s) successfully!`);
+                } catch (err) {
+                    hideProgress();
+                    console.error(err);
+                    showToast('Failed to apply signatures to PDF.', true);
+                }
+            });
+        })();
+    </script>
+
 </body>
 
 </html>
