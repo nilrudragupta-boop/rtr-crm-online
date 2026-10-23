@@ -36,6 +36,9 @@
     <!-- QR Code Styling (Client-side custom shapes, gradients & logo support) -->
     <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.6.0-rc.1/lib/qr-code-styling.js"></script>
 
+    <!-- QPDF WebAssembly (Local client-side 128/256-bit AES PDF encryption & permissions) -->
+    <script src="https://cdn.jsdelivr.net/npm/@ninja-labs/qpdf@1.1.2/dist/qpdf.min.js"></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -1174,60 +1177,118 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 4: PROTECT PDF                         -->
-        <!-- ========================================== -->
-        <section id="tab-protect-pdf" class="tab-content hidden tool-page space-y-6">
-            <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All
-                tools</button>
-            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-                <div class="tool-content-heading mb-4">
-                    <h2 class="text-xl font-bold text-slate-900">Protect PDF with Password</h2>
-                    <p class="text-sm text-slate-500">Create a password-protected ZIP container for your PDF. This keeps
-                        everything local in the browser and avoids cloud uploads.</p>
+<!-- TAB 4: PROTECT PDF                         -->
+<!-- ========================================== -->
+<section id="tab-protect-pdf" class="tab-content hidden tool-page space-y-6">
+    <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All tools</button>
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <div class="tool-content-heading mb-4">
+            <h2 class="text-xl font-bold text-slate-900">Native PDF Password & Permission Security</h2>
+            <p class="text-sm text-slate-500">Encrypt your PDF with standard native PDF encryption. Set a User password to view, an Owner password to manage rights, and configure access permissions (Printing, Copying, and Page Assembly).</p>
+        </div>
+
+        <div id="dropzone-protect"
+            class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-rose-400 transition-colors cursor-pointer bg-slate-50/50">
+            <input type="file" id="file-protect" accept="application/pdf,.pdf" class="hidden">
+            <div class="w-14 h-14 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3">
+                <i data-lucide="shield-check" class="w-7 h-7"></i>
+            </div>
+            <p class="font-semibold text-slate-800 text-base">Select or drop a PDF file to encrypt</p>
+            <p class="text-xs text-slate-500 mt-1">Processed locally in browser memory</p>
+        </div>
+
+        <div id="ctrl-protect" class="hidden mt-6 pt-6 border-t border-slate-200 space-y-6">
+            <!-- Password Credentials -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="key-round" class="w-4 h-4 text-indigo-600"></i>
+                        <label class="text-xs font-bold text-slate-800 uppercase tracking-wider">User Password (Open PDF)</label>
+                    </div>
+                    <input id="protect-user-password" type="password" placeholder="Required to view/open the document"
+                        class="w-full text-sm border-slate-200 rounded-lg p-2.5 bg-white border focus:ring-2 focus:ring-rose-500">
+                    <p class="text-[11px] text-slate-500 mt-1.5">Leave blank if you only want to restrict permissions without requiring an open password.</p>
                 </div>
 
-                <div id="dropzone-protect"
-                    class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-rose-400 transition-colors cursor-pointer bg-slate-50/50">
-                    <input type="file" id="file-protect" accept="application/pdf,.pdf" class="hidden">
-                    <div
-                        class="w-14 h-14 mx-auto rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3">
-                        <i data-lucide="shield-check" class="w-7 h-7"></i>
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i data-lucide="shield-alert" class="w-4 h-4 text-rose-600"></i>
+                        <label class="text-xs font-bold text-slate-800 uppercase tracking-wider">Owner / Master Password (Permissions)</label>
                     </div>
-                    <p class="font-semibold text-slate-800 text-base">Select or drop a PDF file</p>
-                    <p class="text-xs text-slate-500 mt-1">Add a password to protect the file in an encrypted ZIP folder
-                    </p>
+                    <input id="protect-owner-password" type="password" placeholder="Required to modify security settings"
+                        class="w-full text-sm border-slate-200 rounded-lg p-2.5 bg-white border focus:ring-2 focus:ring-rose-500">
+                    <p class="text-[11px] text-slate-500 mt-1.5">Mandatory if you disable any permissions below.</p>
                 </div>
+            </div>
 
-                <div id="ctrl-protect" class="hidden mt-6 pt-6 border-t border-slate-200">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-                            <input id="protect-password" type="password" placeholder="Enter password"
-                                class="w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-rose-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Confirm password</label>
-                            <input id="protect-password-confirm" type="password" placeholder="Repeat password"
-                                class="w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-rose-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Output file name</label>
-                            <input id="protect-output-name" type="text" placeholder="protected_document"
-                                class="w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border focus:ring-2 focus:ring-rose-500">
-                        </div>
+            <!-- Permission Flags -->
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Document Restrictions & Permissions</h3>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Printing Protection -->
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Printing Rights</label>
+                        <select id="protect-perm-print" class="w-full text-xs border-slate-200 rounded-lg p-2 bg-slate-50 border">
+                            <option value="full" selected>Allow Full Print (High Resolution)</option>
+                            <option value="low">Allow Low Resolution Only</option>
+                            <option value="none">Block / Disable Printing</option>
+                        </select>
                     </div>
 
-                    <div
-                        class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                        <div class="text-xs font-medium text-slate-700" id="protect-file-info">No file selected</div>
-                        <button onclick="protectPdfWithPassword()"
-                            class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
-                            <i data-lucide="lock" class="w-4 h-4"></i> Protect & Download
-                        </button>
+                    <!-- Content Copying -->
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200 flex flex-col justify-between">
+                        <div>
+                            <span class="block text-xs font-semibold text-slate-700 mb-1">Content Copying</span>
+                            <span class="block text-[11px] text-slate-400">Copying text, images, and tables</span>
+                        </div>
+                        <label class="inline-flex items-center gap-2 mt-2 cursor-pointer">
+                            <input id="protect-perm-copy" type="checkbox" checked class="rounded text-rose-600 focus:ring-rose-500">
+                            <span class="text-xs font-medium text-slate-700">Allow Copying of Content</span>
+                        </label>
+                    </div>
+
+                    <!-- Document Assembly -->
+                    <div class="bg-white p-3.5 rounded-lg border border-slate-200 flex flex-col justify-between">
+                        <div>
+                            <span class="block text-xs font-semibold text-slate-700 mb-1">Document Assembly</span>
+                            <span class="block text-[11px] text-slate-400">Insert, rotate, or delete pages</span>
+                        </div>
+                        <label class="inline-flex items-center gap-2 mt-2 cursor-pointer">
+                            <input id="protect-perm-assemble" type="checkbox" checked class="rounded text-rose-600 focus:ring-rose-500">
+                            <span class="text-xs font-medium text-slate-700">Allow Document Assembly</span>
+                        </label>
                     </div>
                 </div>
             </div>
-        </section>
+
+            <!-- Encryption Level & Output Name -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Encryption Algorithm</label>
+                    <select id="protect-encryption-level" class="w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
+                        <option value="256" selected>256-bit AES (Acrobat X and later - Recommended)</option>
+                        <option value="128">128-bit AES (Acrobat 7 and later - Maximum Compatibility)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Output File Name</label>
+                    <input id="protect-output-name" type="text" placeholder="secured_document"
+                        class="w-full text-sm border-slate-200 rounded-lg p-2.5 bg-slate-50 border">
+                </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div class="text-xs font-medium text-slate-700" id="protect-file-info">No file selected</div>
+                <button onclick="protectPdfWithPassword()"
+                    class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm">
+                    <i data-lucide="lock" class="w-4 h-4"></i> Encrypt & Download Native PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
 
         <!-- ========================================== -->
         <!-- TAB 5: SPLIT PDF                           -->
@@ -2707,7 +2768,7 @@
         }
 
         // ==========================================
-        // TOOL 4: Protect PDF with Password
+        // TOOL 4: Native PDF Password Protection & Permissions
         // ==========================================
         let protectFile = null;
 
@@ -2725,7 +2786,8 @@
             if (!outputName.value.trim()) {
                 outputName.value = safeFileBaseName(protectFile);
             }
-            showToast('PDF ready to protect');
+            showToast('PDF loaded. Set passwords and permissions.');
+            refreshIcons();
         });
 
         async function protectPdfWithPassword() {
@@ -2734,40 +2796,102 @@
                 return;
             }
 
-            const password = document.getElementById('protect-password').value;
-            const passwordConfirm = document.getElementById('protect-password-confirm').value;
+            const userPass = document.getElementById('protect-user-password').value;
+            const ownerPass = document.getElementById('protect-owner-password').value;
+            const printPerm = document.getElementById('protect-perm-print').value;
+            const allowCopy = document.getElementById('protect-perm-copy').checked;
+            const allowAssemble = document.getElementById('protect-perm-assemble').checked;
+            const encBit = document.getElementById('protect-encryption-level').value;
             const outputName = document.getElementById('protect-output-name').value.trim() || safeFileBaseName(protectFile);
 
-            if (!password || password.length < 4) {
-                showToast('Use a password with at least 4 characters.', true);
+            // Validation: Must supply at least one password
+            if (!userPass && !ownerPass) {
+                showToast('Please enter at least a User Password or an Owner Password.', true);
                 return;
             }
 
-            if (password !== passwordConfirm) {
-                showToast('Passwords do not match. Please try again.', true);
+            // If restricting any permissions, owner password is required
+            const isRestricting = (printPerm !== 'full') || !allowCopy || !allowAssemble;
+            if (isRestricting && !ownerPass) {
+                showToast('An Owner Password is required when disabling printing, copying, or assembly.', true);
                 return;
             }
 
-            if (!window.zip || typeof zip.ZipWriter !== 'function' || typeof zip.BlobWriter !== 'function' || typeof zip.BlobReader !== 'function') {
-                showToast('Protected ZIP support is unavailable in this browser.', true);
+            if (userPass && ownerPass && userPass === ownerPass) {
+                showToast('User Password and Owner Password should be different.', true);
                 return;
             }
 
-            showProgress('Encrypting PDF', 'Creating a password-protected ZIP archive on this device...');
+            // Check if QPDF WASM is available
+            if (!window.qpdf && !window.createQPDF) {
+                showToast('PDF encryption engine is loading. Please verify internet access and try again.', true);
+                return;
+            }
+
+            showProgress('Encrypting Native PDF', 'Applying AES encryption and setting permission flags...');
 
             try {
-                const zipWriter = new zip.ZipWriter(new zip.BlobWriter('application/zip'), { password });
-                const pdfBlob = protectFile;
-                await zipWriter.add(`${safeFileBaseName(protectFile)}.pdf`, new zip.BlobReader(pdfBlob));
-                const protectedBlob = await zipWriter.close();
+                // Initialize QPDF instance
+                const qpdfInstance = window.qpdf || (await window.createQPDF());
+                const fileBuffer = await protectFile.arrayBuffer();
+                const inBytes = new Uint8Array(fileBuffer);
+
+                // Write source file to Virtual File System
+                const inFileName = 'input.pdf';
+                const outFileName = 'secured_output.pdf';
+                qpdfInstance.FS.writeFile(inFileName, inBytes);
+
+                // Construct QPDF command-line arguments
+                // Syntax: qpdf --encrypt <user-password> <owner-password> <key-length> [flags...] -- input.pdf output.pdf
+                const args = ['--encrypt', userPass || '', ownerPass || (userPass + '_owner'), encBit];
+
+                // Permission flags
+                if (printPerm === 'none') {
+                    args.push('--print=none');
+                } else if (printPerm === 'low') {
+                    args.push('--print=low');
+                } else {
+                    args.push('--print=full');
+                }
+
+                if (!allowCopy) {
+                    args.push('--extract=n');
+                } else {
+                    args.push('--extract=y');
+                }
+
+                if (!allowAssemble) {
+                    args.push('--assemble=n');
+                } else {
+                    args.push('--assemble=y');
+                }
+
+                args.push('--', inFileName, outFileName);
+
+                // Execute encryption
+                const exitCode = qpdfInstance.callMain(args);
+
+                if (exitCode !== 0) {
+                    throw new Error(`QPDF encryption process exited with status ${exitCode}`);
+                }
+
+                // Read secured file from VFS
+                const outBytes = qpdfInstance.FS.readFile(outFileName);
+                const outBlob = new Blob([outBytes], { type: 'application/pdf' });
+
+                // Cleanup VFS
+                try {
+                    qpdfInstance.FS.unlink(inFileName);
+                    qpdfInstance.FS.unlink(outFileName);
+                } catch (_) {}
 
                 hideProgress();
-                saveAs(protectedBlob, `${outputName.replace(/\.[^.]+$/, '')}_protected.zip`);
-                showToast('Password-protected ZIP created successfully!');
+                saveAs(outBlob, `${outputName.replace(/\.pdf$/i, '')}_protected.pdf`);
+                showToast('PDF encrypted successfully with standard native permissions!');
             } catch (err) {
                 hideProgress();
-                console.error('Failed to create password-protected ZIP', err);
-                showToast('Unable to protect the PDF. Please try another file or password.', true);
+                console.error('Failed to encrypt PDF natively', err);
+                showToast('Unable to encrypt the PDF. Check console for details.', true);
             }
         }
 
