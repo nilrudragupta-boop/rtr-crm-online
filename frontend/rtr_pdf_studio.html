@@ -36,8 +36,8 @@
     <!-- QR Code Styling (Client-side custom shapes, gradients & logo support) -->
     <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.6.0-rc.1/lib/qr-code-styling.js"></script>
 
-    <!-- QPDF WebAssembly (Local client-side 128/256-bit AES PDF encryption & permissions) -->
-    <script src="https://cdn.jsdelivr.net/npm/@ninja-labs/qpdf@1.1.2/dist/qpdf.min.js"></script>
+    <!-- Native PDF Encryption Engine (Self-contained WebAssembly) -->
+<script src="https://cdn.jsdelivr.net/npm/qpdf-wasm@1.0.1/dist/qpdf-wasm.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -2822,30 +2822,39 @@
                 return;
             }
 
-            // Check if QPDF WASM is available
-            if (!window.qpdf && !window.createQPDF) {
-                showToast('PDF encryption engine is loading. Please verify internet access and try again.', true);
-                return;
-            }
-
-            showProgress('Encrypting Native PDF', 'Applying AES encryption and setting permission flags...');
+            showProgress('Encrypting Native PDF', 'Initializing native engine & applying security dictionaries...');
 
             try {
-                // Initialize QPDF instance
-                const qpdfInstance = window.qpdf || (await window.createQPDF());
+                // Initialize the WASM Module instance safely across environments
+                let qpdfModule = null;
+
+                if (typeof window.qpdf === 'function') {
+                    qpdfModule = await window.qpdf();
+                } else if (typeof window.createQPDF === 'function') {
+                    qpdfModule = await window.createQPDF();
+                } else if (window.QPDFWasm) {
+                    qpdfModule = await window.QPDFWasm();
+                } else if (window.qpdf && window.qpdf.FS) {
+                    qpdfModule = window.qpdf;
+                }
+
+                if (!qpdfModule || !qpdfModule.FS) {
+                    throw new Error('WASM engine could not be initialized in this browser session.');
+                }
+
                 const fileBuffer = await protectFile.arrayBuffer();
                 const inBytes = new Uint8Array(fileBuffer);
 
-                // Write source file to Virtual File System
                 const inFileName = 'input.pdf';
                 const outFileName = 'secured_output.pdf';
-                qpdfInstance.FS.writeFile(inFileName, inBytes);
 
-                // Construct QPDF command-line arguments
-                // Syntax: qpdf --encrypt <user-password> <owner-password> <key-length> [flags...] -- input.pdf output.pdf
-                const args = ['--encrypt', userPass || '', ownerPass || (userPass + '_owner'), encBit];
+                // Write file to memory virtual filesystem
+                qpdfModule.FS.writeFile(inFileName, inBytes);
 
-                // Permission flags
+                // Build parameter flags
+                // qpdf --encrypt <user-password> <owner-password> <key-length> [flags...] -- input.pdf output.pdf
+                const args = ['--encrypt', userPass || '', ownerPass || (userPass + '_owner'), String(encBit)];
+
                 if (printPerm === 'none') {
                     args.push('--print=none');
                 } else if (printPerm === 'low') {
@@ -2868,30 +2877,30 @@
 
                 args.push('--', inFileName, outFileName);
 
-                // Execute encryption
-                const exitCode = qpdfInstance.callMain(args);
+                // Execute in WASM memory
+                const exitCode = qpdfModule.callMain(args);
 
                 if (exitCode !== 0) {
-                    throw new Error(`QPDF encryption process exited with status ${exitCode}`);
+                    throw new Error(`Encryption command failed with exit code ${exitCode}`);
                 }
 
-                // Read secured file from VFS
-                const outBytes = qpdfInstance.FS.readFile(outFileName);
+                // Read output bytes
+                const outBytes = qpdfModule.FS.readFile(outFileName);
                 const outBlob = new Blob([outBytes], { type: 'application/pdf' });
 
-                // Cleanup VFS
+                // Clean memory
                 try {
-                    qpdfInstance.FS.unlink(inFileName);
-                    qpdfInstance.FS.unlink(outFileName);
+                    qpdfModule.FS.unlink(inFileName);
+                    qpdfModule.FS.unlink(outFileName);
                 } catch (_) {}
 
                 hideProgress();
                 saveAs(outBlob, `${outputName.replace(/\.pdf$/i, '')}_protected.pdf`);
-                showToast('PDF encrypted successfully with standard native permissions!');
+                showToast('PDF encrypted successfully with native permissions!');
             } catch (err) {
                 hideProgress();
-                console.error('Failed to encrypt PDF natively', err);
-                showToast('Unable to encrypt the PDF. Check console for details.', true);
+                console.error('PDF Encryption Error:', err);
+                showToast(err.message || 'Encryption failed. Check console for details.', true);
             }
         }
 
