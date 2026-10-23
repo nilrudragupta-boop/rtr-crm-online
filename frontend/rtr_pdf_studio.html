@@ -33,6 +33,9 @@
     <!-- FileSaver.js for reliable saving across browsers -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
+    <!-- QR Code Styling (Client-side custom shapes, gradients & logo support) -->
+    <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.6.0-rc.1/lib/qr-code-styling.js"></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -897,6 +900,13 @@
                         <span class="directory-card-icon"><i data-lucide="pen-tool" aria-hidden="true"></i></span>
                         <strong>Sign PDF</strong>
                         <span>Draw or upload a signature to place on pages</span>
+                    </button>
+                    <button class="directory-card" type="button" data-tool="qr-generator"
+                        data-search="qr code generator barcode wifi vcard paypal sepa link url dots gradient logo"
+                        style="--tool-color:#0284c7;--tool-tint:#e0f2fe">
+                        <span class="directory-card-icon"><i data-lucide="qr-code" aria-hidden="true"></i></span>
+                        <strong>Generate QR Code</strong>
+                        <span>Create custom styled QR codes with logos & gradients</span>
                     </button>
 
 
@@ -2123,6 +2133,176 @@
                 </div>
             </div>
         </section>
+
+        <!-- ========================================== -->
+<!-- TAB: GENERATE QR CODE                      -->
+<!-- ========================================== -->
+<section id="tab-qr-generator" class="tab-content hidden tool-page space-y-6">
+    <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All tools</button>
+    
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <div class="tool-content-heading mb-6">
+            <h2 class="text-xl font-bold text-slate-900">Custom QR Code Studio</h2>
+            <p class="text-sm text-slate-500">* Generate styled QR codes for links, Wi-Fi access, vCards, PayPal or SEPA payments, and plain text.</p>
+            <p class="text-sm text-slate-500 mt-1">* Fully client-side with custom dot styles, gradients, and logo overlays.</p>
+            <p class="text-sm text-slate-500 mt-1">* All QR codes are generated locally in your browser and do not leave your device.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left Column: Configuration Controls -->
+            <div class="lg:col-span-7 space-y-6">
+                <!-- QR Content Type Selector -->
+                <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">QR Code Data Type</label>
+                    <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        <button type="button" onclick="setQrType('text')" class="qr-type-btn py-2 px-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-100 flex flex-col items-center gap-1 active" data-type="text">
+                            <i data-lucide="type" class="w-4 h-4 text-indigo-600"></i> Text
+                        </button>
+                        <button type="button" onclick="setQrType('url')" class="qr-type-btn py-2 px-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-100 flex flex-col items-center gap-1" data-type="url">
+                            <i data-lucide="globe" class="w-4 h-4 text-sky-600"></i> URL
+                        </button>
+                        <button type="button" onclick="setQrType('wifi')" class="qr-type-btn py-2 px-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-100 flex flex-col items-center gap-1" data-type="wifi">
+                            <i data-lucide="wifi" class="w-4 h-4 text-emerald-600"></i> Wi-Fi
+                        </button>
+                        <button type="button" onclick="setQrType('vcard')" class="qr-type-btn py-2 px-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-100 flex flex-col items-center gap-1" data-type="vcard">
+                            <i data-lucide="contact" class="w-4 h-4 text-violet-600"></i> vCard
+                        </button>
+                        <button type="button" onclick="setQrType('paypal')" class="qr-type-btn py-2 px-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-100 flex flex-col items-center gap-1" data-type="paypal">
+                            <i data-lucide="credit-card" class="w-4 h-4 text-amber-600"></i> PayPal
+                        </button>
+                        <button type="button" onclick="setQrType('sepa')" class="qr-type-btn py-2 px-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-100 flex flex-col items-center gap-1" data-type="sepa">
+                            <i data-lucide="landmark" class="w-4 h-4 text-rose-600"></i> SEPA
+                        </button>
+                    </div>
+
+                    <!-- Dynamic Input Fields Container -->
+                    <div id="qr-input-fields" class="mt-4 pt-4 border-t border-slate-200">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- Styling Accordions / Sections -->
+                <div class="space-y-4">
+                    <!-- Dots & Pattern Style -->
+                    <div class="border border-slate-200 rounded-xl p-4 bg-white">
+                        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">1. Pattern & Corner Style</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Dot Pattern</label>
+                                <select id="qr-dot-type" class="w-full text-xs border-slate-200 rounded-lg p-2 bg-slate-50 border">
+                                    <option value="square">Square</option>
+                                    <option value="dots" selected>Dots / Circles</option>
+                                    <option value="rounded">Rounded</option>
+                                    <option value="classy">Classy</option>
+                                    <option value="classy-rounded">Classy Rounded</option>
+                                    <option value="extra-rounded">Extra Rounded</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Corner Square</label>
+                                <select id="qr-corner-square" class="w-full text-xs border-slate-200 rounded-lg p-2 bg-slate-50 border">
+                                    <option value="square">Square</option>
+                                    <option value="dot">Dot / Circle</option>
+                                    <option value="extra-rounded" selected>Extra Rounded</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Corner Dot</label>
+                                <select id="qr-corner-dot" class="w-full text-xs border-slate-200 rounded-lg p-2 bg-slate-50 border">
+                                    <option value="square">Square</option>
+                                    <option value="dot" selected>Dot / Circle</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Color & Gradients -->
+                    <div class="border border-slate-200 rounded-xl p-4 bg-white">
+                        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">2. Colors & Gradients</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Color Mode</label>
+                                <select id="qr-color-mode" class="w-full text-xs border-slate-200 rounded-lg p-2 bg-slate-50 border" onchange="toggleQrGradientUI()">
+                                    <option value="single">Single Solid Color</option>
+                                    <option value="linear" selected>Linear Gradient</option>
+                                    <option value="radial">Radial Gradient</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Primary Color</label>
+                                <input type="color" id="qr-color-1" value="#4f46e5" class="w-full h-8 border border-slate-200 rounded-lg p-1 bg-white cursor-pointer">
+                            </div>
+                            <div id="qr-color-2-wrap">
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Gradient End Color</label>
+                                <input type="color" id="qr-color-2" value="#06b6d4" class="w-full h-8 border border-slate-200 rounded-lg p-1 bg-white cursor-pointer">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Background Color</label>
+                                <input type="color" id="qr-bg-color" value="#ffffff" class="w-full h-8 border border-slate-200 rounded-lg p-1 bg-white cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Corner Border Color</label>
+                                <input type="color" id="qr-corner-color" value="#4338ca" class="w-full h-8 border border-slate-200 rounded-lg p-1 bg-white cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Corner Dot Color</label>
+                                <input type="color" id="qr-corner-dot-color" value="#06b6d4" class="w-full h-8 border border-slate-200 rounded-lg p-1 bg-white cursor-pointer">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Center Logo & Margins -->
+                    <div class="border border-slate-200 rounded-xl p-4 bg-white">
+                        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">3. Center Logo & Margins</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Upload Brand Logo</label>
+                                <input type="file" id="qr-logo-file" accept="image/png,image/jpeg,image/svg+xml" class="text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Logo Size Ratio</label>
+                                <input type="range" id="qr-logo-size" min="0.15" max="0.45" step="0.05" value="0.3" class="w-full">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="qr-remove-logo" onclick="removeQrLogo()" class="text-xs text-rose-600 hover:underline font-semibold hidden">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5 inline mr-1"></i> Remove Logo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Live Sticky Preview & Download Actions -->
+            <div class="lg:col-span-5 flex flex-col items-center">
+                <div class="sticky top-24 w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-800 mb-4">Live High-Res Preview</h3>
+                    
+                    <div id="qr-canvas-holder" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] min-w-[300px]">
+                        <!-- Rendered by qr-code-styling -->
+                    </div>
+
+                    <!-- Download Buttons -->
+                    <div class="mt-6 w-full space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="downloadQrCode('png')" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-colors">
+                                <i data-lucide="image" class="w-4 h-4"></i> Save PNG
+                            </button>
+                            <button onclick="downloadQrCode('svg')" class="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-colors">
+                                <i data-lucide="code" class="w-4 h-4"></i> Save Vector SVG
+                            </button>
+                        </div>
+                        <button onclick="exportQrToPdf()" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-colors">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> Generate Printable PDF Page
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
 
 
@@ -5782,6 +5962,378 @@
             });
         })();
     </script>
+
+    <script>
+    // ==========================================
+    // MODULE: QR Code Generator & Stylist
+    // ==========================================
+    (function () {
+        let currentType = 'text';
+        let qrLogoDataUrl = null;
+        let qrCodeInstance = null;
+
+        // Initialize QR instance
+        function initQrInstance() {
+            if (!window.QRCodeStyling) return;
+            qrCodeInstance = new QRCodeStyling({
+                width: 300,
+                height: 300,
+                data: 'https://example.com',
+                margin: 8,
+                qrOptions: {
+                    typeNumber: 0,
+                    mode: 'Byte',
+                    errorCorrectionLevel: 'Q' // High resilience for logo overlays
+                },
+                imageOptions: {
+                    hideBackgroundDots: true,
+                    imageSize: 0.3,
+                    margin: 4
+                },
+                dotsOptions: {
+                    type: 'dots',
+                    gradient: {
+                        type: 'linear',
+                        rotation: 0.785,
+                        colorStops: [
+                            { offset: 0, color: '#4f46e5' },
+                            { offset: 1, color: '#06b6d4' }
+                        ]
+                    }
+                },
+                backgroundOptions: {
+                    color: '#ffffff'
+                },
+                cornersSquareOptions: {
+                    type: 'extra-rounded',
+                    color: '#4338ca'
+                },
+                cornersDotOptions: {
+                    type: 'dot',
+                    color: '#06b6d4'
+                }
+            });
+
+            const holder = document.getElementById('qr-canvas-holder');
+            holder.innerHTML = '';
+            qrCodeInstance.append(holder);
+        }
+
+        // Render dynamic forms based on chosen preset type
+        window.setQrType = function (type) {
+            currentType = type;
+            document.querySelectorAll('.qr-type-btn').forEach(btn => {
+                const isActive = btn.dataset.type === type;
+                btn.classList.toggle('border-indigo-500', isActive);
+                btn.classList.toggle('bg-indigo-50', isActive);
+                btn.classList.toggle('text-indigo-700', isActive);
+            });
+
+            const container = document.getElementById('qr-input-fields');
+            if (type === 'text') {
+                container.innerHTML = `
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Plain Text</label>
+                    <textarea id="qr-input-text" rows="3" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-white" placeholder="Type text to encode...">Hello from RTR-CRM PDF Studio!</textarea>
+                `;
+            } else if (type === 'url') {
+                container.innerHTML = `
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Website URL</label>
+                    <input type="url" id="qr-input-url" class="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-white" placeholder="https://yourwebsite.com" value="https://example.com">
+                `;
+            } else if (type === 'wifi') {
+                container.innerHTML = `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Network Name (SSID)</label>
+                            <input type="text" id="qr-wifi-ssid" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" placeholder="Home_WiFi" value="Office_Guest">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                            <input type="text" id="qr-wifi-pass" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" placeholder="Password" value="SafeP@ssw0rd!">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Security</label>
+                            <select id="qr-wifi-type" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white">
+                                <option value="WPA" selected>WPA/WPA2/WPA3</option>
+                                <option value="WEP">WEP</option>
+                                <option value="nopass">None (Open)</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center pt-5">
+                            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                                <input type="checkbox" id="qr-wifi-hidden" class="rounded text-indigo-600">
+                                <span>Hidden Network</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'vcard') {
+                container.innerHTML = `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                            <input type="text" id="qr-vcard-name" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" value="RTR CRM User">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Organization / Title</label>
+                            <input type="text" id="qr-vcard-org" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" value="RTR Enterprises">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+                            <input type="tel" id="qr-vcard-phone" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" value="+1234567890">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                            <input type="email" id="qr-vcard-email" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" value="abc@example.com">
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'paypal') {
+                container.innerHTML = `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">PayPal Username / Email</label>
+                            <input type="text" id="qr-paypal-user" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" placeholder="username" value="business">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Amount (Optional)</label>
+                            <input type="number" step="0.01" id="qr-paypal-amount" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" placeholder="25.00">
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'sepa') {
+                container.innerHTML = `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Beneficiary Name</label>
+                            <input type="text" id="qr-sepa-name" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" value="Tech Services Ltd">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">IBAN</label>
+                            <input type="text" id="qr-sepa-iban" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" placeholder="DE89370400440532013000" value="DE89370400440532013000">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">BIC (Optional)</label>
+                            <input type="text" id="qr-sepa-bic" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" placeholder="GENODED1PA4">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Amount EUR (Optional)</label>
+                            <input type="number" step="0.01" id="qr-sepa-amount" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" placeholder="100.00">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Remittance Reference</label>
+                            <input type="text" id="qr-sepa-ref" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-white" value="INV-2026-001">
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Attach listeners to trigger update on input
+            container.querySelectorAll('input, textarea, select').forEach(input => {
+                input.addEventListener('input', updateQrCode);
+            });
+
+            updateQrCode();
+        };
+
+        // Formulate standard encoding string
+        function computeQrDataString() {
+            if (currentType === 'text') {
+                return document.getElementById('qr-input-text')?.value || '';
+            } else if (currentType === 'url') {
+                let url = document.getElementById('qr-input-url')?.value.trim() || '';
+                if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+                return url;
+            } else if (currentType === 'wifi') {
+                const ssid = document.getElementById('qr-wifi-ssid')?.value || '';
+                const pass = document.getElementById('qr-wifi-pass')?.value || '';
+                const type = document.getElementById('qr-wifi-type')?.value || 'WPA';
+                const hidden = document.getElementById('qr-wifi-hidden')?.checked ? 'true' : 'false';
+                return `WIFI:T:${type};S:${ssid};P:${pass};H:${hidden};;`;
+            } else if (currentType === 'vcard') {
+                const name = document.getElementById('qr-vcard-name')?.value || '';
+                const org = document.getElementById('qr-vcard-org')?.value || '';
+                const phone = document.getElementById('qr-vcard-phone')?.value || '';
+                const email = document.getElementById('qr-vcard-email')?.value || '';
+                return `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nORG:${org}\nTEL:${phone}\nEMAIL:${email}\nEND:VCARD`;
+            } else if (currentType === 'paypal') {
+                const user = document.getElementById('qr-paypal-user')?.value || '';
+                const amount = document.getElementById('qr-paypal-amount')?.value;
+                return `https://www.paypal.me/${user}${amount ? '/' + amount : ''}`;
+            } else if (currentType === 'sepa') {
+                const name = document.getElementById('qr-sepa-name')?.value || '';
+                const iban = (document.getElementById('qr-sepa-iban')?.value || '').replace(/\s+/g, '');
+                const bic = (document.getElementById('qr-sepa-bic')?.value || '').replace(/\s+/g, '');
+                const amount = document.getElementById('qr-sepa-amount')?.value;
+                const ref = document.getElementById('qr-sepa-ref')?.value || '';
+                return `BCD\n002\n1\nSCT\n${bic}\n${name}\n${iban}\nEUR${amount || ''}\n\n${ref}\n`;
+            }
+            return '';
+        }
+
+        window.toggleQrGradientUI = function () {
+            const mode = document.getElementById('qr-color-mode').value;
+            document.getElementById('qr-color-2-wrap').classList.toggle('hidden', mode === 'single');
+            updateQrCode();
+        };
+
+        // Re-render and style the QR code instance
+        function updateQrCode() {
+            if (!qrCodeInstance) return;
+            const dataString = computeQrDataString();
+            const dotType = document.getElementById('qr-dot-type').value;
+            const cornerSquareType = document.getElementById('qr-corner-square').value;
+            const cornerDotType = document.getElementById('qr-corner-dot').value;
+            const colorMode = document.getElementById('qr-color-mode').value;
+            const color1 = document.getElementById('qr-color-1').value;
+            const color2 = document.getElementById('qr-color-2').value;
+            const bgColor = document.getElementById('qr-bg-color').value;
+            const cornerColor = document.getElementById('qr-corner-color').value;
+            const cornerDotColor = document.getElementById('qr-corner-dot-color').value;
+            const logoSize = parseFloat(document.getElementById('qr-logo-size').value) || 0.3;
+
+            const dotsOptions = { type: dotType };
+            if (colorMode === 'single') {
+                dotsOptions.color = color1;
+                delete dotsOptions.gradient;
+            } else {
+                delete dotsOptions.color;
+                dotsOptions.gradient = {
+                    type: colorMode, // 'linear' or 'radial'
+                    rotation: 0.785,
+                    colorStops: [
+                        { offset: 0, color: color1 },
+                        { offset: 1, color: color2 }
+                    ]
+                };
+            }
+
+            qrCodeInstance.update({
+                data: dataString || ' ',
+                image: qrLogoDataUrl || '',
+                imageOptions: {
+                    hideBackgroundDots: true,
+                    imageSize: logoSize,
+                    margin: 4
+                },
+                dotsOptions: dotsOptions,
+                backgroundOptions: { color: bgColor },
+                cornersSquareOptions: {
+                    type: cornerSquareType,
+                    color: cornerColor
+                },
+                cornersDotOptions: {
+                    type: cornerDotType,
+                    color: cornerDotColor
+                }
+            });
+        }
+
+        // Logo Upload & Reset
+        document.getElementById('qr-logo-file').addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                qrLogoDataUrl = evt.target.result;
+                document.getElementById('qr-remove-logo').classList.remove('hidden');
+                updateQrCode();
+                showToast('Brand logo applied to QR Code!');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        window.removeQrLogo = function () {
+            qrLogoDataUrl = null;
+            document.getElementById('qr-logo-file').value = '';
+            document.getElementById('qr-remove-logo').classList.add('hidden');
+            updateQrCode();
+            showToast('Logo removed');
+        };
+
+        // Attach listeners to style controls
+        ['qr-dot-type', 'qr-corner-square', 'qr-corner-dot', 'qr-color-1', 'qr-color-2', 'qr-bg-color', 'qr-corner-color', 'qr-corner-dot-color', 'qr-logo-size']
+            .forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', updateQrCode);
+                    el.addEventListener('change', updateQrCode);
+                }
+            });
+
+        // Download PNG or SVG
+        window.downloadQrCode = function (extension) {
+            if (!qrCodeInstance) return;
+            qrCodeInstance.download({
+                name: 'custom_qrcode',
+                extension: extension
+            });
+            showToast(`Downloaded QR Code as ${extension.toUpperCase()}`);
+        };
+
+        // Export directly into a formatted PDF page
+        window.exportQrToPdf = async function () {
+            if (!qrCodeInstance || !window.PDFLib) {
+                showToast('PDF rendering engine unavailable', true);
+                return;
+            }
+            showProgress('Generating PDF', 'Embedding vector/raster QR into A4 sheet...');
+            try {
+                // Get PNG blob from QR Code Styling
+                const rawBlob = await qrCodeInstance.getRawData('png');
+                const arrayBuf = await rawBlob.arrayBuffer();
+
+                const { PDFDocument, StandardFonts, rgb } = PDFLib;
+                const pdfDoc = await PDFDocument.create();
+                const page = pdfDoc.addPage([595.28, 841.89]); // A4 Portrait
+
+                const embeddedImg = await pdfDoc.embedPng(arrayBuf);
+                const qrSize = 320;
+                const x = (595.28 - qrSize) / 2;
+                const y = (841.89 - qrSize) / 2;
+
+                // Draw QR Code
+                page.drawImage(embeddedImg, { x, y, width: qrSize, height: qrSize });
+
+                // Add Document Title & Type Header
+                const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+                const fontNorm = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+                page.drawText('SCAN QR CODE', {
+                    x: 595.28 / 2 - 80,
+                    y: y + qrSize + 40,
+                    size: 20,
+                    font: fontBold,
+                    color: rgb(0.1, 0.15, 0.2)
+                });
+
+                const subtext = `Type: ${currentType.toUpperCase()}`;
+                page.drawText(subtext, {
+                    x: 595.28 / 2 - 35,
+                    y: y - 30,
+                    size: 12,
+                    font: fontNorm,
+                    color: rgb(0.4, 0.45, 0.5)
+                });
+
+                const pdfBytes = await pdfDoc.save();
+                saveAs(new Blob([pdfBytes], { type: 'application/pdf' }), 'qrcode_printable.pdf');
+                hideProgress();
+                showToast('Printable PDF generated and downloaded!');
+            } catch (err) {
+                hideProgress();
+                console.error(err);
+                showToast('Failed to export QR code to PDF', true);
+            }
+        };
+
+        // Initialize default view
+        document.addEventListener('DOMContentLoaded', () => {
+            initQrInstance();
+            setQrType('text');
+        });
+    })();
+</script>
 
 </body>
 
