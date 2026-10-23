@@ -5462,6 +5462,382 @@
     </script>
 
     <script>
+
+        // ==========================================
+        // TOOL: Add Text to PDF
+        // ==========================================
+        let addTextDocuments = [];
+        let activeAddTextDocIndex = 0;
+        let activeAddTextPageNum = 1;
+        let activeAddTextScale = 1;
+        let selectedAddTextIndex = -1;
+        let addTextInteraction = null;
+        let addTextEyedropperActive = false;
+
+        function getActiveAddTextPage() {
+            return addTextDocuments[activeAddTextDocIndex]?.pages[activeAddTextPageNum - 1] || null;
+        }
+
+        const addTextOverlay = document.getElementById('add-text-overlay-canvas');
+
+        function renderAddTextOverlay() {
+            if (!addTextOverlay) return;
+            const ctx = addTextOverlay.getContext('2d');
+            ctx.clearRect(0, 0, addTextOverlay.width, addTextOverlay.height);
+
+            const curPage = getActiveAddTextPage();
+            if (curPage) {
+                curPage.items.forEach((item, idx) => {
+                    const x = item.x * addTextOverlay.width;
+                    const y = item.y * addTextOverlay.height;
+                    const fontFamilies = {
+                        Helvetica: 'Helvetica, Arial, sans-serif',
+                        HelveticaBold: 'Helvetica, Arial, sans-serif',
+                        TimesRoman: '"Times New Roman", Times, serif',
+                        Courier: '"Courier New", Courier, monospace'
+                    };
+                    const isBold = item.font === 'HelveticaBold' ? 'bold ' : '';
+                    const pxSize = item.size * activeAddTextScale;
+
+                    ctx.save();
+                    ctx.font = `${isBold}${pxSize}px ${fontFamilies[item.font] || 'sans-serif'}`;
+                    ctx.fillStyle = item.color;
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(item.text, x, y);
+
+                    const metrics = ctx.measureText(item.text);
+                    item.computedWidth = metrics.width / addTextOverlay.width;
+                    item.computedHeight = (pxSize * 1.15) / addTextOverlay.height;
+
+                    if (idx === selectedAddTextIndex) {
+                        ctx.strokeStyle = '#4f46e5';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([4, 2]);
+                        ctx.strokeRect(x - 3, y - 2, metrics.width + 6, pxSize * 1.15 + 4);
+                    }
+                    ctx.restore();
+                });
+            }
+
+            document.getElementById('add-text-undo').disabled = !curPage || curPage.items.length === 0;
+            document.getElementById('add-text-run').disabled = !addTextDocuments.some(d => d.pages.some(p => p.items.length > 0));
+        }
+
+        async function renderAddTextPdfPage() {
+            const docState = addTextDocuments[activeAddTextDocIndex];
+            const wrap = document.getElementById('add-text-page-wrap');
+            const status = document.getElementById('add-text-status');
+            if (!docState) {
+                wrap.classList.add('hidden');
+                status.textContent = 'Select a PDF to begin adding text.';
+                return;
+            }
+
+            status.textContent = `Rendering page ${activeAddTextPageNum}...`;
+            wrap.classList.add('hidden');
+
+            try {
+                const page = await docState.pdf.getPage(activeAddTextPageNum);
+                const baseViewport = page.getViewport({ scale: 1 });
+                const scale = Math.min(1.35, 850 / baseViewport.width, 1100 / baseViewport.height);
+                const viewport = page.getViewport({ scale });
+                activeAddTextScale = scale;
+
+                const canvas = document.getElementById('add-text-page-canvas');
+                canvas.width = addTextOverlay.width = Math.ceil(viewport.width);
+                canvas.height = addTextOverlay.height = Math.ceil(viewport.height);
+
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+                wrap.classList.remove('hidden');
+                status.textContent = `Page ${activeAddTextPageNum} of ${docState.pages.length} — click anywhere to place text, or drag existing text to reposition.`;
+                renderAddTextOverlay();
+            } catch (err) {
+                console.error(err);
+                status.textContent = 'Could not preview page.';
+                showToast('Failed to preview this page.', true);
+            }
+        }
+
+        function updateAddTextPageDropdown() {
+            const select = document.getElementById('add-text-page-select');
+            select.innerHTML = '';
+            const doc = addTextDocuments[activeAddTextDocIndex];
+            if (!doc) return;
+            doc.pages.forEach((_, i) => {
+                const opt = document.createElement('option');
+                opt.value = i + 1;
+                opt.textContent = `Page ${i + 1}`;
+                select.appendChild(opt);
+            });
+            select.value = activeAddTextPageNum;
+        }
+
+        setupDropzone('dropzone-add-text', 'file-add-text', async (files) => {
+            const valid = getValidPdfFiles(files);
+            if (valid.length === 0) {
+                showToast('Please select valid PDF documents.', true);
+                return;
+            }
+
+            showProgress('Loading PDFs', 'Preparing document pages for text annotation...');
+            const docs = [];
+            for (let i = 0; i < valid.length; i++) {
+                try {
+                    const pdf = await pdfjsLib.getDocument({ data: await valid[i].arrayBuffer() }).promise;
+                    docs.push({
+                        file: valid[i],
+                        pdf: pdf,
+                        pages: Array.from({ length: pdf.numPages }, () => ({ items: [] }))
+                    });
+                } catch (e) {
+                    console.error(e);
+                }
+                updateProgress(((i + 1) / valid.length) * 90);
+            }
+
+            hideProgress();
+            addTextDocuments = docs;
+            activeAddTextDocIndex = 0;
+            activeAddTextPageNum = 1;
+            selectedAddTextIndex = -1;
+
+            const fileSelect = document.getElementById('add-text-file-select');
+            fileSelect.innerHTML = '';
+            addTextDocuments.forEach((d, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${i + 1}. ${d.file.name}`;
+                fileSelect.appendChild(opt);
+            });
+
+            document.getElementById('add-text-selection').textContent = `${addTextDocuments.length} PDF(s) loaded`;
+            document.getElementById('add-text-controls').classList.remove('hidden');
+            updateAddTextPageDropdown();
+            renderAddTextPdfPage();
+            showToast(`${addTextDocuments.length} PDF(s) ready for text annotation.`);
+        });
+
+        document.getElementById('add-text-file-select').addEventListener('change', (e) => {
+            activeAddTextDocIndex = parseInt(e.target.value, 10);
+            activeAddTextPageNum = 1;
+            selectedAddTextIndex = -1;
+            updateAddTextPageDropdown();
+            renderAddTextPdfPage();
+        });
+
+        document.getElementById('add-text-page-select').addEventListener('change', (e) => {
+            activeAddTextPageNum = parseInt(e.target.value, 10);
+            selectedAddTextIndex = -1;
+            renderAddTextPdfPage();
+        });
+
+        // Eyedropper for Add Text
+        document.getElementById('add-text-pick-color').addEventListener('click', async () => {
+            if (window.EyeDropper) {
+                try {
+                    const eyeDropper = new EyeDropper();
+                    const result = await eyeDropper.open();
+                    if (result && result.sRGBHex) {
+                        document.getElementById('add-text-color').value = result.sRGBHex;
+                        showToast(`Text color set to ${result.sRGBHex}`);
+                    }
+                    return;
+                } catch (_) { return; }
+            }
+            addTextEyedropperActive = true;
+            addTextOverlay.style.cursor = 'copy';
+            showToast('Click anywhere on the PDF preview to pick color');
+        });
+
+        // Pointer interactions: Place and Drag
+        addTextOverlay.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+
+            // Eyedropper fallback click
+            if (addTextEyedropperActive) {
+                const pageCanvas = document.getElementById('add-text-page-canvas');
+                const rect = pageCanvas.getBoundingClientRect();
+                const scaleX = pageCanvas.width / rect.width;
+                const scaleY = pageCanvas.height / rect.height;
+                const x = Math.floor((e.clientX - rect.left) * scaleX);
+                const y = Math.floor((e.clientY - rect.top) * scaleY);
+                const ctx = pageCanvas.getContext('2d');
+                const pixel = ctx.getImageData(Math.max(0, Math.min(pageCanvas.width - 1, x)), Math.max(0, Math.min(pageCanvas.height - 1, y)), 1, 1).data;
+                const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+                document.getElementById('add-text-color').value = hex;
+                addTextEyedropperActive = false;
+                addTextOverlay.style.cursor = 'crosshair';
+                showToast(`Text color set to ${hex}`);
+                return;
+            }
+
+            const bounds = addTextOverlay.getBoundingClientRect();
+            const normX = (e.clientX - bounds.left) / bounds.width;
+            const normY = (e.clientY - bounds.top) / bounds.height;
+            const curPage = getActiveAddTextPage();
+            if (!curPage) return;
+
+            // Hit test existing text annotations
+            let hitIdx = -1;
+            for (let i = curPage.items.length - 1; i >= 0; i--) {
+                const it = curPage.items[i];
+                const w = it.computedWidth || 0.1;
+                const h = it.computedHeight || 0.03;
+                if (normX >= it.x && normX <= it.x + w && normY >= it.y && normY <= it.y + h) {
+                    hitIdx = i;
+                    break;
+                }
+            }
+
+            if (hitIdx !== -1) {
+                selectedAddTextIndex = hitIdx;
+                const item = curPage.items[hitIdx];
+                addTextInteraction = {
+                    pointerId: e.pointerId,
+                    startX: normX,
+                    startY: normY,
+                    initialX: item.x,
+                    initialY: item.y
+                };
+                addTextOverlay.setPointerCapture(e.pointerId);
+                renderAddTextOverlay();
+                return;
+            }
+
+            // Clicked empty area -> place new text
+            const textVal = document.getElementById('add-text-input').value.trim();
+            if (!textVal) {
+                showToast('Please type some text in the "Text Content" field first.', true);
+                return;
+            }
+
+            curPage.items.push({
+                text: textVal,
+                x: normX,
+                y: normY,
+                font: document.getElementById('add-text-font').value,
+                size: parseFloat(document.getElementById('add-text-size').value) || 16,
+                color: document.getElementById('add-text-color').value
+            });
+            selectedAddTextIndex = curPage.items.length - 1;
+            renderAddTextOverlay();
+            showToast('Text placed! Drag to adjust position if needed.');
+        });
+
+        addTextOverlay.addEventListener('pointermove', (e) => {
+            const bounds = addTextOverlay.getBoundingClientRect();
+            const normX = (e.clientX - bounds.left) / bounds.width;
+            const normY = (e.clientY - bounds.top) / bounds.height;
+            const curPage = getActiveAddTextPage();
+
+            if (addTextInteraction && curPage && selectedAddTextIndex !== -1) {
+                const item = curPage.items[selectedAddTextIndex];
+                if (item) {
+                    item.x = Math.max(0, Math.min(0.98, addTextInteraction.initialX + (normX - addTextInteraction.startX)));
+                    item.y = Math.max(0, Math.min(0.98, addTextInteraction.initialY + (normY - addTextInteraction.startY)));
+                    renderAddTextOverlay();
+                }
+                return;
+            }
+
+            if (!curPage || addTextEyedropperActive) return;
+            let hovered = false;
+            for (let i = curPage.items.length - 1; i >= 0; i--) {
+                const it = curPage.items[i];
+                const w = it.computedWidth || 0.1;
+                const h = it.computedHeight || 0.03;
+                if (normX >= it.x && normX <= it.x + w && normY >= it.y && normY <= it.y + h) {
+                    hovered = true;
+                    break;
+                }
+            }
+            addTextOverlay.style.cursor = hovered ? 'move' : 'crosshair';
+        });
+
+        const stopAddTextDrag = (e) => {
+            if (addTextInteraction) {
+                try { addTextOverlay.releasePointerCapture(e.pointerId); } catch (_) {}
+                addTextInteraction = null;
+                renderAddTextOverlay();
+            }
+        };
+        addTextOverlay.addEventListener('pointerup', stopAddTextDrag);
+        addTextOverlay.addEventListener('pointercancel', stopAddTextDrag);
+
+        document.getElementById('add-text-undo').addEventListener('click', () => {
+            const curPage = getActiveAddTextPage();
+            if (curPage && curPage.items.length) {
+                curPage.items.pop();
+                selectedAddTextIndex = -1;
+                renderAddTextOverlay();
+            }
+        });
+
+        // Save & Download Annotated PDF
+        document.getElementById('add-text-run').addEventListener('click', async () => {
+            showProgress('Applying text annotations', 'Writing text directly into PDF coordinates...');
+            try {
+                const { PDFDocument, StandardFonts, rgb } = PDFLib;
+                const outputs = [];
+
+                for (let d = 0; d < addTextDocuments.length; d++) {
+                    const docState = addTextDocuments[d];
+                    const pdfDoc = await PDFDocument.load(await docState.file.arrayBuffer());
+                    const pages = pdfDoc.getPages();
+
+                    // Font cache per document
+                    const fontMap = {
+                        Helvetica: await pdfDoc.embedFont(StandardFonts.Helvetica),
+                        HelveticaBold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+                        TimesRoman: await pdfDoc.embedFont(StandardFonts.TimesRoman),
+                        Courier: await pdfDoc.embedFont(StandardFonts.Courier)
+                    };
+
+                    for (let pIdx = 0; pIdx < docState.pages.length; pIdx++) {
+                        const pageState = docState.pages[pIdx];
+                        if (!pageState.items.length || pIdx >= pages.length) continue;
+                        const page = pages[pIdx];
+                        const { width, height } = page.getSize();
+
+                        for (const it of pageState.items) {
+                            const font = fontMap[it.font] || fontMap.Helvetica;
+                            const hex = it.color.replace('#', '');
+                            const r = parseInt(hex.substring(0, 2), 16) / 255;
+                            const g = parseInt(hex.substring(2, 4), 16) / 255;
+                            const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+                            const x = it.x * width;
+                            // Convert canvas top-left coordinates to PDF bottom-left coordinates
+                            const y = height - (it.y * height) - it.size;
+
+                            page.drawText(it.text, {
+                                x: x,
+                                y: y,
+                                size: it.size,
+                                font: font,
+                                color: rgb(r, g, b)
+                            });
+                        }
+                    }
+
+                    outputs.push({
+                        name: `${safeFileBaseName(docState.file)}_annotated.pdf`,
+                        bytes: await pdfDoc.save()
+                    });
+                    updateProgress(((d + 1) / addTextDocuments.length) * 85);
+                }
+
+                await downloadPdfOutputs(outputs, 'annotated_pdfs.zip');
+                hideProgress();
+                showToast(`Text applied to ${outputs.length} PDF(s) successfully!`);
+            } catch (err) {
+                hideProgress();
+                console.error(err);
+                showToast('Failed to apply text annotations to PDF.', true);
+            }
+        });
+        
         // ==========================================
         // EXTENSION MODULE: Sign PDF (Draw, Upload, Stamp & Resize)
         // ==========================================
