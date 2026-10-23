@@ -908,6 +908,13 @@
                         <strong>Generate QR Code</strong>
                         <span>Create custom styled QR codes with logos & gradients</span>
                     </button>
+                    <button class="directory-card" type="button" data-tool="compare-pdf"
+    data-search="compare pdf diff difference revisions compare documents visual changes"
+    style="--tool-color:#e11d48;--tool-tint:#ffe4e6">
+    <span class="directory-card-icon"><i data-lucide="git-compare" aria-hidden="true"></i></span>
+    <strong>Compare PDF</strong>
+    <span>Spot visual & layout differences between two PDFs</span>
+</button>
 
 
                 </div>
@@ -1380,6 +1387,122 @@
                 </div>
             </div>
         </section>
+
+        <!-- ========================================== -->
+<!-- TAB: COMPARE PDF                           -->
+<!-- ========================================== -->
+<section id="tab-compare-pdf" class="tab-content hidden tool-page space-y-6">
+    <button class="tool-back" type="button" onclick="showToolDirectory()"><i data-lucide="arrow-left"></i> All tools</button>
+
+    <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <div class="tool-content-heading mb-6">
+            <h2 class="text-xl font-bold text-slate-900">Compare PDF Documents</h2>
+            <p class="text-sm text-slate-500">Select two revisions of a PDF to visually inspect layout alterations, text modifications, and graphic revisions right inside your browser.</p>
+        </div>
+
+        <!-- Two Dropzones Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <!-- Document A (Original) -->
+            <div id="dropzone-cmp-a" class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-indigo-400 transition-colors cursor-pointer bg-slate-50/50">
+                <input type="file" id="file-cmp-a" accept="application/pdf,.pdf" class="hidden">
+                <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 text-slate-600 flex items-center justify-center mb-2">
+                    <i data-lucide="file-text" class="w-6 h-6"></i>
+                </div>
+                <p class="font-semibold text-slate-800 text-sm">Select Original PDF (File A)</p>
+                <p id="cmp-info-a" class="text-xs text-slate-500 mt-1">First revision / source document</p>
+            </div>
+
+            <!-- Document B (Modified) -->
+            <div id="dropzone-cmp-b" class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-rose-400 transition-colors cursor-pointer bg-slate-50/50">
+                <input type="file" id="file-cmp-b" accept="application/pdf,.pdf" class="hidden">
+                <div class="w-12 h-12 mx-auto rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mb-2">
+                    <i data-lucide="file-diff" class="w-6 h-6"></i>
+                </div>
+                <p class="font-semibold text-slate-800 text-sm">Select Modified PDF (File B)</p>
+                <p id="cmp-info-b" class="text-xs text-slate-500 mt-1">Second revision / updated document</p>
+            </div>
+        </div>
+
+        <!-- Controls Bar (Hidden until both files loaded) -->
+        <div id="cmp-controls" class="hidden border-t border-slate-200 pt-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <!-- Navigation -->
+                <div class="flex items-center gap-3">
+                    <button id="cmp-prev-page" type="button" class="p-2 border border-slate-200 bg-white hover:bg-slate-100 rounded-lg text-slate-700 text-xs font-semibold disabled:opacity-40">
+                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                    </button>
+                    <div class="text-xs font-semibold text-slate-700">
+                        <span>Page</span>
+                        <select id="cmp-page-select" class="mx-1 border border-slate-200 rounded-md py-1 px-2 text-xs bg-white"></select>
+                        <span id="cmp-total-pages" class="text-slate-400 font-normal">of 1</span>
+                    </div>
+                    <button id="cmp-next-page" type="button" class="p-2 border border-slate-200 bg-white hover:bg-slate-100 rounded-lg text-slate-700 text-xs font-semibold disabled:opacity-40">
+                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Mode Selection -->
+                <div class="flex items-center gap-2">
+                    <label class="text-xs font-semibold text-slate-600">View Mode:</label>
+                    <div class="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+                        <button type="button" onclick="setCmpViewMode('side-by-side')" class="cmp-mode-btn px-3 py-1 text-xs font-semibold rounded-md bg-indigo-50 text-indigo-700" data-mode="side-by-side">Side-by-Side</button>
+                        <button type="button" onclick="setCmpViewMode('slider')" class="cmp-mode-btn px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900" data-mode="slider">Swipe Slider</button>
+                        <button type="button" onclick="setCmpViewMode('diff-only')" class="cmp-mode-btn px-3 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900" data-mode="diff-only">Highlight Diff</button>
+                    </div>
+                </div>
+
+                <!-- Legend / Summary Tag -->
+                <div id="cmp-status-tag" class="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600">
+                    Comparing pages...
+                </div>
+            </div>
+
+            <!-- Workspace Viewports -->
+            <div class="overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4 min-h-[500px] flex items-center justify-center">
+                <!-- Mode 1: Side by Side -->
+                <div id="cmp-view-side" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                    <div class="flex flex-col items-center">
+                        <span class="text-xs font-bold text-slate-500 mb-2">Original (Document A)</span>
+                        <div class="relative shadow-md bg-white border border-slate-300 rounded overflow-hidden">
+                            <canvas id="cmp-canvas-a" class="block max-w-full h-auto"></canvas>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <span class="text-xs font-bold text-slate-500 mb-2">Modified (Document B)</span>
+                        <div class="relative shadow-md bg-white border border-slate-300 rounded overflow-hidden">
+                            <canvas id="cmp-canvas-b" class="block max-w-full h-auto"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mode 2: Interactive Swipe Slider -->
+                <div id="cmp-view-slider" class="hidden relative shadow-lg bg-white border border-slate-300 rounded overflow-hidden select-none">
+                    <canvas id="cmp-slider-canvas-b" class="block max-w-full h-auto"></canvas>
+                    <div id="cmp-slider-clip" class="absolute inset-0 overflow-hidden" style="width: 50%;">
+                        <canvas id="cmp-slider-canvas-a" class="block max-w-none h-full"></canvas>
+                    </div>
+                    <div id="cmp-slider-divider" class="absolute top-0 bottom-0 w-1 bg-indigo-600 cursor-ew-resize flex items-center justify-center shadow-lg" style="left: 50%;">
+                        <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] shadow-md pointer-events-none">
+                            <i data-lucide="move-horizontal" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mode 3: Diff Map Highlight -->
+<div id="cmp-view-diff" class="hidden flex flex-col items-center">
+    <div class="flex items-center gap-4 text-xs font-semibold mb-2">
+        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span> Red = Removed / Altered</span>
+        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-600 inline-block"></span> Blue = Added</span>
+        <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-slate-900 inline-block"></span> Black = Same text</span>
+    </div>
+    <div class="relative shadow-md bg-white border border-slate-300 rounded overflow-hidden">
+        <canvas id="cmp-canvas-diff" class="block max-w-full h-auto"></canvas>
+    </div>
+</div>
+        </div>
+    </div>
+</section>
+
 
         <!-- ========================================== -->
         <!-- TAB 7: ROTATE PDF                          -->
@@ -6826,6 +6949,294 @@
         document.addEventListener('DOMContentLoaded', () => {
             initQrInstance();
             setQrType('text');
+        });
+    })();
+</script>
+
+<script>
+    // ==========================================
+    // MODULE: Compare PDF Documents
+    // ==========================================
+    (function () {
+        let pdfDocA = null, pdfDocB = null;
+        let fileA = null, fileB = null;
+        let currentPageNum = 1;
+        let totalPages = 1;
+        let activeViewMode = 'side-by-side';
+        let isDraggingSlider = false;
+
+        // Register dropzones for Document A and Document B
+        setupDropzone('dropzone-cmp-a', 'file-cmp-a', async (files) => {
+            const valid = getValidPdfFiles(files);
+            if (!valid.length) return;
+            fileA = valid[0];
+            document.getElementById('cmp-info-a').innerText = `${fileA.name} • ${(fileA.size / (1024 * 1024)).toFixed(2)} MB`;
+            try {
+                pdfDocA = await pdfjsLib.getDocument({ data: await fileA.arrayBuffer() }).promise;
+                showToast(`Loaded Document A (${pdfDocA.numPages} pages)`);
+                checkBothFilesLoaded();
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to parse Document A', true);
+            }
+        });
+
+        setupDropzone('dropzone-cmp-b', 'file-cmp-b', async (files) => {
+            const valid = getValidPdfFiles(files);
+            if (!valid.length) return;
+            fileB = valid[0];
+            document.getElementById('cmp-info-b').innerText = `${fileB.name} • ${(fileB.size / (1024 * 1024)).toFixed(2)} MB`;
+            try {
+                pdfDocB = await pdfjsLib.getDocument({ data: await fileB.arrayBuffer() }).promise;
+                showToast(`Loaded Document B (${pdfDocB.numPages} pages)`);
+                checkBothFilesLoaded();
+            } catch (err) {
+                console.error(err);
+                showToast('Failed to parse Document B', true);
+            }
+        });
+
+        function checkBothFilesLoaded() {
+            if (pdfDocA && pdfDocB) {
+                totalPages = Math.max(pdfDocA.numPages, pdfDocB.numPages);
+                currentPageNum = 1;
+                document.getElementById('cmp-controls').classList.remove('hidden');
+
+                // Populate page dropdown
+                const select = document.getElementById('cmp-page-select');
+                select.innerHTML = '';
+                for (let i = 1; i <= totalPages; i++) {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = i;
+                    select.appendChild(opt);
+                }
+                document.getElementById('cmp-total-pages').textContent = `of ${totalPages}`;
+
+                renderComparisonPage();
+                refreshIcons();
+            }
+        }
+
+        // View mode switcher
+        window.setCmpViewMode = function (mode) {
+            activeViewMode = mode;
+            document.querySelectorAll('.cmp-mode-btn').forEach(btn => {
+                const isActive = btn.dataset.mode === mode;
+                btn.classList.toggle('bg-indigo-50', isActive);
+                btn.classList.toggle('text-indigo-700', isActive);
+                btn.classList.toggle('text-slate-600', !isActive);
+            });
+
+            document.getElementById('cmp-view-side').classList.toggle('hidden', mode !== 'side-by-side');
+            document.getElementById('cmp-view-slider').classList.toggle('hidden', mode !== 'slider');
+            document.getElementById('cmp-view-diff').classList.toggle('hidden', mode !== 'diff-only');
+
+            renderComparisonPage();
+        };
+
+        // Render & compare
+        async function renderComparisonPage() {
+            if (!pdfDocA || !pdfDocB) return;
+            showProgress('Comparing Pages', `Analyzing differences on Page ${currentPageNum}...`);
+
+            try {
+                const scale = 1.5;
+                const hasPageA = currentPageNum <= pdfDocA.numPages;
+                const hasPageB = currentPageNum <= pdfDocB.numPages;
+
+                // Offscreen renderers
+                let canvasA = document.createElement('canvas');
+                let canvasB = document.createElement('canvas');
+                let vpA = null, vpB = null;
+
+                if (hasPageA) {
+                    const pageA = await pdfDocA.getPage(currentPageNum);
+                    vpA = pageA.getViewport({ scale });
+                    canvasA.width = Math.ceil(vpA.width);
+                    canvasA.height = Math.ceil(vpA.height);
+                    const ctxA = canvasA.getContext('2d');
+                    ctxA.fillStyle = '#ffffff';
+                    ctxA.fillRect(0, 0, canvasA.width, canvasA.height);
+                    await pageA.render({ canvasContext: ctxA, viewport: vpA }).promise;
+                }
+
+                if (hasPageB) {
+                    const pageB = await pdfDocB.getPage(currentPageNum);
+                    vpB = pageB.getViewport({ scale });
+                    canvasB.width = Math.ceil(vpB.width);
+                    canvasB.height = Math.ceil(vpB.height);
+                    const ctxB = canvasB.getContext('2d');
+                    ctxB.fillStyle = '#ffffff';
+                    ctxB.fillRect(0, 0, canvasB.width, canvasB.height);
+                    await pageB.render({ canvasContext: ctxB, viewport: vpB }).promise;
+                }
+
+                const commonW = Math.max(canvasA.width || 0, canvasB.width || 0);
+                const commonH = Math.max(canvasA.height || 0, canvasB.height || 0);
+
+                // Pixel difference calculation with 3-way color coding:
+                // Red = Removed/Altered from A, Blue = Added in B, Black = Unchanged text
+                const ctxA = canvasA.getContext('2d');
+                const ctxB = canvasB.getContext('2d');
+                const imgDataA = hasPageA ? ctxA.getImageData(0, 0, canvasA.width, canvasA.height) : null;
+                const imgDataB = hasPageB ? ctxB.getImageData(0, 0, canvasB.width, canvasB.height) : null;
+
+                const diffCanvas = document.getElementById('cmp-canvas-diff');
+                diffCanvas.width = commonW;
+                diffCanvas.height = commonH;
+                const diffCtx = diffCanvas.getContext('2d');
+                const diffImgData = diffCtx.createImageData(commonW, commonH);
+
+                let diffPixelCount = 0;
+                const darkThreshold = 210; // Pixels darker than this are treated as text/ink
+
+                for (let y = 0; y < commonH; y++) {
+                    for (let x = 0; x < commonW; x++) {
+                        const idx = (y * commonW + x) * 4;
+                        let r1 = 255, g1 = 255, b1 = 255;
+                        let r2 = 255, g2 = 255, b2 = 255;
+
+                        if (imgDataA && x < canvasA.width && y < canvasA.height) {
+                            const iA = (y * canvasA.width + x) * 4;
+                            r1 = imgDataA.data[iA];
+                            g1 = imgDataA.data[iA + 1];
+                            b1 = imgDataA.data[iA + 2];
+                        }
+                        if (imgDataB && x < canvasB.width && y < canvasB.height) {
+                            const iB = (y * canvasB.width + x) * 4;
+                            r2 = imgDataB.data[iB];
+                            g2 = imgDataB.data[iB + 1];
+                            b2 = imgDataB.data[iB + 2];
+                        }
+
+                        // Luminance calculations (0 = black, 255 = white)
+                        const lumA = r1 * 0.299 + g1 * 0.587 + b1 * 0.114;
+                        const lumB = r2 * 0.299 + g2 * 0.587 + b2 * 0.114;
+                        const delta = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+
+                        const isInkA = lumA < darkThreshold;
+                        const isInkB = lumB < darkThreshold;
+
+                        if (isInkA && isInkB && delta <= 40) {
+                            // 1. Same text present in both files -> BLACK
+                            diffImgData.data[idx] = 15;      // R
+                            diffImgData.data[idx + 1] = 23;  // G
+                            diffImgData.data[idx + 2] = 42;  // B
+                            diffImgData.data[idx + 3] = 255; // Alpha
+                        } else if (isInkA && (!isInkB || delta > 40)) {
+                            // 2. Present in Document A, removed or modified in B -> RED
+                            diffPixelCount++;
+                            diffImgData.data[idx] = 239;     // R
+                            diffImgData.data[idx + 1] = 68;  // G
+                            diffImgData.data[idx + 2] = 68;  // B
+                            diffImgData.data[idx + 3] = 255; // Alpha
+                        } else if (isInkB && (!isInkA || delta > 40)) {
+                            // 3. Newly added in Document B -> BLUE
+                            diffPixelCount++;
+                            diffImgData.data[idx] = 37;      // R
+                            diffImgData.data[idx + 1] = 99;  // G
+                            diffImgData.data[idx + 2] = 235; // B
+                            diffImgData.data[idx + 3] = 255; // Alpha
+                        } else {
+                            // 4. White / Empty Background
+                            diffImgData.data[idx] = 255;
+                            diffImgData.data[idx + 1] = 255;
+                            diffImgData.data[idx + 2] = 255;
+                            diffImgData.data[idx + 3] = 255;
+                        }
+                    }
+                }
+                diffCtx.putImageData(diffImgData, 0, 0);
+
+                // Update Side by Side canvases
+                const cA = document.getElementById('cmp-canvas-a');
+                cA.width = canvasA.width;
+                cA.height = canvasA.height;
+                cA.getContext('2d').drawImage(canvasA, 0, 0);
+
+                const cB = document.getElementById('cmp-canvas-b');
+                cB.width = canvasB.width;
+                cB.height = canvasB.height;
+                cB.getContext('2d').drawImage(canvasB, 0, 0);
+
+                // Update Slider mode canvases
+                const slA = document.getElementById('cmp-slider-canvas-a');
+                const slB = document.getElementById('cmp-slider-canvas-b');
+                slA.width = canvasA.width;
+                slA.height = canvasA.height;
+                slA.getContext('2d').drawImage(canvasA, 0, 0);
+
+                slB.width = canvasB.width;
+                slB.height = canvasB.height;
+                slB.getContext('2d').drawImage(canvasB, 0, 0);
+
+                // Update stats
+                const statusTag = document.getElementById('cmp-status-tag');
+                if (diffPixelCount === 0) {
+                    statusTag.className = 'text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200';
+                    statusTag.innerHTML = '✓ Pages are identical';
+                } else {
+                    statusTag.className = 'text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200';
+                    statusTag.innerHTML = `! ${diffPixelCount.toLocaleString()} changed pixel areas detected`;
+                }
+
+                document.getElementById('cmp-prev-page').disabled = currentPageNum <= 1;
+                document.getElementById('cmp-next-page').disabled = currentPageNum >= totalPages;
+                document.getElementById('cmp-page-select').value = currentPageNum;
+
+                hideProgress();
+            } catch (err) {
+                hideProgress();
+                console.error(err);
+                showToast('Failed to compare selected pages', true);
+            }
+        }
+
+        // Slider swipe interaction
+        const sliderWrap = document.getElementById('cmp-view-slider');
+        const sliderClip = document.getElementById('cmp-slider-clip');
+        const sliderDivider = document.getElementById('cmp-slider-divider');
+
+        function moveSlider(clientX) {
+            const rect = sliderWrap.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+            sliderClip.style.width = pct + '%';
+            sliderDivider.style.left = pct + '%';
+        }
+
+        sliderDivider.addEventListener('pointerdown', (e) => {
+            isDraggingSlider = true;
+            sliderDivider.setPointerCapture(e.pointerId);
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isDraggingSlider) return;
+            moveSlider(e.clientX);
+        });
+
+        window.addEventListener('pointerup', () => {
+            isDraggingSlider = false;
+        });
+
+        // Pagination listeners
+        document.getElementById('cmp-page-select').addEventListener('change', (e) => {
+            currentPageNum = parseInt(e.target.value, 10);
+            renderComparisonPage();
+        });
+
+        document.getElementById('cmp-prev-page').addEventListener('click', () => {
+            if (currentPageNum > 1) {
+                currentPageNum--;
+                renderComparisonPage();
+            }
+        });
+
+        document.getElementById('cmp-next-page').addEventListener('click', () => {
+            if (currentPageNum < totalPages) {
+                currentPageNum++;
+                renderComparisonPage();
+            }
         });
     })();
 </script>
