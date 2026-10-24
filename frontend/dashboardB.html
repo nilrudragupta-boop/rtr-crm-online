@@ -7553,12 +7553,12 @@
     </script>
 
     <script>
-        // Triggers a reload when the timestamp in UserRefresh tab changes
+        // Triggers a centered modal notification and reloads after 10 seconds
         (function () {
             const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
             const POLL_INTERVAL_MS = 15000; // Poll every 15 seconds
+            const COUNTDOWN_SECONDS = 10;   // 10-second warning before reload
 
-            // Correct keys retrieved from RTR-CRM storage
             const userIdentifier = localStorage.getItem("currentUser") ||
                 localStorage.getItem("contactNumber") ||
                 localStorage.getItem("userId") ||
@@ -7566,59 +7566,112 @@
                 sessionStorage.getItem("userId") ||
                 "";
 
-            if (!userIdentifier) {
-                console.warn("[ForceRefresh] No currentUser or contactNumber found in localStorage. Listener halted.");
-                return;
-            }
+            if (!userIdentifier) return;
 
             const storageKey = `client_refresh_stamp_${userIdentifier.toLowerCase()}`;
             let currentStamp = localStorage.getItem(storageKey);
+            let isReloading = false;
 
-            console.log(`[ForceRefresh] Started monitoring for user: "${userIdentifier}". Baseline in storage:`, currentStamp);
+            function showCenteredReloadModal(durationSeconds) {
+                // Darkened backdrop overlay
+                const backdrop = document.createElement("div");
+                backdrop.id = "forceReloadBackdrop";
+                backdrop.style.cssText = `
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.75);
+                backdrop-filter: blur(6px);
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            `;
+
+                // Big centered alert card
+                const modal = document.createElement("div");
+                modal.style.cssText = `
+                background: #ffffff;
+                color: #1e293b;
+                width: 440px;
+                max-width: 90%;
+                padding: 35px 30px;
+                border-radius: 16px;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+                text-align: center;
+                border-top: 6px solid #3c5481;
+                transform: scale(0.95);
+                animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            `;
+
+                modal.innerHTML = `
+                <div style="font-size: 52px; color: #3c5481; margin-bottom: 15px;">
+                    <i class="fas fa-sync-alt fa-spin"></i>
+                </div>
+                <h2 style="margin: 0 0 10px 0; font-size: 22px; color: #0f172a; font-weight: 700;">System Update Notice</h2>
+                <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+                    An administrator has requested a workspace refresh to apply the latest configurations and updates.
+                </p>
+                <div style="background: #f1f5f9; padding: 12px 20px; border-radius: 8px; font-size: 15px; font-weight: 600; color: #1e293b; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-clock" style="color: #f59e0b;"></i>
+                    Reloading in <span id="reloadCountdownTimer" style="color: #dc2626; font-size: 17px; font-weight: 700;">${durationSeconds}</span>s
+                </div>
+            `;
+
+                backdrop.appendChild(modal);
+                document.body.appendChild(backdrop);
+
+                // Dynamic 1-second interval countdown
+                let remaining = durationSeconds;
+                const timerEl = document.getElementById("reloadCountdownTimer");
+                const countdownInterval = setInterval(() => {
+                    remaining--;
+                    if (timerEl) timerEl.innerText = remaining;
+                    if (remaining <= 0) {
+                        clearInterval(countdownInterval);
+                        window.location.reload(true);
+                    }
+                }, 1000);
+            }
 
             async function checkUserRefresh() {
+                if (isReloading) return;
+
                 try {
                     const fetchUrl = `${GOOGLE_SCRIPT_URL}?identifier=${encodeURIComponent(userIdentifier)}&_=${Date.now()}`;
                     const res = await fetch(fetchUrl);
-                    if (!res.ok) {
-                        console.error("[ForceRefresh] HTTP error:", res.status);
-                        return;
-                    }
+                    if (!res.ok) return;
 
                     const data = await res.json();
-                    console.log("[ForceRefresh] Server response:", data);
-
-                    if (!data.found) {
-                        console.warn(`[ForceRefresh] User "${userIdentifier}" not found in UserRefresh tab.`);
-                        return;
-                    }
+                    if (!data.found) return;
 
                     const remoteStamp = (data.refreshTimestamp || "").toString().trim();
 
-                    // 1. Initial run: establish the current baseline without reloading
+                    // 1. Initial run: establish baseline
                     if (currentStamp === null) {
                         currentStamp = remoteStamp;
                         localStorage.setItem(storageKey, remoteStamp);
-                        console.log("[ForceRefresh] Baseline initialized to:", remoteStamp);
                         return;
                     }
 
-                    // 2. If the value in Column C was modified, trigger page reload
+                    // 2. Trigger detected: timestamp modified
                     if (remoteStamp && remoteStamp !== currentStamp) {
-                        console.log(`[ForceRefresh] Force reload triggered! Old: "${currentStamp}" -> New: "${remoteStamp}"`);
+                        isReloading = true;
                         localStorage.setItem(storageKey, remoteStamp);
-                        window.location.reload(true);
+
+                        // Show centered popup with 10-second countdown
+                        showCenteredReloadModal(COUNTDOWN_SECONDS);
                     }
                 } catch (err) {
                     console.warn("[ForceRefresh] Polling error:", err);
                 }
             }
 
-            // Run immediately on dashboard load, then poll at intervals
             checkUserRefresh();
             setInterval(checkUserRefresh, POLL_INTERVAL_MS);
         })();
     </script>
+
 </body>
 
 </html>
