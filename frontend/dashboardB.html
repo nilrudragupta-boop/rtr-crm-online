@@ -7551,6 +7551,74 @@
             applyMenuPlacement();
         });
     </script>
+
+    <script>
+        // Triggers a reload when the timestamp in UserRefresh tab changes
+        (function () {
+            const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
+            const POLL_INTERVAL_MS = 15000; // Poll every 15 seconds
+
+            // Correct keys retrieved from RTR-CRM storage
+            const userIdentifier = localStorage.getItem("currentUser") ||
+                localStorage.getItem("contactNumber") ||
+                localStorage.getItem("userId") ||
+                localStorage.getItem("contactNo") ||
+                sessionStorage.getItem("userId") ||
+                "";
+
+            if (!userIdentifier) {
+                console.warn("[ForceRefresh] No currentUser or contactNumber found in localStorage. Listener halted.");
+                return;
+            }
+
+            const storageKey = `client_refresh_stamp_${userIdentifier.toLowerCase()}`;
+            let currentStamp = localStorage.getItem(storageKey);
+
+            console.log(`[ForceRefresh] Started monitoring for user: "${userIdentifier}". Baseline in storage:`, currentStamp);
+
+            async function checkUserRefresh() {
+                try {
+                    const fetchUrl = `${GOOGLE_SCRIPT_URL}?identifier=${encodeURIComponent(userIdentifier)}&_=${Date.now()}`;
+                    const res = await fetch(fetchUrl);
+                    if (!res.ok) {
+                        console.error("[ForceRefresh] HTTP error:", res.status);
+                        return;
+                    }
+
+                    const data = await res.json();
+                    console.log("[ForceRefresh] Server response:", data);
+
+                    if (!data.found) {
+                        console.warn(`[ForceRefresh] User "${userIdentifier}" not found in UserRefresh tab.`);
+                        return;
+                    }
+
+                    const remoteStamp = (data.refreshTimestamp || "").toString().trim();
+
+                    // 1. Initial run: establish the current baseline without reloading
+                    if (currentStamp === null) {
+                        currentStamp = remoteStamp;
+                        localStorage.setItem(storageKey, remoteStamp);
+                        console.log("[ForceRefresh] Baseline initialized to:", remoteStamp);
+                        return;
+                    }
+
+                    // 2. If the value in Column C was modified, trigger page reload
+                    if (remoteStamp && remoteStamp !== currentStamp) {
+                        console.log(`[ForceRefresh] Force reload triggered! Old: "${currentStamp}" -> New: "${remoteStamp}"`);
+                        localStorage.setItem(storageKey, remoteStamp);
+                        window.location.reload(true);
+                    }
+                } catch (err) {
+                    console.warn("[ForceRefresh] Polling error:", err);
+                }
+            }
+
+            // Run immediately on dashboard load, then poll at intervals
+            checkUserRefresh();
+            setInterval(checkUserRefresh, POLL_INTERVAL_MS);
+        })();
+    </script>
 </body>
 
 </html>
