@@ -1585,6 +1585,25 @@
 
 
 
+    <!-- Account Suspended Modal -->
+    <div id="suspendedModal" class="modal"
+        style="z-index: 25000; background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center;">
+        <div class="modal-content"
+            style="text-align: center; width: 450px; padding: 40px; border-radius: 15px; border-top: 5px solid #e74a3b; box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);">
+            <i class="fas fa-ban" style="font-size: 48px; color: #e74a3b; margin-bottom: 20px;"></i>
+            <h2 style="color: #2c3e50; margin-top: 0; font-size: 24px;">Account Suspended</h2>
+            <p id="suspendedMessage"
+                style="font-size: 15px; color: var(--text-color); margin-bottom: 25px; line-height: 1.5;">
+                Your account has been suspended for policy violations. Please contact the support team.
+            </p>
+            <button onclick="window.close()"
+                style="width: 100%; background: #e74a3b; color: white; padding: 12px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Exit
+                Application</button>
+        </div>
+    </div>
+
+
+
     <!-- System Check Modal -->
     <div id="systemCheckModal" class="modal">
         <div class="modal-content" style="width: 600px;">
@@ -5134,14 +5153,15 @@
             if (res) {
                 // --- CHECK SUSPENDED MODE ---
                 if (res.suspended) {
-                    alert(res.message || "Your account has been suspended.");
-                    document.body.innerHTML = `<div style="display:flex; height:100vh; align-items:center; justify-content:center; flex-direction:column; font-family:sans-serif; background:var(--bg-color); color:var(--text-color); text-align:center;">
-                        <i class="fas fa-ban" style="font-size: 64px; color: #d35400; margin-bottom: 20px;"></i>
-                        <h1 style="color:#d35400; margin-top: 0;">Account Suspended</h1>
-                        <p style="font-size:18px;">${res.message || "Your account has been suspended for policy violations."}</p>
-                    </div>`;
-                    setTimeout(() => { window.location.href = 'login.html'; }, 3000);
-                    return; // Stop execution
+                    const msgEl = document.getElementById('suspendedMessage');
+                    if (msgEl) {
+                        msgEl.innerText = res.message || "Your account has been suspended for policy violations. Please contact the support team.";
+                    }
+                    const suspModal = document.getElementById('suspendedModal');
+                    if (suspModal) {
+                        suspModal.style.display = 'flex';
+                    }
+                    return; // Stop execution and lock dashboard interaction
                 }
 
                 // --- CHECK MAINTENANCE MODE ---
