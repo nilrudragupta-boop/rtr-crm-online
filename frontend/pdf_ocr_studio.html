@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RTR-CRM OCR - Recognize Text and Create Searchable PDFs</title>
+
+  <!-- Tailwind CSS & FontAwesome Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Core Client-side Engines -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+  <script>
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+
+  <style>
+    /* PDF24 Classic Color Variables & Accents */
+    :root {
+      --pdf24-accent: #f7a800;
+      --pdf24-accent-hover: #e09600;
+      --pdf24-blue: #1c5299;
+      --pdf24-blue-hover: #153e75;
+      --pdf24-bg: #f8fafc;
+    }
+
+    body {
+      background-color: #f3f5f8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #edf2f7;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    
+    /* PDF24 Style Dropzone Dashed border */
+    .pdf24-drop-border {
+      border: 3px dashed #b8c7db;
+    }
+    .pdf24-drop-border:hover, .pdf24-drop-border.drag-active {
+      border-color: #f7a800;
+      background-color: #fffdf5;
+    }
+
+    /* PDF24 Yellow Glow Button */
+    .btn-pdf24-primary {
+      background-color: #f7a800;
+      color: #1e293b;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(247, 168, 0, 0.25), 0 2px 4px -2px rgba(247, 168, 0, 0.25);
+    }
+    .btn-pdf24-primary:hover:not(:disabled) {
+      background-color: #e59a00;
+      box-shadow: 0 6px 12px -2px rgba(247, 168, 0, 0.35);
+      transform: translateY(-1px);
+    }
+    .btn-pdf24-primary:disabled {
+      background-color: #e2e8f0;
+      color: #94a3b8;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .btn-pdf24-blue {
+      background-color: #1c5299;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .btn-pdf24-blue:hover:not(:disabled) {
+      background-color: #153e75;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <!-- PDF24 Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo in PDF24 style -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="resetToHome()">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-white flex items-center justify-center text-xl font-black shadow-md border border-amber-300">
+          <i class="fa-solid fa-file-lines text-slate-900 text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-1.5">
+            <span class="text-xl font-extrabold tracking-tight text-slate-800">RTR-CRM<span class="text-amber-500 font-black">PDF OCR</span></span>
+            <span class="text-xs font-semibold uppercase tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">Tools</span>
+          </div>
+          <p class="text-[11px] text-slate-500 font-medium leading-none">OCR & Searchable PDF Creator</p>
+        </div>
+      </div>
+
+      <!-- Quick Header Actions -->
+      <div class="flex items-center space-x-2">
+        <a href="rtr_pdf_studio.html"
+           class="inline-flex items-center gap-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs sm:text-sm font-semibold px-3 py-2 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-400"
+           title="Open RTR PDF Studio"
+           aria-label="Open RTR PDF Studio">
+          <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+          <span>PDF All Tools</span>
+        </a>
+
+        <span id="badgeWorker" class="hidden text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 px-3 py-1 rounded-full flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Engine Ready
+        </span>
+
+        <button id="headerNewDocBtn" class="hidden text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3.5 py-1.5 rounded-lg border border-slate-300 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-arrow-rotate-left text-slate-500"></i> New File
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Toast Container -->
+  <div id="toastBox" class="fixed bottom-5 right-5 z-50 transform transition-all duration-300 translate-y-20 opacity-0 pointer-events-none">
+    <div id="toastContent" class="bg-slate-900 text-white text-xs px-4 py-3 rounded-lg shadow-xl flex items-center gap-2">
+      <i id="toastIcon" class="fa-solid fa-circle-check text-amber-400"></i>
+      <span id="toastMsg">Notification message</span>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-start">
+    
+    <!-- PDF24 Title Header -->
+    <div class="text-center mb-6">
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center justify-center gap-2">
+        <i class="fa-solid fa-eye text-amber-500"></i> OCR PDF – Recognize Text Online
+      </h1>
+      <p class="text-sm text-slate-600 mt-1 max-w-2xl mx-auto">
+        Free client-side OCR tool to recognize text in PDF and image documents. Generates searchable, selectable PDF documents without uploading data anywhere.
+      </p>
+    </div>
+
+    <!-- 1. FILE UPLOAD & DROP AREA (PDF24 STYLE) -->
+    <section id="uploadSection" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-10 mb-6 transition-all">
+      <div id="dropzone" class="pdf24-drop-border rounded-xl p-8 sm:p-12 text-center cursor-pointer transition flex flex-col items-center justify-center">
+        <input type="file" id="pdfFileInput" accept="application/pdf,image/png,image/jpeg,image/tiff" class="hidden" />
+        
+        <!-- Sheep/Document Vector Icon (PDF24 classic touch) -->
+        <div class="w-20 h-20 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 text-3xl mb-4 shadow-sm group-hover:scale-105 transition">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+        </div>
+
+        <h3 class="text-base sm:text-lg font-bold text-slate-800 mb-1">Choose files or drop them here</h3>
+        <p class="text-xs text-slate-500 max-w-md mb-5">Supported formats: PDF, PNG, JPG, or Scanned Documents. Safe and local processing directly on your PC.</p>
+
+        <button type="button" class="btn-pdf24-primary px-6 py-2.5 rounded-lg text-sm flex items-center gap-2 pointer-events-none shadow">
+          <i class="fa-regular fa-folder-open"></i> Choose PDF Files
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. OCR SETTINGS & CONFIGURATION BAR (PDF24 Tool Options) -->
+    <section id="settingsSection" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        
+        <!-- Language selector -->
+        <div>
+          <label for="ocrLangSelect" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <i class="fa-solid fa-language text-amber-600"></i> Recognition Language
+          </label>
+          <select id="ocrLangSelect" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-700 font-medium outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="eng" selected>English (eng)</option>            
+            <option value="hin">Hindi (हिन्दी - hin)</option>                        
+          </select>
+        </div>
+
+        <!-- DPI/Quality setting -->
+        <div>
+          <label for="ocrDpiSelect" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <i class="fa-solid fa-sliders text-amber-600"></i> Render Quality / DPI
+          </label>
+          <select id="ocrDpiSelect" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-700 font-medium outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="1.5">150 DPI (Fast / Draft)</option>
+            <option value="2.0" selected>200 DPI (Balanced - Recommended)</option>
+            <option value="2.5">300 DPI (High Precision / Small Text)</option>
+          </select>
+        </div>
+
+        <!-- Processing Mode -->
+        <div>
+          <label for="ocrRangeSelect" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <i class="fa-regular fa-file text-amber-600"></i> Page Range
+          </label>
+          <select id="ocrRangeSelect" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-700 font-medium outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="all" selected>All Pages</option>
+            <option value="current">Current Page Only</option>
+          </select>
+        </div>
+
+        <!-- Primary Start Button -->
+        <div class="flex items-end">
+          <button id="startOcrBtn" disabled class="btn-pdf24-primary w-full py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles text-sm"></i> Start OCR Recognition
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 3. PROGRESS & STATUS BAR (PDF24 style conversion feedback) -->
+    <div id="progressBox" class="hidden bg-white border border-amber-200 rounded-xl p-4 shadow-sm mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-circle-notch fa-spin text-amber-500 text-base"></i>
+          <span id="progressLabel" class="text-xs font-bold text-slate-700">Starting OCR engine...</span>
+        </div>
+        <span id="progressPercentage" class="text-xs font-bold font-mono text-amber-700">0%</span>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
+        <div id="progressBar" class="bg-amber-500 h-full w-0 transition-all duration-200"></div>
+      </div>
+      <p id="progressDetail" class="text-[11px] text-slate-500 mt-1.5">Please wait, your document is processed entirely in your web browser.</p>
+    </div>
+
+    <!-- 4. WORKSPACE AREA (When document is loaded) -->
+    <section id="workspaceArea" class="hidden flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+      
+      <!-- Left Column: Pages Strip / File info (3 cols) -->
+      <div class="lg:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+        
+        <div class="p-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-layer-group text-slate-500 text-xs"></i>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Pages (<span id="pageCountDisplay">0</span>)</span>
+          </div>
+          <span id="ocrStatusBadge" class="text-[11px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-semibold">0 Done</span>
+        </div>
+
+        <!-- Thumbnails Scroll Area -->
+        <div id="pagesThumbnailList" class="flex-1 overflow-y-auto p-3 space-y-2.5 custom-scrollbar max-h-[640px]">
+          <!-- Injected dynamically -->
+        </div>
+
+        <div class="p-3 bg-slate-50 border-t border-slate-200 text-center">
+          <span id="activeDocName" class="text-[11px] font-medium text-slate-500 block truncate">document.pdf</span>
+        </div>
+      </div>
+
+      <!-- Middle Column: Interactive Page Viewer with OCR Box Overlay (6 cols) -->
+      <div class="lg:col-span-6 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+        
+        <!-- Viewer Toolbar -->
+        <div class="h-12 border-b border-slate-200 px-4 flex items-center justify-between bg-slate-50">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-semibold text-slate-500">Page:</span>
+            <span id="activePageBadge" class="text-xs font-bold bg-white text-slate-800 px-2.5 py-0.5 rounded border border-slate-300 shadow-xs">1 / 1</span>
+          </div>
+
+          <div class="flex items-center space-x-3 text-xs">
+            <label class="flex items-center space-x-1.5 cursor-pointer text-slate-700 select-none">
+              <input type="checkbox" id="toggleBoxes" checked class="rounded text-amber-500 focus:ring-0">
+              <span class="text-[11px] font-semibold">Bounding Boxes</span>
+            </label>
+            <div class="h-4 border-r border-slate-300"></div>
+            <button id="zoomOutBtn" class="w-7 h-7 flex items-center justify-center bg-white border border-slate-300 hover:bg-slate-100 rounded text-slate-700 shadow-xs" title="Zoom Out">
+              <i class="fa-solid fa-minus text-[10px]"></i>
+            </button>
+            <span id="zoomLabel" class="text-xs font-mono font-bold text-slate-600">100%</span>
+            <button id="zoomInBtn" class="w-7 h-7 flex items-center justify-center bg-white border border-slate-300 hover:bg-slate-100 rounded text-slate-700 shadow-xs" title="Zoom In">
+              <i class="fa-solid fa-plus text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="flex-1 overflow-auto p-4 flex justify-center items-start bg-slate-100/70 custom-scrollbar min-h-[500px]" id="canvasViewport">
+          <div id="pageCanvasContainer" class="relative shadow-md bg-white rounded border border-slate-300 select-none">
+            <canvas id="pdfRenderCanvas" class="block"></canvas>
+            <svg id="ocrOverlaySvg" class="absolute inset-0 pointer-events-none w-full h-full"></svg>
+          </div>
+        </div>
+
+        <!-- Footer status -->
+        <div class="p-2.5 border-t border-slate-200 bg-white text-[11px] text-slate-500 flex items-center justify-between px-4">
+          <span id="hoveredWordMeta">Hover over OCR boxes to inspect recognized terms</span>
+          <span id="pageConfidenceLabel" class="font-bold text-emerald-600 hidden">Conf: --%</span>
+        </div>
+      </div>
+
+      <!-- Right Column: Extracted Text & PDF24 Export Actions (3 cols) -->
+      <div class="lg:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+        
+        <div class="p-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+            <i class="fa-solid fa-align-left text-slate-500"></i> Recognized Text
+          </span>
+          <span id="charCountLabel" class="text-[10px] text-slate-400">0 words</span>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="p-3 border-b border-slate-100 grid grid-cols-2 gap-2 bg-white">
+          <button id="copyPageTextBtn" class="text-xs bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold py-2 px-2 rounded-lg border border-slate-300 flex items-center justify-center gap-1.5 transition">
+            <i class="fa-regular fa-copy text-slate-500"></i> Copy Page
+          </button>
+          <button id="downloadTxtBtn" class="text-xs bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold py-2 px-2 rounded-lg border border-slate-300 flex items-center justify-center gap-1.5 transition">
+            <i class="fa-solid fa-file-arrow-down text-slate-500"></i> Save .TXT
+          </button>
+        </div>
+
+        <!-- Editable live text -->
+        <div class="flex-1 flex flex-col p-3 overflow-hidden">
+          <label for="pageTextOutput" class="text-[11px] font-bold text-slate-600 mb-1">Page Text Editor</label>
+          <textarea id="pageTextOutput" placeholder="Recognized text will appear here. You can refine and correct wording..." class="flex-1 w-full text-xs border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-amber-500 outline-none resize-none bg-slate-50 font-mono text-slate-800 custom-scrollbar"></textarea>
+        </div>
+
+        <!-- Download Searchable PDF Bar (PDF24 Final Output Style) -->
+        <div class="p-3.5 border-t border-slate-200 bg-amber-50/50">
+          <button id="downloadSearchablePdfBtn" disabled class="btn-pdf24-primary w-full py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2">
+            <i class="fa-solid fa-file-pdf text-base"></i> Download Searchable PDF
+          </button>
+          <p class="text-[10px] text-center text-slate-500 mt-2">Creates a sandwich PDF with an invisible text layer</p>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 5. PDF24 INFORMATIONAL FEATURE CARDS (Matching classic PDF24 layout) -->
+    <section class="mt-8 pt-8 border-t border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-700">
+      
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+        <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-lg mb-3">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <h4 class="text-sm font-bold text-slate-800 mb-1">100% Privacy & Local Security</h4>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Your files never leave your computer. Both the PDF rendering engine and OCR recognition work strictly inside your web browser.
+        </p>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+        <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-lg mb-3">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </div>
+        <h4 class="text-sm font-bold text-slate-800 mb-1">True Searchable Sandwich PDF</h4>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          The tool automatically compiles an invisible text layer behind the scanned images so you can search (Ctrl+F) and copy text in Acrobat or Chrome.
+        </p>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+        <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg mb-3">
+          <i class="fa-solid fa-bolt"></i>
+        </div>
+        <h4 class="text-sm font-bold text-slate-800 mb-1">Multi-Language Recognition</h4>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Powered by Tesseract OCR v5, supporting English, German, French, Spanish, Italian, Hindi, and Simplified Chinese character sets.
+        </p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- PDF24 Footer -->
+  <footer class="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center space-x-2">
+        <span class="font-extrabold text-slate-700">RTR-CRM<span class="text-amber-500 font-black">OCR</span></span>
+        <span>— Browser-Based RTR-CRM OCR Engine Studio</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span>No Upload Limits</span>
+        <span>•</span>
+        <span>High-Accuracy Optical Character Recognition</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    // App State Management
+    const state = {
+      originalFile: null,
+      pdfBytes: null,
+      pdfDoc: null,
+      totalPages: 0,
+      currentPage: 1,
+      scale: 1.25,
+      pagesData: {}, // { [pageNum]: { text, confidence, words: [], canvasWidth, canvasHeight } }
+      worker: null,
+      currentWorkerLang: null,
+      isProcessing: false,
+    };
+
+    // DOM References
+    const dropzone = document.getElementById('dropzone');
+    const pdfFileInput = document.getElementById('pdfFileInput');
+    const uploadSection = document.getElementById('uploadSection');
+    const settingsSection = document.getElementById('settingsSection');
+    const workspaceArea = document.getElementById('workspaceArea');
+    const progressBox = document.getElementById('progressBox');
+    const progressBar = document.getElementById('progressBar');
+    const progressLabel = document.getElementById('progressLabel');
+    const progressPercentage = document.getElementById('progressPercentage');
+    const progressDetail = document.getElementById('progressDetail');
+
+    const startOcrBtn = document.getElementById('startOcrBtn');
+    const ocrLangSelect = document.getElementById('ocrLangSelect');
+    const ocrDpiSelect = document.getElementById('ocrDpiSelect');
+    const ocrRangeSelect = document.getElementById('ocrRangeSelect');
+
+    const pagesThumbnailList = document.getElementById('pagesThumbnailList');
+    const pageCountDisplay = document.getElementById('pageCountDisplay');
+    const ocrStatusBadge = document.getElementById('ocrStatusBadge');
+    const activeDocName = document.getElementById('activeDocName');
+
+    const activePageBadge = document.getElementById('activePageBadge');
+    const pdfRenderCanvas = document.getElementById('pdfRenderCanvas');
+    const ocrOverlaySvg = document.getElementById('ocrOverlaySvg');
+    const pageCanvasContainer = document.getElementById('pageCanvasContainer');
+    const toggleBoxes = document.getElementById('toggleBoxes');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const zoomLabel = document.getElementById('zoomLabel');
+    const hoveredWordMeta = document.getElementById('hoveredWordMeta');
+    const pageConfidenceLabel = document.getElementById('pageConfidenceLabel');
+
+    const pageTextOutput = document.getElementById('pageTextOutput');
+    const charCountLabel = document.getElementById('charCountLabel');
+    const copyPageTextBtn = document.getElementById('copyPageTextBtn');
+    const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+    const downloadSearchablePdfBtn = document.getElementById('downloadSearchablePdfBtn');
+    const headerNewDocBtn = document.getElementById('headerNewDocBtn');
+    const badgeWorker = document.getElementById('badgeWorker');
+
+    // Drag-and-drop Events
+    dropzone.addEventListener('click', () => pdfFileInput.click());
+    
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropzone.classList.add('drag-active');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('drag-active');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files.length) {
+        handleIncomingFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    pdfFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        handleIncomingFile(e.target.files[0]);
+      }
+    });
+
+    // Handle File Intake
+    async function handleIncomingFile(file) {
+      if (!file) return;
+      showToast(`Loading "${file.name}"...`, 'info');
+      showProgress(true, 'Reading and preparing document...', 10, 'Parsing PDF structure and pages.');
+
+      state.originalFile = file;
+      activeDocName.innerText = file.name;
+
+      try {
+        const rawBuffer = await file.arrayBuffer();
+        // Clone master buffer to avoid detach errors
+        state.pdfBytes = rawBuffer.slice(0);
+
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          // Pass slice to PDF.js worker
+          const pdfDataCopy = rawBuffer.slice(0);
+          const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfDataCopy) });
+          state.pdfDoc = await loadingTask.promise;
+          state.totalPages = state.pdfDoc.numPages;
+        } else {
+          // Image file - wrap in a clean PDF using pdf-lib
+          const doc = await PDFLib.PDFDocument.create();
+          let img;
+          if (file.type.includes('png')) {
+            img = await doc.embedPng(rawBuffer.slice(0));
+          } else {
+            img = await doc.embedJpg(rawBuffer.slice(0));
+          }
+          const page = doc.addPage([img.width, img.height]);
+          page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+          const generatedPdf = await doc.save();
+          state.pdfBytes = generatedPdf.buffer.slice(generatedPdf.byteOffset, generatedPdf.byteOffset + generatedPdf.byteLength);
+
+          const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(state.pdfBytes.slice(0)) });
+          state.pdfDoc = await loadingTask.promise;
+          state.totalPages = 1;
+        }
+
+        // Update UI
+        pageCountDisplay.innerText = state.totalPages;
+        ocrStatusBadge.innerText = `0 / ${state.totalPages} OCR'd`;
+        startOcrBtn.disabled = false;
+        headerNewDocBtn.classList.remove('hidden');
+        workspaceArea.classList.remove('hidden');
+
+        // Render thumbnails strip and active page
+        await renderThumbnailsStrip();
+        await switchActivePage(1);
+
+        showProgress(false);
+        showToast('Document ready! Configure options & click Start OCR.', 'success');
+      } catch (err) {
+        console.error(err);
+        showProgress(false);
+        showToast('Failed to load file: ' + err.message, 'error');
+      }
+    }
+
+    // Render Thumbnail Queue
+    async function renderThumbnailsStrip() {
+      pagesThumbnailList.innerHTML = '';
+      for (let i = 1; i <= state.totalPages; i++) {
+        const card = document.createElement('div');
+        card.id = `thumb-card-${i}`;
+        card.className = `p-2.5 rounded-xl border border-slate-200 bg-white hover:border-amber-400 cursor-pointer transition flex items-center space-x-3`;
+        card.innerHTML = `
+          <div class="w-12 h-16 bg-slate-100 border border-slate-300 rounded overflow-hidden flex items-center justify-center text-[10px] text-slate-400 font-mono shadow-inner relative flex-shrink-0" id="thumb-canvas-box-${i}">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-700">Page ${i}</span>
+              <span id="thumb-badge-${i}" class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">Pending</span>
+            </div>
+            <p id="thumb-preview-text-${i}" class="text-[11px] text-slate-400 truncate mt-1">No OCR data</p>
+          </div>
+        `;
+        card.addEventListener('click', () => switchActivePage(i));
+        pagesThumbnailList.appendChild(card);
+
+        // Async render thumb preview
+        renderThumbnailGraphic(i);
+      }
+    }
+
+    async function renderThumbnailGraphic(pageNum) {
+      try {
+        const page = await state.pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 0.22 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        const container = document.getElementById(`thumb-canvas-box-${pageNum}`);
+        if (container) {
+          container.innerHTML = '';
+          canvas.className = 'w-full h-full object-cover';
+          container.appendChild(canvas);
+        }
+      } catch (err) {
+        console.warn('Thumbnail generation failed for page', pageNum, err);
+      }
+    }
+
+    // Switch and View Page
+    async function switchActivePage(pageNum) {
+      if (pageNum < 1 || pageNum > state.totalPages) return;
+      state.currentPage = pageNum;
+      activePageBadge.innerText = `${pageNum} / ${state.totalPages}`;
+
+      // Update thumbnail active styles
+      document.querySelectorAll('#pagesThumbnailList > div').forEach((el, idx) => {
+        if (idx + 1 === pageNum) {
+          el.classList.add('border-amber-500', 'bg-amber-50/40', 'ring-1', 'ring-amber-500');
+        } else {
+          el.classList.remove('border-amber-500', 'bg-amber-50/40', 'ring-1', 'ring-amber-500');
+        }
+      });
+
+      await renderActivePageCanvas();
+      updateInspectionTextPanel(pageNum);
+    }
+
+    // High-resolution Canvas Render
+    async function renderActivePageCanvas() {
+      const page = await state.pdfDoc.getPage(state.currentPage);
+      const viewport = page.getViewport({ scale: state.scale });
+
+      pdfRenderCanvas.width = viewport.width;
+      pdfRenderCanvas.height = viewport.height;
+      pageCanvasContainer.style.width = `${viewport.width}px`;
+      pageCanvasContainer.style.height = `${viewport.height}px`;
+
+      const ctx = pdfRenderCanvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      renderOcrBoundingBoxes(state.currentPage);
+    }
+
+    // Render OCR Bounding Boxes with Tooltips
+    function renderOcrBoundingBoxes(pageNum) {
+      ocrOverlaySvg.innerHTML = '';
+      if (!toggleBoxes.checked) return;
+
+      const pageInfo = state.pagesData[pageNum];
+      if (!pageInfo || !pageInfo.words || !pageInfo.words.length) return;
+
+      const scaleX = pdfRenderCanvas.width / pageInfo.canvasWidth;
+      const scaleY = pdfRenderCanvas.height / pageInfo.canvasHeight;
+      const svgNs = "http://www.w3.org/2000/svg";
+
+      pageInfo.words.forEach(word => {
+        if (!word.text || !word.bbox) return;
+        const { x0, y0, x1, y1 } = word.bbox;
+        const rect = document.createElementNS(svgNs, 'rect');
+
+        rect.setAttribute('x', x0 * scaleX);
+        rect.setAttribute('y', y0 * scaleY);
+        rect.setAttribute('width', (x1 - x0) * scaleX);
+        rect.setAttribute('height', (y1 - y0) * scaleY);
+        rect.setAttribute('fill', 'rgba(247, 168, 0, 0.15)');
+        rect.setAttribute('stroke', '#d97706');
+        rect.setAttribute('stroke-width', '1');
+        rect.setAttribute('class', 'pointer-events-auto cursor-pointer transition-colors duration-100');
+
+        rect.addEventListener('mouseenter', () => {
+          rect.setAttribute('fill', 'rgba(247, 168, 0, 0.45)');
+          hoveredWordMeta.innerHTML = `Word: <strong class="text-slate-800">"${word.text}"</strong> (Confidence: ${Math.round(word.confidence)}%)`;
+        });
+
+        rect.addEventListener('mouseleave', () => {
+          rect.setAttribute('fill', 'rgba(247, 168, 0, 0.15)');
+          hoveredWordMeta.innerText = 'Hover over OCR boxes to inspect recognized terms';
+        });
+
+        ocrOverlaySvg.appendChild(rect);
+      });
+    }
+
+    // Tesseract OCR Engine Worker Management
+    async function getInitializedWorker() {
+      const selectedLang = ocrLangSelect.value;
+      if (!state.worker || state.currentWorkerLang !== selectedLang) {
+        if (state.worker) {
+          await state.worker.terminate();
+        }
+        showProgress(true, `Downloading & initializing Tesseract [${selectedLang}]...`, 15);
+        state.worker = await Tesseract.createWorker(selectedLang, 1, {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              const p = Math.round((m.progress || 0) * 100);
+              showProgress(true, `Recognizing Page ${state.currentPage} text...`, p);
+            }
+          }
+        });
+        state.currentWorkerLang = selectedLang;
+        badgeWorker.classList.remove('hidden');
+      }
+      return state.worker;
+    }
+
+    // OCR Execution
+    startOcrBtn.addEventListener('click', async () => {
+      if (state.isProcessing || !state.pdfDoc) return;
+      state.isProcessing = true;
+      startOcrBtn.disabled = true;
+
+      try {
+        const worker = await getInitializedWorker();
+        const ocrDpiScale = parseFloat(ocrDpiSelect.value) || 2.0;
+        const pageRange = ocrRangeSelect.value;
+
+        const targetPages = pageRange === 'current'
+          ? [state.currentPage]
+          : Array.from({ length: state.totalPages }, (_, i) => i + 1);
+
+        let completed = 0;
+
+        for (const p of targetPages) {
+          showProgress(true, `Rasterizing Page ${p} of ${state.totalPages} at ${Math.round(ocrDpiScale * 100)} DPI...`, 20);
+          
+          const page = await state.pdfDoc.getPage(p);
+          const viewport = page.getViewport({ scale: ocrDpiScale });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          showProgress(true, `Running OCR recognition on Page ${p}...`, 45);
+          const { data } = await worker.recognize(canvas);
+
+          // Save page OCR data
+          state.pagesData[p] = {
+            text: data.text,
+            confidence: data.confidence,
+            words: data.words,
+            canvasWidth: canvas.width,
+            canvasHeight: canvas.height,
+          };
+
+          completed++;
+          ocrStatusBadge.innerText = `${completed} / ${state.totalPages} Done`;
+
+          // Update sidebar cards
+          const thumbBadge = document.getElementById(`thumb-badge-${p}`);
+          const thumbText = document.getElementById(`thumb-preview-text-${p}`);
+          if (thumbBadge) {
+            thumbBadge.className = 'text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold';
+            thumbBadge.innerText = `${Math.round(data.confidence)}% Conf`;
+          }
+          if (thumbText) {
+            thumbText.innerText = data.text.trim().substring(0, 35) || 'No text found';
+          }
+
+          if (p === state.currentPage) {
+            updateInspectionTextPanel(p);
+            renderOcrBoundingBoxes(p);
+          }
+        }
+
+        downloadSearchablePdfBtn.disabled = false;
+        showProgress(false);
+        showToast('OCR complete! You can now download your searchable PDF.', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('OCR process error: ' + err.message, 'error');
+        showProgress(false);
+      } finally {
+        state.isProcessing = false;
+        startOcrBtn.disabled = false;
+      }
+    });
+
+    // Update Text Inspection and Confidence
+    function updateInspectionTextPanel(pageNum) {
+      const pageInfo = state.pagesData[pageNum];
+      if (pageInfo) {
+        pageTextOutput.value = pageInfo.text;
+        pageConfidenceLabel.classList.remove('hidden');
+        pageConfidenceLabel.innerText = `Conf: ${Math.round(pageInfo.confidence)}%`;
+        updateWordCount(pageInfo.text);
+      } else {
+        pageTextOutput.value = '';
+        pageConfidenceLabel.classList.add('hidden');
+        updateWordCount('');
+      }
+    }
+
+    function updateWordCount(str) {
+      const words = str.trim() ? str.trim().split(/\s+/).length : 0;
+      charCountLabel.innerText = `${words} words | ${str.length} chars`;
+    }
+
+    pageTextOutput.addEventListener('input', (e) => {
+      updateWordCount(e.target.value);
+      if (state.pagesData[state.currentPage]) {
+        state.pagesData[state.currentPage].text = e.target.value;
+      }
+    });
+
+    // Copy and TXT Export
+    copyPageTextBtn.addEventListener('click', () => {
+      if (!pageTextOutput.value) {
+        showToast('No text on this page to copy.', 'info');
+        return;
+      }
+      navigator.clipboard.writeText(pageTextOutput.value);
+      copyPageTextBtn.innerHTML = '<i class="fa-solid fa-check text-emerald-600"></i> Copied!';
+      setTimeout(() => {
+        copyPageTextBtn.innerHTML = '<i class="fa-regular fa-copy text-slate-500"></i> Copy Page';
+      }, 1500);
+      showToast('Page text copied to clipboard.', 'success');
+    });
+
+    downloadTxtBtn.addEventListener('click', () => {
+      let combined = '';
+      for (let p = 1; p <= state.totalPages; p++) {
+        combined += `==================== Page ${p} ====================\n`;
+        combined += (state.pagesData[p] ? state.pagesData[p].text : '') + '\n\n';
+      }
+      const blob = new Blob([combined], { type: 'text/plain;charset=utf-8' });
+      downloadBlob(blob, 'recognized_document_text.txt');
+      showToast('TXT document downloaded.', 'success');
+    });
+
+    // Compile Searchable PDF (Sandwich PDF) using pdf-lib
+    downloadSearchablePdfBtn.addEventListener('click', async () => {
+      try {
+        showProgress(true, 'Compiling Searchable Sandwich PDF...', 25, 'Embedding invisible text layers over original pages.');
+        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+        // Retrieve fresh buffer copy to prevent detached ArrayBuffer crash
+        let buffer;
+        if (state.originalFile && (state.originalFile.type === 'application/pdf' || state.originalFile.name.endsWith('.pdf'))) {
+          buffer = await state.originalFile.arrayBuffer();
+        } else if (state.pdfBytes && state.pdfBytes.byteLength > 0) {
+          buffer = state.pdfBytes.slice(0);
+        } else {
+          throw new Error('Valid PDF buffer not found.');
+        }
+
+        const pdfDoc = await PDFDocument.load(buffer);
+        const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const pages = pdfDoc.getPages();
+
+        for (let i = 0; i < pages.length; i++) {
+          const pageNum = i + 1;
+          const page = pages[i];
+          const pageInfo = state.pagesData[pageNum];
+
+          if (pageInfo && pageInfo.words && pageInfo.words.length) {
+            const { width, height } = page.getSize();
+            const scaleX = width / pageInfo.canvasWidth;
+            const scaleY = height / pageInfo.canvasHeight;
+
+            for (const word of pageInfo.words) {
+              let text = (word.text || '').trim();
+              if (!text) continue;
+
+              // Filter out unicode outside WinAnsi to avoid pdf-lib embed encoding crashes
+              text = text.replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+              if (!text) continue;
+
+              const { x0, y0, x1, y1 } = word.bbox;
+              const pdfX = Math.max(0, x0 * scaleX);
+              const pdfHeight = Math.max(1, (y1 - y0) * scaleY);
+              // Bottom-left origin flip in PDF coordinate space
+              const pdfY = Math.max(0, height - (y1 * scaleY));
+              const fontSize = Math.max(pdfHeight * 0.82, 5);
+
+              try {
+                // Draw transparent text overlay (selectable & searchable)
+                page.drawText(text, {
+                  x: pdfX,
+                  y: pdfY,
+                  size: fontSize,
+                  font: helveticaFont,
+                  color: rgb(0, 0, 0),
+                  opacity: 0.001,
+                });
+              } catch (drawErr) {
+                // Ignore glyph encode issues for exotic characters
+              }
+            }
+          }
+        }
+
+        const finalPdfBytes = await pdfDoc.save();
+        const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+        downloadBlob(blob, 'RTR-CRM_searchable_ocr_document.pdf');
+
+        showProgress(false);
+        showToast('Searchable PDF compiled and downloaded successfully!', 'success');
+      } catch (err) {
+        console.error(err);
+        showProgress(false);
+        showToast('Error compiling Searchable PDF: ' + err.message, 'error');
+      }
+    });
+
+    // Zoom Controls
+    zoomInBtn.addEventListener('click', () => {
+      if (state.scale < 2.5) {
+        state.scale += 0.25;
+        zoomLabel.innerText = `${Math.round(state.scale * 100 / 1.25)}%`;
+        renderActivePageCanvas();
+      }
+    });
+
+    zoomOutBtn.addEventListener('click', () => {
+      if (state.scale > 0.5) {
+        state.scale -= 0.25;
+        zoomLabel.innerText = `${Math.round(state.scale * 100 / 1.25)}%`;
+        renderActivePageCanvas();
+      }
+    });
+
+    toggleBoxes.addEventListener('change', () => {
+      renderOcrBoundingBoxes(state.currentPage);
+    });
+
+    // Helper functions
+    function showProgress(visible, label = '', percent = 0, detail = '') {
+      if (visible) {
+        progressBox.classList.remove('hidden');
+        progressLabel.innerText = label;
+        progressBar.style.width = `${percent}%`;
+        progressPercentage.innerText = `${percent}%`;
+        if (detail) progressDetail.innerText = detail;
+      } else {
+        progressBox.classList.add('hidden');
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const toastBox = document.getElementById('toastBox');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.innerText = message;
+      if (type === 'success') {
+        toastIcon.className = 'fa-solid fa-circle-check text-emerald-400';
+      } else if (type === 'error') {
+        toastIcon.className = 'fa-solid fa-triangle-exclamation text-rose-400';
+      } else {
+        toastIcon.className = 'fa-solid fa-circle-info text-amber-400';
+      }
+
+      toastBox.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toastBox.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      }, 3500);
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function resetToHome() {
+      state.originalFile = null;
+      state.pdfBytes = null;
+      state.pdfDoc = null;
+      state.totalPages = 0;
+      state.currentPage = 1;
+      state.pagesData = {};
+
+      workspaceArea.classList.add('hidden');
+      headerNewDocBtn.classList.add('hidden');
+      startOcrBtn.disabled = true;
+      downloadSearchablePdfBtn.disabled = true;
+      pdfFileInput.value = '';
+      pagesThumbnailList.innerHTML = '';
+      pageTextOutput.value = '';
+      ocrOverlaySvg.innerHTML = '';
+      pdfRenderCanvas.width = 0;
+      pdfRenderCanvas.height = 0;
+      ocrStatusBadge.innerText = '0 Done';
+      pageCountDisplay.innerText = '0';
+      showToast('Ready for new file.', 'info');
+    }
+
+    headerNewDocBtn.addEventListener('click', resetToHome);
+  </script>
+</body>
+</html>
