@@ -925,12 +925,19 @@
                         <span class="directory-card-icon"><i data-lucide="image-plus" aria-hidden="true"></i></span>
                         <div class="flex items-center gap-1.5">
                             <strong>Insert Image</strong>
-
-                        </div>
+                            </div>
                         <span>Insert, resize 8-ways, rotate, clone & live opacity</span>
                     </button>
-
-
+                    <button class="directory-card ring-2 ring-emerald-500/20" type="button" data-tool="look-scanned"
+                        data-search="scan look scanned photocopy scanner effect printer tilt noise blur binarize yellowing grayscale black white"
+                        style="--tool-color:#059669;--tool-tint:#ecfdf5">
+                        <span class="directory-card-icon"><i data-lucide="printer" aria-hidden="true"></i></span>
+                        <div class="flex items-center gap-1.5">
+                            <strong>Look Old Scanned</strong>                            
+                        </div>
+                        <span>Make digital PDFs look like realistic old scanned copies</span>
+                    </button>            
+                    </button>
                 </div>
                 <p id="directory-empty" class="directory-empty hidden">No matching tools. Try a different search.</p>
 
@@ -2499,6 +2506,189 @@
                         </div>
                         <p id="add-text-status" class="py-6 text-center text-sm text-slate-500">Select a PDF to begin
                             adding text.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- TAB: LOOK SCANNED (LookScanned.io Full Sim)-->
+        <!-- ========================================== -->
+        <section id="tab-look-scanned" class="tab-content hidden tool-page space-y-5">
+            <button class="tool-back" type="button" onclick="showToolDirectory()">
+                <i data-lucide="arrow-left"></i> All tools
+            </button>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <!-- Header -->
+                <div class="tool-content-heading mb-5">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-xl font-bold text-slate-900">Make PDF Look Scanned</h2>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">100% Client-Side</span>
+                    </div>
+                    <p class="text-sm text-slate-500">Transform digital PDFs into realistic photocopies and scans with mechanical tilt, optical blur, sensor noise, cellulose paper ageing, and scanner border shadows — no printer needed.</p>
+                </div>
+
+                <!-- Top Action & Upload Banner -->
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+                    <div class="flex items-center gap-3">
+                        <label class="cursor-pointer inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors">
+                            <i data-lucide="upload" class="w-4 h-4"></i> Upload Your PDF
+                            <input type="file" id="file-scan" accept="application/pdf,.pdf" multiple class="hidden">
+                        </label>
+                        <span id="scan-file-status" class="text-xs font-medium text-slate-600">Sample document active • Upload any PDF anytime</span>
+                    </div>
+
+                    <!-- Presets Bar -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-slate-600 hidden sm:inline">Presets:</span>
+                        <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+                            <button type="button" onclick="applyScanPreset('office')" class="scan-preset-btn px-2.5 py-1 text-xs font-semibold rounded-md hover:bg-slate-100 text-slate-700">Office</button>
+                            <button type="button" onclick="applyScanPreset('vintage')" class="scan-preset-btn px-2.5 py-1 text-xs font-semibold rounded-md hover:bg-slate-100 text-slate-700">Aged Paper (65%)</button>
+                            <button type="button" onclick="applyScanPreset('antique')" class="scan-preset-btn px-2.5 py-1 text-xs font-semibold rounded-md hover:bg-slate-100 text-slate-700">Antique (90%)</button>
+                            <button type="button" onclick="applyScanPreset('bw-fax')" class="scan-preset-btn px-2.5 py-1 text-xs font-semibold rounded-md hover:bg-slate-100 text-slate-700">B&W Fax</button>
+                            <button type="button" onclick="applyScanPreset('subtle')" class="scan-preset-btn px-2.5 py-1 text-xs font-semibold rounded-md hover:bg-slate-100 text-slate-700">Subtle</button>
+                        </div>
+                    </div>
+
+                    <button id="scan-run-btn" type="button" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-xs font-semibold transition-colors shadow-sm">
+                        <i data-lucide="download" class="w-4 h-4"></i> Export Scanned PDF
+                    </button>
+                </div>
+
+                <!-- Main Layout: Controls on Left, Live Canvas on Right -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Left Controls Column (5 cols) -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <!-- 1. Color Mode & Paper Substrate with Ageing Slider -->
+                        <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <i data-lucide="palette" class="w-3.5 h-3.5 text-indigo-600"></i> Color & Paper Substrate
+                            </h3>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Color Mode</label>
+                                    <select id="scan-colorspace" class="w-full text-xs border border-slate-200 rounded-lg p-2 bg-slate-50">
+                                        <option value="color">Full Color</option>
+                                        <option value="grayscale" selected>Grayscale (Scanner)</option>
+                                        <option value="bw">Black & White (Fax/Xerox)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-xs font-semibold text-slate-700">Paper Ageing</label>
+                                        <span id="scan-ageing-val" class="text-xs font-bold font-mono text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">0%</span>
+                                    </div>
+                                    <input type="range" id="scan-ageing" min="0" max="100" value="0" step="1" class="w-full accent-amber-600">
+                                    <div class="flex justify-between text-[10px] text-slate-400"><span>0% (Fresh)</span><span>50% (Aged)</span><span>100% (Antique)</span></div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 pt-1">
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-xs font-semibold text-slate-700">Brightness</label>
+                                        <span id="scan-bright-val" class="text-xs font-mono text-slate-500">100%</span>
+                                    </div>
+                                    <input type="range" id="scan-brightness" min="60" max="140" value="100" class="w-full accent-emerald-600">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-xs font-semibold text-slate-700">Contrast</label>
+                                        <span id="scan-contrast-val" class="text-xs font-mono text-slate-500">110%</span>
+                                    </div>
+                                    <input type="range" id="scan-contrast" min="70" max="180" value="110" class="w-full accent-emerald-600">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Scanner Imperfections -->
+                        <div class="border border-slate-200 rounded-xl p-4 bg-white space-y-3">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-600"></i> Scanner Imperfections
+                            </h3>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-xs font-semibold text-slate-700">Base Tilt</label>
+                                        <span id="scan-rotate-val" class="text-xs font-mono text-slate-500">0.6°</span>
+                                    </div>
+                                    <input type="range" id="scan-rotate" min="-3" max="3" step="0.1" value="0.6" class="w-full accent-emerald-600">
+                                    <div class="flex justify-between text-[10px] text-slate-400"><span>-3.0°</span><span>+3.0°</span></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-xs font-semibold text-slate-700">Page Variance</label>
+                                        <span id="scan-variance-val" class="text-xs font-mono text-slate-500">±0.4°</span>
+                                    </div>
+                                    <input type="range" id="scan-rotate-variance" min="0" max="2" step="0.1" value="0.4" class="w-full accent-emerald-600">
+                                    <div class="flex justify-between text-[10px] text-slate-400"><span>Identical</span><span>Randomized</span></div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 pt-1">
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-xs font-semibold text-slate-700">Optical Blur</label>
+                                        <span id="scan-blur-val" class="text-xs font-mono text-slate-500">0.3 px</span>
+                                    </div>
+                                    <input type="range" id="scan-blur" min="0" max="1.5" step="0.05" value="0.3" class="w-full accent-emerald-600">
+                                </div>
+                                <div>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-xs font-semibold text-slate-700">Sensor Noise</label>
+                                        <span id="scan-noise-val" class="text-xs font-mono text-slate-500">18%</span>
+                                    </div>
+                                    <input type="range" id="scan-noise" min="0" max="50" value="18" class="w-full accent-emerald-600">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 pt-1 items-center border-t border-slate-100 mt-2">
+                                <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                                    <input type="checkbox" id="scan-border" checked class="rounded text-emerald-600 focus:ring-emerald-500">
+                                    <span>Glass Edge Shadow</span>
+                                </label>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Export Resolution</label>
+                                    <select id="scan-resolution" class="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50">
+                                        <option value="1.0">Standard (100 DPI)</option>
+                                        <option value="1.5" selected>High Quality (150 DPI)</option>
+                                        <option value="2.0">Ultra Crisp (200 DPI)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dropzone for Drag-and-drop -->
+                        <div id="dropzone-scan"
+                            class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:border-emerald-400 transition-colors cursor-pointer bg-slate-50/50">
+                            <i data-lucide="file-up" class="w-5 h-5 mx-auto text-slate-400 mb-1"></i>
+                            <p class="text-xs font-semibold text-slate-700">Drop PDF here to replace sample</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Supports single or multi-page documents</p>
+                        </div>
+                    </div>
+
+                    <!-- Right Live Preview Column (7 cols) -->
+                    <div class="lg:col-span-7 flex flex-col items-center">
+                        <div class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col items-center shadow-sm">
+                            <div class="w-full flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-semibold text-slate-700">Page:</span>
+                                    <button id="scan-prev-page" type="button" class="p-1 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs disabled:opacity-40"><i data-lucide="chevron-left" class="w-3.5 h-3.5"></i></button>
+                                    <select id="scan-page-select" class="text-xs border border-slate-200 rounded py-1 px-2 bg-white"></select>
+                                    <span id="scan-total-pages" class="text-xs text-slate-500">of 1</span>
+                                    <button id="scan-next-page" type="button" class="p-1 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs disabled:opacity-40"><i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></button>
+                                </div>
+                                <span class="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                                    <i data-lucide="sparkles" class="w-3 h-3 inline mr-0.5"></i> Live Real-Time Scan
+                                </span>
+                            </div>
+
+                            <div class="w-full overflow-auto flex items-center justify-center min-h-[460px] max-h-[660px] p-4 bg-slate-200/70 rounded-xl">
+                                <canvas id="scan-preview-canvas" class="max-w-full max-h-[620px] shadow-xl rounded object-contain bg-white"></canvas>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-2 text-center">Move the Ageing Percentage slider or presets to watch paper oxidation, edge tanning, and scanner textures adapt in real-time.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -8464,6 +8654,601 @@
             });
         })();
     </script>
+
+    <script>
+        // ==========================================
+        // MODULE: Make PDF Look Scanned (LookScanned.io Simulation)
+        // ==========================================
+        (function () {
+            let scanDocuments = []; // Array of { file, pdf }
+            let activeDocIndex = 0;
+            let activePageNum = 1;
+            let isRendering = false;
+            let renderQueued = false;
+            let sampleCanvasCache = null;
+
+            // Generate clean sample document canvas for initial immediate preview
+            function getSampleDocumentCanvas() {
+                if (sampleCanvasCache) return sampleCanvasCache;
+                const c = document.createElement('canvas');
+                c.width = 800;
+                c.height = 1131; // Standard A4 ratio
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, c.width, c.height);
+
+                // Header
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 26px sans-serif';
+                ctx.fillText('INVOICE & FINANCIAL AUDIT SUMMARY', 60, 85);
+
+                ctx.fillStyle = '#64748b';
+                ctx.font = '13px sans-serif';
+                ctx.fillText('Invoice No: RTR-2026-8941  •  Date: October 2026  •  Due: Upon Receipt', 60, 115);
+
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(60, 135);
+                ctx.lineTo(740, 135);
+                ctx.stroke();
+
+                // Paragraph text
+                ctx.fillStyle = '#334155';
+                ctx.font = '14px sans-serif';
+                const lines = [
+                    'This sample page demonstrates the realistic in-browser scanner simulation engine.',
+                    'Adjust the parameters on the left to test scanner physics in real-time:',
+                    '  • Color Mode: Grayscale, Full Color, or High-Contrast Black & White photocopy.',
+                    '  • Paper Ageing Percentage: Simulates warm cellulose oxidation and aged parchment.',
+                    '  • Mechanical Tilt: Replicates paper feeder misalignment and angle deviation.',
+                    '  • Optical Blur: Replicates scanner lens depth-of-field and ink dispersion.',
+                    '  • Sensor Grain: Introduces physical CCD sensor noise and photocopy speckles.',
+                    '  • Edge Shadows: Subtle contact vignette along the physical scanner glass.',
+                    '',
+                    'Itemized Bill of Materials & Services:'
+                ];
+                let y = 175;
+                lines.forEach(l => {
+                    ctx.fillText(l, 60, y);
+                    y += 25;
+                });
+
+                // Table
+                ctx.fillStyle = '#f1f5f9';
+                ctx.fillRect(60, y, 680, 36);
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.fillText('DESCRIPTION', 75, y + 23);
+                ctx.fillText('QTY', 440, y + 23);
+                ctx.fillText('RATE', 520, y + 23);
+                ctx.fillText('AMOUNT', 640, y + 23);
+
+                const tableRows = [
+                    ['Cloud Enterprise Suite Deployment', '1', '$1,200.00', '$1,200.00'],
+                    ['Database Security & Encryption Audit', '2', '$350.00', '$700.00'],
+                    ['Client-Side PDF Workflow Toolkit', '1', '$850.00', '$850.00'],
+                    ['Annual Verification & Compliance Seal', '1', '$250.00', '$250.00']
+                ];
+                y += 36;
+                ctx.font = '13px sans-serif';
+                tableRows.forEach((r, idx) => {
+                    if (idx % 2 === 1) {
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.fillRect(60, y, 680, 32);
+                    }
+                    ctx.fillStyle = '#334155';
+                    ctx.fillText(r[0], 75, y + 21);
+                    ctx.fillText(r[1], 450, y + 21);
+                    ctx.fillText(r[2], 520, y + 21);
+                    ctx.fillText(r[3], 640, y + 21);
+
+                    ctx.strokeStyle = '#e2e8f0';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(60, y + 32);
+                    ctx.lineTo(740, y + 32);
+                    ctx.stroke();
+                    y += 32;
+                });
+
+                // Total
+                y += 25;
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 15px sans-serif';
+                ctx.fillText('TOTAL BALANCE: $3,000.00', 525, y);
+
+                // Stamp Box
+                y += 85;
+                ctx.strokeStyle = '#059669';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(480, y - 35, 230, 80);
+                ctx.fillStyle = '#059669';
+                ctx.font = 'bold 15px sans-serif';
+                ctx.fillText('OFFICIALLY VERIFIED', 505, y - 5);
+                ctx.font = '11px sans-serif';
+                ctx.fillText('RTR SCANNER COMPLIANCE SIGN-OFF', 495, y + 20);
+
+                sampleCanvasCache = c;
+                return c;
+            }
+
+            // Presets
+            window.applyScanPreset = function (preset) {
+                if (preset === 'office') {
+                    document.getElementById('scan-colorspace').value = 'grayscale';
+                    document.getElementById('scan-ageing').value = 0;
+                    document.getElementById('scan-brightness').value = 102;
+                    document.getElementById('scan-contrast').value = 115;
+                    document.getElementById('scan-rotate').value = 0.5;
+                    document.getElementById('scan-rotate-variance').value = 0.4;
+                    document.getElementById('scan-blur').value = 0.25;
+                    document.getElementById('scan-noise').value = 16;
+                    document.getElementById('scan-border').checked = true;
+                } else if (preset === 'vintage') {
+                    document.getElementById('scan-colorspace').value = 'color';
+                    document.getElementById('scan-ageing').value = 65;
+                    document.getElementById('scan-brightness').value = 96;
+                    document.getElementById('scan-contrast').value = 120;
+                    document.getElementById('scan-rotate').value = -0.7;
+                    document.getElementById('scan-rotate-variance').value = 0.5;
+                    document.getElementById('scan-blur').value = 0.35;
+                    document.getElementById('scan-noise').value = 24;
+                    document.getElementById('scan-border').checked = true;
+                } else if (preset === 'antique') {
+                    document.getElementById('scan-colorspace').value = 'color';
+                    document.getElementById('scan-ageing').value = 90;
+                    document.getElementById('scan-brightness').value = 92;
+                    document.getElementById('scan-contrast').value = 130;
+                    document.getElementById('scan-rotate').value = 1.2;
+                    document.getElementById('scan-rotate-variance').value = 0.8;
+                    document.getElementById('scan-blur').value = 0.45;
+                    document.getElementById('scan-noise').value = 32;
+                    document.getElementById('scan-border').checked = true;
+                } else if (preset === 'bw-fax') {
+                    document.getElementById('scan-colorspace').value = 'bw';
+                    document.getElementById('scan-ageing').value = 0;
+                    document.getElementById('scan-brightness').value = 105;
+                    document.getElementById('scan-contrast').value = 150;
+                    document.getElementById('scan-rotate').value = 0.7;
+                    document.getElementById('scan-rotate-variance').value = 0.5;
+                    document.getElementById('scan-blur').value = 0.1;
+                    document.getElementById('scan-noise').value = 22;
+                    document.getElementById('scan-border').checked = true;
+                } else if (preset === 'subtle') {
+                    document.getElementById('scan-colorspace').value = 'color';
+                    document.getElementById('scan-ageing').value = 0;
+                    document.getElementById('scan-brightness').value = 100;
+                    document.getElementById('scan-contrast').value = 105;
+                    document.getElementById('scan-rotate').value = 0.2;
+                    document.getElementById('scan-rotate-variance').value = 0.2;
+                    document.getElementById('scan-blur').value = 0.15;
+                    document.getElementById('scan-noise').value = 8;
+                    document.getElementById('scan-border').checked = false;
+                }
+                updateSliderDisplayLabels();
+                triggerPreviewUpdate();
+            };
+
+            function updateSliderDisplayLabels() {
+                const ageEl = document.getElementById('scan-ageing-val');
+                if (ageEl) ageEl.innerText = document.getElementById('scan-ageing').value + '%';
+                const brightEl = document.getElementById('scan-bright-val');
+                if (brightEl) brightEl.innerText = document.getElementById('scan-brightness').value + '%';
+                const contEl = document.getElementById('scan-contrast-val');
+                if (contEl) contEl.innerText = document.getElementById('scan-contrast').value + '%';
+                const rotEl = document.getElementById('scan-rotate-val');
+                if (rotEl) rotEl.innerText = parseFloat(document.getElementById('scan-rotate').value).toFixed(1) + '°';
+                const varEl = document.getElementById('scan-variance-val');
+                if (varEl) varEl.innerText = '±' + parseFloat(document.getElementById('scan-rotate-variance').value).toFixed(1) + '°';
+                const blurEl = document.getElementById('scan-blur-val');
+                if (blurEl) blurEl.innerText = parseFloat(document.getElementById('scan-blur').value).toFixed(2) + ' px';
+                const noiseEl = document.getElementById('scan-noise-val');
+                if (noiseEl) noiseEl.innerText = document.getElementById('scan-noise').value + '%';
+            }
+
+            // Register slider events for real-time live preview
+            ['scan-ageing', 'scan-brightness', 'scan-contrast', 'scan-rotate', 'scan-rotate-variance', 'scan-blur', 'scan-noise', 'scan-colorspace', 'scan-border'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', () => {
+                        updateSliderDisplayLabels();
+                        triggerPreviewUpdate();
+                    });
+                    el.addEventListener('change', () => {
+                        updateSliderDisplayLabels();
+                        triggerPreviewUpdate();
+                    });
+                }
+            });
+
+            // Core Scanner Pixel Processing Function with Ageing Simulation
+            function applyScanEffectToCanvas(sourceCanvas, targetCanvas, options, pageIndex = 0) {
+                const { colorspace, ageing, brightness, contrast, rotate, rotateVariance, blur, noise, border } = options;
+
+                const srcW = sourceCanvas.width;
+                const srcH = sourceCanvas.height;
+
+                targetCanvas.width = srcW;
+                targetCanvas.height = srcH;
+                const ctx = targetCanvas.getContext('2d');
+
+                // Fill with base scanner bed tone
+                ctx.fillStyle = '#fafaf8';
+                ctx.fillRect(0, 0, srcW, srcH);
+
+                // Deterministic angle per page
+                const seed = Math.sin(pageIndex * 997 + 13) * 10000;
+                const randomOffset = (seed - Math.floor(seed)) * 2 - 1; // -1 to +1
+                const totalAngleDeg = rotate + randomOffset * rotateVariance;
+                const totalAngleRad = (totalAngleDeg * Math.PI) / 180;
+
+                ctx.save();
+                ctx.translate(srcW / 2, srcH / 2);
+                ctx.rotate(totalAngleRad);
+                if (blur > 0) {
+                    ctx.filter = `blur(${blur}px)`;
+                }
+                ctx.drawImage(sourceCanvas, -srcW / 2, -srcH / 2);
+                ctx.restore();
+
+                // Pixel manipulation: Colorspace, contrast, brightness, noise, and paper ageing
+                const imgData = ctx.getImageData(0, 0, srcW, srcH);
+                const data = imgData.data;
+                const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+                const brightOffset = (brightness - 100) * 1.5;
+                const noiseAmt = (noise / 100) * 35;
+
+                // Ageing factors
+                const ageRatio = (ageing / 100); // 0.0 to 1.0
+                const ageTintR = 52 * ageRatio;
+                const ageTintG = 34 * ageRatio;
+                const ageTintB = -42 * ageRatio;
+                const centerX = srcW / 2;
+                const centerY = srcH / 2;
+                const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+
+                for (let y = 0; y < srcH; y++) {
+                    const dy = y - centerY;
+                    for (let x = 0; x < srcW; x++) {
+                        const i = (y * srcW + x) * 4;
+                        let r = data[i];
+                        let g = data[i + 1];
+                        let b = data[i + 2];
+
+                        // Contrast & Brightness adjustment
+                        r = contrastFactor * (r - 128) + 128 + brightOffset;
+                        g = contrastFactor * (g - 128) + 128 + brightOffset;
+                        b = contrastFactor * (b - 128) + 128 + brightOffset;
+
+                        // Colorspace conversion
+                        if (colorspace === 'grayscale') {
+                            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                            r = g = b = lum;
+                        } else if (colorspace === 'bw') {
+                            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                            const val = lum < 140 ? 12 : 248;
+                            r = g = b = val;
+                        }
+
+                        // Paper Ageing Simulation
+                        if (ageRatio > 0 && colorspace !== 'bw') {
+                            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                            // Paper fibers / background oxidize much faster than heavy dark ink
+                            const paperAffinity = Math.max(0, Math.min(1, (lum - 40) / 180));
+
+                            // Edge oxidation (cellulose decay accelerates near outer edges and corners)
+                            const dx = x - centerX;
+                            const distRatio = Math.sqrt(dx * dx + dy * dy) / maxDist; // 0 to 1
+                            const edgeTanning = distRatio * distRatio * 32 * ageRatio;
+
+                            // Subtle organic mottled grain for authentic paper texture
+                            const grainWarp = (Math.sin(x * 0.04) * Math.cos(y * 0.04)) * (8 * ageRatio);
+
+                            r += (ageTintR + edgeTanning * 1.1 + grainWarp) * paperAffinity;
+                            g += (ageTintG + edgeTanning * 0.8 + grainWarp) * paperAffinity;
+                            b += (ageTintB - edgeTanning * 0.6 + grainWarp) * paperAffinity;
+                        }
+
+                        // CCD Sensor grain / physical paper noise
+                        if (noiseAmt > 0) {
+                            const n = (Math.random() - 0.5) * noiseAmt;
+                            r += n;
+                            g += n;
+                            b += n;
+                        }
+
+                        data[i] = Math.max(0, Math.min(255, r));
+                        data[i + 1] = Math.max(0, Math.min(255, g));
+                        data[i + 2] = Math.max(0, Math.min(255, b));
+                    }
+                }
+
+                ctx.putImageData(imgData, 0, 0);
+
+                // Scanner glass border & subtle vignetting
+                if (border) {
+                    ctx.save();
+                    const grad = ctx.createRadialGradient(srcW / 2, srcH / 2, Math.min(srcW, srcH) * 0.45, srcW / 2, srcH / 2, Math.max(srcW, srcH) * 0.72);
+                    grad.addColorStop(0, 'rgba(0,0,0,0)');
+                    grad.addColorStop(1, 'rgba(30,30,30,0.14)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, srcW, srcH);
+
+                    ctx.strokeStyle = 'rgba(60,60,60,0.25)';
+                    ctx.lineWidth = Math.max(1, Math.round(srcW * 0.003));
+                    ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, srcW - ctx.lineWidth, srcH - ctx.lineWidth);
+                    ctx.restore();
+                }
+            }
+
+            function getScanOptionsFromUI() {
+                return {
+                    colorspace: document.getElementById('scan-colorspace').value,
+                    ageing: parseFloat(document.getElementById('scan-ageing').value) || 0,
+                    brightness: parseFloat(document.getElementById('scan-brightness').value) || 100,
+                    contrast: parseFloat(document.getElementById('scan-contrast').value) || 110,
+                    rotate: parseFloat(document.getElementById('scan-rotate').value) || 0,
+                    rotateVariance: parseFloat(document.getElementById('scan-rotate-variance').value) || 0,
+                    blur: parseFloat(document.getElementById('scan-blur').value) || 0,
+                    noise: parseFloat(document.getElementById('scan-noise').value) || 0,
+                    border: document.getElementById('scan-border').checked,
+                    resolutionScale: parseFloat(document.getElementById('scan-resolution').value) || 1.5
+                };
+            }
+
+            function triggerPreviewUpdate() {
+                if (isRendering) {
+                    renderQueued = true;
+                    return;
+                }
+                renderScanPreview();
+            }
+
+            async function renderScanPreview() {
+                const previewCanvas = document.getElementById('scan-preview-canvas');
+                if (!previewCanvas) return;
+                const options = getScanOptionsFromUI();
+
+                isRendering = true;
+                try {
+                    if (scanDocuments.length === 0) {
+                        // Render built-in sample document
+                        const sampleCanvas = getSampleDocumentCanvas();
+                        applyScanEffectToCanvas(sampleCanvas, previewCanvas, options, 0);
+                    } else {
+                        // Render uploaded PDF page
+                        const docState = scanDocuments[activeDocIndex];
+                        if (docState) {
+                            const page = await docState.pdf.getPage(activePageNum);
+                            const viewport = page.getViewport({ scale: 1.2 });
+
+                            const rawCanvas = document.createElement('canvas');
+                            rawCanvas.width = Math.ceil(viewport.width);
+                            rawCanvas.height = Math.ceil(viewport.height);
+                            const rawCtx = rawCanvas.getContext('2d');
+                            rawCtx.fillStyle = '#ffffff';
+                            rawCtx.fillRect(0, 0, rawCanvas.width, rawCanvas.height);
+                            await page.render({ canvasContext: rawCtx, viewport }).promise;
+
+                            applyScanEffectToCanvas(rawCanvas, previewCanvas, options, activePageNum - 1);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Scan preview error:', err);
+                } finally {
+                    isRendering = false;
+                    if (renderQueued) {
+                        renderQueued = false;
+                        renderScanPreview();
+                    }
+                }
+            }
+
+            function updateScanPageUI() {
+                const total = scanDocuments.length > 0 ? scanDocuments[activeDocIndex].pdf.numPages : 1;
+                document.getElementById('scan-total-pages').innerText = `of ${total}`;
+
+                const select = document.getElementById('scan-page-select');
+                select.innerHTML = '';
+                for (let i = 1; i <= total; i++) {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.innerText = i;
+                    select.appendChild(opt);
+                }
+                select.value = activePageNum;
+
+                document.getElementById('scan-prev-page').disabled = activePageNum <= 1;
+                document.getElementById('scan-next-page').disabled = activePageNum >= total;
+            }
+
+            // Dropzone & File Input Setup
+            function handleIncomingScanFiles(files) {
+                const validPdfs = getValidPdfFiles(files);
+                if (validPdfs.length === 0) {
+                    showToast('Please select valid PDF documents.', true);
+                    return;
+                }
+
+                showProgress('Loading PDF for Scanning', 'Reading document structures...');
+                const docs = [];
+                Promise.all(validPdfs.map(async (file, i) => {
+                    try {
+                        const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+                        docs.push({ file, pdf });
+                    } catch (err) {
+                        console.error('Error loading PDF:', err);
+                    }
+                    updateProgress(((i + 1) / validPdfs.length) * 90);
+                })).then(() => {
+                    hideProgress();
+                    if (docs.length === 0) {
+                        showToast('Failed to load selected PDF files.', true);
+                        return;
+                    }
+
+                    scanDocuments = docs;
+                    activeDocIndex = 0;
+                    activePageNum = 1;
+
+                    const fileStatus = document.getElementById('scan-file-status');
+                    if (fileStatus) {
+                        fileStatus.innerText = docs.length === 1 
+                            ? `${docs[0].file.name} (${docs[0].pdf.numPages} p) loaded`
+                            : `${docs.length} PDF files loaded`;
+                    }
+
+                    updateScanPageUI();
+                    renderScanPreview();
+                    refreshIcons();
+                    showToast(`${docs.length} PDF file(s) loaded! Adjust parameters and export.`);
+                });
+            }
+
+            setupDropzone('dropzone-scan', 'file-scan', handleIncomingScanFiles);
+
+            document.getElementById('scan-page-select').addEventListener('change', (e) => {
+                activePageNum = parseInt(e.target.value, 10);
+                renderScanPreview();
+            });
+
+            document.getElementById('scan-prev-page').addEventListener('click', () => {
+                if (activePageNum > 1) {
+                    activePageNum--;
+                    updateScanPageUI();
+                    renderScanPreview();
+                }
+            });
+
+            document.getElementById('scan-next-page').addEventListener('click', () => {
+                const total = scanDocuments.length > 0 ? scanDocuments[activeDocIndex].pdf.numPages : 1;
+                if (activePageNum < total) {
+                    activePageNum++;
+                    updateScanPageUI();
+                    renderScanPreview();
+                }
+            });
+
+            // Execute Batch Export to PDF
+            document.getElementById('scan-run-btn').addEventListener('click', async () => {
+                const options = getScanOptionsFromUI();
+                const { PDFDocument } = PDFLib;
+
+                showProgress('Generating Scanned PDF', 'Processing pages with realistic scanner simulation...');
+                try {
+                    if (scanDocuments.length === 0) {
+                        // Export sample document
+                        const sampleCanvas = getSampleDocumentCanvas();
+                        const processedCanvas = document.createElement('canvas');
+                        applyScanEffectToCanvas(sampleCanvas, processedCanvas, options, 0);
+
+                        const jpegBlob = await new Promise(resolve => processedCanvas.toBlob(resolve, 'image/jpeg', 0.90));
+                        const imgBytes = await jpegBlob.arrayBuffer();
+
+                        const outDoc = await PDFDocument.create();
+                        const embeddedImg = await outDoc.embedJpg(imgBytes);
+                        const newPage = outDoc.addPage([595.28, 841.89]); // A4
+                        newPage.drawImage(embeddedImg, { x: 0, y: 0, width: 595.28, height: 841.89 });
+
+                        const outBytes = await outDoc.save();
+                        triggerDownloadBlob(new Blob([outBytes], { type: 'application/pdf' }), 'scanned_sample_document.pdf');
+                        hideProgress();
+                        showToast('Scanned PDF exported successfully!');
+                        return;
+                    }
+
+                    const totalPages = scanDocuments.reduce((sum, d) => sum + d.pdf.numPages, 0);
+                    const outputs = [];
+                    let processedPages = 0;
+
+                    for (let d = 0; d < scanDocuments.length; d++) {
+                        const { file, pdf } = scanDocuments[d];
+                        const outDoc = await PDFDocument.create();
+                        outDoc.setTitle(safeFileBaseName(file) + ' (Scanned)');
+                        outDoc.setCreator('RTR-CRM PDF Studio - Look Scanned');
+
+                        for (let p = 1; p <= pdf.numPages; p++) {
+                            const page = await pdf.getPage(p);
+                            const baseViewport = page.getViewport({ scale: 1 });
+                            const renderViewport = page.getViewport({ scale: options.resolutionScale });
+
+                            const rawCanvas = document.createElement('canvas');
+                            rawCanvas.width = Math.ceil(renderViewport.width);
+                            rawCanvas.height = Math.ceil(renderViewport.height);
+                            const rawCtx = rawCanvas.getContext('2d');
+                            rawCtx.fillStyle = '#ffffff';
+                            rawCtx.fillRect(0, 0, rawCanvas.width, rawCanvas.height);
+                            await page.render({ canvasContext: rawCtx, viewport: renderViewport }).promise;
+
+                            const processedCanvas = document.createElement('canvas');
+                            applyScanEffectToCanvas(rawCanvas, processedCanvas, options, p - 1);
+
+                            const jpegBlob = await new Promise((resolve) => {
+                                processedCanvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.88);
+                            });
+                            const imgBytes = await jpegBlob.arrayBuffer();
+                            const embeddedImg = await outDoc.embedJpg(imgBytes);
+
+                            const newPage = outDoc.addPage([baseViewport.width, baseViewport.height]);
+                            newPage.drawImage(embeddedImg, {
+                                x: 0,
+                                y: 0,
+                                width: baseViewport.width,
+                                height: baseViewport.height
+                            });
+
+                            processedPages++;
+                            updateProgress((processedPages / totalPages) * 88);
+                        }
+
+                        const outBytes = await outDoc.save();
+                        outputs.push({
+                            name: `${safeFileBaseName(file)}_scanned.pdf`,
+                            bytes: outBytes
+                        });
+                    }
+
+                    if (outputs.length === 1) {
+                        triggerDownloadBlob(new Blob([outputs[0].bytes], { type: 'application/pdf' }), outputs[0].name);
+                    } else {
+                        const zip = new JSZip();
+                        outputs.forEach((out, idx) => zip.file(`${idx + 1}_${out.name}`, out.bytes));
+                        const zipBlob = await zip.generateAsync({ type: 'blob' }, (metadata) => {
+                            updateProgress(88 + metadata.percent * 0.12);
+                        });
+                        triggerDownloadBlob(zipBlob, 'scanned_documents.zip');
+                    }
+
+                    hideProgress();
+                    showToast(`Scanned ${totalPages} page(s) successfully!`);
+                } catch (err) {
+                    hideProgress();
+                    console.error('Scan export error:', err);
+                    showToast('Failed to generate scanned PDF.', true);
+                }
+            });
+
+            // Initialize default preview immediately on load
+            document.addEventListener('DOMContentLoaded', () => {
+                updateSliderDisplayLabels();
+                updateScanPageUI();
+                renderScanPreview();
+            });
+
+            // Also render whenever the tab is brought into view
+            const origSwitchTab = window.switchTab;
+            window.switchTab = function(tabId) {
+                origSwitchTab(tabId);
+                if (tabId === 'look-scanned') {
+                    setTimeout(() => {
+                        updateSliderDisplayLabels();
+                        renderScanPreview();
+                    }, 50);
+                }
+            };
+        })();
+</script>
 
 </body>
 
