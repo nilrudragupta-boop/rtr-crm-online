@@ -1,0 +1,2427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Recipe & Ready-Item Manager - RISE Tech Revolution</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #eef2f6;
+            color: #1e293b;
+        }
+        .pos-gradient {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @keyframes pulseSlow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.65; }
+        }
+        .pulse-badge {
+            animation: pulseSlow 2s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header (Matches restaurant_pos.html & restaurant_kds.html theme) -->
+    <header class="pos-gradient text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center text-slate-900 font-extrabold text-lg shadow">
+                    <i class="fas fa-utensils"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg md:text-xl font-bold tracking-tight">Restaurant Recipe & Ready-Item Engine</h1>
+                        <span class="hidden sm:inline-block text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
+                            POS + KDS Synced
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-300">Auto-calculate ready-to-serve portions from raw ingredients &bull; <span id="lastBackupBadge">DB Backup Ready</span></p>
+                </div>
+            </div>
+
+            <!-- Action Toolbar -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="btnSyncPosStock" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm" title="Push calculated ready counts into POS stock">
+                    <i class="fas fa-bolt"></i> Sync Ready Qty to POS
+                </button>
+                <button id="btnQuickBackup" type="button" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm" title="Download instant JSON DB backup">
+                    <i class="fas fa-download"></i> Quick DB Backup
+                </button>
+                <button id="btnOpenRestoreModal" type="button" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm" title="Restore database from backup file or snapshot">
+                    <i class="fas fa-upload"></i> Restore DB
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-slate-800/90 border-t border-slate-700">
+            <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto custom-scroll gap-1">
+                <button type="button" data-tab="recipes" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-amber-400 text-amber-400 bg-slate-900/40 whitespace-nowrap flex items-center gap-2 transition">
+                    <i class="fas fa-clipboard-list"></i> 1. Recipe & Ready-Item Calculator
+                </button>
+                <button type="button" data-tab="ingredients" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+                    <i class="fas fa-boxes-stacked"></i> 2. Raw Ingredients Stock (<span id="navIngCount">0</span>)
+                </button>
+                <button type="button" data-tab="pos-simulator" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+                    <i class="fas fa-cash-register"></i> 3. Live Order Desk & KDS Sync (<span id="navKdsCount">0</span>)
+                </button>
+                <button type="button" data-tab="backup" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+                    <i class="fas fa-database"></i> 4. Database Backup & Vault
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-5 space-y-5">
+
+        <!-- Top Live KPI Strip -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Menu Items Configured</p>
+                    <p id="kpiTotalRecipes" class="text-2xl font-extrabold text-slate-800 mt-0.5">0</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Linked with BOM ingredients</p>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                    <i class="fas fa-book-open"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Ready Portions</p>
+                    <p id="kpiTotalReadyPortions" class="text-2xl font-extrabold text-emerald-600 mt-0.5">0</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Auto-calculated from raw stock</p>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                    <i class="fas fa-bowl-food"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Ingredient Bottlenecks</p>
+                    <p id="kpiLowStockCount" class="text-2xl font-extrabold text-amber-600 mt-0.5">0</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Low or depleted raw materials</p>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                    <i class="fas fa-triangle-exclamation"></i>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Active KDS / POS Orders</p>
+                    <p id="kpiActiveOrders" class="text-2xl font-extrabold text-purple-600 mt-0.5">0</p>
+                    <p id="kpiSnapshotsCount" class="text-xs text-slate-500 mt-0.5">Auto-snapshots active</p>
+                </div>
+                <div class="w-11 h-11 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+                    <i class="fas fa-fire-burner"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 1: RECIPE & READY-ITEM CALCULATOR ==================== -->
+        <section id="tab-recipes" class="tab-panel space-y-5">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+                <!-- Left Column: Recipe & Ingredient Builder Form (5 cols) -->
+                <div class="lg:col-span-5 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-800 text-white px-5 py-3.5 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-sliders text-amber-400"></i>
+                            <h2 id="recipeFormTitle" class="font-bold text-sm md:text-base">Set Menu Item & Required Ingredients</h2>
+                        </div>
+                        <button id="btnResetRecipeForm" type="button" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded text-slate-200 transition">
+                            <i class="fas fa-rotate-left"></i> New / Clear
+                        </button>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        <input type="hidden" id="editRecipeId" value="">
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="sm:col-span-2">
+                                <label for="recipeItemName" class="block text-xs font-bold text-slate-700 uppercase mb-1">Menu Item Name *</label>
+                                <input type="text" id="recipeItemName" placeholder="e.g. Chicken Dum Biryani" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="recipeItemCode" class="block text-xs font-bold text-slate-700 uppercase mb-1">Item Code</label>
+                                <input type="text" id="recipeItemCode" placeholder="MNU-001" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label for="recipeCategory" class="block text-xs font-bold text-slate-700 uppercase mb-1">Category</label>
+                                <select id="recipeCategory" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                    <option value="Main Course">Main Course</option>
+                                    <option value="Biryani & Rice">Biryani & Rice</option>
+                                    <option value="Starters">Starters</option>
+                                    <option value="Breads">Breads</option>
+                                    <option value="Beverages">Beverages</option>
+                                    <option value="Fast Food">Fast Food</option>
+                                    <option value="Desserts">Desserts</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="recipePrice" class="block text-xs font-bold text-slate-700 uppercase mb-1">Sale Price (₹) *</label>
+                                <input type="number" id="recipePrice" value="220" min="0" step="1" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="recipeGst" class="block text-xs font-bold text-slate-700 uppercase mb-1">GST (%)</label>
+                                <select id="recipeGst" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                    <option value="0">0%</option>
+                                    <option value="5" selected>5%</option>
+                                    <option value="12">12%</option>
+                                    <option value="18">18%</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="recipeYieldQty" class="block text-xs font-bold text-slate-700 uppercase mb-1">Batch Yield</label>
+                                <div class="flex items-center">
+                                    <input type="number" id="recipeYieldQty" value="1" min="1" step="1" class="w-full px-2.5 py-2 rounded-l-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" title="Number of portions produced by the ingredients below">
+                                    <span class="bg-slate-100 border border-l-0 border-slate-300 px-2 py-2 text-xs font-semibold text-slate-600 rounded-r-lg">Pcs</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Ingredients Header -->
+                        <div class="pt-2 border-t border-slate-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                                    <i class="fas fa-Carrot text-amber-500"></i> Required Ingredients & Qty
+                                </label>
+                                <div class="flex gap-1.5">
+                                    <button id="btnQuickNewIngredient" type="button" class="text-xs px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold transition">
+                                        + New Raw Ingredient
+                                    </button>
+                                    <button id="btnAddIngredientRow" type="button" class="text-xs px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold transition">
+                                        + Add Row
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Ingredient Rows Container -->
+                            <div id="recipeIngredientsContainer" class="space-y-2 max-h-64 overflow-y-auto custom-scroll pr-1">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Live Auto-Calculation Preview Box -->
+                        <div class="bg-slate-900 text-white rounded-xl p-4 space-y-2.5 shadow-inner">
+                            <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+                                <div>
+                                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Auto-Calculated Final Ready Items</span>
+                                    <span id="liveBottleneckText" class="text-xs text-amber-300">Add ingredients to calculate capacity</span>
+                                </div>
+                                <div class="text-right">
+                                    <span id="liveReadyCountPreview" class="text-3xl font-extrabold text-emerald-400">0</span>
+                                    <span class="text-xs text-slate-300 block">Portions Ready</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-xs pt-1">
+                                <div>
+                                    <span class="text-slate-400 block">Ingredient Cost/Item</span>
+                                    <span id="liveRecipeCostPreview" class="font-bold text-slate-100">₹0.00</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block">Profit Margin/Item</span>
+                                    <span id="liveRecipeMarginPreview" class="font-bold text-emerald-400">₹0.00 (0%)</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block">Max Revenue Potential</span>
+                                    <span id="liveRevenuePotential" class="font-bold text-sky-300">₹0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="flex gap-2 pt-1">
+                            <button id="btnSaveRecipe" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                                <i class="fas fa-floppy-disk"></i> Save Item Recipe & Sync POS Stock
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Live Auto-Calculated Ready Items Board (7 cols) -->
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h2 class="font-bold text-base text-slate-800 flex items-center gap-2">
+                                    <i class="fas fa-calculator text-emerald-600"></i> Live Ready-to-Serve Item Availability
+                                </h2>
+                                <p class="text-xs text-slate-500">Real-time bottleneck calculation based on current raw ingredient stock</p>
+                            </div>
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <div class="relative flex-1 sm:w-56">
+                                    <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                                    <input type="text" id="searchRecipesInput" placeholder="Search menu item or ingredient..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                </div>
+                                <select id="filterRecipeCategory" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white focus:outline-none">
+                                    <option value="All">All Categories</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Ready Items Grid -->
+                        <div id="readyItemsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== TAB 2: RAW INGREDIENTS STOCK MANAGER ==================== -->
+        <section id="tab-ingredients" class="tab-panel hidden space-y-5">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+                <!-- Add / Edit Raw Ingredient Form (4 cols) -->
+                <div class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-800 text-white px-5 py-3.5 flex items-center justify-between">
+                        <h3 id="ingFormTitle" class="font-bold text-sm flex items-center gap-2">
+                            <i class="fas fa-box-open text-amber-400"></i> Add / Update Raw Ingredient
+                        </h3>
+                        <button id="btnClearIngForm" type="button" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-200">
+                            Clear
+                        </button>
+                    </div>
+                    <div class="p-5 space-y-3.5">
+                        <input type="hidden" id="editIngId" value="">
+                        <div>
+                            <label for="ingName" class="block text-xs font-bold text-slate-700 uppercase mb-1">Ingredient Name *</label>
+                            <input type="text" id="ingName" placeholder="e.g. Basmati Rice, Fresh Paneer" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="ingCode" class="block text-xs font-bold text-slate-700 uppercase mb-1">RM Code</label>
+                                <input type="text" id="ingCode" placeholder="RM-001" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-slate-50 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="ingUom" class="block text-xs font-bold text-slate-700 uppercase mb-1">Stock Unit (UOM) *</label>
+                                <select id="ingUom" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none">
+                                    <option value="kg">kg (Kilogram)</option>
+                                    <option value="g">g (Gram)</option>
+                                    <option value="L">L (Litre)</option>
+                                    <option value="ml">ml (Millilitre)</option>
+                                    <option value="pcs">pcs (Pieces)</option>
+                                    <option value="pkt">pkt (Packet)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2.5">
+                            <div>
+                                <label for="ingStock" class="block text-xs font-bold text-slate-700 uppercase mb-1">Available Qty *</label>
+                                <input type="number" id="ingStock" value="10" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="ingCost" class="block text-xs font-bold text-slate-700 uppercase mb-1">Cost / Unit (₹)</label>
+                                <input type="number" id="ingCost" value="100" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="ingMinAlert" class="block text-xs font-bold text-slate-700 uppercase mb-1">Low Alert Qty</label>
+                                <input type="number" id="ingMinAlert" value="2" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </div>
+                        </div>
+                        <button id="btnSaveIngredient" type="button" class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                            <i class="fas fa-check-circle"></i> Save Ingredient & Recalculate Menu
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Raw Ingredient Inventory Table (8 cols) -->
+                <div class="lg:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-800">Raw Material Kitchen Stock</h3>
+                            <p class="text-xs text-slate-500">Adjusting stock here immediately updates ready-to-serve item counts across all recipes</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="searchIngInput" placeholder="Search ingredient..." class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto custom-scroll">
+                        <table class="w-full text-left border-collapse text-xs md:text-sm">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                    <th class="py-2.5 px-3 font-bold">Ingredient</th>
+                                    <th class="py-2.5 px-3 font-bold text-right">Available Stock</th>
+                                    <th class="py-2.5 px-3 font-bold text-right">Unit Cost</th>
+                                    <th class="py-2.5 px-3 font-bold text-center">Status</th>
+                                    <th class="py-2.5 px-3 font-bold">Used In Menu Items</th>
+                                    <th class="py-2.5 px-3 font-bold text-center">Quick Restock / Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ingredientsTableBody" class="divide-y divide-slate-200">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== TAB 3: LIVE ORDER DESK & KDS SYNC ==================== -->
+        <section id="tab-pos-simulator" class="tab-panel hidden space-y-5">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+                <!-- Left: Order Cart & KDS Dispatch (4 cols) -->
+                <div class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                    <div class="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
+                        <span class="font-bold text-sm flex items-center gap-2">
+                            <i class="fas fa-receipt text-amber-400"></i> Customer Order Cart
+                        </span>
+                        <div class="flex items-center gap-1.5">
+                            <label for="posTableSelect" class="text-xs text-slate-300">Table:</label>
+                            <select id="posTableSelect" class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded border border-blue-400 focus:outline-none">
+                                <option value="Takeaway">Takeaway</option>
+                                <option value="Delivery">Delivery</option>
+                                <option value="T1">T1</option>
+                                <option value="T2">T2</option>
+                                <option value="T3">T3</option>
+                                <option value="T4">T4</option>
+                                <option value="T5">T5</option>
+                                <option value="T6">T6</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="posCartList" class="p-4 space-y-2.5 max-h-72 overflow-y-auto custom-scroll divide-y divide-slate-100">
+                        <!-- Cart items -->
+                    </div>
+
+                    <!-- Ingredient Reservation Notice -->
+                    <div id="posSharedIngNotice" class="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-800 hidden">
+                        <i class="fas fa-circle-info mr-1"></i> Shared ingredients are dynamically reserved across all items in your cart!
+                    </div>
+
+                    <div class="p-4 bg-slate-50 border-t border-slate-200 space-y-2 text-sm">
+                        <div class="flex justify-between text-slate-600 text-xs">
+                            <span>Subtotal:</span>
+                            <span id="posCartSubtotal" class="font-semibold">₹0.00</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600 text-xs">
+                            <span>GST Tax:</span>
+                            <span id="posCartTax" class="font-semibold">₹0.00</span>
+                        </div>
+                        <div class="flex justify-between text-slate-900 font-extrabold text-base pt-1 border-t border-slate-200">
+                            <span>Grand Total:</span>
+                            <span id="posCartTotal" class="text-emerald-600">₹0.00</span>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2 pt-2">
+                            <button id="btnPosClearCart" type="button" class="py-2 px-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition">
+                                <i class="fas fa-trash"></i> Clear
+                            </button>
+                            <button id="btnPosSendKot" type="button" class="py-2 px-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-xs transition" title="Send ticket to restaurant_kds.html">
+                                <i class="fas fa-fire-burner"></i> Send KOT
+                            </button>
+                            <button id="btnPosSettleBill" type="button" class="py-2 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition" title="Deduct ingredients & save POS invoice">
+                                <i class="fas fa-check-double"></i> Settle Bill
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle/Right: Touch Menu with Live Ready Counters + KDS Queue (8 cols) -->
+                <div class="lg:col-span-8 space-y-5">
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div>
+                                <h3 class="font-bold text-base text-slate-800">Take Customer Order (Live Ingredient Deduction)</h3>
+                                <p class="text-xs text-slate-500">Click any ready item to add to order. Shared ingredients update remaining counts across all dishes!</p>
+                            </div>
+                            <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">
+                                Synced with <code class="font-mono">restaurant_pos.html</code> &amp; <code class="font-mono">restaurant_kds.html</code>
+                            </span>
+                        </div>
+                        <div id="posMenuCardsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <!-- Menu cards -->
+                        </div>
+                    </div>
+
+                    <!-- Live KDS Tickets Preview -->
+                    <div class="bg-slate-900 text-white rounded-xl shadow-sm p-4 border border-slate-700">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-700 pb-2.5">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-fire-burner text-amber-400 text-lg"></i>
+                                <div>
+                                    <h3 class="font-bold text-sm">Active Kitchen Display (KDS) Queue (<code class="text-amber-300">kds_orders</code>)</h3>
+                                    <p class="text-xs text-slate-400">Orders sent from here or <code class="text-slate-300">restaurant_pos.html</code> appear live below</p>
+                                </div>
+                            </div>
+                            <button id="btnClearKdsQueue" type="button" class="text-xs bg-rose-600/80 hover:bg-rose-600 px-2.5 py-1 rounded font-semibold transition">
+                                Clear Kitchen Board
+                            </button>
+                        </div>
+                        <div id="liveKdsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            <!-- KDS tickets -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== TAB 4: DATABASE BACKUP & VAULT ==================== -->
+        <section id="tab-backup" class="tab-panel hidden space-y-5">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+                <!-- Export & Import Controls (6 cols) -->
+                <div class="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+                    <div class="flex items-center gap-3 border-b border-slate-200 pb-3">
+                        <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-lg">
+                            <i class="fas fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base text-slate-800">Full Database Backup &amp; Export</h3>
+                            <p class="text-xs text-slate-500">Compatible with standalone browser, RTR-CRM Encrypted Backup, and Electron DB</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                            <label for="backupPasswordInput" class="block text-xs font-bold text-slate-700 uppercase">Optional Encryption Password (AES Compatible with RTR-CRM)</label>
+                            <input type="password" id="backupPasswordInput" placeholder="Leave blank for plain JSON, or enter password for AES encryption" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none">
+                            <p class="text-xs text-slate-500">If you set a password, the file is encrypted with CryptoJS AES (identical to <code class="font-mono">dashboardB.html</code>).</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button id="btnDownloadFullBackup" type="button" class="py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                                <i class="fas fa-file-arrow-down"></i> Download DB Backup (.json)
+                            </button>
+                            <button id="btnExportCsvReport" type="button" class="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                                <i class="fas fa-file-csv"></i> Export Recipes &amp; Stock (.csv)
+                            </button>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-200">
+                            <h4 class="font-bold text-xs uppercase text-slate-700 mb-2">Restore Database from File (.json)</h4>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="file" id="restoreFileInput" accept=".json,.txt" class="flex-1 text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 border border-slate-300 rounded-lg p-1">
+                                <button id="btnRestoreFromFile" type="button" class="py-2 px-4 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition whitespace-nowrap">
+                                    <i class="fas fa-upload mr-1"></i> Restore File
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h4 class="font-bold text-xs uppercase text-slate-700">Sample Restaurant Dataset</h4>
+                                <p class="text-xs text-slate-500">Reload default recipes &amp; raw ingredients for testing</p>
+                            </div>
+                            <button id="btnReloadDemoData" type="button" class="py-2 px-3 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition">
+                                <i class="fas fa-wand-magic-sparkles mr-1"></i> Load Sample Restaurant Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IndexedDB Auto-Backup Vault (6 cols) -->
+                <div class="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+                                <i class="fas fa-clock-rotate-left"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-base text-slate-800">IndexedDB Auto-Backup Vault</h3>
+                                <p class="text-xs text-slate-500">Persistent browser database snapshots saved automatically on changes</p>
+                            </div>
+                        </div>
+                        <button id="btnCreateSnapshotNow" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition">
+                            + Snapshot Now
+                        </button>
+                    </div>
+
+                    <div id="snapshotsListContainer" class="space-y-2 max-h-64 overflow-y-auto custom-scroll">
+                        <!-- Populated via JS -->
+                    </div>
+
+                    <!-- Database Keys Inspector -->
+                    <div class="pt-3 border-t border-slate-200">
+                        <h4 class="font-bold text-xs uppercase text-slate-600 mb-2">Synced RTR-CRM Database Tables (<code class="font-mono">localStorage</code> + <code class="font-mono">IndexedDB</code>)</h4>
+                        <div id="dbTablesSummaryGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== MODAL: QUICK restock / ADJUST INGREDIENT ==================== -->
+    <div id="restockModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                <h3 id="restockModalTitle" class="font-bold text-base text-slate-800">Restock Ingredient</h3>
+                <button id="btnCloseRestockModal" type="button" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+            </div>
+            <input type="hidden" id="restockIngId" value="">
+            <div class="space-y-3">
+                <div>
+                    <label for="restockMode" class="block text-xs font-bold text-slate-700 uppercase mb-1">Adjustment Type</label>
+                    <select id="restockMode" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+                        <option value="add">+ Add Purchase Stock (Restock)</option>
+                        <option value="set">= Set Exact Physical Stock Count</option>
+                        <option value="deduct">- Deduct Wastage / Scrap</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="restockQty" class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantity *</label>
+                        <input type="number" id="restockQty" value="5" min="0.01" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                    </div>
+                    <div>
+                        <label for="restockRate" class="block text-xs font-bold text-slate-700 uppercase mb-1">Unit Cost (₹)</label>
+                        <input type="number" id="restockRate" value="0" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button id="btnCancelRestock" type="button" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">Cancel</button>
+                <button id="btnConfirmRestock" type="button" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">Apply Stock Update</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL: PASSWORD / CONFIRMATION ==================== -->
+    <div id="passwordModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                <h3 class="font-bold text-base text-slate-800">Decrypt Encrypted Backup</h3>
+                <button id="btnClosePasswordModal" type="button" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+            </div>
+            <p class="text-xs text-slate-600">This backup file is AES-encrypted. Enter the backup password to decrypt and restore it:</p>
+            <input type="password" id="decryptPasswordInput" placeholder="Enter backup password..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+            <div class="flex justify-end gap-2 pt-2">
+                <button id="btnCancelPassword" type="button" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">Cancel</button>
+                <button id="btnConfirmPassword" type="button" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold">Decrypt &amp; Restore</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <script>
+        // ============================================================================
+        // SAFE STORAGE & INDEXED-DB BACKUP ENGINE
+        // ============================================================================
+        const SafeStorage = {
+            get(key, fallback = null) {
+                try {
+                    const raw = localStorage.getItem(key);
+                    return raw ? JSON.parse(raw) : fallback;
+                } catch (e) {
+                    return fallback;
+                }
+            },
+            set(key, val) {
+                try {
+                    const str = typeof val === 'string' ? val : JSON.stringify(val);
+                    localStorage.setItem(key, str);
+                    if (window.electronAPI && typeof window.electronAPI.dbWrite === 'function') {
+                        window.electronAPI.dbWrite(key, val).catch(() => {});
+                    }
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            },
+            getAllRaw() {
+                const out = {};
+                try {
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        out[k] = localStorage.getItem(k);
+                    }
+                } catch (e) {}
+                return out;
+            }
+        };
+
+        // IndexedDB Vault for Automatic Point-in-Time Backups
+        const IDBVault = {
+            dbName: 'RTR_RestaurantBackupDB',
+            storeName: 'snapshots',
+            open() {
+                return new Promise((resolve, reject) => {
+                    try {
+                        if (!window.indexedDB) return resolve(null);
+                        const req = window.indexedDB.open(this.dbName, 1);
+                        req.onupgradeneeded = (e) => {
+                            const db = e.target.result;
+                            if (!db.objectStoreNames.contains(this.storeName)) {
+                                db.createObjectStore(this.storeName, { keyPath: 'id' });
+                            }
+                        };
+                        req.onsuccess = (e) => resolve(e.target.result);
+                        req.onerror = () => resolve(null);
+                    } catch (err) {
+                        resolve(null);
+                    }
+                });
+            },
+            async saveSnapshot(label = 'Auto-Backup') {
+                const db = await this.open();
+                if (!db) return false;
+                const payload = {
+                    id: 'SNAP-' + Date.now(),
+                    label,
+                    timestamp: new Date().toISOString(),
+                    data: SafeStorage.getAllRaw()
+                };
+                return new Promise((resolve) => {
+                    try {
+                        const tx = db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        store.put(payload);
+                        tx.oncomplete = () => resolve(true);
+                        tx.onerror = () => resolve(false);
+                    } catch (e) {
+                        resolve(false);
+                    }
+                });
+            },
+            async listSnapshots() {
+                const db = await this.open();
+                if (!db) return [];
+                return new Promise((resolve) => {
+                    try {
+                        const tx = db.transaction(this.storeName, 'readonly');
+                        const store = tx.objectStore(this.storeName);
+                        const req = store.getAll();
+                        req.onsuccess = () => {
+                            const list = Array.isArray(req.result) ? req.result : [];
+                            list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                            resolve(list);
+                        };
+                        req.onerror = () => resolve([]);
+                    } catch (e) {
+                        resolve([]);
+                    }
+                });
+            },
+            async deleteSnapshot(id) {
+                const db = await this.open();
+                if (!db) return false;
+                return new Promise((resolve) => {
+                    try {
+                        const tx = db.transaction(this.storeName, 'readwrite');
+                        tx.objectStore(this.storeName).delete(id);
+                        tx.oncomplete = () => resolve(true);
+                        tx.onerror = () => resolve(false);
+                    } catch (e) {
+                        resolve(false);
+                    }
+                });
+            }
+        };
+
+        // ============================================================================
+        // UNIT CONVERSION HELPER (Supports kg<->g, L<->ml, pcs, pkt)
+        // ============================================================================
+        function getUnitConversionFactor(fromUom, toUom) {
+            const f = (fromUom || '').trim().toLowerCase();
+            const t = (toUom || '').trim().toLowerCase();
+            if (!f || !t || f === t) return 1;
+            if ((f === 'kg' || f === 'kilogram') && (t === 'g' || t === 'gm' || t === 'gram')) return 1000;
+            if ((f === 'g' || f === 'gm' || t === 'gram') && (t === 'kg' || t === 'kilogram')) return 0.001;
+            if ((f === 'l' || f === 'ltr' || f === 'litre') && (t === 'ml' || t === 'millilitre')) return 1000;
+            if ((f === 'ml' || f === 'millilitre') && (t === 'l' || t === 'ltr' || t === 'litre')) return 0.001;
+            return 1;
+        }
+
+        // ============================================================================
+        // APPLICATION STATE & DEFAULT RESTAURANT DATASET
+        // ============================================================================
+        let rawIngredients = []; // Stored in 'restaurant_ingredients' & synced with 'items'/'purchases'
+        let menuRecipes = [];    // Stored in 'restaurant_recipes' & synced with 'boms'/'items'/'production'
+        let posCart = [];
+        let pendingEncryptedContent = null;
+
+        const DEFAULT_INGREDIENTS = [
+            { id: 'ing_1', name: 'Basmati Rice', code: 'RM-101', uom: 'g', stock: 12000, costPerUnit: 0.11, minAlert: 2000 },
+            { id: 'ing_2', name: 'Fresh Chicken', code: 'RM-102', uom: 'g', stock: 7500, costPerUnit: 0.28, minAlert: 1500 },
+            { id: 'ing_3', name: 'Malai Paneer', code: 'RM-103', uom: 'g', stock: 4000, costPerUnit: 0.38, minAlert: 1000 },
+            { id: 'ing_4', name: 'Amul Butter', code: 'RM-104', uom: 'g', stock: 2500, costPerUnit: 0.56, minAlert: 500 },
+            { id: 'ing_5', name: 'Refined Flour (Maida)', code: 'RM-105', uom: 'g', stock: 15000, costPerUnit: 0.045, minAlert: 2500 },
+            { id: 'ing_6', name: 'Onion & Tomato Gravy Base', code: 'RM-106', uom: 'g', stock: 9000, costPerUnit: 0.09, minAlert: 1500 },
+            { id: 'ing_7', name: 'Biryani Masala & Spices', code: 'RM-107', uom: 'g', stock: 1800, costPerUnit: 0.85, minAlert: 300 },
+            { id: 'ing_8', name: 'Full Cream Milk', code: 'RM-108', uom: 'ml', stock: 8000, costPerUnit: 0.065, minAlert: 1500 },
+            { id: 'ing_9', name: 'Roasted Coffee Espresso Shot', code: 'RM-109', uom: 'ml', stock: 1200, costPerUnit: 0.45, minAlert: 300 }
+        ];
+
+        const DEFAULT_RECIPES = [
+            {
+                id: 'rcp_1',
+                bomCode: 'BOM-0001',
+                name: 'Chicken Dum Biryani',
+                itemCode: 'MNU-001',
+                category: 'Biryani & Rice',
+                price: 260,
+                gst: 5,
+                yieldQty: 1,
+                ingredients: [
+                    { ingId: 'ing_1', itemName: 'Basmati Rice', itemCode: 'RM-101', qty: 200, uom: 'g' },
+                    { ingId: 'ing_2', itemName: 'Fresh Chicken', itemCode: 'RM-102', qty: 250, uom: 'g' },
+                    { ingId: 'ing_4', itemName: 'Amul Butter', itemCode: 'RM-104', qty: 25, uom: 'g' },
+                    { ingId: 'ing_7', itemName: 'Biryani Masala & Spices', itemCode: 'RM-107', qty: 20, uom: 'g' }
+                ]
+            },
+            {
+                id: 'rcp_2',
+                bomCode: 'BOM-0002',
+                name: 'Paneer Butter Masala',
+                itemCode: 'MNU-002',
+                category: 'Main Course',
+                price: 220,
+                gst: 5,
+                yieldQty: 1,
+                ingredients: [
+                    { ingId: 'ing_3', itemName: 'Malai Paneer', itemCode: 'RM-103', qty: 200, uom: 'g' },
+                    { ingId: 'ing_6', itemName: 'Onion & Tomato Gravy Base', itemCode: 'RM-106', qty: 180, uom: 'g' },
+                    { ingId: 'ing_4', itemName: 'Amul Butter', itemCode: 'RM-104', qty: 35, uom: 'g' },
+                    { ingId: 'ing_7', itemName: 'Biryani Masala & Spices', itemCode: 'RM-107', qty: 10, uom: 'g' }
+                ]
+            },
+            {
+                id: 'rcp_3',
+                bomCode: 'BOM-0003',
+                name: 'Butter Chicken Masala',
+                itemCode: 'MNU-003',
+                category: 'Main Course',
+                price: 280,
+                gst: 5,
+                yieldQty: 1,
+                ingredients: [
+                    { ingId: 'ing_2', itemName: 'Fresh Chicken', itemCode: 'RM-102', qty: 250, uom: 'g' },
+                    { ingId: 'ing_6', itemName: 'Onion & Tomato Gravy Base', itemCode: 'RM-106', qty: 200, uom: 'g' },
+                    { ingId: 'ing_4', itemName: 'Amul Butter', itemCode: 'RM-104', qty: 40, uom: 'g' },
+                    { ingId: 'ing_7', itemName: 'Biryani Masala & Spices', itemCode: 'RM-107', qty: 12, uom: 'g' }
+                ]
+            },
+            {
+                id: 'rcp_4',
+                bomCode: 'BOM-0004',
+                name: 'Tandoori Butter Naan',
+                itemCode: 'MNU-004',
+                category: 'Breads',
+                price: 55,
+                gst: 5,
+                yieldQty: 1,
+                ingredients: [
+                    { ingId: 'ing_5', itemName: 'Refined Flour (Maida)', itemCode: 'RM-105', qty: 120, uom: 'g' },
+                    { ingId: 'ing_4', itemName: 'Amul Butter', itemCode: 'RM-104', qty: 15, uom: 'g' },
+                    { ingId: 'ing_8', itemName: 'Full Cream Milk', itemCode: 'RM-108', qty: 30, uom: 'ml' }
+                ]
+            },
+            {
+                id: 'rcp_5',
+                bomCode: 'BOM-0005',
+                name: 'Classic Cold Coffee',
+                itemCode: 'MNU-005',
+                category: 'Beverages',
+                price: 130,
+                gst: 5,
+                yieldQty: 1,
+                ingredients: [
+                    { ingId: 'ing_8', itemName: 'Full Cream Milk', itemCode: 'RM-108', qty: 250, uom: 'ml' },
+                    { ingId: 'ing_9', itemName: 'Roasted Coffee Espresso Shot', itemCode: 'RM-109', qty: 40, uom: 'ml' }
+                ]
+            }
+        ];
+
+        // ============================================================================
+        // TOAST NOTIFICATION HELPER
+        // ============================================================================
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-rose-600' : (type === 'warning' ? 'bg-amber-600' : 'bg-slate-900');
+            const iconClass = type === 'error' ? 'fa-circle-xmark' : (type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check text-emerald-400');
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-lg border border-white/10 text-xs md:text-sm font-semibold flex items-center gap-2.5 pointer-events-auto transition duration-300`;
+            toast.innerHTML = `<i class="fas ${iconClass} text-base"></i><span class="flex-1">${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3800);
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // ============================================================================
+        // CORE BOTTLENECK & READY-ITEM AUTO-CALCULATION ENGINE
+        // ============================================================================
+        function findIngredient(ingRef) {
+            if (!ingRef) return null;
+            return rawIngredients.find(i =>
+                i.id === ingRef.ingId ||
+                i.name.trim().toLowerCase() === (ingRef.itemName || '').trim().toLowerCase()
+            ) || null;
+        }
+
+        /**
+         * Calculates how many ready portions of `recipe` can be made from current rawIngredients,
+         * optionally accounting for reserved ingredients in `posCart`.
+         */
+        function calculateRecipeReadiness(recipe, includeCartReservations = false) {
+            if (!recipe || !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0) {
+                return {
+                    readyPortions: 0,
+                    unitCost: 0,
+                    limitingIngredient: 'No ingredients mapped',
+                    breakdown: []
+                };
+            }
+
+            // Calculate reserved raw ingredient quantities from posCart if requested
+            const reservedMap = {};
+            if (includeCartReservations && posCart.length > 0) {
+                posCart.forEach(cartItem => {
+                    const r = menuRecipes.find(x => x.id === cartItem.recipeId);
+                    if (!r) return;
+                    const batchYield = Math.max(1, parseFloat(r.yieldQty) || 1);
+                    (r.ingredients || []).forEach(reqIng => {
+                        const raw = findIngredient(reqIng);
+                        if (!raw) return;
+                        const factor = getUnitConversionFactor(reqIng.uom, raw.uom);
+                        const neededInRawUom = ((parseFloat(reqIng.qty) || 0) * factor / batchYield) * cartItem.qty;
+                        reservedMap[raw.id] = (reservedMap[raw.id] || 0) + neededInRawUom;
+                    });
+                });
+            }
+
+            let minBatches = Infinity;
+            let limitingIngName = 'Sufficient Stock';
+            let totalBatchCost = 0;
+            const breakdown = [];
+            const yieldQty = Math.max(1, parseFloat(recipe.yieldQty) || 1);
+
+            recipe.ingredients.forEach(reqIng => {
+                const raw = findIngredient(reqIng);
+                const reqQty = parseFloat(reqIng.qty) || 0;
+                if (reqQty <= 0) return;
+
+                if (!raw) {
+                    minBatches = 0;
+                    limitingIngName = `${reqIng.itemName} (Missing in Stock)`;
+                    breakdown.push({
+                        name: reqIng.itemName,
+                        reqQty,
+                        reqUom: reqIng.uom || 'unit',
+                        availStock: 0,
+                        rawUom: reqIng.uom || 'unit',
+                        possiblePortions: 0,
+                        lineCost: 0,
+                        isLimiting: true
+                    });
+                    return;
+                }
+
+                // Convert raw.stock into the recipe's requested UOM
+                const convToRecipeUom = getUnitConversionFactor(raw.uom, reqIng.uom);
+                const rawAvailAfterReserve = Math.max(0, (parseFloat(raw.stock) || 0) - (reservedMap[raw.id] || 0));
+                const availInRecipeUom = rawAvailAfterReserve * convToRecipeUom;
+
+                const possibleBatches = Math.floor((availInRecipeUom / reqQty) * yieldQty) / yieldQty;
+                const possiblePortions = Math.max(0, Math.floor((availInRecipeUom / reqQty) * yieldQty));
+
+                // Cost calculation
+                const convToRawUom = getUnitConversionFactor(reqIng.uom, raw.uom);
+                const lineCost = (reqQty * convToRawUom) * (parseFloat(raw.costPerUnit) || 0);
+                totalBatchCost += lineCost;
+
+                if (possibleBatches < minBatches) {
+                    minBatches = possibleBatches;
+                    limitingIngName = raw.name;
+                }
+
+                breakdown.push({
+                    ingId: raw.id,
+                    name: raw.name,
+                    reqQty,
+                    reqUom: reqIng.uom || raw.uom,
+                    availStock: rawAvailAfterReserve,
+                    rawUom: raw.uom,
+                    possiblePortions,
+                    lineCost,
+                    isLimiting: false
+                });
+            });
+
+            const finalReadyPortions = minBatches === Infinity ? 0 : Math.max(0, Math.floor(minBatches * yieldQty));
+            breakdown.forEach(b => {
+                if (b.possiblePortions === finalReadyPortions) {
+                    b.isLimiting = true;
+                }
+            });
+
+            return {
+                readyPortions: finalReadyPortions,
+                unitCost: totalBatchCost / yieldQty,
+                limitingIngredient: limitingIngName,
+                breakdown
+            };
+        }
+
+        // ============================================================================
+        // TWO-WAY SYNC WITH RTR-CRM (`items`, `boms`, `purchases`, `production`)
+        // ============================================================================
+        function loadOrInitializeData() {
+            const savedIngs = SafeStorage.get('restaurant_ingredients', null);
+            const savedRecipes = SafeStorage.get('restaurant_recipes', null);
+
+            if (Array.isArray(savedIngs) && savedIngs.length > 0 && Array.isArray(savedRecipes) && savedRecipes.length > 0) {
+                rawIngredients = savedIngs;
+                menuRecipes = savedRecipes;
+            } else {
+                // Check if existing RTR-CRM `boms` and `items` exist in localStorage
+                const existingBoms = SafeStorage.get('boms', []);
+                const existingItems = SafeStorage.get('items', []);
+                if (existingBoms.length > 0 && existingItems.length > 0 && (!savedRecipes || savedRecipes.length === 0)) {
+                    importFromExistingRtrCrm(existingItems, existingBoms);
+                } else {
+                    rawIngredients = JSON.parse(JSON.stringify(DEFAULT_INGREDIENTS));
+                    menuRecipes = JSON.parse(JSON.stringify(DEFAULT_RECIPES));
+                    syncAllToRtrCrmStorage(false);
+                }
+            }
+
+            const lastBackup = SafeStorage.get('lastBackupDate', null);
+            if (lastBackup) {
+                const badge = document.getElementById('lastBackupBadge');
+                if (badge) badge.textContent = `Last Backup: ${lastBackup}`;
+            }
+        }
+
+        function importFromExistingRtrCrm(existingItems, existingBoms) {
+            rawIngredients = [];
+            menuRecipes = [];
+
+            // Build stock map from purchases/production
+            const purchases = SafeStorage.get('purchases', []);
+            const stockByName = {};
+            purchases.forEach(p => {
+                const k = (p.itemName || '').trim().toLowerCase();
+                stockByName[k] = (stockByName[k] || 0) + (parseFloat(p.qty) || 0);
+            });
+
+            existingItems.filter(i => i.itemType !== 'Finished Good').forEach((item, idx) => {
+                const k = (item.name || '').trim().toLowerCase();
+                rawIngredients.push({
+                    id: item.id || ('ing_' + (idx + 1)),
+                    name: item.name,
+                    code: item.itemCode || `RM-${101 + idx}`,
+                    uom: item.uom || 'g',
+                    stock: stockByName[k] !== undefined ? stockByName[k] : 1000,
+                    costPerUnit: parseFloat(item.purchasePrice || item.price) || 1,
+                    minAlert: 100
+                });
+            });
+
+            if (rawIngredients.length === 0) {
+                rawIngredients = JSON.parse(JSON.stringify(DEFAULT_INGREDIENTS));
+            }
+
+            existingBoms.forEach((b, idx) => {
+                const fgItem = existingItems.find(i => i.name === b.finishedGoodName) || {};
+                menuRecipes.push({
+                    id: b.id || ('rcp_' + (idx + 1)),
+                    bomCode: b.bomCode || `BOM-000${idx + 1}`,
+                    name: b.finishedGoodName || `Menu Item ${idx + 1}`,
+                    itemCode: b.finishedGoodCode || fgItem.itemCode || `MNU-00${idx + 1}`,
+                    category: fgItem.category || 'Main Course',
+                    price: parseFloat(fgItem.salePrice || fgItem.price || b.totalEstimatedCost) || 180,
+                    gst: parseFloat(fgItem.gst) || 5,
+                    yieldQty: parseFloat(b.outputQty) || 1,
+                    ingredients: (b.rawMaterials || []).map(rm => {
+                        const matchIng = rawIngredients.find(x => x.name.toLowerCase() === (rm.itemName || '').toLowerCase());
+                        return {
+                            ingId: matchIng ? matchIng.id : '',
+                            itemName: rm.itemName,
+                            itemCode: rm.itemCode || (matchIng ? matchIng.code : ''),
+                            qty: parseFloat(rm.qty) || 1,
+                            uom: rm.uom || (matchIng ? matchIng.uom : 'g')
+                        };
+                    })
+                });
+            });
+
+            if (menuRecipes.length === 0) {
+                menuRecipes = JSON.parse(JSON.stringify(DEFAULT_RECIPES));
+            }
+            syncAllToRtrCrmStorage(false);
+        }
+
+        /**
+         * Synchronizes rawIngredients and menuRecipes into RTR-CRM's exact localStorage keys:
+         * - `items`: Both Finished Goods (Menu Items) and Raw Materials
+         * - `boms`: Standard BOM format used by `bom.html` & `production.html`
+         * - `purchases`: Ensures raw ingredient stock is reflected in `getStockMap()`
+         * - `production`: Automatically sets Finished Good stock in `restaurant_pos.html` to equal the auto-calculated Ready Portions!
+         */
+        function syncAllToRtrCrmStorage(showNotification = true) {
+            SafeStorage.set('restaurant_ingredients', rawIngredients);
+            SafeStorage.set('restaurant_recipes', menuRecipes);
+
+            // 1. Sync `items`
+            let items = SafeStorage.get('items', []);
+            if (!Array.isArray(items)) items = [];
+
+            // Upsert Raw Materials into `items`
+            rawIngredients.forEach(ing => {
+                const idx = items.findIndex(i =>
+                    (i.name || '').trim().toLowerCase() === ing.name.trim().toLowerCase()
+                );
+                const itemObj = {
+                    id: ing.id,
+                    name: ing.name,
+                    itemCode: ing.code,
+                    itemType: 'Raw Material',
+                    category: 'Raw Ingredients',
+                    uom: ing.uom,
+                    price: ing.costPerUnit,
+                    purchasePrice: ing.costPerUnit,
+                    salePrice: ing.costPerUnit,
+                    gst: 0
+                };
+                if (idx > -1) items[idx] = { ...items[idx], ...itemObj };
+                else items.push(itemObj);
+            });
+
+            // Upsert Menu Recipes as Finished Goods into `items`
+            menuRecipes.forEach(rcp => {
+                const calc = calculateRecipeReadiness(rcp, false);
+                const idx = items.findIndex(i =>
+                    (i.name || '').trim().toLowerCase() === rcp.name.trim().toLowerCase()
+                );
+                const fgObj = {
+                    id: rcp.id,
+                    name: rcp.name,
+                    itemCode: rcp.itemCode,
+                    itemType: 'Finished Good',
+                    category: rcp.category || 'Main Course',
+                    uom: 'Pcs',
+                    price: rcp.price,
+                    salePrice: rcp.price,
+                    costPrice: parseFloat(calc.unitCost.toFixed(2)),
+                    gst: rcp.gst,
+                    description: `Auto-calc Ready: ${calc.readyPortions} | Ingredients: ${rcp.ingredients.map(x => x.itemName).join(', ')}`
+                };
+                if (idx > -1) items[idx] = { ...items[idx], ...fgObj };
+                else items.push(fgObj);
+            });
+            SafeStorage.set('items', items);
+
+            // 2. Sync `boms` (Compatible with bom.html and production.html)
+            const boms = menuRecipes.map(rcp => {
+                const calc = calculateRecipeReadiness(rcp, false);
+                return {
+                    id: rcp.id,
+                    bomCode: rcp.bomCode,
+                    finishedGoodName: rcp.name,
+                    finishedGoodCode: rcp.itemCode,
+                    bomName: 'Standard',
+                    outputQty: rcp.yieldQty || 1,
+                    outputUom: 'Pcs',
+                    materialCost: parseFloat((calc.unitCost * (rcp.yieldQty || 1)).toFixed(2)),
+                    labourCost: 0,
+                    overheadCost: 0,
+                    totalEstimatedCost: parseFloat((calc.unitCost * (rcp.yieldQty || 1)).toFixed(2)),
+                    rawMaterials: rcp.ingredients.map(ing => {
+                        const raw = findIngredient(ing);
+                        const rate = raw ? raw.costPerUnit : 0;
+                        return {
+                            itemName: ing.itemName,
+                            itemCode: ing.itemCode || (raw ? raw.code : ''),
+                            qty: ing.qty,
+                            uom: ing.uom,
+                            rate: rate,
+                            amount: parseFloat((ing.qty * rate).toFixed(2))
+                        };
+                    }),
+                    additionalOutputs: []
+                };
+            });
+            SafeStorage.set('boms', boms);
+
+            // 3. Sync `purchases` & `production` so `restaurant_pos.html` getStockMap() sees exact Ready Portions!
+            // In restaurant_pos.html, stockMap[key] = purchases - invoices + returns - scraps + production(fgQtyProduced)
+            const invoices = SafeStorage.get('invoices', []);
+            const soldMap = {};
+            invoices.forEach(inv => {
+                if (Array.isArray(inv.items)) {
+                    inv.items.forEach(it => {
+                        let itemName = (it.item || '').trim();
+                        const noteIdx = itemName.indexOf(' (* ');
+                        if (noteIdx > -1) itemName = itemName.substring(0, noteIdx).trim();
+                        const key = itemName.toLowerCase() + '|' + (it.itemCode || '').trim().toLowerCase();
+                        soldMap[key] = (soldMap[key] || 0) + (parseFloat(it.qty) || 0);
+                    });
+                }
+            });
+
+            // Sync purchases for raw materials
+            const syncedPurchases = rawIngredients.map((ing, i) => ({
+                id: 'PUR-RM-' + ing.id,
+                invoiceNo: `PUR-RM-${100 + i}`,
+                date: new Date().toISOString().split('T')[0],
+                supplierName: 'Kitchen Opening / Restock',
+                itemName: ing.name,
+                itemCode: ing.code,
+                qty: ing.stock,
+                uom: ing.uom,
+                price: ing.costPerUnit,
+                gst: 0,
+                total: parseFloat((ing.stock * ing.costPerUnit).toFixed(2))
+            }));
+            SafeStorage.set('purchases', syncedPurchases);
+
+            // Sync `production` entries so restaurant_pos.html shows `stock = readyPortions`
+            const syncedProductions = menuRecipes.map((rcp, i) => {
+                const calc = calculateRecipeReadiness(rcp, false);
+                const key = rcp.name.trim().toLowerCase() + '|' + (rcp.itemCode || '').trim().toLowerCase();
+                const alreadySold = soldMap[key] || 0;
+                // So that (fgQtyProduced - alreadySold) === calc.readyPortions in restaurant_pos.html!
+                const targetFgProduced = calc.readyPortions + alreadySold;
+                return {
+                    id: 'PROD-AUTO-' + rcp.id,
+                    productionNo: `MFG-AUTO-${100 + i}`,
+                    date: new Date().toISOString().split('T')[0],
+                    stage: 'Completed',
+                    finishedGood: rcp.name,
+                    fgCode: rcp.itemCode,
+                    bomCode: rcp.bomCode,
+                    bomName: 'Standard',
+                    fgQtyProduced: targetFgProduced,
+                    fgUom: 'Pcs',
+                    materialsConsumed: [],
+                    materialCost: parseFloat((calc.unitCost * calc.readyPortions).toFixed(2)),
+                    totalCost: parseFloat((calc.unitCost * calc.readyPortions).toFixed(2)),
+                    createdAt: new Date().toISOString()
+                };
+            });
+            SafeStorage.set('production', syncedProductions);
+
+            // Save rolling snapshot in IndexedDB
+            IDBVault.saveSnapshot('Auto-Sync Update');
+
+            if (showNotification) {
+                showToast('Synced Ready Item quantities with Restaurant POS & BOM Database!');
+            }
+        }
+
+        // ============================================================================
+        // UI RENDERING: KPI BAR & NAVIGATION
+        // ============================================================================
+        function renderAll() {
+            renderKpis();
+            renderRecipeBuilderPreview();
+            renderReadyItemsBoard();
+            renderIngredientsTable();
+            renderPosSimulator();
+            renderKdsQueue();
+            renderBackupVault();
+            populateCategoryFilter();
+        }
+
+        function renderKpis() {
+            document.getElementById('kpiTotalRecipes').textContent = menuRecipes.length;
+            document.getElementById('navIngCount').textContent = rawIngredients.length;
+
+            let totalReady = 0;
+            menuRecipes.forEach(r => {
+                totalReady += calculateRecipeReadiness(r, false).readyPortions;
+            });
+            document.getElementById('kpiTotalReadyPortions').textContent = totalReady;
+
+            const lowCount = rawIngredients.filter(i => (parseFloat(i.stock) || 0) <= (parseFloat(i.minAlert) || 0)).length;
+            document.getElementById('kpiLowStockCount').textContent = lowCount;
+
+            const kdsOrders = SafeStorage.get('kds_orders', []);
+            document.getElementById('kpiActiveOrders').textContent = kdsOrders.length;
+            document.getElementById('navKdsCount').textContent = kdsOrders.length;
+        }
+
+        function populateCategoryFilter() {
+            const select = document.getElementById('filterRecipeCategory');
+            if (!select) return;
+            const current = select.value || 'All';
+            const cats = ['All', ...new Set(menuRecipes.map(r => r.category || 'Main Course'))];
+            select.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c === 'All' ? 'All Categories' : c)}</option>`).join('');
+            if (cats.includes(current)) select.value = current;
+        }
+
+        // ============================================================================
+        // TAB 1: RECIPE BUILDER & READY-ITEM BOARD
+        // ============================================================================
+        function getNextRecipeCode() {
+            let max = 0;
+            menuRecipes.forEach(r => {
+                const m = String(r.itemCode || '').match(/\d+/);
+                if (m && parseInt(m[0], 10) > max) max = parseInt(m[0], 10);
+            });
+            return `MNU-${String(max + 1).padStart(3, '0')}`;
+        }
+
+        function getNextBomCode() {
+            let max = 0;
+            menuRecipes.forEach(r => {
+                const m = String(r.bomCode || '').match(/\d+/);
+                if (m && parseInt(m[0], 10) > max) max = parseInt(m[0], 10);
+            });
+            return `BOM-${String(max + 1).padStart(4, '0')}`;
+        }
+
+        function addIngredientRowToForm(prefill = null) {
+            const container = document.getElementById('recipeIngredientsContainer');
+            if (!container) return;
+
+            const row = document.createElement('div');
+            row.className = 'ing-form-row grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200';
+
+            const optionsHtml = rawIngredients.map(ing => {
+                const selected = prefill && (prefill.ingId === ing.id || (prefill.itemName || '').toLowerCase() === ing.name.toLowerCase()) ? 'selected' : '';
+                return `<option value="${escapeHtml(ing.id)}" data-uom="${escapeHtml(ing.uom)}" ${selected}>${escapeHtml(ing.name)} (Stock: ${ing.stock} ${escapeHtml(ing.uom)})</option>`;
+            }).join('');
+
+            const initialIng = prefill
+                ? (findIngredient(prefill) || rawIngredients[0])
+                : rawIngredients[0];
+            const defaultUom = prefill && prefill.uom ? prefill.uom : (initialIng ? initialIng.uom : 'g');
+            const defaultQty = prefill && prefill.qty ? prefill.qty : 100;
+
+            row.innerHTML = `
+                <div class="col-span-6">
+                    <select class="row-ing-select w-full px-2 py-1.5 rounded border border-slate-300 text-xs bg-white focus:outline-none">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div class="col-span-3">
+                    <input type="number" class="row-ing-qty w-full px-2 py-1.5 rounded border border-slate-300 text-xs text-right focus:outline-none" value="${defaultQty}" min="0.01" step="any" placeholder="Qty">
+                </div>
+                <div class="col-span-2">
+                    <select class="row-ing-uom w-full px-1.5 py-1.5 rounded border border-slate-300 text-xs bg-white focus:outline-none">
+                        <option value="g" ${defaultUom === 'g' ? 'selected' : ''}>g</option>
+                        <option value="kg" ${defaultUom === 'kg' ? 'selected' : ''}>kg</option>
+                        <option value="ml" ${defaultUom === 'ml' ? 'selected' : ''}>ml</option>
+                        <option value="L" ${defaultUom === 'L' ? 'selected' : ''}>L</option>
+                        <option value="pcs" ${defaultUom === 'pcs' ? 'selected' : ''}>pcs</option>
+                        <option value="pkt" ${defaultUom === 'pkt' ? 'selected' : ''}>pkt</option>
+                    </select>
+                </div>
+                <div class="col-span-1 text-right">
+                    <button type="button" class="btn-remove-ing-row text-rose-500 hover:text-rose-700 p-1" title="Remove Ingredient">
+                        <i class="fas fa-trash-can text-xs"></i>
+                    </button>
+                </div>
+            `;
+
+            const selectEl = row.querySelector('.row-ing-select');
+            const qtyEl = row.querySelector('.row-ing-qty');
+            const uomEl = row.querySelector('.row-ing-uom');
+            const removeBtn = row.querySelector('.btn-remove-ing-row');
+
+            selectEl.addEventListener('change', () => {
+                const chosen = rawIngredients.find(x => x.id === selectEl.value);
+                if (chosen) uomEl.value = chosen.uom;
+                renderRecipeBuilderPreview();
+            });
+            qtyEl.addEventListener('input', renderRecipeBuilderPreview);
+            uomEl.addEventListener('change', renderRecipeBuilderPreview);
+            removeBtn.addEventListener('click', () => {
+                row.remove();
+                renderRecipeBuilderPreview();
+            });
+
+            container.appendChild(row);
+            renderRecipeBuilderPreview();
+        }
+
+        function readFormRecipeDraft() {
+            const rows = document.querySelectorAll('#recipeIngredientsContainer .ing-form-row');
+            const ingredients = [];
+            rows.forEach(r => {
+                const ingId = r.querySelector('.row-ing-select')?.value;
+                const qty = parseFloat(r.querySelector('.row-ing-qty')?.value) || 0;
+                const uom = r.querySelector('.row-ing-uom')?.value || 'g';
+                const raw = rawIngredients.find(x => x.id === ingId);
+                if (raw && qty > 0) {
+                    ingredients.push({
+                        ingId: raw.id,
+                        itemName: raw.name,
+                        itemCode: raw.code,
+                        qty,
+                        uom
+                    });
+                }
+            });
+
+            return {
+                id: document.getElementById('editRecipeId').value || 'preview',
+                name: document.getElementById('recipeItemName').value.trim() || 'Draft Recipe',
+                itemCode: document.getElementById('recipeItemCode').value.trim() || getNextRecipeCode(),
+                category: document.getElementById('recipeCategory').value || 'Main Course',
+                price: parseFloat(document.getElementById('recipePrice').value) || 0,
+                gst: parseFloat(document.getElementById('recipeGst').value) || 0,
+                yieldQty: Math.max(1, parseFloat(document.getElementById('recipeYieldQty').value) || 1),
+                ingredients
+            };
+        }
+
+        function renderRecipeBuilderPreview() {
+            const draft = readFormRecipeDraft();
+            const calc = calculateRecipeReadiness(draft, false);
+
+            document.getElementById('liveReadyCountPreview').textContent = calc.readyPortions;
+            document.getElementById('liveBottleneckText').textContent = draft.ingredients.length > 0
+                ? `Limiting Ingredient: ${calc.limitingIngredient}`
+                : 'Add ingredients to calculate capacity';
+            document.getElementById('liveRecipeCostPreview').textContent = `₹${calc.unitCost.toFixed(2)}`;
+
+            const margin = draft.price - calc.unitCost;
+            const marginPct = draft.price > 0 ? Math.round((margin / draft.price) * 100) : 0;
+            const marginEl = document.getElementById('liveRecipeMarginPreview');
+            marginEl.textContent = `₹${margin.toFixed(2)} (${marginPct}%)`;
+            marginEl.className = margin >= 0 ? 'font-bold text-emerald-400' : 'font-bold text-rose-400';
+
+            const revPotential = calc.readyPortions * draft.price;
+            document.getElementById('liveRevenuePotential').textContent = `₹${revPotential.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        function resetRecipeForm() {
+            document.getElementById('editRecipeId').value = '';
+            document.getElementById('recipeFormTitle').textContent = 'Set Menu Item & Required Ingredients';
+            document.getElementById('recipeItemName').value = '';
+            document.getElementById('recipeItemCode').value = getNextRecipeCode();
+            document.getElementById('recipeCategory').value = 'Main Course';
+            document.getElementById('recipePrice').value = '220';
+            document.getElementById('recipeGst').value = '5';
+            document.getElementById('recipeYieldQty').value = '1';
+
+            const container = document.getElementById('recipeIngredientsContainer');
+            container.innerHTML = '';
+            if (rawIngredients.length > 0) {
+                addIngredientRowToForm({ ingId: rawIngredients[0].id, qty: 150, uom: rawIngredients[0].uom });
+            }
+            renderRecipeBuilderPreview();
+        }
+
+        function loadRecipeIntoForm(recipeId) {
+            const rcp = menuRecipes.find(r => r.id === recipeId);
+            if (!rcp) return;
+
+            document.getElementById('editRecipeId').value = rcp.id;
+            document.getElementById('recipeFormTitle').textContent = `Editing: ${rcp.name}`;
+            document.getElementById('recipeItemName').value = rcp.name;
+            document.getElementById('recipeItemCode').value = rcp.itemCode || '';
+            document.getElementById('recipeCategory').value = rcp.category || 'Main Course';
+            document.getElementById('recipePrice').value = rcp.price;
+            document.getElementById('recipeGst').value = String(rcp.gst || 5);
+            document.getElementById('recipeYieldQty').value = rcp.yieldQty || 1;
+
+            const container = document.getElementById('recipeIngredientsContainer');
+            container.innerHTML = '';
+            (rcp.ingredients || []).forEach(ing => addIngredientRowToForm(ing));
+            renderRecipeBuilderPreview();
+            showToast(`Loaded "${rcp.name}" into recipe editor`);
+        }
+
+        function saveRecipeFromForm() {
+            const draft = readFormRecipeDraft();
+            if (!document.getElementById('recipeItemName').value.trim()) {
+                showToast('Please enter a Menu Item Name.', 'error');
+                document.getElementById('recipeItemName').focus();
+                return;
+            }
+            if (draft.ingredients.length === 0) {
+                showToast('Please add at least one required ingredient with quantity > 0.', 'error');
+                return;
+            }
+
+            const existingId = document.getElementById('editRecipeId').value;
+            if (existingId) {
+                const idx = menuRecipes.findIndex(r => r.id === existingId);
+                if (idx > -1) {
+                    menuRecipes[idx] = {
+                        ...menuRecipes[idx],
+                        name: draft.name,
+                        itemCode: draft.itemCode,
+                        category: draft.category,
+                        price: draft.price,
+                        gst: draft.gst,
+                        yieldQty: draft.yieldQty,
+                        ingredients: draft.ingredients
+                    };
+                }
+                showToast(`Updated "${draft.name}" and auto-calculated ready items!`);
+            } else {
+                const newRecipe = {
+                    id: 'rcp_' + Date.now(),
+                    bomCode: getNextBomCode(),
+                    name: draft.name,
+                    itemCode: draft.itemCode || getNextRecipeCode(),
+                    category: draft.category,
+                    price: draft.price,
+                    gst: draft.gst,
+                    yieldQty: draft.yieldQty,
+                    ingredients: draft.ingredients
+                };
+                menuRecipes.push(newRecipe);
+                showToast(`Added "${draft.name}" to Menu & POS!`);
+            }
+
+            syncAllToRtrCrmStorage(false);
+            resetRecipeForm();
+            renderAll();
+        }
+
+        function deleteRecipe(recipeId) {
+            const rcp = menuRecipes.find(r => r.id === recipeId);
+            if (!rcp) return;
+            menuRecipes = menuRecipes.filter(r => r.id !== recipeId);
+            syncAllToRtrCrmStorage(false);
+            renderAll();
+            showToast(`Removed "${rcp.name}" from recipes.`, 'warning');
+        }
+
+        function renderReadyItemsBoard() {
+            const grid = document.getElementById('readyItemsGrid');
+            if (!grid) return;
+
+            const search = (document.getElementById('searchRecipesInput')?.value || '').trim().toLowerCase();
+            const catFilter = document.getElementById('filterRecipeCategory')?.value || 'All';
+
+            const filtered = menuRecipes.filter(r => {
+                const matchCat = catFilter === 'All' || r.category === catFilter;
+                const matchSearch = !search ||
+                    r.name.toLowerCase().includes(search) ||
+                    (r.itemCode || '').toLowerCase().includes(search) ||
+                    (r.ingredients || []).some(i => (i.itemName || '').toLowerCase().includes(search));
+                return matchCat && matchSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 text-sm">No matching menu recipes found.</div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(rcp => {
+                const calc = calculateRecipeReadiness(rcp, false);
+                const isOut = calc.readyPortions <= 0;
+                const isLow = calc.readyPortions > 0 && calc.readyPortions <= 5;
+
+                const statusBadge = isOut
+                    ? `<span class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-rose-100 text-rose-700 border border-rose-300">0 Ready (Out of Stock)</span>`
+                    : (isLow
+                        ? `<span class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-300 pulse-badge">${calc.readyPortions} Ready (Low Stock)</span>`
+                        : `<span class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">${calc.readyPortions} Ready to Serve</span>`);
+
+                const ingRowsHtml = calc.breakdown.map(b => `
+                    <div class="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-0">
+                        <span class="text-slate-700 font-medium flex items-center gap-1">
+                            ${b.isLimiting ? '<i class="fas fa-bolt text-amber-500" title="Limiting bottleneck ingredient"></i>' : '<i class="fas fa-check text-emerald-500 text-[10px]"></i>'}
+                            ${escapeHtml(b.name)}
+                        </span>
+                        <span class="text-slate-500">
+                            Need <strong class="text-slate-700">${b.reqQty}${escapeHtml(b.reqUom)}</strong> &bull;
+                            Stock: <strong class="${b.possiblePortions <= 5 ? 'text-rose-600' : 'text-emerald-700'}">${b.availStock.toFixed(1)}${escapeHtml(b.rawUom)}</strong>
+                            (${b.possiblePortions}x)
+                        </span>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="rounded-xl border ${isOut ? 'border-rose-300 bg-rose-50/30' : 'border-slate-200 bg-white'} p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition">
+                        <div>
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <div>
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded">${escapeHtml(rcp.category)}</span>
+                                    <span class="text-[11px] text-slate-400 font-mono ml-1">${escapeHtml(rcp.itemCode)}</span>
+                                    <h3 class="font-bold text-base text-slate-800 mt-1">${escapeHtml(rcp.name)}</h3>
+                                </div>
+                                ${statusBadge}
+                            </div>
+
+                            <div class="flex items-center gap-4 text-xs text-slate-600 mb-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                                <div>Price: <strong class="text-slate-900">₹${rcp.price.toFixed(2)}</strong></div>
+                                <div>Recipe Cost: <strong class="text-slate-900">₹${calc.unitCost.toFixed(2)}</strong></div>
+                                <div>Bottleneck: <strong class="text-amber-700">${escapeHtml(calc.limitingIngredient)}</strong></div>
+                            </div>
+
+                            <div class="space-y-0.5 mb-3">
+                                <div class="text-[11px] font-bold uppercase text-slate-400 mb-1">Ingredient Breakdown (Per ${rcp.yieldQty || 1} Portion)</div>
+                                ${ingRowsHtml}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
+                            <div class="flex gap-1.5">
+                                <button type="button" data-edit-recipe="${escapeHtml(rcp.id)}" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
+                                    <i class="fas fa-pen-to-square"></i> Edit Recipe
+                                </button>
+                                <button type="button" data-delete-recipe="${escapeHtml(rcp.id)}" class="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <button type="button" data-order-recipe="${escapeHtml(rcp.id)}" ${isOut ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg ${isOut ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white'} text-xs font-bold transition flex items-center gap-1.5">
+                                <i class="fas fa-cart-plus"></i> + Take Order (${calc.readyPortions})
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Attach listeners
+            grid.querySelectorAll('[data-edit-recipe]').forEach(btn => {
+                btn.addEventListener('click', () => loadRecipeIntoForm(btn.getAttribute('data-edit-recipe')));
+            });
+            grid.querySelectorAll('[data-delete-recipe]').forEach(btn => {
+                btn.addEventListener('click', () => deleteRecipe(btn.getAttribute('data-delete-recipe')));
+            });
+            grid.querySelectorAll('[data-order-recipe]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-order-recipe');
+                    addToPosCart(id);
+                    switchTab('pos-simulator');
+                });
+            });
+        }
+
+        // ============================================================================
+        // TAB 2: RAW INGREDIENTS INVENTORY MANAGEMENT
+        // ============================================================================
+        function getNextIngCode() {
+            let max = 100;
+            rawIngredients.forEach(i => {
+                const m = String(i.code || '').match(/\d+/);
+                if (m && parseInt(m[0], 10) > max) max = parseInt(m[0], 10);
+            });
+            return `RM-${max + 1}`;
+        }
+
+        function clearIngredientForm() {
+            document.getElementById('editIngId').value = '';
+            document.getElementById('ingFormTitle').innerHTML = `<i class="fas fa-box-open text-amber-400"></i> Add / Update Raw Ingredient`;
+            document.getElementById('ingName').value = '';
+            document.getElementById('ingCode').value = getNextIngCode();
+            document.getElementById('ingUom').value = 'g';
+            document.getElementById('ingStock').value = '1000';
+            document.getElementById('ingCost').value = '0.20';
+            document.getElementById('ingMinAlert').value = '200';
+        }
+
+        function saveIngredientFromForm() {
+            const name = document.getElementById('ingName').value.trim();
+            if (!name) {
+                showToast('Please enter an Ingredient Name.', 'error');
+                document.getElementById('ingName').focus();
+                return;
+            }
+            const code = document.getElementById('ingCode').value.trim() || getNextIngCode();
+            const uom = document.getElementById('ingUom').value || 'g';
+            const stock = Math.max(0, parseFloat(document.getElementById('ingStock').value) || 0);
+            const costPerUnit = Math.max(0, parseFloat(document.getElementById('ingCost').value) || 0);
+            const minAlert = Math.max(0, parseFloat(document.getElementById('ingMinAlert').value) || 0);
+
+            const editId = document.getElementById('editIngId').value;
+            if (editId) {
+                const idx = rawIngredients.findIndex(i => i.id === editId);
+                if (idx > -1) {
+                    rawIngredients[idx] = { ...rawIngredients[idx], name, code, uom, stock, costPerUnit, minAlert };
+                }
+                showToast(`Updated ingredient "${name}" stock to ${stock} ${uom}`);
+            } else {
+                const existingIdx = rawIngredients.findIndex(i => i.name.toLowerCase() === name.toLowerCase());
+                if (existingIdx > -1) {
+                    rawIngredients[existingIdx].stock += stock;
+                    rawIngredients[existingIdx].costPerUnit = costPerUnit;
+                    showToast(`Added ${stock} ${uom} to existing ingredient "${name}"`);
+                } else {
+                    rawIngredients.push({
+                        id: 'ing_' + Date.now(),
+                        name,
+                        code,
+                        uom,
+                        stock,
+                        costPerUnit,
+                        minAlert
+                    });
+                    showToast(`Created raw ingredient "${name}" (${stock} ${uom})`);
+                }
+            }
+
+            syncAllToRtrCrmStorage(false);
+            clearIngredientForm();
+            renderAll();
+        }
+
+        function renderIngredientsTable() {
+            const tbody = document.getElementById('ingredientsTableBody');
+            if (!tbody) return;
+
+            const search = (document.getElementById('searchIngInput')?.value || '').trim().toLowerCase();
+            const filtered = rawIngredients.filter(i =>
+                !search || i.name.toLowerCase().includes(search) || (i.code || '').toLowerCase().includes(search)
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">No ingredients found.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(ing => {
+                const isOut = ing.stock <= 0;
+                const isLow = !isOut && ing.stock <= ing.minAlert;
+                const badge = isOut
+                    ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">Out of Stock</span>`
+                    : (isLow
+                        ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">Low Stock</span>`
+                        : `<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">Healthy</span>`);
+
+                const usedIn = menuRecipes
+                    .filter(r => (r.ingredients || []).some(x => x.ingId === ing.id || (x.itemName || '').toLowerCase() === ing.name.toLowerCase()))
+                    .map(r => r.name);
+
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-3 px-3">
+                            <div class="font-bold text-slate-800">${escapeHtml(ing.name)}</div>
+                            <div class="text-[11px] text-slate-400 font-mono">${escapeHtml(ing.code)} &bull; Min Alert: ${ing.minAlert} ${escapeHtml(ing.uom)}</div>
+                        </td>
+                        <td class="py-3 px-3 text-right font-extrabold ${isOut ? 'text-rose-600' : (isLow ? 'text-amber-600' : 'text-slate-800')}">
+                            ${Number(ing.stock).toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span class="text-xs font-normal text-slate-500">${escapeHtml(ing.uom)}</span>
+                        </td>
+                        <td class="py-3 px-3 text-right text-slate-600">
+                            ₹${Number(ing.costPerUnit).toFixed(2)} / ${escapeHtml(ing.uom)}
+                        </td>
+                        <td class="py-3 px-3 text-center">${badge}</td>
+                        <td class="py-3 px-3 text-xs text-slate-600">
+                            ${usedIn.length > 0 ? usedIn.map(n => `<span class="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded mr-1 mb-1">${escapeHtml(n)}</span>`).join('') : '<span class="text-slate-400 italic">Not linked yet</span>'}
+                        </td>
+                        <td class="py-3 px-3 text-center whitespace-nowrap">
+                            <button type="button" data-restock-ing="${escapeHtml(ing.id)}" class="px-2.5 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold mr-1" title="Add Stock / Adjust">
+                                <i class="fas fa-plus"></i> Restock
+                            </button>
+                            <button type="button" data-edit-ing="${escapeHtml(ing.id)}" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs" title="Edit">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.querySelectorAll('[data-restock-ing]').forEach(btn => {
+                btn.addEventListener('click', () => openRestockModal(btn.getAttribute('data-restock-ing')));
+            });
+            tbody.querySelectorAll('[data-edit-ing]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const ing = rawIngredients.find(x => x.id === btn.getAttribute('data-edit-ing'));
+                    if (!ing) return;
+                    document.getElementById('editIngId').value = ing.id;
+                    document.getElementById('ingFormTitle').innerHTML = `<i class="fas fa-pen text-amber-400"></i> Edit: ${escapeHtml(ing.name)}`;
+                    document.getElementById('ingName').value = ing.name;
+                    document.getElementById('ingCode').value = ing.code;
+                    document.getElementById('ingUom').value = ing.uom;
+                    document.getElementById('ingStock').value = ing.stock;
+                    document.getElementById('ingCost').value = ing.costPerUnit;
+                    document.getElementById('ingMinAlert').value = ing.minAlert;
+                });
+            });
+        }
+
+        function openRestockModal(ingId) {
+            const ing = rawIngredients.find(x => x.id === ingId);
+            if (!ing) return;
+            document.getElementById('restockIngId').value = ing.id;
+            document.getElementById('restockModalTitle').textContent = `Update Stock: ${ing.name} (${ing.uom})`;
+            document.getElementById('restockMode').value = 'add';
+            document.getElementById('restockQty').value = ing.uom === 'g' || ing.uom === 'ml' ? '1000' : '5';
+            document.getElementById('restockRate').value = ing.costPerUnit;
+            const modal = document.getElementById('restockModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeRestockModal() {
+            const modal = document.getElementById('restockModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function confirmRestockModal() {
+            const ingId = document.getElementById('restockIngId').value;
+            const ing = rawIngredients.find(x => x.id === ingId);
+            if (!ing) return closeRestockModal();
+
+            const mode = document.getElementById('restockMode').value;
+            const qty = Math.max(0, parseFloat(document.getElementById('restockQty').value) || 0);
+            const rate = parseFloat(document.getElementById('restockRate').value);
+
+            if (mode === 'add') ing.stock = (parseFloat(ing.stock) || 0) + qty;
+            else if (mode === 'set') ing.stock = qty;
+            else if (mode === 'deduct') ing.stock = Math.max(0, (parseFloat(ing.stock) || 0) - qty);
+
+            if (!isNaN(rate) && rate >= 0) ing.costPerUnit = rate;
+
+            syncAllToRtrCrmStorage(false);
+            closeRestockModal();
+            renderAll();
+            showToast(`Updated ${ing.name} stock to ${ing.stock} ${ing.uom}. Ready items recalculated!`);
+        }
+
+        // ============================================================================
+        // TAB 3: LIVE POS ORDER SIMULATOR & KDS DISPATCH
+        // ============================================================================
+        function addToPosCart(recipeId) {
+            const rcp = menuRecipes.find(r => r.id === recipeId);
+            if (!rcp) return;
+
+            const readiness = calculateRecipeReadiness(rcp, true);
+            if (readiness.readyPortions <= 0) {
+                showToast(`Cannot add "${rcp.name}" — insufficient ${readiness.limitingIngredient}!`, 'error');
+                return;
+            }
+
+            const existing = posCart.find(c => c.recipeId === recipeId);
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                posCart.push({
+                    recipeId: rcp.id,
+                    name: rcp.name,
+                    itemCode: rcp.itemCode,
+                    category: rcp.category,
+                    price: rcp.price,
+                    gst: rcp.gst,
+                    qty: 1
+                });
+            }
+            renderPosSimulator();
+        }
+
+        function updatePosCartQty(recipeId, delta) {
+            const item = posCart.find(c => c.recipeId === recipeId);
+            if (!item) return;
+
+            if (delta > 0) {
+                const rcp = menuRecipes.find(r => r.id === recipeId);
+                const readiness = calculateRecipeReadiness(rcp, true);
+                if (readiness.readyPortions <= 0) {
+                    showToast(`Max ready limit reached for "${item.name}" (Limiting: ${readiness.limitingIngredient})`, 'warning');
+                    return;
+                }
+                item.qty += 1;
+            } else {
+                item.qty -= 1;
+                if (item.qty <= 0) {
+                    posCart = posCart.filter(c => c.recipeId !== recipeId);
+                }
+            }
+            renderPosSimulator();
+        }
+
+        function renderPosSimulator() {
+            const menuGrid = document.getElementById('posMenuCardsGrid');
+            const cartList = document.getElementById('posCartList');
+            const sharedNotice = document.getElementById('posSharedIngNotice');
+            if (!menuGrid || !cartList) return;
+
+            if (sharedNotice) {
+                sharedNotice.classList.toggle('hidden', posCart.length === 0);
+            }
+
+            // Render Menu Cards with live remaining ready counts (accounting for cart reservations!)
+            menuGrid.innerHTML = menuRecipes.map(rcp => {
+                const liveCalc = calculateRecipeReadiness(rcp, true);
+                const isOut = liveCalc.readyPortions <= 0;
+                return `
+                    <button type="button" data-pos-add="${escapeHtml(rcp.id)}" ${isOut ? 'disabled' : ''} class="text-left p-3.5 rounded-xl border ${isOut ? 'border-rose-200 bg-rose-50/50 opacity-60 cursor-not-allowed' : 'border-slate-200 bg-white hover:border-blue-400 hover:shadow-md'} transition flex flex-col justify-between min-h-[115px]">
+                        <div>
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${escapeHtml(rcp.category)}</span>
+                                <span class="text-xs font-extrabold px-2 py-0.5 rounded-full ${isOut ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}">
+                                    ${liveCalc.readyPortions} Ready
+                                </span>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-800 mt-1.5">${escapeHtml(rcp.name)}</h4>
+                            <p class="text-[11px] text-slate-400 mt-0.5 truncate">Limiting: ${escapeHtml(liveCalc.limitingIngredient)}</p>
+                        </div>
+                        <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 w-full">
+                            <span class="font-extrabold text-sm text-emerald-600">₹${rcp.price.toFixed(2)}</span>
+                            <span class="text-xs text-blue-600 font-semibold">${isOut ? 'Out of Stock' : '+ Add Order'}</span>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+
+            menuGrid.querySelectorAll('[data-pos-add]').forEach(btn => {
+                btn.addEventListener('click', () => addToPosCart(btn.getAttribute('data-pos-add')));
+            });
+
+            // Render Cart
+            if (posCart.length === 0) {
+                cartList.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">Cart is empty. Click a ready menu item to take a customer order.</div>`;
+            } else {
+                cartList.innerHTML = posCart.map(item => `
+                    <div class="py-2 flex items-center justify-between gap-2">
+                        <div class="flex-1">
+                            <div class="font-bold text-xs text-slate-800">${escapeHtml(item.name)}</div>
+                            <div class="text-[11px] text-slate-400">₹${item.price.toFixed(2)} &times; ${item.qty}</div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" data-cart-dec="${escapeHtml(item.recipeId)}" class="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center">-</button>
+                            <span class="font-bold text-xs w-5 text-center">${item.qty}</span>
+                            <button type="button" data-cart-inc="${escapeHtml(item.recipeId)}" class="w-6 h-6 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center">+</button>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 w-16 text-right">₹${(item.price * item.qty).toFixed(2)}</div>
+                    </div>
+                `).join('');
+
+                cartList.querySelectorAll('[data-cart-dec]').forEach(btn => {
+                    btn.addEventListener('click', () => updatePosCartQty(btn.getAttribute('data-cart-dec'), -1));
+                });
+                cartList.querySelectorAll('[data-cart-inc]').forEach(btn => {
+                    btn.addEventListener('click', () => updatePosCartQty(btn.getAttribute('data-cart-inc'), 1));
+                });
+            }
+
+            let subtotal = 0;
+            let tax = 0;
+            posCart.forEach(i => {
+                const line = i.price * i.qty;
+                subtotal += line;
+                tax += line * ((i.gst || 0) / 100);
+            });
+            const grand = Math.round(subtotal + tax);
+            document.getElementById('posCartSubtotal').textContent = `₹${subtotal.toFixed(2)}`;
+            document.getElementById('posCartTax').textContent = `₹${tax.toFixed(2)}`;
+            document.getElementById('posCartTotal').textContent = `₹${grand.toFixed(2)}`;
+        }
+
+        function sendCartToKds() {
+            if (posCart.length === 0) {
+                showToast('Add at least one item to the cart before sending KOT to KDS.', 'warning');
+                return;
+            }
+            const table = document.getElementById('posTableSelect').value || 'Takeaway';
+            const kdsOrders = SafeStorage.get('kds_orders', []);
+            const ticket = {
+                id: 'KOT-' + Date.now(),
+                table,
+                items: posCart.map(i => ({
+                    id: i.recipeId,
+                    name: i.name,
+                    qty: i.qty,
+                    category: i.category || 'Main Course'
+                })),
+                timestamp: new Date().toISOString()
+            };
+            kdsOrders.push(ticket);
+            SafeStorage.set('kds_orders', kdsOrders);
+            renderKdsQueue();
+            renderKpis();
+            showToast(`KOT ${ticket.id} sent to Kitchen Display System (${table})!`);
+        }
+
+        function settlePosOrderAndDeductIngredients() {
+            if (posCart.length === 0) {
+                showToast('Order cart is empty.', 'warning');
+                return;
+            }
+            const table = document.getElementById('posTableSelect').value || 'Takeaway';
+
+            // Deduct required raw ingredients
+            posCart.forEach(cartItem => {
+                const rcp = menuRecipes.find(r => r.id === cartItem.recipeId);
+                if (!rcp) return;
+                const yieldQty = Math.max(1, parseFloat(rcp.yieldQty) || 1);
+                (rcp.ingredients || []).forEach(reqIng => {
+                    const raw = findIngredient(reqIng);
+                    if (!raw) return;
+                    const convToRaw = getUnitConversionFactor(reqIng.uom, raw.uom);
+                    const consumedInRawUom = ((parseFloat(reqIng.qty) || 0) * convToRaw / yieldQty) * cartItem.qty;
+                    raw.stock = Math.max(0, parseFloat((raw.stock - consumedInRawUom).toFixed(3)));
+                });
+            });
+
+            // Save POS Invoice in `invoices` (same format as restaurant_pos.html)
+            const invoices = SafeStorage.get('invoices', []);
+            const invNo = `INV-${String(invoices.length + 1).padStart(4, '0')}`;
+            let subtotal = 0;
+            let tax = 0;
+            const invItems = posCart.map(i => {
+                const taxable = i.price * i.qty;
+                const itemTax = taxable * ((i.gst || 0) / 100);
+                subtotal += taxable;
+                tax += itemTax;
+                return {
+                    item: i.name,
+                    itemCode: i.itemCode || '',
+                    qty: i.qty,
+                    price: i.price,
+                    gst: i.gst || 0,
+                    total: taxable + itemTax,
+                    uom: 'Pcs'
+                };
+            });
+            const grandTotal = Math.round(subtotal + tax);
+            invoices.push({
+                id: String(Date.now()),
+                invoice_no: invNo,
+                invoice_date: new Date().toISOString().split('T')[0],
+                customer_name: `POS - ${table}`,
+                invoiceType: 'SALE INVOICE',
+                items: invItems,
+                invoice_total: grandTotal,
+                total_paid: grandTotal,
+                total_due: 0,
+                remarks: 'Restaurant POS Order',
+                createdAt: new Date().toISOString()
+            });
+            SafeStorage.set('invoices', invoices);
+
+            posCart = [];
+            syncAllToRtrCrmStorage(false);
+            renderAll();
+            showToast(`Order settled (${invNo})! Ingredients deducted & Ready Items updated.`);
+        }
+
+        function renderKdsQueue() {
+            const grid = document.getElementById('liveKdsGrid');
+            if (!grid) return;
+            const orders = SafeStorage.get('kds_orders', []);
+            if (orders.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-6 text-slate-400 text-xs"><i class="fas fa-check-circle text-emerald-400 mr-1"></i> Kitchen is all caught up! No active KDS tickets.</div>`;
+                return;
+            }
+
+            grid.innerHTML = orders.map(o => {
+                const mins = Math.max(0, Math.floor((Date.now() - new Date(o.timestamp).getTime()) / 60000));
+                const itemsHtml = (o.items || []).map(i => `
+                    <div class="flex justify-between text-xs py-1 border-b border-slate-700/60 last:border-0">
+                        <span class="font-bold text-sky-400">${escapeHtml(i.qty)}x</span>
+                        <span class="text-slate-100 flex-1 ml-2">${escapeHtml(i.name)}</span>
+                    </div>
+                `).join('');
+                return `
+                    <div class="bg-slate-800 border-t-4 border-amber-500 rounded-lg p-3 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center border-b border-slate-700 pb-1.5 mb-2">
+                                <span class="font-extrabold text-sm text-white">${escapeHtml(o.table)}</span>
+                                <span class="text-[11px] text-slate-400"><i class="far fa-clock"></i> ${mins}m ago</span>
+                            </div>
+                            <div class="space-y-0.5 mb-3">${itemsHtml}</div>
+                        </div>
+                        <button type="button" data-kds-done="${escapeHtml(o.id)}" class="w-full py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition">
+                            <i class="fas fa-check mr-1"></i> Mark Ready
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            grid.querySelectorAll('[data-kds-done]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-kds-done');
+                    let kds = SafeStorage.get('kds_orders', []);
+                    const doneOrder = kds.find(x => x.id === id);
+                    kds = kds.filter(x => x.id !== id);
+                    SafeStorage.set('kds_orders', kds);
+                    if (doneOrder) {
+                        const notes = SafeStorage.get('kds_ready_notifications', []);
+                        notes.push({ id: doneOrder.id, table: doneOrder.table, timestamp: new Date().toISOString() });
+                        SafeStorage.set('kds_ready_notifications', notes.slice(-20));
+                    }
+                    renderKdsQueue();
+                    renderKpis();
+                    showToast(`Order ${id} marked Ready to Serve!`);
+                });
+            });
+        }
+
+        // ============================================================================
+        // TAB 4: DATABASE BACKUP, RESTORE & SNAPSHOT VAULT
+        // ============================================================================
+        async function exportFullDatabaseBackup() {
+            syncAllToRtrCrmStorage(false);
+            const allData = SafeStorage.getAllRaw();
+            const jsonString = JSON.stringify(allData, null, 2);
+            const pass = (document.getElementById('backupPasswordInput')?.value || '').trim();
+
+            let outputContent = jsonString;
+            let filePrefix = 'RTR_Restaurant_DB_Backup';
+            if (pass && typeof CryptoJS !== 'undefined') {
+                outputContent = CryptoJS.AES.encrypt(jsonString, pass).toString();
+                filePrefix = 'RTR_Encrypted_DB_Backup';
+            }
+
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const fileName = `${filePrefix}_${dateStr}.json`;
+
+            const nowStr = new Date().toLocaleString();
+            SafeStorage.set('lastBackupDate', nowStr);
+            const badge = document.getElementById('lastBackupBadge');
+            if (badge) badge.textContent = `Last Backup: ${nowStr}`;
+
+            // Trigger Electron DB backup if running in desktop shell
+            if (window.electronAPI && typeof window.electronAPI.triggerDatabaseBackup === 'function') {
+                try { await window.electronAPI.triggerDatabaseBackup(); } catch (e) {}
+            }
+
+            const blob = new Blob([outputContent], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            await IDBVault.saveSnapshot('Manual File Export');
+            renderBackupVault();
+            showToast(`Database backup downloaded (${fileName})`);
+        }
+
+        function exportRecipesAndStockCsv() {
+            const rows = [
+                ['Type', 'Code', 'Item / Recipe Name', 'Category', 'Price / Cost (INR)', 'Auto-Calculated Ready Qty / Stock', 'UOM', 'Limiting Ingredient / Formula']
+            ];
+
+            menuRecipes.forEach(r => {
+                const calc = calculateRecipeReadiness(r, false);
+                const formula = (r.ingredients || []).map(i => `${i.itemName}:${i.qty}${i.uom}`).join(' | ');
+                rows.push([
+                    'MENU_RECIPE',
+                    r.itemCode || '',
+                    r.name,
+                    r.category || '',
+                    r.price,
+                    calc.readyPortions,
+                    'Portions',
+                    `Limiting: ${calc.limitingIngredient} (${formula})`
+                ]);
+            });
+
+            rawIngredients.forEach(ing => {
+                rows.push([
+                    'RAW_INGREDIENT',
+                    ing.code || '',
+                    ing.name,
+                    'Raw Material',
+                    ing.costPerUnit,
+                    ing.stock,
+                    ing.uom,
+                    `Min Alert: ${ing.minAlert} ${ing.uom}`
+                ]);
+            });
+
+            const csvContent = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Restaurant_Ready_Items_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Exported Recipes & Ready Items CSV report!');
+        }
+
+        function applyRestoredDataObject(backupObj) {
+            if (!backupObj || typeof backupObj !== 'object') {
+                showToast('Invalid backup data structure.', 'error');
+                return;
+            }
+            try {
+                Object.keys(backupObj).forEach(k => {
+                    const val = backupObj[k];
+                    if (typeof val === 'string') {
+                        localStorage.setItem(k, val);
+                    } else {
+                        localStorage.setItem(k, JSON.stringify(val));
+                    }
+                });
+            } catch (e) {}
+
+            loadOrInitializeData();
+            syncAllToRtrCrmStorage(false);
+            renderAll();
+            showToast('Database restored and ready-to-serve counts recalculated!');
+        }
+
+        function handleRestoreFromFile() {
+            const input = document.getElementById('restoreFileInput');
+            if (!input || !input.files || !input.files[0]) {
+                showToast('Please select a backup .json file first.', 'warning');
+                return;
+            }
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = (e.target.result || '').trim();
+                if (!content) {
+                    showToast('Backup file is empty.', 'error');
+                    return;
+                }
+                // Try parsing as plain JSON first
+                try {
+                    const parsed = JSON.parse(content);
+                    applyRestoredDataObject(parsed);
+                    input.value = '';
+                    return;
+                } catch (err) {
+                    // Encrypted AES payload -> prompt password modal
+                    pendingEncryptedContent = content;
+                    document.getElementById('decryptPasswordInput').value = '';
+                    const modal = document.getElementById('passwordModal');
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function confirmDecryptRestore() {
+            const pass = document.getElementById('decryptPasswordInput').value;
+            if (!pass || !pendingEncryptedContent) {
+                showToast('Please enter the decryption password.', 'warning');
+                return;
+            }
+            try {
+                const decrypted = CryptoJS.AES.decrypt(pendingEncryptedContent, pass).toString(CryptoJS.enc.Utf8);
+                const parsed = JSON.parse(decrypted);
+                document.getElementById('passwordModal').classList.add('hidden');
+                document.getElementById('passwordModal').classList.remove('flex');
+                pendingEncryptedContent = null;
+                applyRestoredDataObject(parsed);
+            } catch (e) {
+                showToast('Incorrect password or corrupted backup file.', 'error');
+            }
+        }
+
+        async function renderBackupVault() {
+            const listEl = document.getElementById('snapshotsListContainer');
+            const summaryGrid = document.getElementById('dbTablesSummaryGrid');
+            if (!listEl || !summaryGrid) return;
+
+            const snaps = await IDBVault.listSnapshots();
+            const kpiSnap = document.getElementById('kpiSnapshotsCount');
+            if (kpiSnap) kpiSnap.textContent = `${snaps.length} DB snapshots stored`;
+
+            if (snaps.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">No snapshots yet. Click "+ Snapshot Now" to save a recovery point.</div>`;
+            } else {
+                listEl.innerHTML = snaps.slice(0, 12).map(s => `
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                        <div>
+                            <span class="font-bold text-slate-800">${escapeHtml(s.label)}</span>
+                            <span class="text-slate-400 block">${new Date(s.timestamp).toLocaleString()} &bull; ${Object.keys(s.data || {}).length} keys</span>
+                        </div>
+                        <div class="flex gap-1.5">
+                            <button type="button" data-restore-snap="${escapeHtml(s.id)}" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
+                                Restore
+                            </button>
+                            <button type="button" data-delete-snap="${escapeHtml(s.id)}" class="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                listEl.querySelectorAll('[data-restore-snap]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const snap = snaps.find(x => x.id === btn.getAttribute('data-restore-snap'));
+                        if (snap && snap.data) applyRestoredDataObject(snap.data);
+                    });
+                });
+                listEl.querySelectorAll('[data-delete-snap]').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        await IDBVault.deleteSnapshot(btn.getAttribute('data-delete-snap'));
+                        renderBackupVault();
+                    });
+                });
+            }
+
+            const trackedTables = [
+                { key: 'items', label: 'Items Master' },
+                { key: 'boms', label: 'BOM Recipes' },
+                { key: 'purchases', label: 'RM Purchases' },
+                { key: 'production', label: 'POS Ready Stock' },
+                { key: 'invoices', label: 'POS Invoices' },
+                { key: 'kds_orders', label: 'KDS Active Orders' }
+            ];
+            summaryGrid.innerHTML = trackedTables.map(t => {
+                const arr = SafeStorage.get(t.key, []);
+                const count = Array.isArray(arr) ? arr.length : 0;
+                return `
+                    <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
+                        <div>
+                            <div class="font-bold text-slate-700">${escapeHtml(t.label)}</div>
+                            <div class="text-[10px] font-mono text-slate-400">${escapeHtml(t.key)}</div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-extrabold">${count}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ============================================================================
+        // TAB SWITCHING & EVENT LISTENERS
+        // ============================================================================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            const target = document.getElementById(`tab-${tabId}`);
+            if (target) target.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+                const isMatch = btn.getAttribute('data-tab') === tabId;
+                btn.classList.toggle('border-amber-400', isMatch);
+                btn.classList.toggle('text-amber-400', isMatch);
+                btn.classList.toggle('bg-slate-900/40', isMatch);
+                btn.classList.toggle('border-transparent', !isMatch);
+                btn.classList.toggle('text-slate-300', !isMatch);
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadOrInitializeData();
+            resetRecipeForm();
+            clearIngredientForm();
+            renderAll();
+
+            // Tab navigation
+            document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+            });
+
+            // Header buttons
+            document.getElementById('btnSyncPosStock').addEventListener('click', () => syncAllToRtrCrmStorage(true));
+            document.getElementById('btnQuickBackup').addEventListener('click', exportFullDatabaseBackup);
+            document.getElementById('btnOpenRestoreModal').addEventListener('click', () => switchTab('backup'));
+
+            // Recipe Form listeners
+            ['recipeItemName', 'recipeItemCode', 'recipeCategory', 'recipePrice', 'recipeGst', 'recipeYieldQty'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', renderRecipeBuilderPreview);
+            });
+            document.getElementById('btnAddIngredientRow').addEventListener('click', () => addIngredientRowToForm());
+            document.getElementById('btnQuickNewIngredient').addEventListener('click', () => {
+                switchTab('ingredients');
+                document.getElementById('ingName').focus();
+            });
+            document.getElementById('btnResetRecipeForm').addEventListener('click', resetRecipeForm);
+            document.getElementById('btnSaveRecipe').addEventListener('click', saveRecipeFromForm);
+
+            // Search & Filter
+            document.getElementById('searchRecipesInput').addEventListener('input', renderReadyItemsBoard);
+            document.getElementById('filterRecipeCategory').addEventListener('change', renderReadyItemsBoard);
+            document.getElementById('searchIngInput').addEventListener('input', renderIngredientsTable);
+
+            // Ingredient Form
+            document.getElementById('btnClearIngForm').addEventListener('click', clearIngredientForm);
+            document.getElementById('btnSaveIngredient').addEventListener('click', saveIngredientFromForm);
+
+            // Restock Modal
+            document.getElementById('btnCloseRestockModal').addEventListener('click', closeRestockModal);
+            document.getElementById('btnCancelRestock').addEventListener('click', closeRestockModal);
+            document.getElementById('btnConfirmRestock').addEventListener('click', confirmRestockModal);
+
+            // POS Simulator & KDS
+            document.getElementById('btnPosClearCart').addEventListener('click', () => {
+                posCart = [];
+                renderPosSimulator();
+            });
+            document.getElementById('btnPosSendKot').addEventListener('click', sendCartToKds);
+            document.getElementById('btnPosSettleBill').addEventListener('click', settlePosOrderAndDeductIngredients);
+            document.getElementById('btnClearKdsQueue').addEventListener('click', () => {
+                SafeStorage.set('kds_orders', []);
+                renderKdsQueue();
+                renderKpis();
+                showToast('Cleared active KDS board.');
+            });
+
+            // Backup & Restore Tab
+            document.getElementById('btnDownloadFullBackup').addEventListener('click', exportFullDatabaseBackup);
+            document.getElementById('btnExportCsvReport').addEventListener('click', exportRecipesAndStockCsv);
+            document.getElementById('btnRestoreFromFile').addEventListener('click', handleRestoreFromFile);
+            document.getElementById('btnCreateSnapshotNow').addEventListener('click', async () => {
+                await IDBVault.saveSnapshot('Manual Checkpoint');
+                renderBackupVault();
+                showToast('Saved snapshot to IndexedDB Vault!');
+            });
+            document.getElementById('btnReloadDemoData').addEventListener('click', () => {
+                rawIngredients = JSON.parse(JSON.stringify(DEFAULT_INGREDIENTS));
+                menuRecipes = JSON.parse(JSON.stringify(DEFAULT_RECIPES));
+                posCart = [];
+                syncAllToRtrCrmStorage(false);
+                resetRecipeForm();
+                renderAll();
+                showToast('Loaded sample restaurant recipes & ingredient inventory!');
+            });
+
+            // Password Modal
+            document.getElementById('btnClosePasswordModal').addEventListener('click', () => {
+                document.getElementById('passwordModal').classList.add('hidden');
+                document.getElementById('passwordModal').classList.remove('flex');
+            });
+            document.getElementById('btnCancelPassword').addEventListener('click', () => {
+                document.getElementById('passwordModal').classList.add('hidden');
+                document.getElementById('passwordModal').classList.remove('flex');
+            });
+            document.getElementById('btnConfirmPassword').addEventListener('click', confirmDecryptRestore);
+
+            // Cross-tab storage listener for live sync with restaurant_pos.html & restaurant_kds.html
+            window.addEventListener('storage', (e) => {
+                if (['kds_orders', 'invoices', 'purchases', 'items', 'boms', 'restaurant_ingredients', 'restaurant_recipes'].includes(e.key)) {
+                    loadOrInitializeData();
+                    renderAll();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
