@@ -1028,8 +1028,32 @@
                 }
                 if (res.shouldShowAlert && res.alertMessage) {
                     const alertEl = document.getElementById('cloudAlertMessage');
-                    if (alertEl) alertEl.innerText = res.alertMessage;
-                    document.getElementById('cloudAlertModal').style.display = 'block';
+                    const modal = document.getElementById('cloudAlertModal');
+                    if (alertEl && modal) {
+                        alertEl.innerText = res.alertMessage;
+
+                        const modalContent = modal.querySelector('.modal-content');
+                        const modalTitle = modal.querySelector('h3');
+                        const modalBtn = modal.querySelector('button');
+
+                        const colorMap = {
+                            warning: { border: '#e74a3b', text: '#e74a3b', icon: '⚠️ Important Warning', btnBg: '#e74a3b' },
+                            attention: { border: '#f39c12', text: '#f39c12', icon: '🔔 Notice Alert', btnBg: '#f39c12' },
+                            normal: { border: '#0313f3', text: '#0313f3', icon: 'ℹ️ Important Notice', btnBg: '#0313f3' }
+                        };
+
+                        const alertType = (res.alertType || 'normal').toLowerCase();
+                        const theme = colorMap[alertType] || colorMap.normal;
+
+                        if (modalContent) modalContent.style.borderTop = `5px solid ${theme.border}`;
+                        if (modalTitle) {
+                            modalTitle.style.color = theme.text;
+                            modalTitle.innerHTML = theme.icon;
+                        }
+                        if (modalBtn) modalBtn.style.backgroundColor = theme.btnBg;
+
+                        modal.style.display = 'block';
+                    }
                 }
 
                 // Show Cloud Alerts as a scrolling ticker (with dynamic color logic)
