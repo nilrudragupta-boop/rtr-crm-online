@@ -652,6 +652,7 @@
     </div>
 
 
+
     <!-- Cloud Alert Modal -->
     <div id="cloudAlertModal" class="modal" style="z-index: 15000;">
         <div class="modal-content" style="border-top: 5px solid #17a2b8;">
@@ -659,7 +660,7 @@
             <h3 style="color: #0313f3; margin-top: 0;">ℹ️ Important Notice</h3>
             <p id="cloudAlertMessage" style="font-size: 15px; margin: 20px 0; line-height: 1.5; white-space: pre-wrap;">
             </p>
-            <button onclick="document.getElementById('cloudAlertModal').style.display='none'"
+            <button onclick="acknowledgeLoginCloudAlert()"
                 style="width: 100%; background: #0313f3; margin: 0; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;">Understood</button>
         </div>
     </div>
@@ -1026,6 +1027,7 @@
                         checkRenewButtonVisibility();
                     }
                 }
+                if (sessionStorage.getItem('cloudAlertSeen') === 'true') return;
                 if (res.shouldShowAlert && res.alertMessage) {
                     const alertEl = document.getElementById('cloudAlertMessage');
                     const modal = document.getElementById('cloudAlertModal');
@@ -2514,6 +2516,36 @@
             checkUserRefresh();
             setInterval(checkUserRefresh, POLL_INTERVAL_MS);
         })();
+
+
+        function acknowledgeLoginCloudAlert() {
+            const modal = document.getElementById('cloudAlertModal');
+            const alertEl = document.getElementById('cloudAlertMessage');
+            const alertText = alertEl ? alertEl.innerText : '';
+
+            if (modal) modal.style.display = 'none';
+            sessionStorage.setItem('cloudAlertSeen', 'true');
+
+            const username = document.getElementById('username') ? document.getElementById('username').value.trim() : (localStorage.getItem('savedUsername') || 'Client');
+            const contactNumber = localStorage.getItem('contactNumber') || '';
+            const companyName = localStorage.getItem('companyName') || '';
+
+            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
+            if (scriptUrl && scriptUrl.startsWith('http')) {
+                fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        method: 'alert_seen',
+                        username: username,
+                        role: 'Client',
+                        contactNumber: contactNumber,
+                        companyName: companyName,
+                        alertMessage: alertText
+                    })
+                }).catch(err => console.warn('Alert tracking failed:', err));
+            }
+        }
     </script>
 </body>
 

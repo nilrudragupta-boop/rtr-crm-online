@@ -1648,7 +1648,7 @@
                 style="font-size: 15px; color: var(--text-color); margin: 20px 0; line-height: 1.5; white-space: pre-wrap;">
             </p>
             <div style="margin-top: 20px;">
-                <button onclick="document.getElementById('cloudAlertModal').style.display='none'"
+                <button onclick="acknowledgeCloudAlert()"
                     style="padding: 10px 20px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Understood</button>
             </div>
         </div>
@@ -5213,53 +5213,54 @@
                         enforceLicenseExpiry(); // Check immediately after syncing cloud data
                     }
 
+                    if (sessionStorage.getItem('cloudAlertSeen') === 'true') return;
                     // --- CHECK CLOUD POPUP ALERT WITH DYNAMIC COLORS ---
-                if (res.shouldShowAlert && res.alertMessage) {
-                    const alertEl = document.getElementById('cloudAlertMessage');
-                    const modal = document.getElementById('cloudAlertModal');
-                    if (alertEl && modal) {
-                        alertEl.innerText = res.alertMessage;
+                    if (res.shouldShowAlert && res.alertMessage) {
+                        const alertEl = document.getElementById('cloudAlertMessage');
+                        const modal = document.getElementById('cloudAlertModal');
+                        if (alertEl && modal) {
+                            alertEl.innerText = res.alertMessage;
 
-                        const modalContent = modal.querySelector('.modal-content');
-                        const modalTitle = modal.querySelector('h3');
-                        const modalBtn = modal.querySelector('button');
+                            const modalContent = modal.querySelector('.modal-content');
+                            const modalTitle = modal.querySelector('h3');
+                            const modalBtn = modal.querySelector('button');
 
-                        // Color definitions matching your ticker system:
-                        // Red = warning, Orange = attention, Blue = normal
-                        const colorMap = {
-                            warning: {
-                                border: '#e74a3b',  // Red
-                                text: '#e74a3b',
-                                icon: '⚠️ Important Warning',
-                                btnBg: '#e74a3b'
-                            },
-                            attention: {
-                                border: '#f39c12',  // Orange
-                                text: '#f39c12',
-                                icon: '🔔 Notice Alert',
-                                btnBg: '#f39c12'
-                            },
-                            normal: {
-                                border: '#0313f3',  // Blue
-                                text: '#0313f3',
-                                icon: 'ℹ️ Important Notice',
-                                btnBg: '#0313f3'
+                            // Color definitions matching your ticker system:
+                            // Red = warning, Orange = attention, Blue = normal
+                            const colorMap = {
+                                warning: {
+                                    border: '#e74a3b',  // Red
+                                    text: '#e74a3b',
+                                    icon: '⚠️ Important Warning',
+                                    btnBg: '#e74a3b'
+                                },
+                                attention: {
+                                    border: '#f39c12',  // Orange
+                                    text: '#f39c12',
+                                    icon: '🔔 Notice Alert',
+                                    btnBg: '#f39c12'
+                                },
+                                normal: {
+                                    border: '#0313f3',  // Blue
+                                    text: '#0313f3',
+                                    icon: 'ℹ️ Important Notice',
+                                    btnBg: '#0313f3'
+                                }
+                            };
+
+                            const alertType = (res.alertType || 'normal').toLowerCase();
+                            const theme = colorMap[alertType] || colorMap.normal;
+
+                            if (modalContent) modalContent.style.borderTop = `5px solid ${theme.border}`;
+                            if (modalTitle) {
+                                modalTitle.style.color = theme.text;
+                                modalTitle.innerHTML = theme.icon;
                             }
-                        };
+                            if (modalBtn) modalBtn.style.backgroundColor = theme.btnBg;
 
-                        const alertType = (res.alertType || 'normal').toLowerCase();
-                        const theme = colorMap[alertType] || colorMap.normal;
-
-                        if (modalContent) modalContent.style.borderTop = `5px solid ${theme.border}`;
-                        if (modalTitle) {
-                            modalTitle.style.color = theme.text;
-                            modalTitle.innerHTML = theme.icon;
+                            modal.style.display = 'flex';
                         }
-                        if (modalBtn) modalBtn.style.backgroundColor = theme.btnBg;
-
-                        modal.style.display = 'flex';
                     }
-                }
 
                     // --- REMOTE PERMISSIONS LOGIC ---
                     if (res.remotePermissions) {
@@ -7815,6 +7816,47 @@
             checkUserRefresh();
             setInterval(checkUserRefresh, POLL_INTERVAL_MS);
         })();
+
+
+        function acknowledgeCloudAlert() {
+            const modal = document.getElementById('cloudAlertModal');
+            const alertEl = document.getElementById('cloudAlertMessage');
+            const alertText = alertEl ? alertEl.innerText : '';
+
+            if (modal) modal.style.display = 'none';
+
+            // Prevent re-triggering for the current session once acknowledged
+            sessionStorage.setItem('cloudAlertSeen', 'true');
+
+            // Collect user details
+            const currentUser = localStorage.getItem('currentUser') || 'Admin';
+            let userRole = 'User';
+            try {
+                const users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
+                const match = users.find(u => u.username === currentUser);
+                if (match && match.role) userRole = match.role;
+            } catch (e) { }
+
+            const contactNumber = localStorage.getItem('contactNumber') || '';
+            const companyName = localStorage.getItem('companyName') || '';
+
+            // Send acknowledgement to Google Apps Script
+            let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
+            if (scriptUrl && scriptUrl.startsWith('http')) {
+                fetch(scriptUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        method: 'alert_seen',
+                        username: currentUser,
+                        role: userRole,
+                        contactNumber: contactNumber,
+                        companyName: companyName,
+                        alertMessage: alertText
+                    })
+                }).catch(err => console.warn('Alert tracking failed:', err));
+            }
+        }
     </script>
 
 </body>
