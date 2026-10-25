@@ -7601,19 +7601,45 @@
     <script>
         function showClockTamperModal(message) {
             const modal = document.getElementById('warningModal');
+            if (!modal) return;
+
             const msg = document.getElementById('warningMsg');
             const okBtn = modal.querySelector('button');
+            const closeBtn = modal.querySelector('.close-modal');
 
-            if (!modal || !msg || !okBtn) return;
-
-            msg.innerText = message;
+            if (msg) msg.innerText = message;
             modal.style.display = 'flex';
 
-            // Override the OK button action to trigger immediate logout
-            okBtn.onclick = function () {
-                modal.style.display = 'none';
-                confirmLogout(); // Clears session and redirects to login.html
+            // 1. Force logout when user clicks OK
+            if (okBtn) {
+                okBtn.onclick = function () {
+                    modal.style.display = 'none';
+                    confirmLogout();
+                };
+            }
+
+            // 2. Force logout even if user clicks the (x) close button
+            if (closeBtn) {
+                closeBtn.onclick = function () {
+                    modal.style.display = 'none';
+                    confirmLogout();
+                };
+            }
+
+            // 3. Prevent dismissing the warning by clicking outside the modal
+            modal.onclick = function (e) {
+                if (e.target === modal) {
+                    confirmLogout();
+                }
             };
+
+            // 4. Force logout if user presses Escape or Enter on their keyboard
+            window.addEventListener('keydown', function tamperKeyHandler(e) {
+                if (modal.style.display === 'flex' && (e.key === 'Escape' || e.key === 'Enter')) {
+                    window.removeEventListener('keydown', tamperKeyHandler);
+                    confirmLogout();
+                }
+            });
         }
 
 
