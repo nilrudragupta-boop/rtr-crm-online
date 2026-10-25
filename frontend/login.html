@@ -4,8 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <title>Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intro.js/7.2.0/introjs.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.1.4/otpauth.umd.min.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
@@ -554,6 +556,24 @@
         </div>
     </div>
 
+
+    <!-- Account Suspended Modal -->
+    <div id="suspendedModal" class="modal"
+        style="z-index: 25000; background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center;">
+        <div class="modal-content"
+            style="text-align: center; width: 450px; padding: 40px; border-radius: 15px; border-top: 5px solid #e74a3b; box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);">
+            <i class="fas fa-ban" style="font-size: 48px; color: #e74a3b; margin-bottom: 20px;"></i>
+            <h2 style="color: #2c3e50; margin-top: 0; font-size: 24px;">Account Suspended</h2>
+            <p id="suspendedMessage"
+                style="font-size: 15px; color: var(--text-color); margin-bottom: 25px; line-height: 1.5;">
+                Your account has been suspended for policy violations. Please contact the support team.
+            </p>
+            <button onclick="window.close()"
+                style="width: 100%; background: #e74a3b; color: white; padding: 12px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Exit
+                Application</button>
+        </div>
+    </div>
+
     <!-- Forgot Password Email Modal -->
     <div id="forgotEmailModal" class="modal">
         <div class="modal-content">
@@ -974,12 +994,15 @@
             if (res) {
                 // --- CHECK SUSPENDED MODE ---
                 if (res.suspended) {
-                    alert(res.message || "Your account has been suspended.");
-                    document.body.innerHTML = `<div style="display:flex; height:100vh; align-items:center; justify-content:center; flex-direction:column; font-family:sans-serif; text-align:center; background:#fff;">
-                        <h1 style="color:#d35400; margin-top: 0; font-size: 32px;">🚫 Account Suspended</h1>
-                        <p style="font-size:18px; color: #333;">${res.message || "Your account has been suspended for Non-Payment of Subscription."}</p>
-                    </div>`;
-                    return; // Stop execution
+                    const msgEl = document.getElementById('suspendedMessage');
+                    if (msgEl) {
+                        msgEl.innerText = res.message || "Your account has been suspended for policy violations. Please contact the support team.";
+                    }
+                    const suspModal = document.getElementById('suspendedModal');
+                    if (suspModal) {
+                        suspModal.style.display = 'flex';
+                    }
+                    return; // Stop execution and lock dashboard interaction
                 }
 
                 // --- CHECK MAINTENANCE MODE ---
