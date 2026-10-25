@@ -3032,6 +3032,32 @@
             updateCloseAllButtonVisibility();
         }
 
+        (function monitorSystemClock() {
+            let lastRecordedTime = Date.now();
+            const CHECK_INTERVAL = 3000; // Check every 3 seconds
+            let tamperDetected = false;
+
+            const timer = setInterval(() => {
+                if (tamperDetected) return;
+
+                const currentTime = Date.now();
+                const delta = currentTime - lastRecordedTime;
+
+                // Triggers if time jumps backward by > 5s or forward by > 30s
+                if (delta < -5000 || delta > 30000) {
+                    tamperDetected = true;
+                    clearInterval(timer);
+
+                    showClockTamperModal(
+                        "⚠️ System Clock Changed: A system date or time modification was detected. " +
+                        "Please restore & sync the correct date and time to continue."
+                    );
+                }
+
+                lastRecordedTime = currentTime;
+            }, CHECK_INTERVAL);
+        })();
+
         function updateLicenseDisplay() {
             const display = document.getElementById('licenseExpiryDisplay');
             if (!display) return;
@@ -7573,6 +7599,24 @@
     </script>
 
     <script>
+        function showClockTamperModal(message) {
+            const modal = document.getElementById('warningModal');
+            const msg = document.getElementById('warningMsg');
+            const okBtn = modal.querySelector('button');
+
+            if (!modal || !msg || !okBtn) return;
+
+            msg.innerText = message;
+            modal.style.display = 'flex';
+
+            // Override the OK button action to trigger immediate logout
+            okBtn.onclick = function () {
+                modal.style.display = 'none';
+                confirmLogout(); // Clears session and redirects to login.html
+            };
+        }
+
+
         // Triggers a centered modal notification and reloads after 10 seconds
         (function () {
             const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
