@@ -475,7 +475,8 @@
             <button type="button" onclick="signInAsDifferentUser()"
                 style="background: transparent; border: 2px solid #0313f3; color: #0313f3; margin-top: 5px;">🔄 Switch
                 Workspace / User</button>
-            <button id="closeBtn" onclick="closeWindowWithWarning()" style="background:#ad2d2d;"> ❌ Close</button>
+            <button type="button" id="closeBtn" onclick="closeWindowWithWarning(event)" style="background:#ad2d2d;"> ❌
+                Close</button>
             <div style="margin-top: 15px; text-align: center; display: flex; justify-content: center; gap: 15px;">
                 <a href="javascript:void(0)" onclick="openForgotEmailModal()"
                     style="color: #0313f3; text-decoration: none; font-weight: 600;">Forgot Password?</a>
@@ -2254,9 +2255,31 @@
             return `${name[0]}***${name[name.length - 1]}@${domain}`;
         }
 
-        function closeWindowWithWarning() { document.getElementById('closeAppModal').style.display = 'block'; }
-        function closeCloseAppModal() { document.getElementById('closeAppModal').style.display = 'none'; }
-        function confirmCloseApp() { window.close(); }
+        function closeWindowWithWarning(event) {
+            if (event) event.preventDefault();
+            document.getElementById('closeAppModal').style.display = 'block';
+        }
+
+        function closeCloseAppModal() {
+            document.getElementById('closeAppModal').style.display = 'none';
+        }
+
+        function confirmCloseApp() {
+            if (window.electronAPI && window.electronAPI.closeApp) {
+                window.electronAPI.closeApp();
+                return;
+            }
+            window.close();
+            setTimeout(() => {
+                document.body.innerHTML = `
+            <div style="text-align: center; color: #2c3e50; background: #fff; padding: 40px; border-radius: 12px; margin: auto; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                <h2 style="color: #ad2d2d;">Application Closed</h2>
+                <p>You may now safely close this browser window or tab.</p>
+                <button onclick="location.reload()" style="background: #0313f3; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">Return to Login</button>
+            </div>
+        `;
+            }, 300);
+        }
 
         function openPaymentModal() {
             const amount = document.getElementById('renewAmount').value || '0';
