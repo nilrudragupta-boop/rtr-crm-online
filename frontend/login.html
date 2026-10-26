@@ -475,8 +475,7 @@
             <button type="button" onclick="signInAsDifferentUser()"
                 style="background: transparent; border: 2px solid #0313f3; color: #0313f3; margin-top: 5px;">🔄 Switch
                 Workspace / User</button>
-            <button type="button" id="closeBtn" onclick="closeWindowWithWarning(event)" style="background:#ad2d2d;"> ❌
-                Close</button>
+            <button id="closeBtn" onclick="closeWindowWithWarning()" style="background:#ad2d2d;"> ❌ Close</button>
             <div style="margin-top: 15px; text-align: center; display: flex; justify-content: center; gap: 15px;">
                 <a href="javascript:void(0)" onclick="openForgotEmailModal()"
                     style="color: #0313f3; text-decoration: none; font-weight: 600;">Forgot Password?</a>
@@ -653,7 +652,6 @@
     </div>
 
 
-
     <!-- Cloud Alert Modal -->
     <div id="cloudAlertModal" class="modal" style="z-index: 15000;">
         <div class="modal-content" style="border-top: 5px solid #17a2b8;">
@@ -661,7 +659,7 @@
             <h3 style="color: #0313f3; margin-top: 0;">ℹ️ Important Notice</h3>
             <p id="cloudAlertMessage" style="font-size: 15px; margin: 20px 0; line-height: 1.5; white-space: pre-wrap;">
             </p>
-            <button onclick="acknowledgeLoginCloudAlert()"
+            <button onclick="document.getElementById('cloudAlertModal').style.display='none'"
                 style="width: 100%; background: #0313f3; margin: 0; padding: 10px; border: none; border-radius: 4px; color: white; cursor: pointer;">Understood</button>
         </div>
     </div>
@@ -1028,7 +1026,6 @@
                         checkRenewButtonVisibility();
                     }
                 }
-                if (sessionStorage.getItem('cloudAlertSeen') === 'true') return;
                 if (res.shouldShowAlert && res.alertMessage) {
                     const alertEl = document.getElementById('cloudAlertMessage');
                     const modal = document.getElementById('cloudAlertModal');
@@ -1431,14 +1428,10 @@
                 }
             };
 
-
-            // Date tempering check: If system date is set backward, block login unless verified by server time
             const user = document.getElementById("username").value.trim();
             const pass = document.getElementById("password").value;
-            const now = new Date();
-
-            // Zero out time components strictly for calendar-day comparison
-            const todayDateString = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0') + "-" + String(now.getDate()).padStart(2, '0');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
             // Developer backdoor credentials
             const DEV_USER = "RTR-7908040851";
@@ -1460,48 +1453,25 @@
                     localStorage.setItem("isDevLogin", "true");
                     localStorage.setItem("currentUser", "developer");
                     window.location.href = 'settings.html';
-                }, "nilrudragupta@gmail.com");
+                }, "nilrudragupta@gmail.com"); // Ensure this email is valid for receiving Dev OTPs
                 return;
             }
 
             // Check for system date manipulation
             const lastLoginStr = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (lastLoginStr) {
-                const lastDateObj = new Date(lastLoginStr);
-                if (!isNaN(lastDateObj.getTime())) {
-                    const lastLoginDateString = lastDateObj.getFullYear() + "-" + String(lastDateObj.getMonth() + 1).padStart(2, '0') + "-" + String(lastDateObj.getDate()).padStart(2, '0');
+                const lastLoginDateOnly = new Date(lastLoginStr);
+                lastLoginDateOnly.setHours(0, 0, 0, 0);
 
-                    // If today's calendar date is strictly earlier than the recorded date
-                    if (todayDateString < lastLoginDateString) {
-                        // Check if online server time verifies that today's date is actually correct
-                        let isVerifiedCorrect = false;
-                        let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
-
-                        if (scriptUrl && scriptUrl.startsWith("http")) {
-                            try {
-                                const timeRes = await fetch(`${scriptUrl}?action=get_time&_=${Date.now()}`);
-                                const timeData = await timeRes.json();
-                                if (timeData && timeData.serverTime) {
-                                    const sDate = new Date(timeData.serverTime);
-                                    const serverDateString = sDate.getFullYear() + "-" + String(sDate.getMonth() + 1).padStart(2, '0') + "-" + String(sDate.getDate()).padStart(2, '0');
-
-                                    // If system calendar date matches server calendar date (or within 1 day)
-                                    if (todayDateString >= serverDateString) {
-                                        localStorage.setItem(LOCAL_STORAGE_KEY, now.toISOString());
-                                        isVerifiedCorrect = true;
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn("Server time sync check failed", e);
-                            }
-                        }
-
-                        if (!isVerifiedCorrect) {
-                            openWarningModal("System Date Error: Your system date appears to have been set backward. Please correct your system clock and sync network time to proceed.");
-                            return;
-                        }
-                    }
+                if (today < lastLoginDateOnly) {
+                    openWarningModal("System Date Error: Your system date appears to have been set backward. Please correct your system clock & sync. the correct date and time to proceed.");
+                    return;
                 }
+            }
+
+            if (EXPIRY_DATE && today > EXPIRY_DATE) {
+                window.location.href = 'expired.html';
+                return;
             }
 
             // 1. Check if user exists regardless of case
@@ -2284,32 +2254,9 @@
             return `${name[0]}***${name[name.length - 1]}@${domain}`;
         }
 
-        function closeWindowWithWarning(event) {
-            if (event) event.preventDefault();
-            document.getElementById('closeAppModal').style.display = 'block';
-        }
-
-        function closeCloseAppModal() {
-            document.getElementById('closeAppModal').style.display = 'none';
-        }
-
-        function confirmCloseApp() {
-            if (window.electronAPI && window.electronAPI.closeApp) {
-                window.electronAPI.closeApp();
-                return;
-            }
-            window.close();
-            setTimeout(() => {
-                document.body.innerHTML = `
-            <div style="text-align: center; color: #2c3e50; background: #fff; padding: 40px; border-radius: 12px; margin: auto; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-                <h2 style="color: #ad2d2d;">Application Closed</h2>
-                <p>You may now safely close this browser window or tab.</p>
-                <button onclick="location.reload()" style="background: #0313f3; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;">Return to Login</button>
-            </div>
-        `;
-            }, 300);
-        }
-
+        function closeWindowWithWarning() { document.getElementById('closeAppModal').style.display = 'block'; }
+        function closeCloseAppModal() { document.getElementById('closeAppModal').style.display = 'none'; }
+        function confirmCloseApp() { window.close(); }
 
         function openPaymentModal() {
             const amount = document.getElementById('renewAmount').value || '0';
@@ -2567,36 +2514,6 @@
             checkUserRefresh();
             setInterval(checkUserRefresh, POLL_INTERVAL_MS);
         })();
-
-
-        function acknowledgeLoginCloudAlert() {
-            const modal = document.getElementById('cloudAlertModal');
-            const alertEl = document.getElementById('cloudAlertMessage');
-            const alertText = alertEl ? alertEl.innerText : '';
-
-            if (modal) modal.style.display = 'none';
-            sessionStorage.setItem('cloudAlertSeen', 'true');
-
-            const username = document.getElementById('username') ? document.getElementById('username').value.trim() : (localStorage.getItem('savedUsername') || 'Client');
-            const contactNumber = localStorage.getItem('contactNumber') || '';
-            const companyName = localStorage.getItem('companyName') || '';
-
-            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
-            if (scriptUrl && scriptUrl.startsWith('http')) {
-                fetch(scriptUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({
-                        method: 'alert_seen',
-                        username: username,
-                        role: 'Client',
-                        contactNumber: contactNumber,
-                        companyName: companyName,
-                        alertMessage: alertText
-                    })
-                }).catch(err => console.warn('Alert tracking failed:', err));
-            }
-        }
     </script>
 </body>
 
