@@ -3033,28 +3033,60 @@
         }
 
         (function monitorSystemClock() {
-            let lastRecordedTime = Date.now();
-            const CHECK_INTERVAL = 3000; // Check every 3 seconds
+            let lastWallTime = Date.now();
+            let lastPerfTime = performance.now();
+            const CHECK_INTERVAL = 3000;
             let tamperDetected = false;
 
             const timer = setInterval(() => {
                 if (tamperDetected) return;
 
-                const currentTime = Date.now();
-                const delta = currentTime - lastRecordedTime;
+                const currentWallTime = Date.now();
+                const currentPerfTime = performance.now();
 
-                // Triggers if time jumps backward by > 5s or forward by > 30s
-                if (delta < -5000 || delta > 30000) {
+                const wallDelta = currentWallTime - lastWallTime;
+                const perfDelta = currentPerfTime - lastPerfTime;
+
+                // Difference between actual clock time elapsed vs monotonic browser time elapsed
+                const drift = wallDelta - perfDelta;
+
+                // Only trigger if clock manually shifted backward > 10s or forward > 60s
+                // (Monotonic check prevents false alarms from laptop sleep or Windows NTP time sync)
+                if (drift < -10000 || drift > 60000) {
+                    // Check if online server says the new time is actually correct
+                    let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+                    if (scriptUrl && scriptUrl.startsWith("http")) {
+                        fetch(`${scriptUrl}?action=get_time&_=${Date.now()}`)
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data && data.serverTime) {
+                                    const sTime = new Date(data.serverTime).getTime();
+                                    // If current local time matches server time within 60s, it was a legitimate clock correction!
+                                    if (Math.abs(Date.now() - sTime) < 60000) {
+                                        lastWallTime = Date.now();
+                                        lastPerfTime = performance.now();
+                                        return; // Valid sync! Do not alarm.
+                                    }
+                                }
+                                triggerTamper();
+                            })
+                            .catch(() => triggerTamper());
+                    } else {
+                        triggerTamper();
+                    }
+                } else {
+                    lastWallTime = currentWallTime;
+                    lastPerfTime = currentPerfTime;
+                }
+
+                function triggerTamper() {
                     tamperDetected = true;
                     clearInterval(timer);
-
                     showClockTamperModal(
                         "⚠️ System Clock Changed: A system date or time modification was detected. " +
                         "Please restore & sync the correct date and time to continue."
                     );
                 }
-
-                lastRecordedTime = currentTime;
             }, CHECK_INTERVAL);
         })();
 

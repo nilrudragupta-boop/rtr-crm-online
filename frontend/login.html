@@ -1461,12 +1461,41 @@
             // Check for system date manipulation
             const lastLoginStr = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (lastLoginStr) {
-                const lastLoginDateOnly = new Date(lastLoginStr);
-                lastLoginDateOnly.setHours(0, 0, 0, 0);
+                const lastDateObj = new Date(lastLoginStr);
+                if (!isNaN(lastDateObj.getTime())) {
+                    const todayDateString = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0') + "-" + String(now.getDate()).padStart(2, '0');
+                    const lastLoginDateString = lastDateObj.getFullYear() + "-" + String(lastDateObj.getMonth() + 1).padStart(2, '0') + "-" + String(lastDateObj.getDate()).padStart(2, '0');
 
-                if (today < lastLoginDateOnly) {
-                    openWarningModal("System Date Error: Your system date appears to have been set backward. Please correct your system clock & sync. the correct date and time to proceed.");
-                    return;
+                    // If today is reported earlier than previous login
+                    if (todayDateString < lastLoginDateString) {
+                        let isAutoHealed = false;
+                        let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+
+                        // Always verify against online time if internet is connected
+                        if (scriptUrl && scriptUrl.startsWith("http")) {
+                            try {
+                                const timeRes = await fetch(`${scriptUrl}?action=get_time&_=${Date.now()}`);
+                                const timeData = await timeRes.json();
+                                if (timeData && timeData.serverTime) {
+                                    const sDate = new Date(timeData.serverTime);
+                                    const serverDateString = sDate.getFullYear() + "-" + String(sDate.getMonth() + 1).padStart(2, '0') + "-" + String(sDate.getDate()).padStart(2, '0');
+
+                                    // If system clock now matches real server date, auto-heal the corrupted record!
+                                    if (todayDateString === serverDateString) {
+                                        localStorage.setItem(LOCAL_STORAGE_KEY, now.toISOString());
+                                        isAutoHealed = true;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn("Could not reach time server", e);
+                            }
+                        }
+
+                        if (!isAutoHealed) {
+                            openWarningModal("System Date Error: Your system date appears to have been set backward. Please correct your system clock and sync network time to proceed.");
+                            return;
+                        }
+                    }
                 }
             }
 
