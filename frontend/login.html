@@ -1459,21 +1459,43 @@
                 return;
             }
 
-            // Check for system date manipulation
+            // Check for system date manipulation with online auto-recovery
             const lastLoginStr = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (lastLoginStr) {
-                const lastLoginDateOnly = new Date(lastLoginStr);
+                const lastLoginDate = new Date(lastLoginStr);
+                const lastLoginDateOnly = new Date(lastLoginDate);
                 lastLoginDateOnly.setHours(0, 0, 0, 0);
 
                 if (today < lastLoginDateOnly) {
-                    openWarningModal("System Date Error: Your system date appears to have been set backward. Please correct your system clock & sync. the correct date and time to proceed.");
-                    return;
-                }
-            }
+                    // Check if device clock is actually correct by checking with server
+                    let isVerifiedCorrect = false;
+                    let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
 
-            if (EXPIRY_DATE && today > EXPIRY_DATE) {
-                window.location.href = 'expired.html';
-                return;
+                    if (scriptUrl && scriptUrl.startsWith("http")) {
+                        try {
+                            const timeRes = await fetch(`${scriptUrl}?action=get_time&_=${Date.now()}`);
+                            const timeData = await timeRes.json();
+                            if (timeData && timeData.serverTime) {
+                                const serverDate = new Date(timeData.serverTime);
+                                serverDate.setHours(0, 0, 0, 0);
+                                // If the system date matches the real server date (within 1 day difference for timezones)
+                                const dayDiff = Math.abs(today - serverDate) / (1000 * 60 * 60 * 24);
+                                if (dayDiff <= 1) {
+                                    // Clock has been corrected! Clear the trapped future stamp
+                                    localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
+                                    isVerifiedCorrect = true;
+                                }
+                            }
+                        } catch (e) {
+                            console.warn("Could not verify clock with server", e);
+                        }
+                    }
+
+                    if (!isVerifiedCorrect) {
+                        openWarningModal("System Date Error: Your system date appears to have been set backward. Please ensure your date, time, and internet time synchronization are set correctly.");
+                        return;
+                    }
+                }
             }
 
             // 1. Check if user exists regardless of case
