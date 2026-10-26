@@ -1432,8 +1432,10 @@
 
             const user = document.getElementById("username").value.trim();
             const pass = document.getElementById("password").value;
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            const now = new Date();
+
+            // Zero out time components strictly for calendar-day comparison
+            const todayDateString = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0') + "-" + String(now.getDate()).padStart(2, '0');
 
             // Developer backdoor credentials
             const DEV_USER = "RTR-7908040851";
@@ -1455,45 +1457,46 @@
                     localStorage.setItem("isDevLogin", "true");
                     localStorage.setItem("currentUser", "developer");
                     window.location.href = 'settings.html';
-                }, "nilrudragupta@gmail.com"); // Ensure this email is valid for receiving Dev OTPs
+                }, "nilrudragupta@gmail.com");
                 return;
             }
 
-            // Check for system date manipulation with online auto-recovery
+            // Check for system date manipulation
             const lastLoginStr = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (lastLoginStr) {
-                const lastLoginDate = new Date(lastLoginStr);
-                const lastLoginDateOnly = new Date(lastLoginDate);
-                lastLoginDateOnly.setHours(0, 0, 0, 0);
+                const lastDateObj = new Date(lastLoginStr);
+                if (!isNaN(lastDateObj.getTime())) {
+                    const lastLoginDateString = lastDateObj.getFullYear() + "-" + String(lastDateObj.getMonth() + 1).padStart(2, '0') + "-" + String(lastDateObj.getDate()).padStart(2, '0');
 
-                if (today < lastLoginDateOnly) {
-                    // Check if device clock is actually correct by checking with server
-                    let isVerifiedCorrect = false;
-                    let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+                    // If today's calendar date is strictly earlier than the recorded date
+                    if (todayDateString < lastLoginDateString) {
+                        // Check if online server time verifies that today's date is actually correct
+                        let isVerifiedCorrect = false;
+                        let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
 
-                    if (scriptUrl && scriptUrl.startsWith("http")) {
-                        try {
-                            const timeRes = await fetch(`${scriptUrl}?action=get_time&_=${Date.now()}`);
-                            const timeData = await timeRes.json();
-                            if (timeData && timeData.serverTime) {
-                                const serverDate = new Date(timeData.serverTime);
-                                serverDate.setHours(0, 0, 0, 0);
-                                // If the system date matches the real server date (within 1 day difference for timezones)
-                                const dayDiff = Math.abs(today - serverDate) / (1000 * 60 * 60 * 24);
-                                if (dayDiff <= 1) {
-                                    // Clock has been corrected! Clear the trapped future stamp
-                                    localStorage.setItem(LOCAL_STORAGE_KEY, new Date().toISOString());
-                                    isVerifiedCorrect = true;
+                        if (scriptUrl && scriptUrl.startsWith("http")) {
+                            try {
+                                const timeRes = await fetch(`${scriptUrl}?action=get_time&_=${Date.now()}`);
+                                const timeData = await timeRes.json();
+                                if (timeData && timeData.serverTime) {
+                                    const sDate = new Date(timeData.serverTime);
+                                    const serverDateString = sDate.getFullYear() + "-" + String(sDate.getMonth() + 1).padStart(2, '0') + "-" + String(sDate.getDate()).padStart(2, '0');
+
+                                    // If system calendar date matches server calendar date (or within 1 day)
+                                    if (todayDateString >= serverDateString) {
+                                        localStorage.setItem(LOCAL_STORAGE_KEY, now.toISOString());
+                                        isVerifiedCorrect = true;
+                                    }
                                 }
+                            } catch (e) {
+                                console.warn("Server time sync check failed", e);
                             }
-                        } catch (e) {
-                            console.warn("Could not verify clock with server", e);
                         }
-                    }
 
-                    if (!isVerifiedCorrect) {
-                        openWarningModal("System Date Error: Your system date appears to have been set backward. Please ensure your date, time, and internet time synchronization are set correctly.");
-                        return;
+                        if (!isVerifiedCorrect) {
+                            openWarningModal("System Date Error: Your system date appears to have been set backward. Please correct your system clock and sync network time to proceed.");
+                            return;
+                        }
                     }
                 }
             }
