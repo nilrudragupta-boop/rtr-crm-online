@@ -1318,21 +1318,21 @@
                             style="display: none; position: absolute; top: -5px; right: -5px; background: var(--danger-color); color: white; border-radius: 50%; padding: 2px 5px; font-size: 10px; font-weight: bold; line-height: 1;">0</span>
                     </button>
                     <button class="btn-icon" id="emailBell" onclick="openWindow('email_sender.html', 1000, 800)"
-                        title="Inbox" style="position: relative;">
+                        data-permission-id="perm_email" title="Inbox" style="position: relative;">
                         <i class="fas fa-envelope"></i>
                         <span id="unreadEmailCount"
                             style="display: none; position: absolute; top: -5px; right: -5px; background: var(--danger-color); color: white; border-radius: 50%; padding: 2px 5px; font-size: 10px; font-weight: bold; line-height: 1;">0</span>
                     </button>
                     <button class="btn-icon" id="reminderBell" onclick="showDueReminders({ openModal: true })"
-                        title="Reminders" style="position: relative;">
+                        data-permission-id="perm_reminders" title="Reminders" style="position: relative;">
                         <i class="fas fa-bell"></i>
                         <span id="reminderCount"
                             style="display: none; position: absolute; top: -5px; right: -5px; background: var(--danger-color); color: white; border-radius: 50%; padding: 2px 5px; font-size: 10px; font-weight: bold; line-height: 1;">0</span>
                     </button>
-                    <button class="btn-icon" onclick="startGuidedTour(true)" title="Guided Tour"><i
-                            class="fas fa-map-signs"></i></button>
-                    <button class="btn-icon" onclick="toggleTheme()" title="Toggle Theme"><i
-                            class="fas fa-moon"></i></button>
+                    <button class="btn-icon" onclick="startGuidedTour(true)" data-permission-id="perm_guided_tour"
+                        title="Guided Tour"><i class="fas fa-map-signs"></i></button>
+                    <button class="btn-icon" onclick="toggleTheme()" data-permission-id="perm_theme"
+                        title="Toggle Theme"><i class="fas fa-moon"></i></button>
                     <button class="btn-icon" onclick="window.location.href='logout.html'" title="Logout"><i
                             class="fas fa-sign-out-alt"></i></button>
 
@@ -5214,52 +5214,52 @@
                     }
 
                     // --- CHECK CLOUD POPUP ALERT WITH DYNAMIC COLORS ---
-                if (res.shouldShowAlert && res.alertMessage) {
-                    const alertEl = document.getElementById('cloudAlertMessage');
-                    const modal = document.getElementById('cloudAlertModal');
-                    if (alertEl && modal) {
-                        alertEl.innerText = res.alertMessage;
+                    if (res.shouldShowAlert && res.alertMessage) {
+                        const alertEl = document.getElementById('cloudAlertMessage');
+                        const modal = document.getElementById('cloudAlertModal');
+                        if (alertEl && modal) {
+                            alertEl.innerText = res.alertMessage;
 
-                        const modalContent = modal.querySelector('.modal-content');
-                        const modalTitle = modal.querySelector('h3');
-                        const modalBtn = modal.querySelector('button');
+                            const modalContent = modal.querySelector('.modal-content');
+                            const modalTitle = modal.querySelector('h3');
+                            const modalBtn = modal.querySelector('button');
 
-                        // Color definitions matching your ticker system:
-                        // Red = warning, Orange = attention, Blue = normal
-                        const colorMap = {
-                            warning: {
-                                border: '#e74a3b',  // Red
-                                text: '#e74a3b',
-                                icon: '⚠️ Important Warning',
-                                btnBg: '#e74a3b'
-                            },
-                            attention: {
-                                border: '#f39c12',  // Orange
-                                text: '#f39c12',
-                                icon: '🔔 Notice Alert',
-                                btnBg: '#f39c12'
-                            },
-                            normal: {
-                                border: '#0313f3',  // Blue
-                                text: '#0313f3',
-                                icon: 'ℹ️ Important Notice',
-                                btnBg: '#0313f3'
+                            // Color definitions matching your ticker system:
+                            // Red = warning, Orange = attention, Blue = normal
+                            const colorMap = {
+                                warning: {
+                                    border: '#e74a3b',  // Red
+                                    text: '#e74a3b',
+                                    icon: '⚠️ Important Warning',
+                                    btnBg: '#e74a3b'
+                                },
+                                attention: {
+                                    border: '#f39c12',  // Orange
+                                    text: '#f39c12',
+                                    icon: '🔔 Notice Alert',
+                                    btnBg: '#f39c12'
+                                },
+                                normal: {
+                                    border: '#0313f3',  // Blue
+                                    text: '#0313f3',
+                                    icon: 'ℹ️ Important Notice',
+                                    btnBg: '#0313f3'
+                                }
+                            };
+
+                            const alertType = (res.alertType || 'normal').toLowerCase();
+                            const theme = colorMap[alertType] || colorMap.normal;
+
+                            if (modalContent) modalContent.style.borderTop = `5px solid ${theme.border}`;
+                            if (modalTitle) {
+                                modalTitle.style.color = theme.text;
+                                modalTitle.innerHTML = theme.icon;
                             }
-                        };
+                            if (modalBtn) modalBtn.style.backgroundColor = theme.btnBg;
 
-                        const alertType = (res.alertType || 'normal').toLowerCase();
-                        const theme = colorMap[alertType] || colorMap.normal;
-
-                        if (modalContent) modalContent.style.borderTop = `5px solid ${theme.border}`;
-                        if (modalTitle) {
-                            modalTitle.style.color = theme.text;
-                            modalTitle.innerHTML = theme.icon;
+                            modal.style.display = 'flex';
                         }
-                        if (modalBtn) modalBtn.style.backgroundColor = theme.btnBg;
-
-                        modal.style.display = 'flex';
                     }
-                }
 
                     // --- REMOTE PERMISSIONS LOGIC ---
                     if (res.remotePermissions) {
