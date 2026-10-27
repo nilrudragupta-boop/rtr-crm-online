@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Business Hub - RTR CRM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="brandLoader.js"></script>
+    <style>
+        :root {
+            --primary: #3c5481;
+            --wa-green: #25D366;
+            --wa-dark: #128C7E;
+            --wa-light: #dcf8c6;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --border: #e2e8f0;
+        }
+
+        body.dark-mode {
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --text: #e0e0e0;
+            --border: #444444;
+            --wa-light: #1f3b2b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+            border-left: 6px solid var(--wa-green);
+        }
+
+        .header h2 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--wa-dark);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media(max-width: 850px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text);
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            background: var(--bg);
+            color: var(--text);
+            box-sizing: border-box;
+            margin-bottom: 14px;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+            height: 120px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-wa {
+            background: var(--wa-green);
+            color: white;
+        }
+
+        .btn-wa:hover {
+            background: var(--wa-dark);
+        }
+
+        .btn-api {
+            background: #0284c7;
+            color: white;
+        }
+
+        .btn-api:hover {
+            background: #0369a1;
+        }
+
+        .btn-secondary {
+            background: #64748b;
+            color: white;
+        }
+
+        .badge {
+            background: rgba(37, 211, 102, 0.15);
+            color: var(--wa-dark);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .preview-box {
+            background: #e5ddd5;
+            background-image: radial-gradient(#d4cbbe 10%, transparent 11%);
+            background-size: 10px 10px;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 140px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .wa-bubble {
+            background: #ffffff;
+            color: #111b21;
+            padding: 10px 14px;
+            border-radius: 8px;
+            box-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.15);
+            font-size: 13.5px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            position: relative;
+            max-width: 90%;
+            align-self: flex-start;
+        }
+
+        .wa-bubble.outbound {
+            background: #d9fdd3;
+            align-self: flex-end;
+        }
+
+        .quick-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .quick-tag {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .quick-tag:hover {
+            background: var(--primary);
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h2><i class="fab fa-whatsapp"></i> WhatsApp Business Dispatcher</h2>
+                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+                    Send Invoices, Ledger Balances, Due Reminders & Dispatch details directly to your customers.
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-secondary" onclick="openConfigModal()" title="Configure Meta WhatsApp Cloud API">
+                    <i class="fas fa-cog"></i> API Settings
+                </button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Message Builder -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-paper-plane"></i> Compose Message
+                </div>
+
+                <!-- Customer Picker -->
+                <label>Select Customer / Party:</label>
+                <select id="customerSelect" onchange="onCustomerSelect()">
+                    <option value="">-- Choose Existing Customer --</option>
+                </select>
+
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label>Country Code:</label>
+                        <input type="text" id="countryCode" value="91" placeholder="91">
+                    </div>
+                    <div style="flex: 3;">
+                        <label>WhatsApp Number (10 Digits):</label>
+                        <input type="text" id="phoneInput" placeholder="9876543210" oninput="updatePreview()">
+                    </div>
+                </div>
+
+                <!-- Pre-defined Business Templates -->
+                <label>Template Preset:</label>
+                <select id="templateSelect" onchange="applyTemplate()">
+                    <option value="custom">Custom Message</option>
+                    <option value="invoice">📄 Smart Invoice Bill & Link</option>
+                    <option value="payment_due">🔔 Payment Outstanding Due Reminder</option>
+                    <option value="dispatch">🚚 Order Dispatched & Tracking Alert</option>
+                    <option value="greeting">🌼 Festive Greeting & Offer</option>
+                </select>
+
+                <!-- Quick Insertion Tags -->
+                <label>Insert Placeholders:</label>
+                <div class="quick-tags">
+                    <span class="quick-tag" onclick="insertTag('{CUSTOMER_NAME}')">{CUSTOMER_NAME}</span>
+                    <span class="quick-tag" onclick="insertTag('{BILL_NO}')">{BILL_NO}</span>
+                    <span class="quick-tag" onclick="insertTag('{AMOUNT}')">{AMOUNT}</span>
+                    <span class="quick-tag" onclick="insertTag('{DUE_DATE}')">{DUE_DATE}</span>
+                    <span class="quick-tag" onclick="insertTag('{COMPANY_NAME}')">{COMPANY_NAME}</span>
+                    <span class="quick-tag" onclick="insertTag('{UPI_PAY_LINK}')">{UPI_PAY_LINK}</span>
+                </div>
+
+                <!-- Message Text -->
+                <label>Message Content:</label>
+                <textarea id="messageBody" oninput="updatePreview()"
+                    placeholder="Type your WhatsApp message here..."></textarea>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn btn-wa" style="flex: 1;" onclick="sendViaWebWhatsApp()">
+                        <i class="fab fa-whatsapp"></i> Send via WhatsApp Web / App
+                    </button>
+                    <button class="btn btn-api" onclick="sendViaCloudApi()" title="Send directly via Meta Cloud API">
+                        <i class="fas fa-cloud-upload-alt"></i> Send via API
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Preview & Quick Invoices -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-mobile-alt"></i> Live WhatsApp Chat Preview
+                </div>
+
+                <div class="preview-box">
+                    <div class="wa-bubble outbound" id="previewBubble">
+                        Hello! Your message will preview here...
+                    </div>
+                </div>
+
+                <!-- Recent Invoices for Selected Customer -->
+                <div class="card-title" style="margin-top: 20px;">
+                    <i class="fas fa-file-invoice-dollar"></i> Customer's Recent Invoices
+                </div>
+                <div id="customerInvoiceList" style="max-height: 180px; overflow-y: auto; font-size: 13px;">
+                    <p style="color: #888; text-align: center; margin: 20px 0;">Select a customer to view their pending
+                        invoices.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Meta Cloud API Settings -->
+    <div id="apiConfigModal"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
+        <div
+            style="background:var(--card-bg); width:460px; max-width:92%; padding:24px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="margin-top:0; color:var(--primary);"><i class="fas fa-cogs"></i> Meta WhatsApp Cloud API Setup
+            </h3>
+            <p style="font-size:12px; color:#64748b; margin-bottom:15px;">
+                Optional: If you have registered for the official Meta WhatsApp Business Cloud API, provide credentials
+                below to send background messages without opening WhatsApp Web.
+            </p>
+
+            <label>Phone Number ID:</label>
+            <input type="text" id="waPhoneNumberId" placeholder="e.g. 109823482394823">
+
+            <label>System User Access Token (Permanent / Bearer):</label>
+            <input type="password" id="waAccessToken" placeholder="EAABw...">
+
+            <label>Webhook / Business Account ID (Optional):</label>
+            <input type="text" id="waWabaId" placeholder="e.g. 9832948239482">
+
+            <div style="text-align:right; margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeConfigModal()">Cancel</button>
+                <button class="btn btn-wa" onclick="saveApiConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let customersList = [];
+        let invoicesList = [];
+        let companyName = "Our Company";
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            // 1. Fetch fresh data from apiClient if available, fallback to localStorage
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomers) {
+                    customersList = await apiClient.getCustomers() || JSON.parse(localStorage.getItem("customers")) || [];
+                    invoicesList = await apiClient.getInvoices() || JSON.parse(localStorage.getItem("invoices")) || [];
+                } else {
+                    customersList = JSON.parse(localStorage.getItem("customers")) || [];
+                    invoicesList = JSON.parse(localStorage.getItem("invoices")) || [];
+                }
+                companyName = localStorage.getItem("companyName") || "RISE Tech Revolution";
+            } catch (e) {
+                customersList = JSON.parse(localStorage.getItem("customers")) || [];
+                invoicesList = JSON.parse(localStorage.getItem("invoices")) || [];
+            }
+
+            populateCustomerDropdown();
+
+            // 2. Read incoming parameters from other modules (e.g. ?phone=9876543210&name=John&bill=INV-101&amount=5000)
+            const params = new URLSearchParams(window.location.search);
+            const qPhone = params.get('phone');
+            const qName = params.get('name');
+            const qBill = params.get('bill');
+            const qAmount = params.get('amount');
+            const qTpl = params.get('template');
+
+            if (qPhone) {
+                document.getElementById("phoneInput").value = qPhone.replace(/\D/g, '').slice(-10);
+            }
+            if (qBill && qAmount) {
+                window.selectedBill = {
+                    billNo: qBill,
+                    total: qAmount,
+                    date: new Date().toLocaleDateString('en-GB')
+                };
+            }
+            if (qTpl) {
+                document.getElementById("templateSelect").value = qTpl;
+            }
+
+            // Match customer dropdown if name passed
+            if (qName) {
+                const matchIdx = customersList.findIndex(c => (c.name || '').toLowerCase() === qName.toLowerCase());
+                if (matchIdx > -1) {
+                    document.getElementById("customerSelect").value = matchIdx;
+                    loadCustomerInvoices(qName);
+                }
+            }
+
+            applyTemplate();
+        });
+
+        function populateCustomerDropdown() {
+            const select = document.getElementById("customerSelect");
+            select.innerHTML = '<option value="">-- Choose Existing Customer --</option>';
+            customersList.forEach((c, idx) => {
+                const opt = document.createElement("option");
+                opt.value = idx;
+                opt.textContent = `${c.name || 'Unnamed'} (${c.mobile || c.phone || 'No Phone'})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function onCustomerSelect() {
+            const idx = document.getElementById("customerSelect").value;
+            if (idx === "") return;
+
+            const customer = customersList[idx];
+            if (!customer) return;
+
+            // Clean and set phone
+            let phone = (customer.mobile || customer.phone || "").replace(/\D/g, '');
+            if (phone.length > 10) phone = phone.slice(-10);
+            document.getElementById("phoneInput").value = phone;
+
+            // Load customer's invoices
+            loadCustomerInvoices(customer.name);
+            applyTemplate();
+        }
+
+        function loadCustomerInvoices(custName) {
+            const container = document.getElementById("customerInvoiceList");
+            if (!custName) {
+                container.innerHTML = `<p style="color:#888; text-align:center;">Select a customer to view invoices.</p>`;
+                return;
+            }
+
+            const matchedInvoices = invoicesList.filter(inv =>
+                (inv.customer_name || inv.customer || "").trim().toLowerCase() === custName.trim().toLowerCase()
+            );
+
+            if (matchedInvoices.length === 0) {
+                container.innerHTML = `<p style="color:#888; text-align:center;">No recorded invoices for ${custName}.</p>`;
+                return;
+            }
+
+            let html = '<table style="width:100%; border-collapse:collapse;">';
+            html += '<tr style="border-bottom:1px solid var(--border); text-align:left; color:#64748b;"><th>Bill No</th><th>Date</th><th>Total</th><th>Action</th></tr>';
+
+            matchedInvoices.slice(0, 5).forEach(inv => {
+                const total = parseFloat(inv.invoice_total || inv.total || 0).toFixed(2);
+                const billNo = inv.invoice_no || inv.invoiceNo || "-";
+                const date = inv.invoice_date || inv.date || "-";
+                html += `
+                <tr style="border-bottom:1px solid var(--border); height:35px;">
+                    <td><b>${billNo}</b></td>
+                    <td>${date}</td>
+                    <td>₹${total}</td>
+                    <td>
+                        <button style="padding:2px 8px; font-size:11px; background:var(--wa-green); color:white; border:none; border-radius:4px; cursor:pointer;" 
+                            onclick="selectInvoiceForMsg('${billNo}', '${total}', '${date}')">
+                            Attach
+                        </button>
+                    </td>
+                </tr>
+            `;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+        }
+
+        function selectInvoiceForMsg(billNo, total, date) {
+            window.selectedBill = { billNo, total, date };
+            document.getElementById("templateSelect").value = "invoice";
+            applyTemplate();
+        }
+
+        function applyTemplate() {
+            const tpl = document.getElementById("templateSelect").value;
+            const custIdx = document.getElementById("customerSelect").value;
+            const cust = customersList[custIdx] || { name: "Valued Customer" };
+            const bill = window.selectedBill || { billNo: "INV-1001", total: "0.00", date: new Date().toLocaleDateString('en-GB') };
+
+            let text = "";
+            if (tpl === "invoice") {
+                text = `Dear *${cust.name}*,\n\nGreetings from *${companyName}*! 📄\n\nYour Invoice *#${bill.billNo}* dated *${bill.date}* for Amount *₹${bill.total}* has been generated successfully.\n\nKindly acknowledge receipt. If you have any questions regarding this billing, feel free to reply directly to this chat.\n\nThank you for choosing us! ✨`;
+            } else if (tpl === "payment_due") {
+                text = `Dear *${cust.name}*,\n\nThis is a gentle payment reminder from *${companyName}* regarding your pending invoice *#${bill.billNo}* of *₹${bill.total}*.\n\nWe kindly request you to clear the balance at your earliest convenience.\n\nUPI Payment ID: *arindammemari-1@okicici*\n\nThank you for your prompt cooperation! 🙏`;
+            } else if (tpl === "dispatch") {
+                text = `Hello *${cust.name}*,\n\nGreat news! Your order under Bill *#${bill.billNo}* has been safely packed and dispatched today 🚚.\n\nEstimated delivery: 2-3 business days.\n\nThank you for doing business with *${companyName}*!`;
+            } else if (tpl === "greeting") {
+                text = `Dear *${cust.name}*,\n\nWarm greetings from all of us at *${companyName}*! 🌼✨\n\nMay this festive season bring joy, health, and prosperity to you and your family. We deeply appreciate your continued partnership.`;
+            }
+
+            if (text) {
+                document.getElementById("messageBody").value = text;
+            }
+            updatePreview();
+        }
+
+        function insertTag(tag) {
+            const area = document.getElementById("messageBody");
+            area.value += " " + tag + " ";
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const text = document.getElementById("messageBody").value;
+            const bubble = document.getElementById("previewBubble");
+            bubble.innerText = text || "Type message to preview...";
+        }
+
+        function sendViaWebWhatsApp() {
+            const cc = document.getElementById("countryCode").value.trim().replace(/\D/g, '') || "91";
+            const phone = document.getElementById("phoneInput").value.trim().replace(/\D/g, '');
+            const message = document.getElementById("messageBody").value.trim();
+
+            if (!phone || phone.length < 10) {
+                alert("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+            if (!message) {
+                alert("Message cannot be empty.");
+                return;
+            }
+
+            const fullPhone = (phone.length === 10) ? (cc + phone) : phone;
+            const encodedMsg = encodeURIComponent(message);
+            const waUrl = `https://web.whatsapp.com/send?phone=${fullPhone}&text=${encodedMsg}`;
+
+            // Open in popup or new tab
+            window.open(waUrl, "_blank", "width=1000,height=750");
+        }
+
+        async function sendViaCloudApi() {
+            const phoneId = localStorage.getItem("meta_wa_phone_id");
+            const token = localStorage.getItem("meta_wa_token");
+
+            if (!phoneId || !token) {
+                alert("Meta Cloud API is not configured yet. Please click 'API Settings' to enter your Phone Number ID and Access Token, or use 'Send via WhatsApp Web'.");
+                openConfigModal();
+                return;
+            }
+
+            const cc = document.getElementById("countryCode").value.trim().replace(/\D/g, '') || "91";
+            const phone = document.getElementById("phoneInput").value.trim().replace(/\D/g, '');
+            const message = document.getElementById("messageBody").value.trim();
+
+            if (!phone || phone.length < 10) {
+                alert("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+
+            const fullPhone = (phone.length === 10) ? (cc + phone) : phone;
+
+            const payload = {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: fullPhone,
+                type: "text",
+                text: { body: message }
+            };
+
+            try {
+                const res = await fetch(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.messages && data.messages.length > 0) {
+                    alert("✅ Message dispatched successfully via Meta WhatsApp Cloud API!");
+                } else {
+                    alert("Failed to send via API: " + (data.error ? data.error.message : JSON.stringify(data)));
+                }
+            } catch (err) {
+                alert("API Dispatch Error: " + err.message);
+            }
+        }
+
+        function openConfigModal() {
+            document.getElementById("waPhoneNumberId").value = localStorage.getItem("meta_wa_phone_id") || "";
+            document.getElementById("waAccessToken").value = localStorage.getItem("meta_wa_token") || "";
+            document.getElementById("waWabaId").value = localStorage.getItem("meta_wa_waba_id") || "";
+            document.getElementById("apiConfigModal").style.display = "flex";
+        }
+
+        function closeConfigModal() {
+            document.getElementById("apiConfigModal").style.display = "none";
+        }
+
+        function saveApiConfig() {
+            localStorage.setItem("meta_wa_phone_id", document.getElementById("waPhoneNumberId").value.trim());
+            localStorage.setItem("meta_wa_token", document.getElementById("waAccessToken").value.trim());
+            localStorage.setItem("meta_wa_waba_id", document.getElementById("waWabaId").value.trim());
+            alert("WhatsApp Cloud API credentials saved successfully!");
+            closeConfigModal();
+        }
+    </script>
+</body>
+
+</html>
