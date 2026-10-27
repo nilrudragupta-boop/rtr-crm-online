@@ -156,15 +156,6 @@
             color: white;
         }
 
-        .badge {
-            background: rgba(37, 211, 102, 0.15);
-            color: var(--wa-dark);
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
         .preview-box {
             background: #e5ddd5;
             background-image: radial-gradient(#d4cbbe 10%, transparent 11%);
@@ -212,11 +203,20 @@
             font-size: 11px;
             cursor: pointer;
             user-select: none;
+            font-weight: 600;
         }
 
         .quick-tag:hover {
             background: var(--primary);
             color: white;
+        }
+
+        .upi-box {
+            background: rgba(13, 110, 253, 0.05);
+            border: 1px dashed #0d6efd;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
         }
     </style>
 </head>
@@ -234,7 +234,7 @@
             </div>
             <div>
                 <button class="btn btn-secondary" onclick="openConfigModal()" title="Configure Meta WhatsApp Cloud API">
-                    <i class="fas fa-cog"></i> API Settings
+                    <i class="fas fa-cog"></i> Settings & API
                 </button>
             </div>
         </div>
@@ -265,7 +265,7 @@
 
                 <!-- Pre-defined Business Templates -->
                 <label>Template Preset:</label>
-                <select id="templateSelect" onchange="applyTemplate()">
+                <select id="templateSelect" onchange="onTemplateChange()">
                     <option value="custom">Custom Message</option>
                     <option value="invoice">📄 Smart Invoice Bill & Link</option>
                     <option value="payment_due">🔔 Payment Outstanding Due Reminder</option>
@@ -273,15 +273,33 @@
                     <option value="greeting">🌼 Festive Greeting & Offer</option>
                 </select>
 
+                <!-- Client-configured UPI ID Container -->
+                <div id="upiFieldContainer" class="upi-box" style="display:none;">
+                    <label style="color:#0d6efd; margin-bottom:4px;">
+                        <i class="fas fa-qrcode"></i> Your Business UPI ID (for receiving payment):
+                    </label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="clientUpiInput" placeholder="e.g. yourname@okhdfcbank"
+                            style="margin-bottom:0; background:#fff;" oninput="onUpiInputChange()">
+                        <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px;"
+                            onclick="saveClientUpi()">
+                            Save
+                        </button>
+                    </div>
+                    <small style="color:#64748b; font-size:11px;">Saved locally for your company. Changes auto-update
+                        payment links in messages.</small>
+                </div>
+
                 <!-- Quick Insertion Tags -->
-                <label>Insert Placeholders:</label>
+                <label>Insert Placeholders (Click to insert):</label>
                 <div class="quick-tags">
                     <span class="quick-tag" onclick="insertTag('{CUSTOMER_NAME}')">{CUSTOMER_NAME}</span>
                     <span class="quick-tag" onclick="insertTag('{BILL_NO}')">{BILL_NO}</span>
                     <span class="quick-tag" onclick="insertTag('{AMOUNT}')">{AMOUNT}</span>
+                    <span class="quick-tag" onclick="insertTag('{OUTSTANDING}')">{OUTSTANDING}</span>
                     <span class="quick-tag" onclick="insertTag('{DUE_DATE}')">{DUE_DATE}</span>
                     <span class="quick-tag" onclick="insertTag('{COMPANY_NAME}')">{COMPANY_NAME}</span>
-                    <span class="quick-tag" onclick="insertTag('{UPI_PAY_LINK}')">{UPI_PAY_LINK}</span>
+                    <span class="quick-tag" onclick="insertTag('{UPI_ID}')">{UPI_ID}</span>
                 </div>
 
                 <!-- Message Text -->
@@ -313,10 +331,12 @@
                 </div>
 
                 <!-- Recent Invoices for Selected Customer -->
-                <div class="card-title" style="margin-top: 20px;">
-                    <i class="fas fa-file-invoice-dollar"></i> Customer's Recent Invoices
+                <div class="card-title"
+                    style="margin-top: 20px; display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="fas fa-file-invoice-dollar"></i> Customer Invoices & Outstanding</span>
+                    <span id="headerTotalDueBadge" style="font-size:12px; font-weight:normal; color:#dc2626;"></span>
                 </div>
-                <div id="customerInvoiceList" style="max-height: 180px; overflow-y: auto; font-size: 13px;">
+                <div id="customerInvoiceList" style="max-height: 220px; overflow-y: auto; font-size: 13px;">
                     <p style="color: #888; text-align: center; margin: 20px 0;">Select a customer to view their pending
                         invoices.</p>
                 </div>
@@ -324,30 +344,34 @@
         </div>
     </div>
 
-    <!-- Modal: Meta Cloud API Settings -->
+    <!-- Modal: Settings & Meta Cloud API -->
     <div id="apiConfigModal"
         style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
         <div
             style="background:var(--card-bg); width:460px; max-width:92%; padding:24px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
-            <h3 style="margin-top:0; color:var(--primary);"><i class="fas fa-cogs"></i> Meta WhatsApp Cloud API Setup
-            </h3>
-            <p style="font-size:12px; color:#64748b; margin-bottom:15px;">
-                Optional: If you have registered for the official Meta WhatsApp Business Cloud API, provide credentials
-                below to send background messages without opening WhatsApp Web.
+            <h3 style="margin-top:0; color:var(--primary);"><i class="fas fa-cogs"></i> Dispatcher Settings</h3>
+
+            <label>Business Default UPI ID (for Payment Reminders):</label>
+            <input type="text" id="modalUpiId" placeholder="e.g. businessname@okaxis">
+
+            <hr style="border:none; border-top:1px solid var(--border); margin:15px 0;">
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#475569;">Meta WhatsApp Cloud API (Optional)</h4>
+            <p style="font-size:11px; color:#64748b; margin-bottom:12px;">
+                Required only if sending via official Meta Server API without opening WhatsApp Web.
             </p>
 
             <label>Phone Number ID:</label>
             <input type="text" id="waPhoneNumberId" placeholder="e.g. 109823482394823">
 
-            <label>System User Access Token (Permanent / Bearer):</label>
+            <label>Access Token (Bearer):</label>
             <input type="password" id="waAccessToken" placeholder="EAABw...">
 
-            <label>Webhook / Business Account ID (Optional):</label>
+            <label>WhatsApp Business Account ID:</label>
             <input type="text" id="waWabaId" placeholder="e.g. 9832948239482">
 
             <div style="text-align:right; margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
                 <button class="btn btn-secondary" onclick="closeConfigModal()">Cancel</button>
-                <button class="btn btn-wa" onclick="saveApiConfig()">Save Configuration</button>
+                <button class="btn btn-wa" onclick="saveApiConfig()">Save Settings</button>
             </div>
         </div>
     </div>
@@ -358,7 +382,6 @@
         let companyName = "Our Company";
 
         document.addEventListener("DOMContentLoaded", async () => {
-            // 1. Fetch fresh data from apiClient if available, fallback to localStorage
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getCustomers) {
                     customersList = await apiClient.getCustomers() || JSON.parse(localStorage.getItem("customers")) || [];
@@ -373,9 +396,13 @@
                 invoicesList = JSON.parse(localStorage.getItem("invoices")) || [];
             }
 
+            // Load saved client UPI ID
+            const savedUpi = localStorage.getItem("client_business_upi") || "";
+            document.getElementById("clientUpiInput").value = savedUpi;
+
             populateCustomerDropdown();
 
-            // 2. Read incoming parameters from other modules (e.g. ?phone=9876543210&name=John&bill=INV-101&amount=5000)
+            // Read query params from other modules
             const params = new URLSearchParams(window.location.search);
             const qPhone = params.get('phone');
             const qName = params.get('name');
@@ -390,6 +417,7 @@
                 window.selectedBill = {
                     billNo: qBill,
                     total: qAmount,
+                    outstanding: qAmount,
                     date: new Date().toLocaleDateString('en-GB')
                 };
             }
@@ -397,7 +425,6 @@
                 document.getElementById("templateSelect").value = qTpl;
             }
 
-            // Match customer dropdown if name passed
             if (qName) {
                 const matchIdx = customersList.findIndex(c => (c.name || '').toLowerCase() === qName.toLowerCase());
                 if (matchIdx > -1) {
@@ -406,7 +433,7 @@
                 }
             }
 
-            applyTemplate();
+            onTemplateChange();
         });
 
         function populateCustomerDropdown() {
@@ -415,7 +442,7 @@
             customersList.forEach((c, idx) => {
                 const opt = document.createElement("option");
                 opt.value = idx;
-                opt.textContent = `${c.name || 'Unnamed'} (${c.mobile || c.phone || 'No Phone'})`;
+                opt.textContent = `${c.name || 'Unnamed'} (${c.mobile || c.contact || c.phone || 'No Phone'})`;
                 select.appendChild(opt);
             });
         }
@@ -427,60 +454,136 @@
             const customer = customersList[idx];
             if (!customer) return;
 
-            // Clean and set phone
-            let phone = (customer.mobile || customer.phone || "").replace(/\D/g, '');
+            let phone = (customer.mobile || customer.contact || customer.phone || "").replace(/\D/g, '');
             if (phone.length > 10) phone = phone.slice(-10);
             document.getElementById("phoneInput").value = phone;
 
-            // Load customer's invoices
             loadCustomerInvoices(customer.name);
             applyTemplate();
         }
 
+        // Calculates individual invoice outstanding as well as Total Customer Outstanding
         function loadCustomerInvoices(custName) {
             const container = document.getElementById("customerInvoiceList");
+            const headerDueBadge = document.getElementById("headerTotalDueBadge");
             if (!custName) {
                 container.innerHTML = `<p style="color:#888; text-align:center;">Select a customer to view invoices.</p>`;
+                if (headerDueBadge) headerDueBadge.innerText = "";
                 return;
             }
 
             const matchedInvoices = invoicesList.filter(inv =>
-                (inv.customer_name || inv.customer || "").trim().toLowerCase() === custName.trim().toLowerCase()
+                (inv.customer_name || (inv.customer && inv.customer.name) || inv.customer || "").trim().toLowerCase() === custName.trim().toLowerCase()
             );
 
+            // Compute total outstanding across all records for this party
+            let customerObj = customersList.find(c => (c.name || '').trim().toLowerCase() === custName.trim().toLowerCase()) || {};
+            let totalCustomerOutstanding = parseFloat(customerObj.openingBalance || 0);
+            if (customerObj.openingBalanceType === 'Cr') totalCustomerOutstanding = -totalCustomerOutstanding;
+
+            matchedInvoices.forEach(inv => {
+                const invTotal = parseFloat(inv.invoice_total || inv.total || 0);
+                const invPaid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
+                totalCustomerOutstanding += (invTotal - invPaid);
+            });
+
+            window.currentCustomerTotalOutstanding = totalCustomerOutstanding;
+            if (headerDueBadge) {
+                headerDueBadge.innerText = `Total Due: ₹ ${totalCustomerOutstanding.toFixed(2)}`;
+            }
+
             if (matchedInvoices.length === 0) {
-                container.innerHTML = `<p style="color:#888; text-align:center;">No recorded invoices for ${custName}.</p>`;
+                container.innerHTML = `
+                    <p style="color:#888; text-align:center; margin:15px 0;">No recorded invoices for ${custName}.</p>
+                    <div style="background:#f8fafc; padding:8px 12px; border-radius:6px; font-weight:bold; text-align:right; border-top:1px solid var(--border);">
+                        Total Outstanding: <span style="color:#dc2626;">₹ ${totalCustomerOutstanding.toFixed(2)}</span>
+                    </div>
+                `;
                 return;
             }
 
             let html = '<table style="width:100%; border-collapse:collapse;">';
-            html += '<tr style="border-bottom:1px solid var(--border); text-align:left; color:#64748b;"><th>Bill No</th><th>Date</th><th>Total</th><th>Action</th></tr>';
+            html += '<tr style="border-bottom:1px solid var(--border); text-align:left; color:#64748b; font-size:12px;">' +
+                '<th>Bill No</th><th>Date</th><th>Bill Total</th><th>Due Balance</th><th>Action</th></tr>';
 
-            matchedInvoices.slice(0, 5).forEach(inv => {
-                const total = parseFloat(inv.invoice_total || inv.total || 0).toFixed(2);
+            matchedInvoices.forEach(inv => {
+                const total = parseFloat(inv.invoice_total || inv.total || 0);
+                const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
+                const invDue = Math.max(0, total - paid);
                 const billNo = inv.invoice_no || inv.invoiceNo || "-";
                 const date = inv.invoice_date || inv.date || "-";
+
                 html += `
-                <tr style="border-bottom:1px solid var(--border); height:35px;">
-                    <td><b>${billNo}</b></td>
-                    <td>${date}</td>
-                    <td>₹${total}</td>
+                    <tr style="border-bottom:1px solid var(--border); height:36px;">
+                        <td><b>${billNo}</b></td>
+                        <td>${date}</td>
+                        <td>₹ ${total.toFixed(2)}</td>
+                        <td style="font-weight:bold; color:${invDue > 0 ? '#dc2626' : '#16a34a'};">₹ ${invDue.toFixed(2)}</td>
+                        <td>
+                            <button style="padding:2px 8px; font-size:11px; background:var(--wa-green); color:white; border:none; border-radius:4px; cursor:pointer;" 
+                                onclick="selectInvoiceForMsg('${billNo}', '${total.toFixed(2)}', '${invDue.toFixed(2)}', '${date}')">
+                                Select
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Sticky summary footer at the bottom
+            html += `
+                <tr style="background:#f1f5f9; font-weight:bold; border-top:2px solid #cbd5e1; height:40px;">
+                    <td colspan="3" style="text-align:right; padding-right:10px;">Total Outstanding:</td>
+                    <td style="color:#dc2626; font-size:14px;">₹ ${totalCustomerOutstanding.toFixed(2)}</td>
                     <td>
-                        <button style="padding:2px 8px; font-size:11px; background:var(--wa-green); color:white; border:none; border-radius:4px; cursor:pointer;" 
-                            onclick="selectInvoiceForMsg('${billNo}', '${total}', '${date}')">
-                            Attach
+                        <button style="padding:3px 8px; font-size:11px; background:#0d6efd; color:white; border:none; border-radius:4px; cursor:pointer;"
+                                onclick="selectTotalDueForMsg('${totalCustomerOutstanding.toFixed(2)}')">
+                            Remind Total
                         </button>
                     </td>
                 </tr>
             `;
-            });
+
             html += '</table>';
             container.innerHTML = html;
         }
 
-        function selectInvoiceForMsg(billNo, total, date) {
-            window.selectedBill = { billNo, total, date };
-            document.getElementById("templateSelect").value = "invoice";
+        function selectInvoiceForMsg(billNo, total, due, date) {
+            window.selectedBill = { billNo, total, outstanding: due, date };
+            applyTemplate();
+        }
+
+        function selectTotalDueForMsg(totalDue) {
+            window.selectedBill = {
+                billNo: "Consolidated Due",
+                total: totalDue,
+                outstanding: totalDue,
+                date: new Date().toLocaleDateString('en-GB')
+            };
+            document.getElementById("templateSelect").value = "payment_due";
+            onTemplateChange();
+        }
+
+        function onTemplateChange() {
+            const tpl = document.getElementById("templateSelect").value;
+            const upiBox = document.getElementById("upiFieldContainer");
+
+            // Show UPI configuration directly when Payment Due Reminder is chosen
+            if (tpl === "payment_due") {
+                upiBox.style.display = "block";
+            } else {
+                upiBox.style.display = "none";
+            }
+            applyTemplate();
+        }
+
+        function onUpiInputChange() {
+            applyTemplate();
+        }
+
+        function saveClientUpi() {
+            const upi = document.getElementById("clientUpiInput").value.trim();
+            localStorage.setItem("client_business_upi", upi);
+            alert("Business UPI ID saved successfully!");
             applyTemplate();
         }
 
@@ -488,13 +591,23 @@
             const tpl = document.getElementById("templateSelect").value;
             const custIdx = document.getElementById("customerSelect").value;
             const cust = customersList[custIdx] || { name: "Valued Customer" };
-            const bill = window.selectedBill || { billNo: "INV-1001", total: "0.00", date: new Date().toLocaleDateString('en-GB') };
+            const bill = window.selectedBill || {
+                billNo: "INV-1001",
+                total: "0.00",
+                outstanding: "0.00",
+                date: new Date().toLocaleDateString('en-GB')
+            };
+
+            const clientUpi = document.getElementById("clientUpiInput").value.trim() ||
+                localStorage.getItem("client_business_upi") ||
+                "your-upi-id@bank";
 
             let text = "";
             if (tpl === "invoice") {
-                text = `Dear *${cust.name}*,\n\nGreetings from *${companyName}*! 📄\n\nYour Invoice *#${bill.billNo}* dated *${bill.date}* for Amount *₹${bill.total}* has been generated successfully.\n\nKindly acknowledge receipt. If you have any questions regarding this billing, feel free to reply directly to this chat.\n\nThank you for choosing us! ✨`;
+                text = `Dear *${cust.name}*,\n\nGreetings from *${companyName}*! 📄\n\nYour Invoice *#${bill.billNo}* dated *${bill.date}* for Amount *₹ ${bill.total}* has been generated successfully.\n\nKindly acknowledge receipt. If you have any questions regarding this billing, feel free to reply directly to this chat.\n\nThank you for choosing us! ✨`;
             } else if (tpl === "payment_due") {
-                text = `Dear *${cust.name}*,\n\nThis is a gentle payment reminder from *${companyName}* regarding your pending invoice *#${bill.billNo}* of *₹${bill.total}*.\n\nWe kindly request you to clear the balance at your earliest convenience.\n\nUPI Payment ID: *arindammemari-1@okicici*\n\nThank you for your prompt cooperation! 🙏`;
+                const totalDueAmt = (bill.outstanding && parseFloat(bill.outstanding) > 0) ? bill.outstanding : (bill.total || "0.00");
+                text = `Dear *${cust.name}*,\n\nThis is a gentle payment reminder from *${companyName}* regarding your pending balance under *${bill.billNo}* of *₹ ${totalDueAmt}*.\n\nWe kindly request you to clear the balance at your earliest convenience.\n\n👉 Pay via UPI: *${clientUpi}*\n\nThank you for your prompt cooperation! 🙏`;
             } else if (tpl === "dispatch") {
                 text = `Hello *${cust.name}*,\n\nGreat news! Your order under Bill *#${bill.billNo}* has been safely packed and dispatched today 🚚.\n\nEstimated delivery: 2-3 business days.\n\nThank you for doing business with *${companyName}*!`;
             } else if (tpl === "greeting") {
@@ -507,37 +620,67 @@
             updatePreview();
         }
 
+        // Inserts tag at cursor position and replaces with live data preview
         function insertTag(tag) {
             const area = document.getElementById("messageBody");
-            area.value += " " + tag + " ";
+            const start = area.selectionStart;
+            const end = area.selectionEnd;
+            const text = area.value;
+            area.value = text.substring(0, start) + tag + text.substring(end);
+            area.selectionStart = area.selectionEnd = start + tag.length;
+            area.focus();
             updatePreview();
         }
 
+        // Resolves placeholders dynamically into real text for dispatch and preview
+        function resolveMessagePlaceholders(templateText) {
+            const custIdx = document.getElementById("customerSelect").value;
+            const cust = customersList[custIdx] || { name: "Valued Customer" };
+            const bill = window.selectedBill || {
+                billNo: "INV-1001",
+                total: "0.00",
+                outstanding: (window.currentCustomerTotalOutstanding ? window.currentCustomerTotalOutstanding.toFixed(2) : "0.00"),
+                date: new Date().toLocaleDateString('en-GB')
+            };
+            const clientUpi = document.getElementById("clientUpiInput").value.trim() ||
+                localStorage.getItem("client_business_upi") ||
+                "your-upi@bank";
+
+            return templateText
+                .replace(/{CUSTOMER_NAME}/g, cust.name || 'Valued Customer')
+                .replace(/{BILL_NO}/g, bill.billNo || 'INV-1001')
+                .replace(/{AMOUNT}/g, `₹ ${bill.total || '0.00'}`)
+                .replace(/{OUTSTANDING}/g, `₹ ${bill.outstanding || '0.00'}`)
+                .replace(/{DUE_DATE}/g, bill.date || new Date().toLocaleDateString('en-GB'))
+                .replace(/{COMPANY_NAME}/g, companyName)
+                .replace(/{UPI_ID}/g, clientUpi);
+        }
+
         function updatePreview() {
-            const text = document.getElementById("messageBody").value;
+            const rawText = document.getElementById("messageBody").value;
+            const previewText = resolveMessagePlaceholders(rawText);
             const bubble = document.getElementById("previewBubble");
-            bubble.innerText = text || "Type message to preview...";
+            bubble.innerText = previewText || "Type message to preview...";
         }
 
         function sendViaWebWhatsApp() {
             const cc = document.getElementById("countryCode").value.trim().replace(/\D/g, '') || "91";
             const phone = document.getElementById("phoneInput").value.trim().replace(/\D/g, '');
-            const message = document.getElementById("messageBody").value.trim();
+            const rawMessage = document.getElementById("messageBody").value.trim();
 
             if (!phone || phone.length < 10) {
                 alert("Please enter a valid 10-digit mobile number.");
                 return;
             }
-            if (!message) {
+            if (!rawMessage) {
                 alert("Message cannot be empty.");
                 return;
             }
 
+            const finalMessage = resolveMessagePlaceholders(rawMessage);
             const fullPhone = (phone.length === 10) ? (cc + phone) : phone;
-            const encodedMsg = encodeURIComponent(message);
-            const waUrl = `https://web.whatsapp.com/send?phone=${fullPhone}&text=${encodedMsg}`;
+            const waUrl = `https://web.whatsapp.com/send?phone=${fullPhone}&text=${encodeURIComponent(finalMessage)}`;
 
-            // Open in popup or new tab
             window.open(waUrl, "_blank", "width=1000,height=750");
         }
 
@@ -546,20 +689,25 @@
             const token = localStorage.getItem("meta_wa_token");
 
             if (!phoneId || !token) {
-                alert("Meta Cloud API is not configured yet. Please click 'API Settings' to enter your Phone Number ID and Access Token, or use 'Send via WhatsApp Web'.");
+                alert("Meta Cloud API is not configured yet. Click 'Settings & API' to enter your Phone Number ID and Access Token, or use 'Send via WhatsApp Web'.");
                 openConfigModal();
                 return;
             }
 
             const cc = document.getElementById("countryCode").value.trim().replace(/\D/g, '') || "91";
             const phone = document.getElementById("phoneInput").value.trim().replace(/\D/g, '');
-            const message = document.getElementById("messageBody").value.trim();
+            const rawMessage = document.getElementById("messageBody").value.trim();
 
             if (!phone || phone.length < 10) {
                 alert("Please enter a valid 10-digit mobile number.");
                 return;
             }
+            if (!rawMessage) {
+                alert("Message cannot be empty.");
+                return;
+            }
 
+            const finalMessage = resolveMessagePlaceholders(rawMessage);
             const fullPhone = (phone.length === 10) ? (cc + phone) : phone;
 
             const payload = {
@@ -567,7 +715,7 @@
                 recipient_type: "individual",
                 to: fullPhone,
                 type: "text",
-                text: { body: message }
+                text: { body: finalMessage }
             };
 
             try {
@@ -591,6 +739,7 @@
         }
 
         function openConfigModal() {
+            document.getElementById("modalUpiId").value = localStorage.getItem("client_business_upi") || "";
             document.getElementById("waPhoneNumberId").value = localStorage.getItem("meta_wa_phone_id") || "";
             document.getElementById("waAccessToken").value = localStorage.getItem("meta_wa_token") || "";
             document.getElementById("waWabaId").value = localStorage.getItem("meta_wa_waba_id") || "";
@@ -602,11 +751,17 @@
         }
 
         function saveApiConfig() {
+            const upi = document.getElementById("modalUpiId").value.trim();
+            localStorage.setItem("client_business_upi", upi);
+            document.getElementById("clientUpiInput").value = upi;
+
             localStorage.setItem("meta_wa_phone_id", document.getElementById("waPhoneNumberId").value.trim());
             localStorage.setItem("meta_wa_token", document.getElementById("waAccessToken").value.trim());
             localStorage.setItem("meta_wa_waba_id", document.getElementById("waWabaId").value.trim());
-            alert("WhatsApp Cloud API credentials saved successfully!");
+
+            alert("Settings updated successfully!");
             closeConfigModal();
+            applyTemplate();
         }
     </script>
 </body>
