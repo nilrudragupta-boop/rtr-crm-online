@@ -1222,10 +1222,6 @@
                         <input type="checkbox" id="showActionReceipt"
                             onchange="toggleActionButton('receipt', this.checked)"> Receipt
                     </label>
-                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
-                        <input type="checkbox" id="showActionWhatsapp"
-                            onchange="toggleActionButton('whatsapp', this.checked)"> WhatsApp
-                    </label>
                 </div>
                 <label
                     style="cursor:pointer; display:flex; align-items:center; gap:10px; font-weight:bold; margin-top: 15px;">
@@ -1385,8 +1381,7 @@
             edit: true,
             delete: true,
             attach: true,
-            receipt: true,
-            whatsapp: true
+            receipt: true
         };
 
         if (actionButtonVisibility.receipt === undefined) {
@@ -1396,24 +1391,6 @@
         if (actionButtonVisibility.view === undefined) {
             actionButtonVisibility.view = true;
             localStorage.setItem("customerActionButtons", JSON.stringify(actionButtonVisibility));
-        }
-
-        // --- WhatsApp Sender Logic ---
-        function openWhatsAppForCustomer(name, phone) {
-            // If the contact field contains multiple numbers, take the first valid 10-digit number
-            let cleanPhone = "";
-            if (phone) {
-                const parts = phone.split(/[, ]+/).filter(Boolean);
-                const valid = parts.find(p => p.replace(/\D/g, '').length >= 10);
-                cleanPhone = (valid || parts[0] || "").replace(/\D/g, '').slice(-10);
-            }
-
-            const url = `whatsapp_sender.html?name=${encodeURIComponent(name || '')}&phone=${encodeURIComponent(cleanPhone)}&template=invoice`;
-            if (typeof openWindow === 'function') {
-                openWindow(url, 1150, 780);
-            } else {
-                window.open(url, '_blank', 'width=1150,height=780');
-            }
         }
 
         // Fix: Ensure all customers have an ID (in case they were added via Invoice page without one)
@@ -1928,7 +1905,6 @@
                     <button class="edit-btn btn-action-edit" data-action="edit" data-id="${c.id}" data-permission-id="perm_manage_customers">✏️ Edit</button>
                     <button class="btn-action-attach" data-action="attach" data-id="${c.id}">📎 Attach</button>
                     <button class="btn-action-receipt" data-action="receipt" data-id="${c.id}">🧾 Receipt</button>
-                    <button class="btn-action-whatsapp" data-name="${escapeHtml(c.name)}" data-phone="${escapeHtml(c.contact || '')}" onclick="openWhatsAppForCustomer(this.getAttribute('data-name'), this.getAttribute('data-phone'))" style="color: #25D366 !important;"><i class="fab fa-whatsapp"></i> WhatsApp</button>
                     <button class="delete-btn btn-action-delete" data-action="delete" data-id="${c.id}" data-permission-id="perm_delete_action" style="color: #dc3545 !important;">🗑️ Delete</button>
                 </div>
             </div>
@@ -2920,8 +2896,6 @@
             document.getElementById("showActionDelete").checked = actionButtonVisibility.delete;
             document.getElementById("showActionAttach").checked = actionButtonVisibility.attach !== false;
             document.getElementById("showActionReceipt").checked = actionButtonVisibility.receipt !== false;
-            const waToggle = document.getElementById("showActionWhatsapp");
-            if (waToggle) waToggle.checked = actionButtonVisibility.whatsapp !== false;
 
             const greyToggle = document.getElementById("greyButtonsToggle");
             if (greyToggle) greyToggle.checked = isGreyButtons;
@@ -3045,7 +3019,6 @@
             if (!actionButtonVisibility.delete) css += `.btn-action-delete, .action-dropdown-content .btn-action-delete { display: none !important; }\n`;
             if (actionButtonVisibility.attach === false) css += `.btn-action-attach, .action-dropdown-content .btn-action-attach { display: none !important; }\n`;
             if (!actionButtonVisibility.receipt) css += `.btn-action-receipt, .action-dropdown-content .btn-action-receipt { display: none !important; }\n`;
-            if (!actionButtonVisibility.whatsapp) css += `.btn-action-whatsapp, .action-dropdown-content .btn-action-whatsapp { display: none !important; }\n`;
             style.textContent = css;
         }
 
