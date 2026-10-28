@@ -396,23 +396,3 @@ module.exports = {
     Message: mongoose.model('Message', messageSchema),
     ChatterGroup: mongoose.model('ChatterGroup', chatterGroupSchema)
 };
-
-
-// --- Electron Window Creation with DevTools Disabled ---
-const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    webPreferences: {
-        devTools: false, // <-- Completely disables F12 and DevTools in Electron
-        preload: path.join(__dirname, 'preload.js'),
-        nodeIntegration: false,
-        contextIsolation: true
-    }
-});
-
-// Also block keyboard accelerators in Electron menus
-mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'F12' || (input.control && input.shift && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j'))) {
-        event.preventDefault();
-    }
-});

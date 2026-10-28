@@ -43,7 +43,7 @@ let isQuitting = false; // Flag to track backup status
 let whatsNewWindow = null; // Track What's New window instance
 
 function createWindow() {
-    // Remove the application menu (File, Edit, View, etc.) globally
+    // Remove the application menu globally
     Menu.setApplicationMenu(null);
 
     const win = new BrowserWindow({
@@ -51,9 +51,10 @@ function createWindow() {
         height: 800,
         title: "RTR Reminder",
         icon: path.join(__dirname, 'logo.png'),
-        autoHideMenuBar: true,      // hides menu bar completely
-        menuBarVisible: false,      // ensures it is not visible
+        autoHideMenuBar: true,
+        menuBarVisible: false,
         webPreferences: {
+            devTools: false, // <-- Natively disables DevTools on main window
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: false,
@@ -62,15 +63,11 @@ function createWindow() {
         }
     });
 
-
     // Load your HTML file
     win.loadFile(HTML_FILE);
-
-    // Completely remove the menu bar
     win.removeMenu();
 
-    // IMPORTANT: Open WhatsApp/External links in the default browser (Chrome/Edge)
-    // instead of inside the app window.
+    // Enforce DevTools lock on ALL child windows spawned by window.open
     win.webContents.setWindowOpenHandler(({ url }) => {
         if (url.startsWith('http')) {
             shell.openExternal(url);
@@ -79,7 +76,10 @@ function createWindow() {
         return {
             action: 'allow',
             overrideBrowserWindowOptions: {
+                autoHideMenuBar: true,
+                menuBarVisible: false,
                 webPreferences: {
+                    devTools: false, // <-- Natively disables DevTools on all popup windows
                     preload: path.join(__dirname, 'preload.js'),
                     nodeIntegration: false,
                     contextIsolation: true,
@@ -249,12 +249,24 @@ function processAllScheduledEmails() {
 }
 
 app.whenReady().then(() => {
-    // --- STEP 7: Developer Override Shortcut ---
-    globalShortcut.register('CommandOrControl+Shift+Alt+D', () => {
-        const windows = BrowserWindow.getAllWindows();
-        if (windows.length > 0) {
-            windows[0].webContents.send('force-open-dev-panel');
-        }
+    // Globally block DevTools shortcuts on ANY window or webContents created
+    app.on('web-contents-created', (e, contents) => {
+        // Block manual DevTools open requests
+        contents.on('devtools-opened', () => {
+            contents.closeDevTools();
+        });
+
+        // Block shortcuts on input
+        contents.on('before-input-event', (event, input) => {
+            const key = (input.key || '').toLowerCase();
+            const isF12 = key === 'f12';
+            const isInspect = (input.control || input.meta) && input.shift && (key === 'i' || key === 'j' || key === 'c');
+            const isViewSource = (input.control || input.meta) && key === 'u';
+
+            if (isF12 || isInspect || isViewSource) {
+                event.preventDefault();
+            }
+        });
     });
 
     createWindow();
