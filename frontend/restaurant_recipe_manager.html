@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Restaurant Recipe & Ready-Item Manager - RISE Tech Revolution</title>
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
@@ -14,62 +17,87 @@
             background-color: #eef2f6;
             color: #1e293b;
         }
+
         .pos-gradient {
             background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
         }
+
         .custom-scroll::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
+
         .custom-scroll::-webkit-scrollbar-track {
             background: #f1f5f9;
             border-radius: 4px;
         }
+
         .custom-scroll::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 4px;
         }
+
         .custom-scroll::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
+
         @keyframes pulseSlow {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.65; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.65;
+            }
         }
+
         .pulse-badge {
             animation: pulseSlow 2s infinite;
         }
     </style>
 </head>
+
 <body class="min-h-screen flex flex-col">
 
     <!-- Top Navigation Header (Matches restaurant_pos.html & restaurant_kds.html theme) -->
     <header class="pos-gradient text-white shadow-lg sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center text-slate-900 font-extrabold text-lg shadow">
+                <div
+                    class="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center text-slate-900 font-extrabold text-lg shadow">
                     <i class="fas fa-utensils"></i>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-lg md:text-xl font-bold tracking-tight">Restaurant Recipe & Ready-Item Engine</h1>
-                        <span class="hidden sm:inline-block text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
+                        <h1 class="text-lg md:text-xl font-bold tracking-tight">Restaurant Recipe & Ready-Item Engine
+                        </h1>
+                        <span
+                            class="hidden sm:inline-block text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
                             POS + KDS Synced
                         </span>
                     </div>
-                    <p class="text-xs text-slate-300">Auto-calculate ready-to-serve portions from raw ingredients &bull; <span id="lastBackupBadge">DB Backup Ready</span></p>
+                    <p class="text-xs text-slate-300">Auto-calculate ready-to-serve portions from raw ingredients &bull;
+                        <span id="lastBackupBadge">DB Backup Ready</span></p>
                 </div>
             </div>
 
             <!-- Action Toolbar -->
             <div class="flex flex-wrap items-center gap-2">
-                <button id="btnSyncPosStock" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm" title="Push calculated ready counts into POS stock">
+                <button id="btnSyncPosStock" type="button"
+                    class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm"
+                    title="Push calculated ready counts into POS stock">
                     <i class="fas fa-bolt"></i> Sync Ready Qty to POS
                 </button>
-                <button id="btnQuickBackup" type="button" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm" title="Download instant JSON DB backup">
+                <button id="btnQuickBackup" type="button"
+                    class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm"
+                    title="Download instant JSON DB backup">
                     <i class="fas fa-download"></i> Quick DB Backup
                 </button>
-                <button id="btnOpenRestoreModal" type="button" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm" title="Restore database from backup file or snapshot">
+                <button id="btnOpenRestoreModal" type="button"
+                    class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs md:text-sm font-semibold transition flex items-center gap-1.5 shadow-sm"
+                    title="Restore database from backup file or snapshot">
                     <i class="fas fa-upload"></i> Restore DB
                 </button>
             </div>
@@ -78,16 +106,20 @@
         <!-- Navigation Tabs -->
         <div class="bg-slate-800/90 border-t border-slate-700">
             <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto custom-scroll gap-1">
-                <button type="button" data-tab="recipes" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-amber-400 text-amber-400 bg-slate-900/40 whitespace-nowrap flex items-center gap-2 transition">
+                <button type="button" data-tab="recipes"
+                    class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-amber-400 text-amber-400 bg-slate-900/40 whitespace-nowrap flex items-center gap-2 transition">
                     <i class="fas fa-clipboard-list"></i> 1. Recipe & Ready-Item Calculator
                 </button>
-                <button type="button" data-tab="ingredients" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+                <button type="button" data-tab="ingredients"
+                    class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
                     <i class="fas fa-boxes-stacked"></i> 2. Raw Ingredients Stock (<span id="navIngCount">0</span>)
                 </button>
-                <button type="button" data-tab="pos-simulator" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+                <button type="button" data-tab="pos-simulator"
+                    class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
                     <i class="fas fa-cash-register"></i> 3. Live Order Desk & KDS Sync (<span id="navKdsCount">0</span>)
                 </button>
-                <button type="button" data-tab="backup" class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
+                <button type="button" data-tab="backup"
+                    class="nav-tab-btn px-4 py-2.5 text-xs md:text-sm font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap flex items-center gap-2 transition">
                     <i class="fas fa-database"></i> 4. Database Backup & Vault
                 </button>
             </div>
@@ -116,7 +148,8 @@
                     <p id="kpiTotalReadyPortions" class="text-2xl font-extrabold text-emerald-600 mt-0.5">0</p>
                     <p class="text-xs text-slate-500 mt-0.5">Auto-calculated from raw stock</p>
                 </div>
-                <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                <div
+                    class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
                     <i class="fas fa-bowl-food"></i>
                 </div>
             </div>
@@ -153,9 +186,11 @@
                     <div class="bg-slate-800 text-white px-5 py-3.5 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <i class="fas fa-sliders text-amber-400"></i>
-                            <h2 id="recipeFormTitle" class="font-bold text-sm md:text-base">Set Menu Item & Required Ingredients</h2>
+                            <h2 id="recipeFormTitle" class="font-bold text-sm md:text-base">Set Menu Item & Required
+                                Ingredients</h2>
                         </div>
-                        <button id="btnResetRecipeForm" type="button" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded text-slate-200 transition">
+                        <button id="btnResetRecipeForm" type="button"
+                            class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded text-slate-200 transition">
                             <i class="fas fa-rotate-left"></i> New / Clear
                         </button>
                     </div>
@@ -165,19 +200,26 @@
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div class="sm:col-span-2">
-                                <label for="recipeItemName" class="block text-xs font-bold text-slate-700 uppercase mb-1">Menu Item Name *</label>
-                                <input type="text" id="recipeItemName" placeholder="e.g. Chicken Dum Biryani" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="recipeItemName"
+                                    class="block text-xs font-bold text-slate-700 uppercase mb-1">Menu Item Name
+                                    *</label>
+                                <input type="text" id="recipeItemName" placeholder="e.g. Chicken Dum Biryani"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                             <div>
-                                <label for="recipeItemCode" class="block text-xs font-bold text-slate-700 uppercase mb-1">Item Code</label>
-                                <input type="text" id="recipeItemCode" placeholder="MNU-001" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="recipeItemCode"
+                                    class="block text-xs font-bold text-slate-700 uppercase mb-1">Item Code</label>
+                                <input type="text" id="recipeItemCode" placeholder="MNU-001"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                         </div>
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
-                                <label for="recipeCategory" class="block text-xs font-bold text-slate-700 uppercase mb-1">Category</label>
-                                <select id="recipeCategory" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="recipeCategory"
+                                    class="block text-xs font-bold text-slate-700 uppercase mb-1">Category</label>
+                                <select id="recipeCategory"
+                                    class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                                     <option value="Main Course">Main Course</option>
                                     <option value="Biryani & Rice">Biryani & Rice</option>
                                     <option value="Starters">Starters</option>
@@ -188,12 +230,17 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="recipePrice" class="block text-xs font-bold text-slate-700 uppercase mb-1">Sale Price (₹) *</label>
-                                <input type="number" id="recipePrice" value="220" min="0" step="1" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="recipePrice"
+                                    class="block text-xs font-bold text-slate-700 uppercase mb-1">Sale Price (₹)
+                                    *</label>
+                                <input type="number" id="recipePrice" value="220" min="0" step="1"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                             <div>
-                                <label for="recipeGst" class="block text-xs font-bold text-slate-700 uppercase mb-1">GST (%)</label>
-                                <select id="recipeGst" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="recipeGst" class="block text-xs font-bold text-slate-700 uppercase mb-1">GST
+                                    (%)</label>
+                                <select id="recipeGst"
+                                    class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                                     <option value="0">0%</option>
                                     <option value="5" selected>5%</option>
                                     <option value="12">12%</option>
@@ -201,10 +248,14 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="recipeYieldQty" class="block text-xs font-bold text-slate-700 uppercase mb-1">Batch Yield</label>
+                                <label for="recipeYieldQty"
+                                    class="block text-xs font-bold text-slate-700 uppercase mb-1">Batch Yield</label>
                                 <div class="flex items-center">
-                                    <input type="number" id="recipeYieldQty" value="1" min="1" step="1" class="w-full px-2.5 py-2 rounded-l-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" title="Number of portions produced by the ingredients below">
-                                    <span class="bg-slate-100 border border-l-0 border-slate-300 px-2 py-2 text-xs font-semibold text-slate-600 rounded-r-lg">Pcs</span>
+                                    <input type="number" id="recipeYieldQty" value="1" min="1" step="1"
+                                        class="w-full px-2.5 py-2 rounded-l-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        title="Number of portions produced by the ingredients below">
+                                    <span
+                                        class="bg-slate-100 border border-l-0 border-slate-300 px-2 py-2 text-xs font-semibold text-slate-600 rounded-r-lg">Pcs</span>
                                 </div>
                             </div>
                         </div>
@@ -216,17 +267,20 @@
                                     <i class="fas fa-Carrot text-amber-500"></i> Required Ingredients & Qty
                                 </label>
                                 <div class="flex gap-1.5">
-                                    <button id="btnQuickNewIngredient" type="button" class="text-xs px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold transition">
+                                    <button id="btnQuickNewIngredient" type="button"
+                                        class="text-xs px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold transition">
                                         + New Raw Ingredient
                                     </button>
-                                    <button id="btnAddIngredientRow" type="button" class="text-xs px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold transition">
+                                    <button id="btnAddIngredientRow" type="button"
+                                        class="text-xs px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold transition">
                                         + Add Row
                                     </button>
                                 </div>
                             </div>
 
                             <!-- Dynamic Ingredient Rows Container -->
-                            <div id="recipeIngredientsContainer" class="space-y-2 max-h-64 overflow-y-auto custom-scroll pr-1">
+                            <div id="recipeIngredientsContainer"
+                                class="space-y-2 max-h-64 overflow-y-auto custom-scroll pr-1">
                                 <!-- Populated via JS -->
                             </div>
                         </div>
@@ -235,11 +289,15 @@
                         <div class="bg-slate-900 text-white rounded-xl p-4 space-y-2.5 shadow-inner">
                             <div class="flex items-center justify-between border-b border-slate-700 pb-2">
                                 <div>
-                                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Auto-Calculated Final Ready Items</span>
-                                    <span id="liveBottleneckText" class="text-xs text-amber-300">Add ingredients to calculate capacity</span>
+                                    <span
+                                        class="text-xs uppercase tracking-wider text-slate-400 font-semibold block">Auto-Calculated
+                                        Final Ready Items</span>
+                                    <span id="liveBottleneckText" class="text-xs text-amber-300">Add ingredients to
+                                        calculate capacity</span>
                                 </div>
                                 <div class="text-right">
-                                    <span id="liveReadyCountPreview" class="text-3xl font-extrabold text-emerald-400">0</span>
+                                    <span id="liveReadyCountPreview"
+                                        class="text-3xl font-extrabold text-emerald-400">0</span>
                                     <span class="text-xs text-slate-300 block">Portions Ready</span>
                                 </div>
                             </div>
@@ -250,7 +308,8 @@
                                 </div>
                                 <div>
                                     <span class="text-slate-400 block">Profit Margin/Item</span>
-                                    <span id="liveRecipeMarginPreview" class="font-bold text-emerald-400">₹0.00 (0%)</span>
+                                    <span id="liveRecipeMarginPreview" class="font-bold text-emerald-400">₹0.00
+                                        (0%)</span>
                                 </div>
                                 <div>
                                     <span class="text-slate-400 block">Max Revenue Potential</span>
@@ -261,7 +320,8 @@
 
                         <!-- Submit Button -->
                         <div class="flex gap-2 pt-1">
-                            <button id="btnSaveRecipe" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                            <button id="btnSaveRecipe" type="button"
+                                class="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
                                 <i class="fas fa-floppy-disk"></i> Save Item Recipe & Sync POS Stock
                             </button>
                         </div>
@@ -274,16 +334,21 @@
                         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                             <div>
                                 <h2 class="font-bold text-base text-slate-800 flex items-center gap-2">
-                                    <i class="fas fa-calculator text-emerald-600"></i> Live Ready-to-Serve Item Availability
+                                    <i class="fas fa-calculator text-emerald-600"></i> Live Ready-to-Serve Item
+                                    Availability
                                 </h2>
-                                <p class="text-xs text-slate-500">Real-time bottleneck calculation based on current raw ingredient stock</p>
+                                <p class="text-xs text-slate-500">Real-time bottleneck calculation based on current raw
+                                    ingredient stock</p>
                             </div>
                             <div class="flex items-center gap-2 w-full sm:w-auto">
                                 <div class="relative flex-1 sm:w-56">
                                     <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                                    <input type="text" id="searchRecipesInput" placeholder="Search menu item or ingredient..." class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                    <input type="text" id="searchRecipesInput"
+                                        placeholder="Search menu item or ingredient..."
+                                        class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                                 </div>
-                                <select id="filterRecipeCategory" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white focus:outline-none">
+                                <select id="filterRecipeCategory"
+                                    class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white focus:outline-none">
                                     <option value="All">All Categories</option>
                                 </select>
                             </div>
@@ -309,24 +374,31 @@
                         <h3 id="ingFormTitle" class="font-bold text-sm flex items-center gap-2">
                             <i class="fas fa-box-open text-amber-400"></i> Add / Update Raw Ingredient
                         </h3>
-                        <button id="btnClearIngForm" type="button" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-200">
+                        <button id="btnClearIngForm" type="button"
+                            class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-200">
                             Clear
                         </button>
                     </div>
                     <div class="p-5 space-y-3.5">
                         <input type="hidden" id="editIngId" value="">
                         <div>
-                            <label for="ingName" class="block text-xs font-bold text-slate-700 uppercase mb-1">Ingredient Name *</label>
-                            <input type="text" id="ingName" placeholder="e.g. Basmati Rice, Fresh Paneer" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label for="ingName"
+                                class="block text-xs font-bold text-slate-700 uppercase mb-1">Ingredient Name *</label>
+                            <input type="text" id="ingName" placeholder="e.g. Basmati Rice, Fresh Paneer"
+                                class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label for="ingCode" class="block text-xs font-bold text-slate-700 uppercase mb-1">RM Code</label>
-                                <input type="text" id="ingCode" placeholder="RM-001" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-slate-50 focus:outline-none">
+                                <label for="ingCode" class="block text-xs font-bold text-slate-700 uppercase mb-1">RM
+                                    Code</label>
+                                <input type="text" id="ingCode" placeholder="RM-001"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-slate-50 focus:outline-none">
                             </div>
                             <div>
-                                <label for="ingUom" class="block text-xs font-bold text-slate-700 uppercase mb-1">Stock Unit (UOM) *</label>
-                                <select id="ingUom" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none">
+                                <label for="ingUom" class="block text-xs font-bold text-slate-700 uppercase mb-1">Stock
+                                    Unit (UOM) *</label>
+                                <select id="ingUom"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none">
                                     <option value="kg">kg (Kilogram)</option>
                                     <option value="g">g (Gram)</option>
                                     <option value="L">L (Litre)</option>
@@ -338,19 +410,27 @@
                         </div>
                         <div class="grid grid-cols-3 gap-2.5">
                             <div>
-                                <label for="ingStock" class="block text-xs font-bold text-slate-700 uppercase mb-1">Available Qty *</label>
-                                <input type="number" id="ingStock" value="10" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="ingStock"
+                                    class="block text-xs font-bold text-slate-700 uppercase mb-1">Available Qty
+                                    *</label>
+                                <input type="number" id="ingStock" value="10" min="0" step="any"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                             <div>
-                                <label for="ingCost" class="block text-xs font-bold text-slate-700 uppercase mb-1">Cost / Unit (₹)</label>
-                                <input type="number" id="ingCost" value="100" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="ingCost" class="block text-xs font-bold text-slate-700 uppercase mb-1">Cost
+                                    / Unit (₹)</label>
+                                <input type="number" id="ingCost" value="100" min="0" step="any"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                             <div>
-                                <label for="ingMinAlert" class="block text-xs font-bold text-slate-700 uppercase mb-1">Low Alert Qty</label>
-                                <input type="number" id="ingMinAlert" value="2" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <label for="ingMinAlert"
+                                    class="block text-xs font-bold text-slate-700 uppercase mb-1">Low Alert Qty</label>
+                                <input type="number" id="ingMinAlert" value="2" min="0" step="any"
+                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             </div>
                         </div>
-                        <button id="btnSaveIngredient" type="button" class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                        <button id="btnSaveIngredient" type="button"
+                            class="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
                             <i class="fas fa-check-circle"></i> Save Ingredient & Recalculate Menu
                         </button>
                     </div>
@@ -361,10 +441,12 @@
                     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <div>
                             <h3 class="font-bold text-base text-slate-800">Raw Material Kitchen Stock</h3>
-                            <p class="text-xs text-slate-500">Adjusting stock here immediately updates ready-to-serve item counts across all recipes</p>
+                            <p class="text-xs text-slate-500">Adjusting stock here immediately updates ready-to-serve
+                                item counts across all recipes</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <input type="text" id="searchIngInput" placeholder="Search ingredient..." class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:outline-none">
+                            <input type="text" id="searchIngInput" placeholder="Search ingredient..."
+                                class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:outline-none">
                         </div>
                     </div>
 
@@ -395,14 +477,16 @@
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
                 <!-- Left: Order Cart & KDS Dispatch (4 cols) -->
-                <div class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                <div
+                    class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                     <div class="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
                         <span class="font-bold text-sm flex items-center gap-2">
                             <i class="fas fa-receipt text-amber-400"></i> Customer Order Cart
                         </span>
                         <div class="flex items-center gap-1.5">
                             <label for="posTableSelect" class="text-xs text-slate-300">Table:</label>
-                            <select id="posTableSelect" class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded border border-blue-400 focus:outline-none">
+                            <select id="posTableSelect"
+                                class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded border border-blue-400 focus:outline-none">
                                 <option value="Takeaway">Takeaway</option>
                                 <option value="Delivery">Delivery</option>
                                 <option value="T1">T1</option>
@@ -415,13 +499,16 @@
                         </div>
                     </div>
 
-                    <div id="posCartList" class="p-4 space-y-2.5 max-h-72 overflow-y-auto custom-scroll divide-y divide-slate-100">
+                    <div id="posCartList"
+                        class="p-4 space-y-2.5 max-h-72 overflow-y-auto custom-scroll divide-y divide-slate-100">
                         <!-- Cart items -->
                     </div>
 
                     <!-- Ingredient Reservation Notice -->
-                    <div id="posSharedIngNotice" class="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-800 hidden">
-                        <i class="fas fa-circle-info mr-1"></i> Shared ingredients are dynamically reserved across all items in your cart!
+                    <div id="posSharedIngNotice"
+                        class="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-800 hidden">
+                        <i class="fas fa-circle-info mr-1"></i> Shared ingredients are dynamically reserved across all
+                        items in your cart!
                     </div>
 
                     <div class="p-4 bg-slate-50 border-t border-slate-200 space-y-2 text-sm">
@@ -433,19 +520,25 @@
                             <span>GST Tax:</span>
                             <span id="posCartTax" class="font-semibold">₹0.00</span>
                         </div>
-                        <div class="flex justify-between text-slate-900 font-extrabold text-base pt-1 border-t border-slate-200">
+                        <div
+                            class="flex justify-between text-slate-900 font-extrabold text-base pt-1 border-t border-slate-200">
                             <span>Grand Total:</span>
                             <span id="posCartTotal" class="text-emerald-600">₹0.00</span>
                         </div>
 
                         <div class="grid grid-cols-3 gap-2 pt-2">
-                            <button id="btnPosClearCart" type="button" class="py-2 px-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition">
+                            <button id="btnPosClearCart" type="button"
+                                class="py-2 px-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition">
                                 <i class="fas fa-trash"></i> Clear
                             </button>
-                            <button id="btnPosSendKot" type="button" class="py-2 px-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-xs transition" title="Send ticket to restaurant_kds.html">
+                            <button id="btnPosSendKot" type="button"
+                                class="py-2 px-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-xs transition"
+                                title="Send ticket to restaurant_kds.html">
                                 <i class="fas fa-fire-burner"></i> Send KOT
                             </button>
-                            <button id="btnPosSettleBill" type="button" class="py-2 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition" title="Deduct ingredients & save POS invoice">
+                            <button id="btnPosSettleBill" type="button"
+                                class="py-2 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
+                                title="Deduct ingredients & save POS invoice">
                                 <i class="fas fa-check-double"></i> Settle Bill
                             </button>
                         </div>
@@ -457,11 +550,15 @@
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                             <div>
-                                <h3 class="font-bold text-base text-slate-800">Take Customer Order (Live Ingredient Deduction)</h3>
-                                <p class="text-xs text-slate-500">Click any ready item to add to order. Shared ingredients update remaining counts across all dishes!</p>
+                                <h3 class="font-bold text-base text-slate-800">Take Customer Order (Live Ingredient
+                                    Deduction)</h3>
+                                <p class="text-xs text-slate-500">Click any ready item to add to order. Shared
+                                    ingredients update remaining counts across all dishes!</p>
                             </div>
-                            <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">
-                                Synced with <code class="font-mono">restaurant_pos.html</code> &amp; <code class="font-mono">restaurant_kds.html</code>
+                            <span
+                                class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">
+                                Synced with <code class="font-mono">restaurant_pos.html</code> &amp; <code
+                                    class="font-mono">restaurant_kds.html</code>
                             </span>
                         </div>
                         <div id="posMenuCardsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -475,11 +572,14 @@
                             <div class="flex items-center gap-2">
                                 <i class="fas fa-fire-burner text-amber-400 text-lg"></i>
                                 <div>
-                                    <h3 class="font-bold text-sm">Active Kitchen Display (KDS) Queue (<code class="text-amber-300">kds_orders</code>)</h3>
-                                    <p class="text-xs text-slate-400">Orders sent from here or <code class="text-slate-300">restaurant_pos.html</code> appear live below</p>
+                                    <h3 class="font-bold text-sm">Active Kitchen Display (KDS) Queue (<code
+                                            class="text-amber-300">kds_orders</code>)</h3>
+                                    <p class="text-xs text-slate-400">Orders sent from here or <code
+                                            class="text-slate-300">restaurant_pos.html</code> appear live below</p>
                                 </div>
                             </div>
-                            <button id="btnClearKdsQueue" type="button" class="text-xs bg-rose-600/80 hover:bg-rose-600 px-2.5 py-1 rounded font-semibold transition">
+                            <button id="btnClearKdsQueue" type="button"
+                                class="text-xs bg-rose-600/80 hover:bg-rose-600 px-2.5 py-1 rounded font-semibold transition">
                                 Clear Kitchen Board
                             </button>
                         </div>
@@ -499,36 +599,48 @@
                 <!-- Export & Import Controls (6 cols) -->
                 <div class="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
                     <div class="flex items-center gap-3 border-b border-slate-200 pb-3">
-                        <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-lg">
+                        <div
+                            class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-lg">
                             <i class="fas fa-shield-halved"></i>
                         </div>
                         <div>
                             <h3 class="font-bold text-base text-slate-800">Full Database Backup &amp; Export</h3>
-                            <p class="text-xs text-slate-500">Compatible with standalone browser, RTR-CRM Encrypted Backup, and Electron DB</p>
+                            <p class="text-xs text-slate-500">Compatible with standalone browser, RTR-CRM Encrypted
+                                Backup, and Electron DB</p>
                         </div>
                     </div>
 
                     <div class="space-y-3">
                         <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                            <label for="backupPasswordInput" class="block text-xs font-bold text-slate-700 uppercase">Optional Encryption Password (AES Compatible with RTR-CRM)</label>
-                            <input type="password" id="backupPasswordInput" placeholder="Leave blank for plain JSON, or enter password for AES encryption" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none">
-                            <p class="text-xs text-slate-500">If you set a password, the file is encrypted with CryptoJS AES (identical to <code class="font-mono">dashboardB.html</code>).</p>
+                            <label for="backupPasswordInput"
+                                class="block text-xs font-bold text-slate-700 uppercase">Optional Encryption Password
+                                (AES Compatible with RTR-CRM)</label>
+                            <input type="password" id="backupPasswordInput"
+                                placeholder="Leave blank for plain JSON, or enter password for AES encryption"
+                                class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white focus:outline-none">
+                            <p class="text-xs text-slate-500">If you set a password, the file is encrypted with CryptoJS
+                                AES (identical to <code class="font-mono">dashboardB.html</code>).</p>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <button id="btnDownloadFullBackup" type="button" class="py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                            <button id="btnDownloadFullBackup" type="button"
+                                class="py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
                                 <i class="fas fa-file-arrow-down"></i> Download DB Backup (.json)
                             </button>
-                            <button id="btnExportCsvReport" type="button" class="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                            <button id="btnExportCsvReport" type="button"
+                                class="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
                                 <i class="fas fa-file-csv"></i> Export Recipes &amp; Stock (.csv)
                             </button>
                         </div>
 
                         <div class="pt-3 border-t border-slate-200">
-                            <h4 class="font-bold text-xs uppercase text-slate-700 mb-2">Restore Database from File (.json)</h4>
+                            <h4 class="font-bold text-xs uppercase text-slate-700 mb-2">Restore Database from File
+                                (.json)</h4>
                             <div class="flex flex-col sm:flex-row gap-2">
-                                <input type="file" id="restoreFileInput" accept=".json,.txt" class="flex-1 text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 border border-slate-300 rounded-lg p-1">
-                                <button id="btnRestoreFromFile" type="button" class="py-2 px-4 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition whitespace-nowrap">
+                                <input type="file" id="restoreFileInput" accept=".json,.txt"
+                                    class="flex-1 text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 border border-slate-300 rounded-lg p-1">
+                                <button id="btnRestoreFromFile" type="button"
+                                    class="py-2 px-4 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition whitespace-nowrap">
                                     <i class="fas fa-upload mr-1"></i> Restore File
                                 </button>
                             </div>
@@ -537,9 +649,11 @@
                         <div class="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <h4 class="font-bold text-xs uppercase text-slate-700">Sample Restaurant Dataset</h4>
-                                <p class="text-xs text-slate-500">Reload default recipes &amp; raw ingredients for testing</p>
+                                <p class="text-xs text-slate-500">Reload default recipes &amp; raw ingredients for
+                                    testing</p>
                             </div>
-                            <button id="btnReloadDemoData" type="button" class="py-2 px-3 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition">
+                            <button id="btnReloadDemoData" type="button"
+                                class="py-2 px-3 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition">
                                 <i class="fas fa-wand-magic-sparkles mr-1"></i> Load Sample Restaurant Data
                             </button>
                         </div>
@@ -550,15 +664,18 @@
                 <div class="lg:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
                     <div class="flex items-center justify-between border-b border-slate-200 pb-3">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+                            <div
+                                class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
                                 <i class="fas fa-clock-rotate-left"></i>
                             </div>
                             <div>
                                 <h3 class="font-bold text-base text-slate-800">IndexedDB Auto-Backup Vault</h3>
-                                <p class="text-xs text-slate-500">Persistent browser database snapshots saved automatically on changes</p>
+                                <p class="text-xs text-slate-500">Persistent browser database snapshots saved
+                                    automatically on changes</p>
                             </div>
                         </div>
-                        <button id="btnCreateSnapshotNow" type="button" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition">
+                        <button id="btnCreateSnapshotNow" type="button"
+                            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition">
                             + Snapshot Now
                         </button>
                     </div>
@@ -569,7 +686,9 @@
 
                     <!-- Database Keys Inspector -->
                     <div class="pt-3 border-t border-slate-200">
-                        <h4 class="font-bold text-xs uppercase text-slate-600 mb-2">Synced RTR-CRM Database Tables (<code class="font-mono">localStorage</code> + <code class="font-mono">IndexedDB</code>)</h4>
+                        <h4 class="font-bold text-xs uppercase text-slate-600 mb-2">Synced RTR-CRM Database Tables
+                            (<code class="font-mono">localStorage</code> + <code class="font-mono">IndexedDB</code>)
+                        </h4>
                         <div id="dbTablesSummaryGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                             <!-- Populated via JS -->
                         </div>
@@ -582,17 +701,21 @@
     </main>
 
     <!-- ==================== MODAL: QUICK restock / ADJUST INGREDIENT ==================== -->
-    <div id="restockModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="restockModal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
             <div class="flex items-center justify-between border-b border-slate-200 pb-3">
                 <h3 id="restockModalTitle" class="font-bold text-base text-slate-800">Restock Ingredient</h3>
-                <button id="btnCloseRestockModal" type="button" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                <button id="btnCloseRestockModal" type="button"
+                    class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
             </div>
             <input type="hidden" id="restockIngId" value="">
             <div class="space-y-3">
                 <div>
-                    <label for="restockMode" class="block text-xs font-bold text-slate-700 uppercase mb-1">Adjustment Type</label>
-                    <select id="restockMode" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
+                    <label for="restockMode" class="block text-xs font-bold text-slate-700 uppercase mb-1">Adjustment
+                        Type</label>
+                    <select id="restockMode"
+                        class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white">
                         <option value="add">+ Add Purchase Stock (Restock)</option>
                         <option value="set">= Set Exact Physical Stock Count</option>
                         <option value="deduct">- Deduct Wastage / Scrap</option>
@@ -600,40 +723,55 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label for="restockQty" class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantity *</label>
-                        <input type="number" id="restockQty" value="5" min="0.01" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        <label for="restockQty" class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantity
+                            *</label>
+                        <input type="number" id="restockQty" value="5" min="0.01" step="any"
+                            class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
                     </div>
                     <div>
-                        <label for="restockRate" class="block text-xs font-bold text-slate-700 uppercase mb-1">Unit Cost (₹)</label>
-                        <input type="number" id="restockRate" value="0" min="0" step="any" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+                        <label for="restockRate" class="block text-xs font-bold text-slate-700 uppercase mb-1">Unit Cost
+                            (₹)</label>
+                        <input type="number" id="restockRate" value="0" min="0" step="any"
+                            class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
                     </div>
                 </div>
             </div>
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-200">
-                <button id="btnCancelRestock" type="button" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">Cancel</button>
-                <button id="btnConfirmRestock" type="button" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">Apply Stock Update</button>
+                <button id="btnCancelRestock" type="button"
+                    class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">Cancel</button>
+                <button id="btnConfirmRestock" type="button"
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">Apply
+                    Stock Update</button>
             </div>
         </div>
     </div>
 
     <!-- ==================== MODAL: PASSWORD / CONFIRMATION ==================== -->
-    <div id="passwordModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div id="passwordModal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4">
             <div class="flex items-center justify-between border-b border-slate-200 pb-3">
                 <h3 class="font-bold text-base text-slate-800">Decrypt Encrypted Backup</h3>
-                <button id="btnClosePasswordModal" type="button" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                <button id="btnClosePasswordModal" type="button"
+                    class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
             </div>
-            <p class="text-xs text-slate-600">This backup file is AES-encrypted. Enter the backup password to decrypt and restore it:</p>
-            <input type="password" id="decryptPasswordInput" placeholder="Enter backup password..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+            <p class="text-xs text-slate-600">This backup file is AES-encrypted. Enter the backup password to decrypt
+                and restore it:</p>
+            <input type="password" id="decryptPasswordInput" placeholder="Enter backup password..."
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
             <div class="flex justify-end gap-2 pt-2">
-                <button id="btnCancelPassword" type="button" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">Cancel</button>
-                <button id="btnConfirmPassword" type="button" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold">Decrypt &amp; Restore</button>
+                <button id="btnCancelPassword" type="button"
+                    class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">Cancel</button>
+                <button id="btnConfirmPassword" type="button"
+                    class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold">Decrypt
+                    &amp; Restore</button>
             </div>
         </div>
     </div>
 
     <!-- Toast Notification Container -->
-    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+    <div id="toastContainer"
+        class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
 
     <script>
         // ============================================================================
@@ -653,7 +791,7 @@
                     const str = typeof val === 'string' ? val : JSON.stringify(val);
                     localStorage.setItem(key, str);
                     if (window.electronAPI && typeof window.electronAPI.dbWrite === 'function') {
-                        window.electronAPI.dbWrite(key, val).catch(() => {});
+                        window.electronAPI.dbWrite(key, val).catch(() => { });
                     }
                     return true;
                 } catch (e) {
@@ -667,7 +805,7 @@
                         const k = localStorage.key(i);
                         out[k] = localStorage.getItem(k);
                     }
-                } catch (e) {}
+                } catch (e) { }
                 return out;
             }
         };
@@ -2107,7 +2245,7 @@
 
             // Trigger Electron DB backup if running in desktop shell
             if (window.electronAPI && typeof window.electronAPI.triggerDatabaseBackup === 'function') {
-                try { await window.electronAPI.triggerDatabaseBackup(); } catch (e) {}
+                try { await window.electronAPI.triggerDatabaseBackup(); } catch (e) { }
             }
 
             const blob = new Blob([outputContent], { type: 'application/json;charset=utf-8' });
@@ -2185,7 +2323,7 @@
                         localStorage.setItem(k, JSON.stringify(val));
                     }
                 });
-            } catch (e) {}
+            } catch (e) { }
 
             loadOrInitializeData();
             syncAllToRtrCrmStorage(false);
@@ -2424,4 +2562,5 @@
         });
     </script>
 </body>
+
 </html>

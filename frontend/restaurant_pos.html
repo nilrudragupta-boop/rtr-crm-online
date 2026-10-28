@@ -6,6 +6,8 @@
     <title>Restaurant POS - RISE Tech Revolution</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="apiClient.js"></script>
     <script src="settings.js"></script>
     <script src="brandLoader.js"></script>
@@ -263,7 +265,9 @@
     <div class="pos-header">
         <h2><i class="fas fa-utensils"></i> Restaurant POS - <span data-brand="name"></span></h2>
         <div style="display: flex; gap: 10px;">
-            <button style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="refreshMenu()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button
+                style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                onclick="refreshMenu()"><i class="fas fa-sync-alt"></i> Refresh</button>
             <button
                 style="background: #8e44ad; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;"
                 onclick="showOrderStatus()"><i class="fas fa-bell"></i> Order Status</button>
@@ -292,8 +296,10 @@
                 <div class="totals-row" style="align-items: center; margin-bottom: 12px;">
                     <span>Overall Discount:</span>
                     <div style="display:flex; gap:5px; justify-content: flex-end;">
-                        <input type="number" id="posDiscount" value="0" min="0" oninput="renderCart()" style="width: 70px; padding: 4px; text-align: right; font-weight: bold; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
-                        <select id="posDiscountType" onchange="renderCart()" style="width: 50px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                        <input type="number" id="posDiscount" value="0" min="0" oninput="renderCart()"
+                            style="width: 70px; padding: 4px; text-align: right; font-weight: bold; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                        <select id="posDiscountType" onchange="renderCart()"
+                            style="width: 50px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
                             <option value="flat">₹</option>
                             <option value="%">%</option>
                         </select>
@@ -328,7 +334,9 @@
         <!-- Right Side: Touch-friendly Menu -->
         <div id="menu-section">
             <div style="padding: 15px 15px 0 15px; background: white;">
-                <input type="text" id="menuSearch" placeholder="🔍 Search items by name or code..." oninput="triggerSearch()" style="width: 100%; padding: 10px 15px; border: 1px solid #bdc3c7; border-radius: 20px; font-size: 14px; box-sizing: border-box; outline: none; transition: 0.2s;">
+                <input type="text" id="menuSearch" placeholder="🔍 Search items by name or code..."
+                    oninput="triggerSearch()"
+                    style="width: 100%; padding: 10px 15px; border: 1px solid #bdc3c7; border-radius: 20px; font-size: 14px; box-sizing: border-box; outline: none; transition: 0.2s;">
             </div>
             <div id="categories">
                 <button class="cat-btn active" onclick="filterMenu('All', this)">All</button>
@@ -434,7 +442,7 @@
                 if (inv.items) inv.items.forEach(it => {
                     let itemName = (it.item || "").trim();
                     const noteIdx = itemName.indexOf(' (* '); // Strip POS notes before checking stock
-                    if(noteIdx > -1) itemName = itemName.substring(0, noteIdx).trim();
+                    if (noteIdx > -1) itemName = itemName.substring(0, noteIdx).trim();
                     const key = itemName.toLowerCase() + "|" + (it.itemCode || "").trim().toLowerCase();
                     stockMap[key] = (stockMap[key] || 0) - (parseFloat(it.qty) || 0);
                 });
@@ -483,7 +491,7 @@
         function loadMenuItems() {
             const storedItems = JSON.parse(localStorage.getItem("items")) || [];
             const stockMap = getStockMap();
-            
+
             menuItems = storedItems.map(i => {
                 const key = (i.name || "").trim().toLowerCase() + "|" + (i.itemCode || "").trim().toLowerCase();
                 return {
@@ -550,7 +558,7 @@
                 if (item.itemCode) detailsHtml += `<span style="display:block; color:#7f8c8d; font-size:11px; margin-top:2px;"><b>Code:</b> ${item.itemCode}</span>`;
                 if (item.category && item.category !== 'Uncategorized') detailsHtml += `<span style="display:block; color:#7f8c8d; font-size:11px; margin-top:2px;"><b>Cat:</b> ${item.category}</span>`;
                 if (item.description) detailsHtml += `<span style="display:block; color:#95a5a6; font-size:11px; margin-top:2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.description}">${item.description}</span>`;
-                
+
                 let oosOverlay = isOutOfStock ? `<span style="display:block; color:#e74c3c; font-weight:bold; font-size:11px; margin-top:5px;">OUT OF STOCK</span>` : '';
 
                 card.innerHTML = `
@@ -743,7 +751,7 @@
             const grandTotal = Math.round((subtotal - appliedDisc) + finalTax);
 
             document.getElementById('subtotalDisplay').innerText = `₹${subtotal.toFixed(2)}`;
-            
+
             const discRow = document.getElementById('discountDisplayRow');
             if (discRow) {
                 if (appliedDisc > 0) {
@@ -753,7 +761,7 @@
                     discRow.style.display = 'none';
                 }
             }
-            
+
             document.getElementById('taxDisplay').innerText = `₹${finalTax.toFixed(2)}`;
             document.getElementById('grandTotalDisplay').innerText = `₹${grandTotal.toFixed(2)}`;
         }
@@ -891,7 +899,7 @@
 
             invoices.push(newInv);
             localStorage.setItem("invoices", JSON.stringify(invoices));
-        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(newInv).catch(console.warn);
+            if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(newInv).catch(console.warn);
 
             alert(`Bill Settled Successfully! Invoice Generated: ${invNo}`);
             orderState[currentTable] = []; // Clear the table cart

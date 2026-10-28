@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <title>Production Report</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
@@ -49,7 +51,8 @@
             color: white;
         }
 
-        input, select {
+        input,
+        select {
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -65,22 +68,44 @@
             font-weight: bold;
         }
 
-        .btn-primary { background: #3498db; }
-        .btn-success { background: #27ae60; }
-        .btn-danger { background: #e74c3c; }
+        .btn-primary {
+            background: #3498db;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
 
         /* Dark Mode */
         body.dark-mode {
             background: #121212;
             color: #e0e0e0;
         }
+
         body.dark-mode table {
             background: #2c2c2c;
             border-color: #444;
         }
-        body.dark-mode th { background: #1f1f1f; border-color: #444; }
-        body.dark-mode td { border-color: #444; }
-        body.dark-mode input, body.dark-mode select { background: #3a3a3a; color: white; border-color: #555; }
+
+        body.dark-mode th {
+            background: #1f1f1f;
+            border-color: #444;
+        }
+
+        body.dark-mode td {
+            border-color: #444;
+        }
+
+        body.dark-mode input,
+        body.dark-mode select {
+            background: #3a3a3a;
+            color: white;
+            border-color: #555;
+        }
     </style>
 </head>
 
@@ -123,18 +148,18 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (localStorage.getItem('appThemeMode') === 'dark') document.body.classList.add('dark-mode');
-            
+
             const today = new Date();
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
             document.getElementById('fromDate').valueAsDate = firstDay;
             document.getElementById('toDate').valueAsDate = today;
-            
+
             await loadData();
         });
 
         async function loadData() {
             document.getElementById('reportBody').innerHTML = '<tr><td colspan="8" style="text-align:center;">Loading...</td></tr>';
-            
+
             // Fetch data from backend API
             productions = await apiClient.getProductions();
             renderTable();
@@ -164,7 +189,7 @@
             filtered.forEach(p => {
                 totalMaterial += parseFloat(p.materialCost) || 0;
                 totalEstCost += parseFloat(p.totalCost) || 0;
-                
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = \`
                     <td>\${new Date(p.date || p.createdAt).toLocaleDateString('en-GB')}</td>
@@ -205,4 +230,5 @@
         }
     </script>
 </body>
+
 </html>
