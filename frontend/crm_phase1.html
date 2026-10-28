@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>CRM - Phase 1</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="apiClient.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
@@ -452,7 +454,8 @@
                         <div id="plants" class="section"></div>
                         <div id="activities" class="section"></div>
                         <div id="followups" class="section"></div>
-                        <div id="documents" class="section"></div><div id="business360" class="section"></div>
+                        <div id="documents" class="section"></div>
+                        <div id="business360" class="section"></div>
                     </div>
                 </section>
             </div>
@@ -489,27 +492,27 @@
                 const localOrders = JSON.parse(localStorage.getItem('order_sheets') || '[]').filter(o => String(o.customerId || '') === String(cid) || String(o.customerName || '').toLowerCase() === String(state.selected?.name || '').toLowerCase());
                 const localReminders = JSON.parse(localStorage.getItem('reminders') || '[]').filter(r => String(r.customerId || r.partyId || '') === String(cid) || String(r.cname || r.customerName || '').toLowerCase() === String(state.selected?.name || '').toLowerCase());
                 const timeline = [...(data.timeline || [])];
-                localTickets.forEach(t => timeline.push({ date:t.createdAt || t.updatedAt, type:'Service / Complaint', icon:'fa-headset', reference:t.id || t.ticketNo || '-', status:t.status || 'Open', description:t.subject || 'Customer support ticket' }));
-                localOrders.forEach(o => timeline.push({ date:o.orderDate || o.createdAt, type:'Customer Order / PO', icon:'fa-cart-shopping', reference:o.orderNo || '-', status:o.status || 'Pending', amount:Number(o.grandTotal || 0), description:'Customer order record' }));
-                localReminders.forEach(r => timeline.push({ date:r.enquiryDate || r.reminderDate || r.createdAt, type:'Enquiry / Reminder', icon:'fa-bell', reference:r.billNo || r.__localId || '-', status:r.status || 'Follow-up', description:r.enquiryType || r.reminderFor || 'Customer enquiry / reminder' }));
-                timeline.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+                localTickets.forEach(t => timeline.push({ date: t.createdAt || t.updatedAt, type: 'Service / Complaint', icon: 'fa-headset', reference: t.id || t.ticketNo || '-', status: t.status || 'Open', description: t.subject || 'Customer support ticket' }));
+                localOrders.forEach(o => timeline.push({ date: o.orderDate || o.createdAt, type: 'Customer Order / PO', icon: 'fa-cart-shopping', reference: o.orderNo || '-', status: o.status || 'Pending', amount: Number(o.grandTotal || 0), description: 'Customer order record' }));
+                localReminders.forEach(r => timeline.push({ date: r.enquiryDate || r.reminderDate || r.createdAt, type: 'Enquiry / Reminder', icon: 'fa-bell', reference: r.billNo || r.__localId || '-', status: r.status || 'Follow-up', description: r.enquiryType || r.reminderFor || 'Customer enquiry / reminder' }));
+                timeline.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
                 const s = data.summary || {};
-                const money = n => Number(n || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+                const money = n => Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 box.innerHTML = `<div class="toolbar"><button class="secondary" onclick="loadBusiness360('${esc(cid)}')"><i class="fas fa-sync"></i> Refresh Business History</button></div>
                 <h3 style="margin:5px 0 12px">Integrated Customer Business History</h3>
                 <div class="cards" style="grid-template-columns:repeat(4,minmax(150px,1fr));margin-bottom:15px">
-                    <div class="card"><div class="muted">Quotations</div><div class="num">${s.quotations||0}</div><small>Value ₹${money(s.quotationValue)}</small></div>
-                    <div class="card"><div class="muted">Invoices</div><div class="num">${s.invoices||0}</div><small>₹${money(s.invoicedValue)}</small></div>
+                    <div class="card"><div class="muted">Quotations</div><div class="num">${s.quotations || 0}</div><small>Value ₹${money(s.quotationValue)}</small></div>
+                    <div class="card"><div class="muted">Invoices</div><div class="num">${s.invoices || 0}</div><small>₹${money(s.invoicedValue)}</small></div>
                     <div class="card"><div class="muted">Payments Received</div><div class="num">₹${money(s.paidValue)}</div></div>
                     <div class="card"><div class="muted">Outstanding</div><div class="num">₹${money(s.outstandingValue)}</div></div>
                 </div>
                 <div class="tablewrap"><table class="data"><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Status</th><th>Amount</th><th>Description</th></tr></thead><tbody>
-                ${timeline.map(x=>`<tr><td>${esc(formatBusinessDate(x.date))}</td><td><span class="badge"><i class="fas ${esc(x.icon||'fa-link')}"></i> ${esc(x.type)}</span></td><td><b>${esc(x.reference||'-')}</b></td><td>${esc(x.status||'-')}</td><td>${x.amount ? '₹'+money(x.amount) : '-'}</td><td>${esc(x.description||'')}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No linked business transactions found.</td></tr>'}
+                ${timeline.map(x => `<tr><td>${esc(formatBusinessDate(x.date))}</td><td><span class="badge"><i class="fas ${esc(x.icon || 'fa-link')}"></i> ${esc(x.type)}</span></td><td><b>${esc(x.reference || '-')}</b></td><td>${esc(x.status || '-')}</td><td>${x.amount ? '₹' + money(x.amount) : '-'}</td><td>${esc(x.description || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No linked business transactions found.</td></tr>'}
                 </tbody></table></div>
                 <p class="muted" style="font-size:12px;margin-top:10px">This view combines server-side CRM transactions with existing quotation/invoice data and compatible local Customer Order, Enquiry/Reminder and Support Ticket records. Existing modules are not altered.</p>`;
             } catch (e) { box.innerHTML = `<div class="empty">Unable to load Business 360°.<br><small>${esc(e.message)}</small></div>`; }
         }
-        function formatBusinessDate(v) { if (!v) return '-'; const d=new Date(v); return isNaN(d) ? String(v) : d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+        function formatBusinessDate(v) { if (!v) return '-'; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
 
         function renderContacts(rows) { document.getElementById('contacts').innerHTML = `<div class="toolbar"><button class="primary" onclick="openContact()">+ New Contact</button></div><div class="tablewrap"><table class="data"><thead><tr><th>Name</th><th>Designation</th><th>Department</th><th>Mobile</th><th>Email</th><th>Primary</th></tr></thead><tbody>${rows.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(x.designation)}</td><td>${esc(x.department)}</td><td>${esc(x.mobile)}</td><td>${esc(x.email)}</td><td>${x.isPrimary ? 'Yes' : '-'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No contacts.</td></tr>'}</tbody></table></div>` }
         function renderPlants(rows) { document.getElementById('plants').innerHTML = `<div class="toolbar"><button class="primary" onclick="openPlant()">+ New Plant</button></div><div class="tablewrap"><table class="data"><thead><tr><th>Plant</th><th>Code</th><th>Location</th><th>Industry</th><th>Status</th></tr></thead><tbody>${rows.map(x => `<tr><td><b>${esc(x.plantName)}</b><br><small>${esc(x.unitDetails || '')}</small></td><td>${esc(x.plantCode)}</td><td>${esc([x.district, x.state].filter(Boolean).join(', '))}</td><td>${esc(x.industry)}</td><td>${esc(x.status)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No plants.</td></tr>'}</tbody></table></div>` }

@@ -6,6 +6,8 @@
     <meta charset="UTF-8">
     <title>Credit/Debit Notes</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -377,8 +379,8 @@
 
             <button class="btn-secondary" onclick="openSettingsModal()" style="background:#607d8b;"><i
                     class="fas fa-cog"></i> Settings</button>
-            <button class="btn-danger" id="bulkDeleteBtn" onclick="deleteSelectedNotes()" style="display:none;" data-permission-id="perm_delete_action"><i 
-                    class="fas fa-trash"></i> Delete Selected</button>
+            <button class="btn-danger" id="bulkDeleteBtn" onclick="deleteSelectedNotes()" style="display:none;"
+                data-permission-id="perm_delete_action"><i class="fas fa-trash"></i> Delete Selected</button>
         </div>
 
         <div
@@ -386,7 +388,8 @@
             <table>
                 <thead style="position:sticky; top:0;">
                     <tr>
-                        <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                        <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll"
+                                onclick="toggleSelectAll()"></th>
                         <th style="cursor:pointer;" onclick="handleSort('note_date')">Date <span
                                 id="sort-icon-note_date" class="sort-icon"></span></th>
                         <th style="cursor:pointer;" onclick="handleSort('note_no')">Note No <span id="sort-icon-note_no"
@@ -708,7 +711,7 @@
             const typeFilter = document.getElementById('typeFilter').value;
 
             const filtered = notes.filter(n => {
-                const matchesSearch = Object.values(n).some(val => 
+                const matchesSearch = Object.values(n).some(val =>
                     String(val).toLowerCase().includes(search)
                 );
                 const matchesDate = (!fromDate || n.note_date >= fromDate) && (!toDate || n.note_date <= toDate);
@@ -781,7 +784,7 @@
             renderPaginationControls(totalItems, startIndex + 1, endIndex, totalPages);
             updateLastNoteNoDisplay();
             updateSelectAllState();
-            
+
             if (typeof applyUIPermissions === 'function') {
                 applyUIPermissions();
             }
@@ -1039,14 +1042,14 @@
 
         async function deleteNote(id) {
             if (!confirm("Are you sure you want to permanently delete this note?")) return;
-            
+
             notes = notes.filter(n => n.id !== id);
             localStorage.setItem('credit_debit_notes', JSON.stringify(notes));
-            
+
             if (typeof apiClient !== 'undefined' && apiClient.deleteCreditDebitNote) {
                 apiClient.deleteCreditDebitNote(id).catch(e => console.warn(e));
             }
-            
+
             renderTable();
         }
 
@@ -1069,7 +1072,7 @@
 
         function updateSelectAllState() {
             const selectAllCb = document.getElementById('selectAll');
-            if(!selectAllCb) return;
+            if (!selectAllCb) return;
             const allRows = document.querySelectorAll('.selectRow');
             selectAllCb.checked = allRows.length > 0 && Array.from(allRows).every(cb => selectedIds.has(cb.value));
         }
@@ -1087,7 +1090,7 @@
         async function deleteSelectedNotes() {
             if (selectedIds.size === 0) return;
             if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected note(s)?`)) return;
-            
+
             for (let id of selectedIds) await deleteNote(id);
             selectedIds.clear();
         }
@@ -1283,7 +1286,7 @@
             const typeFilter = document.getElementById('typeFilter').value;
 
             const filtered = notes.filter(n => {
-                const matchesSearch = Object.values(n).some(val => 
+                const matchesSearch = Object.values(n).some(val =>
                     String(val).toLowerCase().includes(search)
                 );
                 const matchesDate = (!fromDate || n.note_date >= fromDate) && (!toDate || n.note_date <= toDate);

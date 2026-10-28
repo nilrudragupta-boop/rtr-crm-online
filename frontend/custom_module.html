@@ -21,6 +21,9 @@
     <!-- Bootstrap JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" defer></script>
 
+
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <!-- Your existing scripts -->
     <script src="apiClient.js" defer></script>
     <script src="settings.js" defer></script>
@@ -944,13 +947,15 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content" style="border-radius:var(--radius-lg);border:1px solid var(--neutral-200);">
                 <div class="modal-header" style="border-bottom:1px solid var(--neutral-200);">
-                    <h5 class="modal-title" id="previewAttachmentTitle" style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;">
+                    <h5 class="modal-title" id="previewAttachmentTitle"
+                        style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;">
                         <i class="fas fa-paperclip" style="color:var(--primary)"></i> Attachment Preview
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" style="padding:20px; text-align: center; background: var(--neutral-100);">
-                    <div id="previewAttachmentContent" style="min-height: 200px; max-height: 60vh; overflow: auto; display: flex; align-items: center; justify-content: center;">
+                    <div id="previewAttachmentContent"
+                        style="min-height: 200px; max-height: 60vh; overflow: auto; display: flex; align-items: center; justify-content: center;">
                     </div>
                 </div>
                 <div class="modal-footer" style="border-top:1px solid var(--neutral-200);">
@@ -1009,7 +1014,7 @@
             const parentInput = document.getElementById(`field_${parentFieldName}`);
             if (!parentInput) return;
             const parentVal = parentInput.value;
-            
+
             moduleFields.forEach(f => {
                 if (f.dependsOn === parentFieldName && f.fieldType === 'select') {
                     const childSelect = document.getElementById(`field_${f.fieldName}`);
@@ -1142,7 +1147,7 @@
                     let optionsToRender = [];
                     if (field.dependsOn && field.optionsRaw && field.optionsRaw.includes(':')) {
                     } else {
-                        optionsToRender = field.optionsRaw && field.optionsRaw.includes(',') && !field.optionsRaw.includes(':') ? field.optionsRaw.split(',').map(s=>s.trim()) : (field.options || []);
+                        optionsToRender = field.optionsRaw && field.optionsRaw.includes(',') && !field.optionsRaw.includes(':') ? field.optionsRaw.split(',').map(s => s.trim()) : (field.options || []);
                     }
                     const opts = optionsToRender.map(o => `<option value="${String(o).replace(/"/g, '&quot;')}">${o}</option>`).join('');
                     inputHTML = `<select id="${id}" class="form-select dynamic-input" ${data} ${reqAttr} ${css} onchange="handleDependentFields('${field.fieldName}')">
@@ -1228,7 +1233,7 @@
                         if (targetModule) {
                             if (targetModule.toLowerCase() === 'customer' || targetModule.toLowerCase() === 'customers') {
                                 const customers = JSON.parse(localStorage.getItem('customers')) || [];
-                                 lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
+                                lookupOptions = customers.map(c => ({ id: c.id, label: (displayField && c[displayField] !== undefined) ? c[displayField] : (c.name || c.id) }));
                             } else if (targetModule.toLowerCase() === 'supplier' || targetModule.toLowerCase() === 'suppliers') {
                                 const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
                                 lookupOptions = suppliers.map(s => ({ id: s.id, label: (displayField && s[displayField] !== undefined) ? s[displayField] : (s.name || s.id) }));
@@ -1244,7 +1249,7 @@
                             }
                         }
                         lookupOptions = [...new Set(lookupOptions)].filter(Boolean);
-                    } catch(e) { console.warn("Error loading lookup options", e); }
+                    } catch (e) { console.warn("Error loading lookup options", e); }
                     const uniqueOps = []; const seen = new Set();
                     lookupOptions.forEach(o => { if (o && o.id && !seen.has(o.id)) { seen.add(o.id); uniqueOps.push(o); } });
                     let lOpts = uniqueOps.map(o => `<option value="${String(o.id).replace(/"/g, '&quot;')}">${String(o.label).replace(/</g, '&lt;')}</option>`).join('');
@@ -1814,7 +1819,7 @@
                                     }
                                 }
                             }
-                        } catch(e) {}
+                        } catch (e) { }
                         if (linkUrl !== '#') {
                             html += `<td title="${linkTitle}"><a href="javascript:void(0)" onclick="openWindow('${linkUrl}', 1200, 800); event.stopPropagation();" style="color: var(--primary); text-decoration: none;">${displayText}</a></td>`;
                         } else {
@@ -2092,9 +2097,9 @@
                     }
                 }
             });
-            
+
             moduleFields.filter(f => !f.dependsOn).forEach(f => handleDependentFields(f.fieldName));
-            
+
             document.querySelectorAll('.dynamic-input').forEach(input => {
                 const key = input.dataset.fieldName;
                 if (input.tagName === 'SELECT') {
@@ -2160,7 +2165,7 @@
             });
 
             applyVisibilityRules();
-            
+
             moduleFields.forEach(f => {
                 if (f.fieldType === 'autonumber') {
                     let nextNum = f.autoStart || 1;
@@ -2241,7 +2246,7 @@
                 try {
                     const fileObj = JSON.parse(record[fieldName]);
                     showPreviewModal(fileObj);
-                } catch(e) { console.error("Error parsing file object", e); }
+                } catch (e) { console.error("Error parsing file object", e); }
             }
         }
 
@@ -2251,7 +2256,7 @@
                 try {
                     const fileObj = JSON.parse(hiddenInput.value);
                     showPreviewModal(fileObj);
-                } catch(e) { console.error("Error parsing file object", e); }
+                } catch (e) { console.error("Error parsing file object", e); }
             }
         }
 
@@ -2463,7 +2468,7 @@
                                     if (match) v = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || v);
                                 }
                             }
-                        } catch(e) {}
+                        } catch (e) { }
                     }
                     return `"${String(v).replace(/"/g, '""')}"`;
                 }).join(',')
@@ -2554,7 +2559,7 @@
                                     if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || val);
                                 }
                             }
-                        } catch(e) {}
+                        } catch (e) { }
                     } else if (field.fieldType === 'date') {
                         const d = new Date(val);
                         if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
@@ -2712,7 +2717,7 @@
                                 if (match) val = (displayField && match[displayField] !== undefined) ? match[displayField] : (match.name || match.label || match.title || val);
                             }
                         }
-                    } catch(e) {}
+                    } catch (e) { }
                 } else if (field.fieldType === 'date') {
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) val = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;

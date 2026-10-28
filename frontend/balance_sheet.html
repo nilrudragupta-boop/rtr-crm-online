@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <title>Balance Sheet</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -576,7 +578,7 @@
                     const discType = p.discType || '%';
                     const discAmt = discType === 'flat' ? discVal : baseAmt * (discVal / 100);
                     const extraCharges = (parseFloat(p.freightCharges) || 0) + (parseFloat(p.packingCharges) || 0) + (parseFloat(p.loadingCharges) || 0);
-                    
+
                     const taxable = baseAmt - discAmt + extraCharges;
                     const tax = taxable * ((parseFloat(p.gst) || 0) / 100);
                     const roundOff = parseFloat(p.roundOff) || 0;
@@ -786,7 +788,7 @@
             // 7. Process Journal Vouchers (JVs) for Balance Sheet Accounts
             const journalVouchers = JSON.parse(localStorage.getItem("journal_vouchers")) || [];
             const nonAccountingTypes = ['Memorandum', 'Purchase Order', 'Sales Order', 'Delivery Note', 'Receipt Note'];
-            
+
             let jvCapital = 0;
             let jvDrawings = 0;
             let jvLoans = 0;
@@ -796,7 +798,7 @@
 
             journalVouchers.forEach(jv => {
                 if (nonAccountingTypes.includes(jv.voucher_type)) return; // Exclude non-accounting
-                
+
                 const isCurrent = jv.date >= fromDate && jv.date <= toDate;
                 const isRetained = jv.date < fromDate;
 
@@ -806,7 +808,7 @@
                     const isDr = entry.type === 'Dr';
                     const amt = parseFloat(entry.debit || entry.credit || 0);
                     if (amt === 0) return;
-                    
+
                     const acc = entry.account;
 
                     if (acc === 'Cash') cashInHand += isDr ? amt : -amt;
@@ -1468,18 +1470,18 @@
                 purchases.forEach(p => {
                     if (p.date <= asOfDate) {
                         const name = (p.supplierName || "Unknown").trim();
-                        
+
                         const baseAmt = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
                         const discVal = parseFloat(p.discount) || 0;
                         const discType = p.discType || '%';
                         const discAmt = discType === 'flat' ? discVal : baseAmt * (discVal / 100);
                         const extraCharges = (parseFloat(p.freightCharges) || 0) + (parseFloat(p.packingCharges) || 0) + (parseFloat(p.loadingCharges) || 0);
-                        
+
                         const taxable = baseAmt - discAmt + extraCharges;
                         const tax = taxable * ((parseFloat(p.gst) || 0) / 100);
                         const roundOff = parseFloat(p.roundOff) || 0;
                         const total = taxable + tax + roundOff;
-                        
+
                         const paid = parseFloat(p.paid) || parseFloat(p.total_paid) || 0;
                         map[name] = (map[name] || 0) + (total - paid);
                     }
@@ -1513,7 +1515,7 @@
                         const amt = parseFloat(entry.debit || entry.credit || 0);
                         if (amt === 0) return;
                         const acc = entry.account;
-                        
+
                         if (type === 'debtors' && customers.some(c => c.name === acc)) {
                             map[acc] = (map[acc] || 0) + (entry.type === 'Dr' ? amt : -amt);
                         } else if (type === 'creditors' && suppliers.some(s => s.name === acc)) {

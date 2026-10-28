@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <title>Employee Management</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -278,81 +280,84 @@
 
     <!-- Employee Form -->
     <div class="controls" style="display: block;">
-        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 10px;" onclick="toggleEmployeeForm()">
+        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin-bottom: 10px;"
+            onclick="toggleEmployeeForm()">
             <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: inherit;">Add / Edit Employee</h3>
-            <button id="toggleFormBtn" type="button" style="background:none; border:none; font-size:1.2em; padding:0; margin:0; cursor:pointer; color:inherit; box-shadow:none;">&#9650;</button>
+            <button id="toggleFormBtn" type="button"
+                style="background:none; border:none; font-size:1.2em; padding:0; margin:0; cursor:pointer; color:inherit; box-shadow:none;">&#9650;</button>
         </div>
         <div id="employeeFormContainer" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-        <input type="hidden" id="empId">
-        <div style="display:flex; flex-direction:column; align-items:center; margin-right:5px;">
-            <img id="empPhotoPreview" src=""
-                style="width:40px; height:40px; object-fit:cover; border-radius:50%; display:none; border:1px solid #ccc; margin-bottom:2px;">
-            <label for="empPhoto" style="cursor:pointer; font-size:20px;" title="Upload Photo">📷</label>
-            <input type="file" id="empPhoto" accept="image/*" style="display:none;" onchange="handlePhotoUpload(this)">
-            <input type="hidden" id="empPhotoBase64">
-            <button onclick="removePhoto()" id="removePhotoBtn"
-                style="display:none; font-size:10px; padding:2px 5px; background:#dc3545; color:white; border:none; border-radius:3px; cursor:pointer; margin-top:2px;">X</button>
-        </div>
-        <input type="text" id="empName" placeholder="Employee Name" style="flex:2;">
-        <input type="text" id="empCode" placeholder="Emp ID (Opt)" style="flex:1;">
-        <div style="flex:1; display:flex; gap:2px;">
-            <select id="empDesignation" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
-                <option value="">Designation</option>
+            <input type="hidden" id="empId">
+            <div style="display:flex; flex-direction:column; align-items:center; margin-right:5px;">
+                <img id="empPhotoPreview" src=""
+                    style="width:40px; height:40px; object-fit:cover; border-radius:50%; display:none; border:1px solid #ccc; margin-bottom:2px;">
+                <label for="empPhoto" style="cursor:pointer; font-size:20px;" title="Upload Photo">📷</label>
+                <input type="file" id="empPhoto" accept="image/*" style="display:none;"
+                    onchange="handlePhotoUpload(this)">
+                <input type="hidden" id="empPhotoBase64">
+                <button onclick="removePhoto()" id="removePhotoBtn"
+                    style="display:none; font-size:10px; padding:2px 5px; background:#dc3545; color:white; border:none; border-radius:3px; cursor:pointer; margin-top:2px;">X</button>
+            </div>
+            <input type="text" id="empName" placeholder="Employee Name" style="flex:2;">
+            <input type="text" id="empCode" placeholder="Emp ID (Opt)" style="flex:1;">
+            <div style="flex:1; display:flex; gap:2px;">
+                <select id="empDesignation" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <option value="">Designation</option>
+                </select>
+                <button onclick="openMasterModal('designation')"
+                    style="padding:0 6px; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer;"
+                    title="Manage Designations">⚙️</button>
+            </div>
+            <div style="flex:1; display:flex; gap:2px;">
+                <select id="empDepartment" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <option value="">Department</option>
+                </select>
+                <button onclick="openMasterModal('department')"
+                    style="padding:0 6px; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer;"
+                    title="Manage Departments">⚙️</button>
+            </div>
+            <input type="number" id="empDutyHours" placeholder="Duty Hrs (Def: 8)" style="flex:1;">
+            <input type="text" id="empContact" placeholder="Contact No. (comma separated)"
+                oninput="this.value = this.value.replace(/[^0-9, ]/g, '')" style="flex:1;">
+            <input type="text" id="empEmail" placeholder="Email (comma separated)" style="flex:1;">
+            <input type="number" id="empSalary" placeholder="Salary (₹)" style="flex:1;">
+            <input type="date" id="empJoiningDate" style="flex:1;">
+            <div
+                style="flex:2; display:flex; gap:5px; align-items:center; background:#f8f9fa; padding:2px; border-radius:4px; border:1px solid #ddd;">
+                <select id="empShiftSelect" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;"
+                    onchange="applyShift()">
+                    <option value="">Custom Shift</option>
+                </select>
+                <button onclick="openShiftModal()"
+                    style="padding:4px 8px; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer;"
+                    title="Manage Shifts">⚙️</button>
+                <input type="time" id="empShiftStart" title="Start Time"
+                    style="width:90px; border:1px solid #ccc; border-radius:4px; padding:4px;">
+                <input type="time" id="empShiftEnd" title="End Time"
+                    style="width:90px; border:1px solid #ccc; border-radius:4px; padding:4px;">
+            </div>
+            <select id="empWeeklyOff" style="flex:1;">
+                <option value="">Weekly Off</option>
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
             </select>
-            <button onclick="openMasterModal('designation')"
-                style="padding:0 6px; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer;"
-                title="Manage Designations">⚙️</button>
-        </div>
-        <div style="flex:1; display:flex; gap:2px;">
-            <select id="empDepartment" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;">
-                <option value="">Department</option>
+            <select id="empHalfDay" style="flex:1;">
+                <option value="">Half Day</option>
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
             </select>
-            <button onclick="openMasterModal('department')"
-                style="padding:0 6px; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer;"
-                title="Manage Departments">⚙️</button>
-        </div>
-        <input type="number" id="empDutyHours" placeholder="Duty Hrs (Def: 8)" style="flex:1;">
-        <input type="text" id="empContact" placeholder="Contact No. (comma separated)"
-            oninput="this.value = this.value.replace(/[^0-9, ]/g, '')" style="flex:1;">
-        <input type="text" id="empEmail" placeholder="Email (comma separated)" style="flex:1;">
-        <input type="number" id="empSalary" placeholder="Salary (₹)" style="flex:1;">
-        <input type="date" id="empJoiningDate" style="flex:1;">
-        <div
-            style="flex:2; display:flex; gap:5px; align-items:center; background:#f8f9fa; padding:2px; border-radius:4px; border:1px solid #ddd;">
-            <select id="empShiftSelect" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;"
-                onchange="applyShift()">
-                <option value="">Custom Shift</option>
-            </select>
-            <button onclick="openShiftModal()"
-                style="padding:4px 8px; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer;"
-                title="Manage Shifts">⚙️</button>
-            <input type="time" id="empShiftStart" title="Start Time"
-                style="width:90px; border:1px solid #ccc; border-radius:4px; padding:4px;">
-            <input type="time" id="empShiftEnd" title="End Time"
-                style="width:90px; border:1px solid #ccc; border-radius:4px; padding:4px;">
-        </div>
-        <select id="empWeeklyOff" style="flex:1;">
-            <option value="">Weekly Off</option>
-            <option value="0">Sunday</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
-        </select>
-        <select id="empHalfDay" style="flex:1;">
-            <option value="">Half Day</option>
-            <option value="0">Sunday</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
-        </select>
-        <button class="action" onclick="saveEmployee()">💾 Save</button>
-        <button class="clear" onclick="clearForm()">♻️ Clear</button>
+            <button class="action" onclick="saveEmployee()">💾 Save</button>
+            <button class="clear" onclick="clearForm()">♻️ Clear</button>
         </div>
     </div>
 
@@ -1237,7 +1242,7 @@
             } else {
                 shiftSelect.value = "";
             }
-            
+
             if (!isEmployeeFormVisible) {
                 toggleEmployeeForm();
             }
