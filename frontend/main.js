@@ -17,6 +17,25 @@ try {
     console.warn("Optional dependencies 'imapflow' or 'mailparser' are missing. Inbox functionality will be disabled.");
 }
 
+// --- F12 AND DEVTOOLS DISABLING ---
+const mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    webPreferences: {
+        devTools: false, // <-- Completely disables F12 and DevTools in Electron
+        preload: path.join(__dirname, 'preload.js'),
+        nodeIntegration: false,
+        contextIsolation: true
+    }
+});
+
+// Also block keyboard accelerators in Electron menus
+mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' || (input.control && input.shift && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j'))) {
+        event.preventDefault();
+    }
+});
+
 // CHANGE THIS if your html file name is different
 const HTML_FILE = 'login.html';
 
