@@ -156,6 +156,10 @@
             color: white;
         }
 
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
         .preview-box {
             background: #e5ddd5;
             background-image: radial-gradient(#d4cbbe 10%, transparent 11%);
@@ -218,6 +222,25 @@
             padding: 10px 12px;
             margin-bottom: 14px;
         }
+
+        .preset-tab-btn {
+            flex: 1;
+            padding: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .preset-tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
     </style>
 </head>
 
@@ -263,14 +286,24 @@
                     </div>
                 </div>
 
-                <!-- Pre-defined Business Templates -->
-                <label>Template Preset:</label>
+                <!-- Pre-defined Business Templates & Custom Button -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label style="margin-bottom: 0;">Template Preset:</label>
+                    <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="openCustomPresetsModal()">
+                        <i class="fas fa-edit"></i> Custom Messages (1-5)
+                    </button>
+                </div>
                 <select id="templateSelect" onchange="onTemplateChange()">
-                    <option value="custom">Custom Message</option>
-                    <option value="invoice">📄 Smart Invoice Bill & Link</option>
-                    <option value="payment_due">🔔 Payment Outstanding Due Reminder</option>
-                    <option value="dispatch">🚚 Order Dispatched & Tracking Alert</option>
-                    <option value="greeting">🌼 Festive Greeting & Offer</option>
+                    <option value="custom">Blank / Custom Message</option>
+                    <optgroup label="Ready Custom Templates (Editable)" id="customPresetsOptGroup">
+                        <!-- Populated dynamically (up to 5 types) -->
+                    </optgroup>
+                    <optgroup label="System Presets">
+                        <option value="invoice">📄 Invoice/Bill & Link</option>
+                        <option value="payment_due">🔔 Payment Outstanding Due Reminder</option>
+                        <option value="dispatch">🚚 Order Dispatched & Tracking Alert</option>
+                        <option value="greeting">🌼 Festive Greeting & Offer</option>
+                    </optgroup>
                 </select>
 
                 <!-- Client-configured UPI ID Container -->
@@ -344,6 +377,49 @@
         </div>
     </div>
 
+    <!-- Modal: Custom Message Templates (1 to 5) -->
+    <div id="customPresetsModal"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
+        <div style="background:var(--card-bg); width:520px; max-width:92%; padding:22px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="margin:0; color:var(--primary); font-size:17px;">
+                    <i class="fas fa-comments"></i> Manage Custom Presets (Up to 5)
+                </h3>
+                <button type="button" onclick="closeCustomPresetsModal()" style="border:none; background:transparent; font-size:18px; cursor:pointer; color:#64748b;">&times;</button>
+            </div>
+            
+            <p style="font-size:12px; color:#64748b; margin-top:0; margin-bottom:12px;">
+                Configure predefined ready-to-send messages with placeholders. Switch tabs to edit each type.
+            </p>
+
+            <div style="display:flex; gap:6px; margin-bottom:14px;" id="presetTabsContainer">
+                <button type="button" class="preset-tab-btn active" onclick="switchPresetTab(0)">Type 1</button>
+                <button type="button" class="preset-tab-btn" onclick="switchPresetTab(1)">Type 2</button>
+                <button type="button" class="preset-tab-btn" onclick="switchPresetTab(2)">Type 3</button>
+                <button type="button" class="preset-tab-btn" onclick="switchPresetTab(3)">Type 4</button>
+                <button type="button" class="preset-tab-btn" onclick="switchPresetTab(4)">Type 5</button>
+            </div>
+
+            <label>Template Label / Title:</label>
+            <input type="text" id="presetTitleInput" placeholder="e.g. Follow-up Inquiry / Thank You Note">
+
+            <label>Template Message Body:</label>
+            <div class="quick-tags" style="margin-bottom:6px;">
+                <span class="quick-tag" onclick="insertPresetTag('{CUSTOMER_NAME}')">{CUSTOMER_NAME}</span>
+                <span class="quick-tag" onclick="insertPresetTag('{BILL_NO}')">{BILL_NO}</span>
+                <span class="quick-tag" onclick="insertPresetTag('{AMOUNT}')">{AMOUNT}</span>
+                <span class="quick-tag" onclick="insertPresetTag('{OUTSTANDING}')">{OUTSTANDING}</span>
+                <span class="quick-tag" onclick="insertPresetTag('{COMPANY_NAME}')">{COMPANY_NAME}</span>
+            </div>
+            <textarea id="presetBodyInput" style="height:110px;" placeholder="Write predefined message text here..."></textarea>
+
+            <div style="text-align:right; margin-top:15px; display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeCustomPresetsModal()">Cancel</button>
+                <button class="btn btn-wa" onclick="saveCustomPresetCurrent()">Save Presets</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Settings & Meta Cloud API -->
     <div id="apiConfigModal"
         style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
@@ -381,6 +457,101 @@
         let invoicesList = [];
         let companyName = "Our Company";
 
+        // Up to 5 predefined editable custom message types
+        const defaultCustomPresets = [
+            { title: "Custom Type 1: Follow-up Reminder", body: "Dear *{CUSTOMER_NAME}*,\n\nHope you are doing well! We wanted to follow up regarding your pending account balance of *{OUTSTANDING}*.\n\nWarm regards,\n*{COMPANY_NAME}*" },
+            { title: "Custom Type 2: Order Confirmation", body: "Hello *{CUSTOMER_NAME}*,\n\nYour order has been confirmed under Bill *#{BILL_NO}* for total value *{AMOUNT}*.\n\nThank you for choosing *{COMPANY_NAME}*!" },
+            { title: "Custom Type 3: General Thank You", body: "Dear *{CUSTOMER_NAME}*,\n\nThank you for visiting us today! We truly appreciate your patronage.\n\nBest wishes,\n*{COMPANY_NAME}*" },
+            { title: "Custom Type 4: Promotional Offer", body: "Greetings *{CUSTOMER_NAME}*!\n\nExciting new offers are now live at *{COMPANY_NAME}*. Get in touch with us today to avail exclusive discounts on your next order." },
+            { title: "Custom Type 5: Feedback Request", body: "Dear *{CUSTOMER_NAME}*,\n\nWe would love to hear about your recent experience with *{COMPANY_NAME}*. Please reply to this message with your valuable feedback." }
+        ];
+
+        let customPresets = [];
+        let activePresetIndex = 0;
+
+        function loadCustomPresets() {
+            try {
+                const stored = localStorage.getItem("custom_wa_presets");
+                if (stored) {
+                    customPresets = JSON.parse(stored);
+                } else {
+                    customPresets = [...defaultCustomPresets];
+                }
+            } catch (e) {
+                customPresets = [...defaultCustomPresets];
+            }
+            while (customPresets.length < 5) {
+                customPresets.push({
+                    title: `Custom Type ${customPresets.length + 1}`,
+                    body: `Hello *{CUSTOMER_NAME}*,\n\nMessage body for type ${customPresets.length + 1}.\n\n*{COMPANY_NAME}*`
+                });
+            }
+            populateCustomPresetsDropdown();
+        }
+
+        function populateCustomPresetsDropdown() {
+            const group = document.getElementById("customPresetsOptGroup");
+            if (!group) return;
+            group.innerHTML = "";
+            customPresets.slice(0, 5).forEach((preset, idx) => {
+                const opt = document.createElement("option");
+                opt.value = `custom_preset_${idx}`;
+                opt.textContent = `💬 ${preset.title || ('Custom Type ' + (idx + 1))}`;
+                group.appendChild(opt);
+            });
+        }
+
+        function openCustomPresetsModal() {
+            activePresetIndex = 0;
+            switchPresetTab(0);
+            document.getElementById("customPresetsModal").style.display = "flex";
+        }
+
+        function closeCustomPresetsModal() {
+            document.getElementById("customPresetsModal").style.display = "none";
+        }
+
+        function switchPresetTab(index) {
+            // Save current fields before switching if modal is open
+            if (document.getElementById("customPresetsModal").style.display === "flex") {
+                customPresets[activePresetIndex].title = document.getElementById("presetTitleInput").value;
+                customPresets[activePresetIndex].body = document.getElementById("presetBodyInput").value;
+            }
+
+            activePresetIndex = index;
+            const tabs = document.querySelectorAll("#presetTabsContainer .preset-tab-btn");
+            tabs.forEach((tab, i) => {
+                if (i === index) tab.classList.add("active");
+                else tab.classList.remove("active");
+            });
+
+            document.getElementById("presetTitleInput").value = customPresets[index].title || `Custom Type ${index + 1}`;
+            document.getElementById("presetBodyInput").value = customPresets[index].body || "";
+        }
+
+        function insertPresetTag(tag) {
+            const area = document.getElementById("presetBodyInput");
+            const start = area.selectionStart;
+            const end = area.selectionEnd;
+            const text = area.value;
+            area.value = text.substring(0, start) + tag + text.substring(end);
+            area.selectionStart = area.selectionEnd = start + tag.length;
+            area.focus();
+        }
+
+        function saveCustomPresetCurrent() {
+            customPresets[activePresetIndex].title = document.getElementById("presetTitleInput").value.trim() || `Custom Type ${activePresetIndex + 1}`;
+            customPresets[activePresetIndex].body = document.getElementById("presetBodyInput").value;
+
+            localStorage.setItem("custom_wa_presets", JSON.stringify(customPresets));
+            populateCustomPresetsDropdown();
+            closeCustomPresetsModal();
+
+            // Auto-select the currently edited preset
+            document.getElementById("templateSelect").value = `custom_preset_${activePresetIndex}`;
+            onTemplateChange();
+        }
+
         document.addEventListener("DOMContentLoaded", async () => {
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getCustomers) {
@@ -395,6 +566,8 @@
                 customersList = JSON.parse(localStorage.getItem("customers")) || [];
                 invoicesList = JSON.parse(localStorage.getItem("invoices")) || [];
             }
+
+            loadCustomPresets();
 
             // Load saved client UPI ID
             const savedUpi = localStorage.getItem("client_business_upi") || "";
@@ -462,7 +635,6 @@
             applyTemplate();
         }
 
-        // Calculates individual invoice outstanding as well as Total Customer Outstanding
         function loadCustomerInvoices(custName) {
             const container = document.getElementById("customerInvoiceList");
             const headerDueBadge = document.getElementById("headerTotalDueBadge");
@@ -476,7 +648,6 @@
                 (inv.customer_name || (inv.customer && inv.customer.name) || inv.customer || "").trim().toLowerCase() === custName.trim().toLowerCase()
             );
 
-            // Compute total outstanding across all records for this party
             let customerObj = customersList.find(c => (c.name || '').trim().toLowerCase() === custName.trim().toLowerCase()) || {};
             let totalCustomerOutstanding = parseFloat(customerObj.openingBalance || 0);
             if (customerObj.openingBalanceType === 'Cr') totalCustomerOutstanding = -totalCustomerOutstanding;
@@ -529,7 +700,6 @@
                 `;
             });
 
-            // Sticky summary footer at the bottom
             html += `
                 <tr style="background:#f1f5f9; font-weight:bold; border-top:2px solid #cbd5e1; height:40px;">
                     <td colspan="3" style="text-align:right; padding-right:10px;">Total Outstanding:</td>
@@ -567,7 +737,6 @@
             const tpl = document.getElementById("templateSelect").value;
             const upiBox = document.getElementById("upiFieldContainer");
 
-            // Show UPI configuration directly when Payment Due Reminder is chosen
             if (tpl === "payment_due") {
                 upiBox.style.display = "block";
             } else {
@@ -603,7 +772,13 @@
                 "your-upi-id@bank";
 
             let text = "";
-            if (tpl === "invoice") {
+
+            if (tpl.startsWith("custom_preset_")) {
+                const pIndex = parseInt(tpl.replace("custom_preset_", ""), 10);
+                if (!isNaN(pIndex) && customPresets[pIndex]) {
+                    text = customPresets[pIndex].body || "";
+                }
+            } else if (tpl === "invoice") {
                 text = `Dear *${cust.name}*,\n\nGreetings from *${companyName}*! 📄\n\nYour Invoice *#${bill.billNo}* dated *${bill.date}* for Amount *₹ ${bill.total}* has been generated successfully.\n\nKindly acknowledge receipt. If you have any questions regarding this billing, feel free to reply directly to this chat.\n\nThank you for choosing us! ✨`;
             } else if (tpl === "payment_due") {
                 const totalDueAmt = (bill.outstanding && parseFloat(bill.outstanding) > 0) ? bill.outstanding : (bill.total || "0.00");
@@ -620,7 +795,6 @@
             updatePreview();
         }
 
-        // Inserts tag at cursor position and replaces with live data preview
         function insertTag(tag) {
             const area = document.getElementById("messageBody");
             const start = area.selectionStart;
@@ -632,7 +806,6 @@
             updatePreview();
         }
 
-        // Resolves placeholders dynamically into real text for dispatch and preview
         function resolveMessagePlaceholders(templateText) {
             const custIdx = document.getElementById("customerSelect").value;
             const cust = customersList[custIdx] || { name: "Valued Customer" };
