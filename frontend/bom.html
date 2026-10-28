@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <title>Bill of Materials (BOM)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -168,6 +170,7 @@
             position: relative;
             display: inline-block;
         }
+
         .action-btn-main {
             background-color: #607d8b;
             color: white;
@@ -178,6 +181,7 @@
             cursor: pointer;
             white-space: nowrap;
         }
+
         .action-dropdown-content {
             display: none;
             position: fixed;
@@ -190,6 +194,7 @@
             padding: 4px 0;
             text-align: left;
         }
+
         .action-dropdown-content button {
             color: #333 !important;
             background: none !important;
@@ -205,10 +210,12 @@
             font-weight: normal !important;
             font-size: 13px !important;
         }
+
         .action-dropdown-content button:hover {
             background-color: #f1f1f1 !important;
             color: #000 !important;
         }
+
         .action-dropdown.active .action-dropdown-content {
             display: block;
         }
@@ -273,7 +280,8 @@
                             <select id="bomName" style="flex: 1;">
                                 <option value="Standard">Standard</option>
                             </select>
-                            <button type="button" class="btn-primary" onclick="openBomNameManager()" title="Manage Recipe Names"
+                            <button type="button" class="btn-primary" onclick="openBomNameManager()"
+                                title="Manage Recipe Names"
                                 style="padding: 0 10px; font-size: 16px; flex: 0;">⚙️</button>
                         </div>
                     </div>
@@ -341,7 +349,9 @@
                 <div style="margin-top: 30px;">
                     <h4>Additional Outputs (By-Products / Co-Products) - <small style="color: #888;">Optional</small>
                     </h4>
-                    <p style="font-size: 12px; color: #666; margin-top: -10px; margin-bottom: 10px;">Note: Production costs (Materials, Labour, Overhead) are allocated entirely to the main Finished Good. By-products are tracked purely for inventory quantity.</p>
+                    <p style="font-size: 12px; color: #666; margin-top: -10px; margin-bottom: 10px;">Note: Production
+                        costs (Materials, Labour, Overhead) are allocated entirely to the main Finished Good.
+                        By-products are tracked purely for inventory quantity.</p>
                     <div class="table-container-scroll" style="max-height: 200px;">
                         <table id="additionalOutputsTable">
                             <thead>
@@ -408,10 +418,12 @@
                     <h3 style="margin:0;">BOM Preview</h3>
                     <span style="cursor:pointer; font-size:24px;" onclick="closeBomViewModal()">&times;</span>
                 </div>
-                <div id="bomViewContent" style="text-align:left; max-height: 65vh; overflow-y:auto; border:1px solid #ddd; padding:15px; border-radius:4px; background:#fff;">
+                <div id="bomViewContent"
+                    style="text-align:left; max-height: 65vh; overflow-y:auto; border:1px solid #ddd; padding:15px; border-radius:4px; background:#fff;">
                 </div>
                 <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
-                    <button class="btn-primary" onclick="printBomFromView()"><i class="fas fa-print"></i> Print BOM</button>
+                    <button class="btn-primary" onclick="printBomFromView()"><i class="fas fa-print"></i> Print
+                        BOM</button>
                     <button class="btn-danger" onclick="closeBomViewModal()">Close</button>
                 </div>
             </div>
@@ -425,7 +437,8 @@
                     <input type="text" id="newBomNameInput" placeholder="Enter new recipe name" style="flex:1;">
                     <button class="btn-success" onclick="addManagedBomName()">Add</button>
                 </div>
-                <div id="managedBomNameList" style="text-align:left; max-height:250px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:4px; margin-bottom:15px; background: #fff;">
+                <div id="managedBomNameList"
+                    style="text-align:left; max-height:250px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:4px; margin-bottom:15px; background: #fff;">
                     <!-- Items -->
                 </div>
                 <div style="display: flex; justify-content: flex-end;">
@@ -632,7 +645,7 @@
             names.forEach((name) => {
                 const div = document.createElement('div');
                 div.style.cssText = "display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee; align-items:center;";
-                
+
                 let buttonsHtml = '';
                 if (name.toLowerCase() !== 'standard') {
                     buttonsHtml = `
@@ -655,7 +668,7 @@
 
             const lowerName = val.toLowerCase();
             const allNames = getAllBomNames();
-            
+
             if (allNames.some(n => n.toLowerCase() === lowerName)) {
                 alert("Recipe name already exists!");
                 return;
@@ -664,7 +677,7 @@
             const customNames = JSON.parse(localStorage.getItem('custom_bom_names')) || [];
             customNames.push(val);
             localStorage.setItem('custom_bom_names', JSON.stringify(customNames));
-            
+
             input.value = '';
             renderManagedBomNames();
             loadBOMNames();
@@ -674,7 +687,7 @@
 
         function editManagedBomName(oldName) {
             if (oldName.toLowerCase() === 'standard') return;
-            
+
             const newName = prompt("Rename Recipe:", oldName);
             if (newName && newName.trim() !== "" && newName.trim() !== oldName) {
                 const trimmedName = newName.trim();
@@ -708,7 +721,7 @@
 
                 renderManagedBomNames();
                 loadBOMNames();
-                
+
                 const select = document.getElementById('bomName');
                 if (select && select.value === oldName) {
                     select.value = trimmedName;
@@ -718,10 +731,10 @@
 
         function deleteManagedBomName(name) {
             if (name.toLowerCase() === 'standard') return;
-            
+
             let boms = JSON.parse(localStorage.getItem("boms")) || [];
             const isUsed = boms.some(b => b.bomName === name);
-            
+
             if (isUsed) {
                 alert('Cannot delete "' + name + '" because it is used in existing BOMs. Rename it instead or change the BOMs first.');
                 return;
@@ -731,7 +744,7 @@
                 let customNames = JSON.parse(localStorage.getItem('custom_bom_names')) || [];
                 customNames = customNames.filter(n => n !== name);
                 localStorage.setItem('custom_bom_names', JSON.stringify(customNames));
-                
+
                 renderManagedBomNames();
                 loadBOMNames();
             }
@@ -1147,11 +1160,11 @@
             }
             if (itemUpdated) {
                 localStorage.setItem("items", JSON.stringify(items));
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].name === finishedGoodName && (!finishedGoodCode || items[i].itemCode === finishedGoodCode)) {
-                    if (typeof apiClient !== 'undefined' && apiClient.saveItem) apiClient.saveItem(items[i]).catch(console.warn);
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].name === finishedGoodName && (!finishedGoodCode || items[i].itemCode === finishedGoodCode)) {
+                        if (typeof apiClient !== 'undefined' && apiClient.saveItem) apiClient.saveItem(items[i]).catch(console.warn);
+                    }
                 }
-            }
             }
 
             alert(cloudSyncFailed
@@ -1182,7 +1195,7 @@
             const tbodyOut = document.querySelector('#additionalOutputsTable tbody');
             tbodyOut.innerHTML = '';
         }
-        
+
         function getStockMap() {
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const invoices = JSON.parse(localStorage.getItem("invoices")) || [];
@@ -1234,20 +1247,20 @@
         function calculateMaxPossible(bom, stockMap) {
             let maxBatches = Infinity;
             if (!bom.rawMaterials || bom.rawMaterials.length === 0) return 0;
-            
+
             for (const rm of bom.rawMaterials) {
                 const rmName = (rm.itemName || "").trim().toLowerCase();
                 const requiredQty = parseFloat(rm.qty) || 0;
                 if (requiredQty <= 0) continue;
-                
+
                 const availableStock = stockMap[rmName] || 0;
                 const possibleBatches = availableStock / requiredQty;
-                
+
                 if (possibleBatches < maxBatches) {
                     maxBatches = possibleBatches;
                 }
             }
-            
+
             if (maxBatches === Infinity || maxBatches < 0) return 0;
             return maxBatches * (parseFloat(bom.outputQty) || 1);
         }
@@ -1345,10 +1358,10 @@
                 `;
                 const totalCostDisplay = bom.totalEstimatedCost ? `<strong>₹${parseFloat(bom.totalEstimatedCost).toFixed(2)}</strong>` : '-';
                 const outputDisplay = `${bom.outputQty} ${bom.outputUom || ''}`;
-                
+
                 const maxPossible = calculateMaxPossible(bom, stockMap);
                 const maxPossibleDisplay = `<span style="font-weight: bold; color: #27ae60;">${maxPossible.toFixed(2)} ${bom.outputUom || ''}</span>`;
-                
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="text-align: center;">${sl++}</td>
@@ -1455,7 +1468,7 @@
                 }
             }
             if (itemUpdated) localStorage.setItem("items", JSON.stringify(items));
-        if (itemUpdated && typeof apiClient !== 'undefined' && apiClient.saveItem) items.forEach(i => { if (i.name === bom.finishedGoodName && (!bom.finishedGoodCode || i.itemCode === bom.finishedGoodCode)) apiClient.saveItem(i).catch(console.warn); });
+            if (itemUpdated && typeof apiClient !== 'undefined' && apiClient.saveItem) items.forEach(i => { if (i.name === bom.finishedGoodName && (!bom.finishedGoodCode || i.itemCode === bom.finishedGoodCode)) apiClient.saveItem(i).catch(console.warn); });
 
             alert(cloudSyncFailed
                 ? "BOM rates updated locally, but cloud sync failed."
