@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Reminder</title>
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
@@ -1221,8 +1223,8 @@
     <script>
 
         /* ================= GLOBAL DATA ================= */
-            const authQuery = typeof apiClient !== 'undefined' ? apiClient._getAuthQuery() : '';
-            const API = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:9883104847/api';
+        const authQuery = typeof apiClient !== 'undefined' ? apiClient._getAuthQuery() : '';
+        const API = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://localhost:9883104847/api';
 
         const district = document.getElementById('district');
         const state = document.getElementById('state');
@@ -1431,7 +1433,7 @@ service cloud.firestore {
                     const op = it.op;
                     const rec = it.record;
                     if (op === 'create') {
-                            const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create + authQuery, {
+                        const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create + authQuery, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec)
                         });
                         if (res.ok) {
@@ -1444,14 +1446,14 @@ service cloud.firestore {
                         const id = rec.__remoteId;
                         let res;
                         if (id) {
-                                res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.update + '/' + encodeURIComponent(id) + authQuery, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
+                            res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.update + '/' + encodeURIComponent(id) + authQuery, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
                         } else {
-                                res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create + authQuery, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
+                            res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.create + authQuery, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rec) });
                         }
                         if (res && res.ok) { const body = await res.json(); const rid = body.id || body._id || body.remoteId; if (rid) { const idx = data.findIndex(d => d.__localId === rec.__localId); if (idx > -1) { data[idx].__remoteId = rid; data[idx].__lastModified = new Date().toISOString(); localStorage.setItem('reminders', JSON.stringify(data)); } } await deleteQueueItem(it.id); } else { console.error('Failed update', res ? await res.text() : 'no response'); }
                     } else if (op === 'delete') {
                         const id = rec.__remoteId;
-                            if (id) { const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.delete + '/' + encodeURIComponent(id) + authQuery, { method: 'DELETE' }); if (res.ok || res.status === 404) { await deleteQueueItem(it.id); } else { console.error('Failed delete', await res.text()); } } else { await deleteQueueItem(it.id); }
+                        if (id) { const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.delete + '/' + encodeURIComponent(id) + authQuery, { method: 'DELETE' }); if (res.ok || res.status === 404) { await deleteQueueItem(it.id); } else { console.error('Failed delete', await res.text()); } } else { await deleteQueueItem(it.id); }
                     }
                 } catch (e) { console.error('Queue processing error', e); setSyncStatus('Sync error: ' + (e.message || e), true); return; }
             }
@@ -1466,7 +1468,7 @@ service cloud.firestore {
         async function fetchFromServer() {
             if (!navigator.onLine) { setSyncStatus('Offline — cannot fetch'); return; }
             try {
-                    const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.list + authQuery);
+                const res = await fetch(SYNC_CONFIG.baseUrl + SYNC_CONFIG.endpoints.list + authQuery);
                 if (!res.ok) { console.warn('Failed fetching remote', res.status); return; }
                 const serverData = await res.json();
                 if (!Array.isArray(serverData)) return;
@@ -2795,11 +2797,11 @@ Thanking You
                 // Ignore if snoozed until a future time
                 if (r.snoozedUntil && new Date(r.snoozedUntil) > now) return false;
 
-                 const reminderDateTime = new Date(`${r.reminderDate}T${r.reminderTime || '09:00:00'}`);
+                const reminderDateTime = new Date(`${r.reminderDate}T${r.reminderTime || '09:00:00'}`);
                 // Show if the reminder time is in the past
                 return reminderDateTime <= now;
             });
-            
+
             let followUps = [];
             try { followUps = JSON.parse(localStorage.getItem('follow_ups')) || []; } catch (e) { }
             const dueFollowUps = followUps.filter(f => {
@@ -2811,7 +2813,7 @@ Thanking You
 
                 return followUpDateTime <= now;
             }).map(f => ({ __localId: f.id, cname: f.partyName, reminderFor: 'Follow-up', billNo: '-', reminderDate: f.date, reminderTime: '', message: f.notes || 'No message.' }));
-            
+
             const allDue = [...due, ...dueFollowUps];
             if (allDue.length === 0) { hideModal(); return; }
 
@@ -2826,7 +2828,7 @@ Thanking You
                 const item = document.createElement('div');
                 item.className = 'reminder-item';
 
-                 let editAction = '';
+                let editAction = '';
                 if (r.__localId.startsWith('fu_')) {
                     editAction = `onclick="openWindow('follow_up.html?id=${r.__localId}', 1100, 700); hideModal();" style="cursor:pointer;" title="Click to edit this follow-up"`;
                 }
@@ -2853,7 +2855,7 @@ Thanking You
                             loadTable();
                         }
 
-                    
+
                         item.remove();
                         if (!dueList.querySelector('.reminder-item')) hideModal();
                     }
@@ -2873,7 +2875,7 @@ Thanking You
                     stopNotificationSound();
                     const minutes = parseInt(snoozeInput.value, 10);
                     if (isNaN(minutes) || minutes < 1) { alert('Enter valid snooze minutes (>=1)'); return; }
-                     if (r.__localId.startsWith('fu_')) {
+                    if (r.__localId.startsWith('fu_')) {
                         const fIdx = followUps.findIndex(f => f.id === r.__localId);
                         if (fIdx > -1) { followUps[fIdx].snoozedUntil = new Date(Date.now() + minutes * 60000).toISOString(); localStorage.setItem('follow_ups', JSON.stringify(followUps)); }
                     } else {
