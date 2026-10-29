@@ -1552,14 +1552,12 @@ body.top-tab-unfolded .sidebar-search-container {
                             <i class="fas fa-cloud-download-alt"></i>
                             <span class="nav-text">Cloud Restore</span>
                         </button>
-
-                        <button class="nav-item" id="vaultLedgerBtn" onclick="openShadowLedgerSecurely()"
-                             data-permission-id="perm_vault_ledger" title="Vault Ledger"
-                            style="display: none;" data-search-ignore="true">
-                            <i class="fas fa-user-secret"></i>
-                            <span class="nav-text">Vault Ledger</span>
-                        </button>
-
+                        <button class="nav-item" id="vaultLedgerBtn" onclick="openWindow('vault_ledger.html', 1000, 800)"
+    data-permission-id="perm_vault_ledger" title="Vault Ledger"
+    style="display: none !important;" data-search-ignore="true">
+    <i class="fas fa-user-secret"></i>
+    <span class="nav-text">Vault Ledger</span>
+</button>
                         <button class="nav-item" id="closeAllBtn" onclick="closeAllWindows()"
                             style="display:none; background: rgba(231, 74, 59, 0.2);"
                             data-permission-id="perm_close_all_windows" title="Close All Windows">
@@ -3131,31 +3129,36 @@ body.top-tab-unfolded .sidebar-search-container {
         let secretTapTimer = null;
 
         function handleSecretTap() {
-            secretTapCount++;
-            clearTimeout(secretTapTimer);
-            if (secretTapCount >= 5) {
-                secretTapCount = 0;
-                const vaultBtn = document.getElementById('vaultLedgerBtn');
-                if (vaultBtn) vaultBtn.click();
-            } else {
-                secretTapTimer = setTimeout(() => { secretTapCount = 0; }, 2000);
-            }
-        }
-
-        function applyShadowLedgerVisibility() {
-    const isVisible = localStorage.getItem('show_shadow_ledger') === 'true';
-    const btn = document.getElementById('vaultLedgerBtn');
-    if (btn) {
-        btn.style.setProperty('display', isVisible ? (document.body.classList.contains('top-tab-unfolded') ? 'inline-flex' : 'flex') : 'none', 'important');
+    secretTapCount++;
+    clearTimeout(secretTapTimer);
+    if (secretTapCount >= 5) {
+        secretTapCount = 0;
+        const vaultBtn = document.getElementById('vaultLedgerBtn');
+        if (vaultBtn) vaultBtn.click();
+    } else {
+        secretTapTimer = setTimeout(() => { secretTapCount = 0; }, 2000);
     }
 }
 
-// Global auto-hide helper to ensure Vault Ledger hides upon any navigation or menu action
-function autoHideVaultLedger() {
-    if (localStorage.getItem('show_shadow_ledger') === 'true') {
-        localStorage.setItem('show_shadow_ledger', 'false');
-        applyShadowLedgerVisibility();
+        function applyShadowLedgerVisibility() {
+    const isVisible = localStorage.getItem('show_vault_ledger') === 'true' || 
+                      localStorage.getItem('show_shadow_ledger') === 'true';
+    const btn = document.getElementById('vaultLedgerBtn');
+    
+    if (btn) {
+        if (!isVisible) {
+            btn.style.setProperty('display', 'none', 'important');
+        } else {
+            const displayType = document.body.classList.contains('top-tab-unfolded') ? 'inline-flex' : 'flex';
+            btn.style.setProperty('display', displayType, 'important');
+        }
     }
+}
+
+function autoHideVaultLedger() {
+    localStorage.setItem('show_vault_ledger', 'false');
+    localStorage.setItem('show_shadow_ledger', 'false');
+    applyShadowLedgerVisibility();
 }
 
         // Track opened windows
@@ -3855,24 +3858,27 @@ function autoHideVaultLedger() {
             setInterval(() => showDueReminders({ openModal: false }), 15000);
             document.addEventListener('DOMContentLoaded', () => showDueReminders({ openModal: false }));
 
-            let vaultShortcutPressed = false;
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey && e.altKey && e.shiftKey && (e.key === 'V' || e.key === 'v')) {
-                    e.preventDefault();
-                    if (e.repeat) return;
-                    vaultShortcutPressed = true;
-                }
-            });
+            
+            // Global Handler: Ctrl + Alt + Shift + Z
+window.addEventListener('keydown', function (e) {
+    // Check physical code ('KeyZ') or key character ('z' / 'Z')
+    const isZ = e.code === 'KeyZ' || (e.key && e.key.toLowerCase() === 'z');
 
-            document.addEventListener('keyup', (e) => {
-                // Trigger on releasing 'V' only if the full shortcut was pressed
-                if (vaultShortcutPressed && (e.key === 'V' || e.key === 'v')) {
-                    vaultShortcutPressed = false; // Reset the flag
-                    if (!isSpaMode) return; // Restrict shortcut to SPA mode only
-                    const vaultBtn = document.getElementById('vaultLedgerBtn');
-                    if (vaultBtn) vaultBtn.click(); // Open window on key up
-                }
-            });
+    if (e.ctrlKey && e.altKey && e.shiftKey && isZ) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof e.stopImmediatePropagation === 'function') {
+            e.stopImmediatePropagation();
+        }
+
+        // Open vault ledger
+        if (typeof openWindow === 'function') {
+            openWindow('vault_ledger.html', 1000, 800);
+        } else {
+            window.open('vault_ledger.html', 'VaultLedger', 'width=1000,height=800,resizable=yes,scrollbars=yes');
+        }
+    }
+}, true); // The `true` parameter forces capture phase BEFORE anti-debug or child scripts intercept it
 
             // Inject Dynamic Custom Pages
             function loadDynamicCustomPages() {
@@ -4018,8 +4024,8 @@ function autoHideVaultLedger() {
             }
 
             // Auto-hide the Vault Ledger button when navigating (including clicking it)
-            if (localStorage.getItem('show_shadow_ledger') === 'true') {
-                localStorage.setItem('show_shadow_ledger', 'false');
+            if (localStorage.getItem('show_vault_ledger') === 'true') {
+                localStorage.setItem('show_vault_ledger', 'false');
                 if (typeof applyShadowLedgerVisibility === 'function') applyShadowLedgerVisibility();
             }
 
@@ -7977,6 +7983,29 @@ function autoHideVaultLedger() {
             if (e.key === 'lastChatterCheck') checkUnreadChatter();
         });
 
+        window.addEventListener('keydown', function (e) {
+  // Check code (KeyZ) or fallback to key ('z'/'Z')
+  const isZ = e.code === 'KeyZ' || e.key.toLowerCase() === 'z';
+
+  if (e.ctrlKey && e.altKey && e.shiftKey && isZ) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Option A: Toggle button visibility if you want to reveal the button first
+    const btn = document.getElementById('vaultLedgerBtn');
+    if (btn) {
+      btn.style.display = (btn.style.display === 'none' || !btn.style.display) ? 'inline-flex' : 'none';
+    }
+
+    // Option B: Directly execute the ledger function
+    if (typeof openShadowLedger === 'function') {
+      openShadowLedger();
+    } else {
+      console.warn('openShadowLedger() function is not defined in scope.');
+    }
+  }
+}, true); // useCapture = true ensures it intercepts before child handlers stop propagation
+
 
 
         // Storage Key for LocalStorage
@@ -8105,6 +8134,17 @@ function saveMenuPlacement(mode) {
                 }
             });
         }
+
+        window.addEventListener('keydown', (event) => {
+  // Use event.code === 'KeyZ' to match the physical key regardless of caps/layout
+  const isZ = event.code === 'KeyZ' || event.key.toLowerCase() === 'z';
+  
+  if (event.ctrlKey && event.altKey && event.shiftKey && isZ) {
+    event.preventDefault(); // Stop default browser behavior
+    event.stopPropagation();
+    toggleShadowLedger();
+  }
+});
 
 
         // Triggers a centered modal notification and reloads after 10 seconds
