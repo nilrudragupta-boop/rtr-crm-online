@@ -4885,10 +4885,17 @@
         if (btnImportCsvEl) {
             btnImportCsvEl.addEventListener("click", () => {
                 currentImportType = 'csv';
-                initiateSecureAction('Data Import', () => {
+                const openModal = () => {
                     document.getElementById("overlay").style.display = "block";
                     document.getElementById("importWarningModal").style.display = "block";
-                });
+                };
+
+                // If in Electron and OTP API is active, require OTP; otherwise bypass directly
+                if (window.electronAPI && typeof window.electronAPI.requestOtp === 'function') {
+                    initiateSecureAction('Data Import', openModal);
+                } else {
+                    openModal();
+                }
             });
         }
 
