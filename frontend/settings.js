@@ -379,6 +379,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_gst_report', label: 'GST Report', feature: 'gst' },
     { id: 'perm_ledger_report', label: 'Ledger Report' },
     { id: 'perm_settings', label: 'Settings' },
+    { id: 'perm_vault_ledger', label: 'Vault Ledger' },
     { id: 'perm_credit_debit_notes', label: 'Credit/Debit Notes' },
     { id: 'perm_return_management', label: 'Returns Management' },
     { id: 'perm_scrap_inventory', label: 'Scrap Inventory', feature: 'inventory' },

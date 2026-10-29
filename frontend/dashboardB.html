@@ -1553,8 +1553,8 @@ body.top-tab-unfolded .sidebar-search-container {
                             <span class="nav-text">Cloud Restore</span>
                         </button>
 
-                        <button class="nav-item" id="vaultLedgerBtn"
-                            onclick="openWindow('shadow_ledger.html', 1200, 800)" title="Vault Ledger"
+                        <button class="nav-item" id="vaultLedgerBtn" onclick="openShadowLedgerSecurely()"
+                             data-permission-id="perm_vault_ledger" title="Vault Ledger"
                             style="display: none;" data-search-ignore="true">
                             <i class="fas fa-user-secret"></i>
                             <span class="nav-text">Vault Ledger</span>
@@ -3143,10 +3143,20 @@ body.top-tab-unfolded .sidebar-search-container {
         }
 
         function applyShadowLedgerVisibility() {
-            const isVisible = localStorage.getItem('show_shadow_ledger') === 'true';
-            const btn = document.getElementById('vaultLedgerBtn');
-            if (btn) btn.style.display = isVisible ? 'flex' : 'none';
-        }
+    const isVisible = localStorage.getItem('show_shadow_ledger') === 'true';
+    const btn = document.getElementById('vaultLedgerBtn');
+    if (btn) {
+        btn.style.setProperty('display', isVisible ? (document.body.classList.contains('top-tab-unfolded') ? 'inline-flex' : 'flex') : 'none', 'important');
+    }
+}
+
+// Global auto-hide helper to ensure Vault Ledger hides upon any navigation or menu action
+function autoHideVaultLedger() {
+    if (localStorage.getItem('show_shadow_ledger') === 'true') {
+        localStorage.setItem('show_shadow_ledger', 'false');
+        applyShadowLedgerVisibility();
+    }
+}
 
         // Track opened windows
         const openedWindows = {};
@@ -3161,24 +3171,22 @@ body.top-tab-unfolded .sidebar-search-container {
         }
 
         function returnToDashboard() {
-            const iframe = document.getElementById('spaIframe');
-            const mainContent = document.getElementById('mainDashboardContent');
-            if (iframe && mainContent) {
-                iframe.style.display = 'none';
-                iframe.src = '';
-                mainContent.style.display = 'block';
-            }
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active-window', 'open-window'));
+    const iframe = document.getElementById('spaIframe');
+    const mainContent = document.getElementById('mainDashboardContent');
+    if (iframe && mainContent) {
+        iframe.style.display = 'none';
+        iframe.src = '';
+        mainContent.style.display = 'block';
+    }
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active-window', 'open-window'));
 
-            // Seamlessly refresh the KPIs and Charts with the latest data
-            loadDashboardData();
+    // Seamlessly refresh the KPIs and Charts with the latest data
+    loadDashboardData();
 
-            // Auto-hide the Vault Ledger button when navigating
-            if (localStorage.getItem('show_shadow_ledger') === 'true') {
-                localStorage.setItem('show_shadow_ledger', 'false');
-                if (typeof applyShadowLedgerVisibility === 'function') applyShadowLedgerVisibility();
-            }
-        }
+    // Auto-hide the Vault Ledger button
+    autoHideVaultLedger();
+}
+
 
         function toggleSection(wrapperId, headerElement) {
             const wrapper = document.getElementById(wrapperId);
@@ -8440,6 +8448,8 @@ function saveMenuPlacement(mode) {
             const overflowBox = document.getElementById('topTabOverflowContainer');
             const overflowMenu = document.getElementById('topTabOverflowMenu');
 
+            
+
             // Reset any overflow items back to original wrappers before changing layout
             if (overflowMenu) {
                 const movedItems = Array.from(overflowMenu.querySelectorAll('.nav-item'));
@@ -8509,6 +8519,25 @@ function saveMenuPlacement(mode) {
         document.addEventListener('DOMContentLoaded', () => {
             applyMenuPlacement();
         });
+
+
+        // Universal click interceptor: auto-closes "More ▾" & horizontal dropdowns, and hides Vault Ledger
+document.addEventListener('click', (e) => {
+    const navBtn = e.target.closest('.nav-item');
+    
+    // If any navigation button was clicked (except the secret vault button itself)
+    if (navBtn && navBtn.id !== 'vaultLedgerBtn') {
+        autoHideVaultLedger();
+        closeTopTabOverflowMenu();
+        closeHorizontalMenuDropdowns();
+    }
+
+    // Close "More ▾" menu when clicking outside the overflow container
+    const overflowContainer = document.getElementById('topTabOverflowContainer');
+    if (overflowContainer && !overflowContainer.contains(e.target)) {
+        closeTopTabOverflowMenu();
+    }
+});
     </script>
 </body>
 </html>
