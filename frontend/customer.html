@@ -2106,15 +2106,42 @@
             document.getElementById("custName").focus();
         }
 
-        function openInvoice(name) {
-            const win = window.open(`invoice.html?custName=${encodeURIComponent(name)}`, 'invoice', 'width=800,height=600,resizable=yes,scrollbars=yes');
-            if (win) win.focus();
-        }
+        function openInDashboardWindow(url, width = 1000, height = 750) {
+    // 1. Check if customer.html is running inside the SPA iframe of the dashboard
+    if (window.parent && window.parent !== window && typeof window.parent.openWindow === 'function') {
+        window.parent.openWindow(url, width, height);
+        return;
+    }
 
-        function openLedger(name) {
-            const win = window.open(`ledger.html?customer=${encodeURIComponent(name)}`, 'ledger', 'width=1000,height=800,resizable=yes,scrollbars=yes');
-            if (win) win.focus();
+    // 2. Check if customer.html was opened as a pop-up window from the dashboard
+    if (window.opener && !window.opener.closed) {
+        if (typeof window.opener.openWindow === 'function') {
+            window.opener.openWindow(url, width, height);
+            window.opener.focus();
+            return;
+        } else {
+            // If the dashboard doesn't have openWindow, redirect the dashboard window directly
+            window.opener.location.href = url;
+            window.opener.focus();
+            return;
         }
+    }
+
+    // 3. Fallback: Standalone window
+    window.location.href = url;
+}
+
+function openInvoice(name) {
+    if (!name) return showToast("Customer name is missing", "toast-warning");
+    const targetUrl = `invoice.html?custName=${encodeURIComponent(name)}`;
+    openInDashboardWindow(targetUrl, 900, 700);
+}
+
+function openLedger(name) {
+    if (!name) return showToast("Customer name is missing", "toast-warning");
+    const targetUrl = `ledger.html?customer=${encodeURIComponent(name)}`;
+    openInDashboardWindow(targetUrl, 1100, 800);
+}
 
         async function saveCustomer() {
             const id = document.getElementById("custId").value;
