@@ -659,6 +659,7 @@
                                 id="sort-icon-description"></span></th>
                         <th style="cursor:pointer;" onclick="handleHeaderClick('salePrice')">Sale Price <span
                                 id="sort-icon-salePrice"></span></th>
+                        <th>Avg. Purchase Price (₹)</th>
                         <th style="cursor:pointer;" onclick="handleHeaderClick('gst')">GST % <span
                                 id="sort-icon-gst"></span></th>
                         <th style="width: 140px;">Actions</th>
@@ -989,17 +990,23 @@
 
         // Dynamic Fields Config
         let dynamicFieldsList = [];
-        let baseFixedCols = 17; // Including Checkbox and Sl No and Actions
+        let baseFixedCols = 18; // Including Checkbox and Sl No and Actions
 
-        let defaultVisibility = new Array(17).fill(true);
-        [5, 8, 9, 10, 11].forEach(i => defaultVisibility[i] = false);
-        let columnVisibility = JSON.parse(localStorage.getItem("itemColumnVisibility")) || defaultVisibility;
-        if (columnVisibility.length < 17) {
-            let newVis = new Array(17).fill(true);
-            [5, 8, 9, 10, 11].forEach(i => newVis[i] = false);
+        let defaultVisibility = new Array(18).fill(true);
+        [5, 8, 9, 10, 11, 15].forEach(i => defaultVisibility[i] = false);
+        const savedColumnVisibility = JSON.parse(localStorage.getItem("itemColumnVisibility"));
+        let columnVisibility = Array.isArray(savedColumnVisibility) ? savedColumnVisibility : defaultVisibility.slice();
+        if (Array.isArray(savedColumnVisibility) && localStorage.getItem("itemAvgPriceColumnVersion") !== "1") {
+            columnVisibility.splice(15, 0, false);
+            localStorage.setItem("itemAvgPriceColumnVersion", "1");
+        }
+        if (columnVisibility.length < 18) {
+            const newVis = defaultVisibility.slice();
             for (let i = 0; i < columnVisibility.length; i++) newVis[i] = columnVisibility[i];
             columnVisibility = newVis;
         }
+        localStorage.setItem("itemColumnVisibility", JSON.stringify(columnVisibility));
+        localStorage.setItem("itemAvgPriceColumnVersion", "1");
 
         async function fetchCustomFieldsConfig() {
             try {
@@ -1034,7 +1041,7 @@
                 theadTr.insertBefore(th, actionsTh);
             });
 
-            const totalCols = baseFixedCols + dynamicFieldsList.length - 1; // excluding actions? 
+            const totalCols = baseFixedCols + dynamicFieldsList.length;
             if (columnVisibility.length < totalCols) {
                 let newVis = new Array(totalCols).fill(true);
                 for (let i = 0; i < columnVisibility.length; i++) newVis[i] = columnVisibility[i];
@@ -1674,8 +1681,84 @@
         }
 
         // 🔹 Render items into table
+        function calculateAveragePurchasePrices() {
+            const catalogItems = JSON.parse(localStorage.getItem("items")) || [];
+            const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            const returns = JSON.parse(localStorage.getItem("returns")) || [];
+            const scraps = JSON.parse(localStorage.getItem("scraps")) || [];
+            const totals = new Map();
+
+            const identityKey = (name, code) => `${name.toLowerCase()}|${code.toLowerCase()}`;
+
+            function getBucket(name, code, uom) {
+                const normalizedName = (name || "").trim().toLowerCase();
+                const normalizedCode = (code || "").trim().toLowerCase();
+                const normalizedUom = (uom || "").trim().toLowerCase();
+                const exact = totals.get(identityKey(normalizedName, normalizedCode));
+                if (exact && exact.has(normalizedUom)) return exact.get(normalizedUom);
+
+                for (const [identity, uomTotals] of totals) {
+                    const [candidateName, candidateCode] = identity.split("|");
+                    if (candidateName !== normalizedName || (normalizedCode && candidateCode !== normalizedCode)) continue;
+                    if (normalizedUom && uomTotals.has(normalizedUom)) return uomTotals.get(normalizedUom);
+                    if (!normalizedUom && uomTotals.size === 1) return uomTotals.values().next().value;
+                }
+                return null;
+            }
+
+            purchases.forEach(purchase => {
+                const name = (purchase.itemName || "").trim();
+                if (!name) return;
+                const codeRaw = (purchase.itemCode || "").trim();
+                const masterItem = catalogItems.find(item =>
+                    (item.name || "").trim().toLowerCase() === name.toLowerCase() &&
+                    (!codeRaw || (item.itemCode || "").trim().toLowerCase() === codeRaw.toLowerCase())
+                ) || catalogItems.find(item => (item.name || "").trim().toLowerCase() === name.toLowerCase());
+                const code = codeRaw || masterItem?.itemCode || "";
+                const uom = (purchase.uom || "").trim().toLowerCase();
+                const identity = identityKey(name, code);
+                if (!totals.has(identity)) totals.set(identity, new Map());
+                const uomTotals = totals.get(identity);
+                if (!uomTotals.has(uom)) uomTotals.set(uom, { purchased: 0, totalCost: 0 });
+
+                const quantity = parseFloat(purchase.qty) || 0;
+                const baseAmount = quantity * (parseFloat(purchase.price) || 0);
+                const discountValue = parseFloat(purchase.discount) || 0;
+                const discountAmount = (purchase.discType || '%') === 'flat'
+                    ? discountValue
+                    : baseAmount * (discountValue / 100);
+                const extraCharges = (parseFloat(purchase.freightCharges) || 0) +
+                    (parseFloat(purchase.packingCharges) || 0) + (parseFloat(purchase.loadingCharges) || 0);
+
+                uomTotals.get(uom).purchased += quantity;
+                uomTotals.get(uom).totalCost += baseAmount - discountAmount + extraCharges;
+            });
+
+            returns.forEach(record => {
+                if (record.return_type !== 'Purchase Return' && record.return_type !== 'Damage') return;
+                if (!Array.isArray(record.items)) return;
+                (record.items || []).forEach(item => {
+                    const bucket = getBucket(item.item_name, item.itemCode, item.uom);
+                    if (bucket) bucket.purchased -= parseFloat(item.qty) || 0;
+                });
+            });
+
+            scraps.forEach(scrap => {
+                const bucket = getBucket(scrap.itemName, scrap.itemCode, scrap.uom);
+                if (bucket) bucket.purchased -= parseFloat(scrap.qty) || 0;
+            });
+
+            const averagePrices = new Map();
+            catalogItems.forEach(item => {
+                const bucket = getBucket(item.name, item.itemCode, item.uom);
+                averagePrices.set(String(item.id), bucket && bucket.purchased > 0 ? bucket.totalCost / bucket.purchased : 0);
+            });
+            return averagePrices;
+        }
+
         function renderItems(list, startIndex = 0) {
             const table = document.getElementById("itemTable");
+            const averagePrices = calculateAveragePurchasePrices();
             const searchName = document.getElementById("searchName").value.trim();
             const searchCode = document.getElementById("searchCode").value.trim();
             const searchIndex = document.getElementById("searchIndex").value.trim();
@@ -1692,6 +1775,7 @@
                 else if (lowerType === 'service') typeBadgeClass = 'bg-primary';
 
                 const convCount = item.conversions ? Object.keys(item.conversions).length : 0;
+                const avgPrice = averagePrices.get(String(item.id)) || 0;
                 let convBadge = '';
                 if (convCount > 0) {
                     let titleText = Object.entries(item.conversions).map(([u, f]) => `1 ${u} = ${f} ${item.uom || 'Base'}`).join('\n');
@@ -1762,6 +1846,7 @@
                         <span id="view-salePrice-${item.id}">₹ ${parseFloat(item.salePrice || 0).toFixed(2)}</span>
                         <input type="number" id="salePrice-${item.id}" value="${item.salePrice || 0}" style="display:none; width: 80px;" class="form-control">
                     </td>
+                    <td>₹ ${avgPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td>
                         <span id="view-gst-${item.id}">${item.gst || 0}%</span>
                         <input type="number" id="gst-${item.id}" value="${item.gst || 0}" style="display:none; width: 60px;" class="form-control" min="0" max="100">
