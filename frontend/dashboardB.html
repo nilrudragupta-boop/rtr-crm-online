@@ -792,10 +792,6 @@
             display: none !important;
         }
 
-        body.top-tab-unfolded .sidebar-scrollable .nav-item {
-            order: var(--top-tab-order, 0);
-        }
-
         body.top-tab-unfolded .horizontal-menu-group {
             display: contents !important;
         }
@@ -1106,6 +1102,11 @@
         body.horizontal-menu #favoritesList {
             display: flex;
             align-items: center;
+        }
+
+        body.horizontal-menu #dynamicPagesWrapper {
+            display: flex;
+            flex: 0 0 auto;
         }
 
         body.horizontal-menu .main-content {
@@ -1528,6 +1529,10 @@
                     </div>
 
                 </div>
+
+                <!-- Dynamic Custom Pages injected here -->
+                <div id="dynamicPagesWrapper"
+                    style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;"></div>
 
             </div>
 
@@ -3751,31 +3756,17 @@
 
         function saveTopTabOrder() {
             const scrollable = document.querySelector('.sidebar-scrollable');
-            const overflowMenu = document.getElementById('topTabOverflowMenu');
             if (!scrollable) return;
 
-            const visibleOrder = Array.from(scrollable.querySelectorAll('.nav-item[data-tab-id]'))
-                .map(btn => btn.getAttribute('data-tab-id'));
-            const visibleIds = new Set(visibleOrder);
-            let nextVisibleIndex = 0;
-            let orderList = [];
+            const orderedButtons = scrollable.querySelectorAll('.nav-item[data-tab-id]');
+            const orderList = [];
 
-            try {
-                const saved = JSON.parse(localStorage.getItem(TOP_TAB_ORDER_KEY) || '[]');
-                if (Array.isArray(saved)) {
-                    orderList = saved.map(id => visibleIds.has(id) ? visibleOrder[nextVisibleIndex++] : id);
+            orderedButtons.forEach(btn => {
+                const id = btn.getAttribute('data-tab-id');
+                if (id && !orderList.includes(id)) {
+                    orderList.push(id);
                 }
-            } catch (err) {
-                console.warn('Failed to read Top Tab order:', err);
-            }
-
-            orderList.push(...visibleOrder.slice(nextVisibleIndex));
-            if (overflowMenu) {
-                overflowMenu.querySelectorAll('.nav-item[data-tab-id]').forEach(btn => {
-                    const id = btn.getAttribute('data-tab-id');
-                    if (id && !orderList.includes(id)) orderList.push(id);
-                });
-            }
+            });
 
             localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(orderList));
         }
@@ -3791,23 +3782,18 @@
                 const scrollable = document.querySelector('.sidebar-scrollable');
                 if (!scrollable) return;
 
-                const buttons = Array.from(document.querySelectorAll('#sidebar .nav-item[data-tab-id]'));
+                const buttons = Array.from(scrollable.querySelectorAll('.nav-item[data-tab-id]'));
                 const btnMap = new Map();
                 buttons.forEach(btn => btnMap.set(btn.getAttribute('data-tab-id'), btn));
 
-                let nextOrder = 0;
-                const orderedButtons = new Set();
+                // In unfolded top bar mode, append in sequential saved order
+                const operationsWrapper = document.getElementById('operationsWrapper');
+                if (!operationsWrapper) return;
+
                 orderList.forEach(tabId => {
                     const btn = btnMap.get(tabId);
-                    if (btn) {
-                        btn.style.setProperty('--top-tab-order', String(nextOrder++));
-                        orderedButtons.add(btn);
-                    }
-                });
-
-                buttons.forEach(btn => {
-                    if (!orderedButtons.has(btn)) {
-                        btn.style.setProperty('--top-tab-order', String(nextOrder++));
+                    if (btn && btn.parentElement) {
+                        btn.parentElement.appendChild(btn);
                     }
                 });
             } catch (err) {
@@ -4038,12 +4024,37 @@
                 }
             }, true); // The `true` parameter forces capture phase BEFORE anti-debug or child scripts intercept it
 
-            if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
-                apiClient.getCustomFields().then(fields => {
-                    if (fields) localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields));
-                }).catch(error => console.warn('Failed to fetch custom fields config:', error));
+            // Inject Dynamic Custom Pages
+            function loadDynamicCustomPages() {
+                const wrapper = document.getElementById('dynamicPagesWrapper');
+                if (wrapper) {
+                    wrapper.innerHTML = '';
+                }
             }
 
+            async function fetchCustomFieldsConfig() {
+                try {
+                    if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
+                        try {
+                            const settings = await apiClient.getSettings();
+                            if (settings && settings.crmCustomPages) {
+                                localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
+                            }
+                        } catch (e) { console.warn("Failed to fetch custom pages config", e); }
+                    }
+
+                    const fields = await apiClient.getCustomFields();
+                    if (fields) {
+                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields));
+                        loadDynamicCustomPages();
+                    }
+                } catch (error) {
+                    console.warn("Failed to fetch custom fields config from server:", error);
+                }
+            }
+
+            loadDynamicCustomPages();
+            fetchCustomFieldsConfig();
         });
 
         async function syncRemoteConfig() {
@@ -8365,11 +8376,6 @@
             if (!scrollable) return [];
             return Array.from(scrollable.querySelectorAll('button.nav-item')).filter(btn => {
                 return !btn.closest('#topTabOverflowMenu') && !btn.parentElement.matches('div[style*="margin-top: auto"]');
-            }).sort((first, second) => {
-                const firstOrder = Number(first.style.getPropertyValue('--top-tab-order'));
-                const secondOrder = Number(second.style.getPropertyValue('--top-tab-order'));
-                if (!Number.isFinite(firstOrder) || !Number.isFinite(secondOrder)) return 0;
-                return firstOrder - secondOrder;
             });
         }
 
@@ -8435,56 +8441,25 @@
             this.classList.remove('tab-drag-over');
 
             if (draggedTab && this !== draggedTab) {
-                const tabs = Array.from(document.querySelectorAll('#sidebar .nav-item[data-tab-id]'));
-                const tabsById = new Map(tabs.map(tab => [tab.getAttribute('data-tab-id'), tab]));
-                let orderList = [];
-                try {
-                    const saved = JSON.parse(localStorage.getItem(TOP_TAB_ORDER_KEY) || '[]');
-                    if (Array.isArray(saved)) orderList = saved.filter(tabId => tabsById.has(tabId));
-                } catch (err) {
-                    console.warn('Failed to read Top Tab order:', err);
-                }
-                tabs.forEach(tab => {
-                    const tabId = tab.getAttribute('data-tab-id');
-                    if (!orderList.includes(tabId)) orderList.push(tabId);
-                });
+                const parent = this.parentElement;
+                const allTabs = Array.from(parent.children);
+                const fromIdx = allTabs.indexOf(draggedTab);
+                const toIdx = allTabs.indexOf(this);
 
-                const draggedId = draggedTab.getAttribute('data-tab-id');
-                const targetId = this.getAttribute('data-tab-id');
-                const fromIdx = orderList.indexOf(draggedId);
-                const toIdx = orderList.indexOf(targetId);
-                if (fromIdx !== -1 && toIdx !== -1) {
-                    orderList.splice(fromIdx, 1);
-                    const targetIndex = orderList.indexOf(targetId);
-                    orderList.splice(fromIdx < toIdx ? targetIndex + 1 : targetIndex, 0, draggedId);
-                    localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(orderList));
-                    restoreTopTabOrder();
+                if (fromIdx < toIdx) {
+                    parent.insertBefore(draggedTab, this.nextSibling);
+                } else {
+                    parent.insertBefore(draggedTab, this);
                 }
+
+                saveTopTabOrder();
                 updateTopTabOverflow();
-            }
-        }
-
-        function persistTopTabOrderFromLayout() {
-            const orderedIds = Array.from(document.querySelectorAll('#sidebar .nav-item[data-tab-id]'))
-                .map((tab, index) => ({
-                    id: tab.getAttribute('data-tab-id'),
-                    order: Number(tab.style.getPropertyValue('--top-tab-order')),
-                    index
-                }))
-                .sort((first, second) => first.order - second.order || first.index - second.index)
-                .map(tab => tab.id);
-
-            if (orderedIds.length) {
-                localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(orderedIds));
             }
         }
 
         function handleTabDragEnd() {
             this.classList.remove('tab-dragging');
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('tab-drag-over'));
-            if (document.body.classList.contains('top-tab-unfolded')) {
-                persistTopTabOrderFromLayout();
-            }
             draggedTab = null;
         }
 
@@ -8517,69 +8492,29 @@
 
             if (typeof applyUIPermissions === 'function') applyUIPermissions();
 
-            overflowBox.style.display = 'inline-flex';
-            const tabs = getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu'));
-            const moreLabel = overflowBox.querySelector('#topTabOverflowBtn span');
-            let hidden = [];
-            let previousHiddenIds = '';
+            const sidebarWidth = document.getElementById('sidebar').clientWidth;
+            const brandWidth = document.querySelector('.sidebar-brand')?.offsetWidth || 180;
+            const utilitiesWidth = document.querySelector('.sidebar > div:last-child')?.offsetWidth || 150;
+            const maxAvailableWidth = sidebarWidth - brandWidth - utilitiesWidth - 120;
 
-            for (let pass = 0; pass <= tabs.length; pass++) {
-                const scrollableStyle = getComputedStyle(scrollable);
-                const sidebar = document.getElementById('sidebar');
-                const brand = document.querySelector('.sidebar-brand');
-                const utilities = sidebar?.querySelector(':scope > div:last-child');
-                const sidebarRect = sidebar?.getBoundingClientRect();
-                const scrollableRect = scrollable.getBoundingClientRect();
-                const brandRect = brand?.getBoundingClientRect();
-                const utilitiesRect = utilities?.getBoundingClientRect();
-                const overflowRect = overflowBox.getBoundingClientRect();
-                const paddingLeft = parseFloat(scrollableStyle.paddingLeft) || 0;
-                const paddingRight = parseFloat(scrollableStyle.paddingRight) || 0;
-                const gap = parseFloat(scrollableStyle.columnGap) || 0;
-                const availableStart = Math.max(
-                    sidebarRect?.left || 0,
-                    scrollableRect.left,
-                    brandRect?.right || 0
-                ) + paddingLeft;
-                const availableEnd = Math.min(
-                    sidebarRect?.right || window.innerWidth,
-                    document.documentElement.clientWidth,
-                    window.innerWidth,
-                    scrollableRect.right,
-                    overflowRect.left,
-                    utilitiesRect?.left ?? window.innerWidth
-                ) - paddingRight;
-                const availableWidth = Math.max(0, availableEnd - availableStart);
-                let usedWidth = 0;
-                let visibleCount = 0;
-                const nextHidden = [];
+            let accumulatedWidth = 0;
+            const hidden = [];
 
-                tabs.forEach(tab => {
-                    if (!isTabAllowedByPermissions(tab)) {
-                        tab.style.display = 'none';
-                        return;
-                    }
+            getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu')).forEach(tab => {
+                if (!isTabAllowedByPermissions(tab)) {
+                    tab.style.display = 'none';
+                    return;
+                }
 
-                    tab.style.display = 'inline-flex';
-                    const style = getComputedStyle(tab);
-                    const width = tab.getBoundingClientRect().width +
-                        (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0);
-                    const nextWidth = usedWidth + (visibleCount ? gap : 0) + width;
+                tab.style.display = 'inline-flex';
+                const width = tab.offsetWidth || 110;
 
-                    if (nextWidth > availableWidth) {
-                        nextHidden.push(tab);
-                    } else {
-                        usedWidth = nextWidth;
-                        visibleCount++;
-                    }
-                });
-
-                hidden = nextHidden;
-                const hiddenIds = hidden.map(tab => tab.getAttribute('data-tab-id')).join('|');
-                if (moreLabel) moreLabel.textContent = hidden.length ? `More (${hidden.length}) ▾` : 'More ▾';
-                if (hiddenIds === previousHiddenIds) break;
-                previousHiddenIds = hiddenIds;
-            }
+                if (accumulatedWidth + width > maxAvailableWidth && accumulatedWidth > 0) {
+                    hidden.push(tab);
+                } else {
+                    accumulatedWidth += width;
+                }
+            });
 
             hidden.forEach(tab => {
                 overflowMenu.appendChild(tab);
@@ -8587,7 +8522,8 @@
             });
 
             if (hidden.length) {
-                if (moreLabel) moreLabel.textContent = `More (${hidden.length}) ▾`;
+                overflowBox.style.display = 'inline-flex';
+                overflowBox.querySelector('#topTabOverflowBtn span').innerText = `More (${hidden.length}) ▾`;
             } else {
                 overflowBox.style.display = 'none';
                 overflowMenu.classList.remove('show');
