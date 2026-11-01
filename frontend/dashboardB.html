@@ -792,13 +792,6 @@
             display: none !important;
         }
 
-        body.top-tab-unfolded #dynamicPagesWrapper {
-            display: contents;
-            margin: 0 !important;
-            border: 0 !important;
-            padding: 0 !important;
-        }
-
         body.top-tab-unfolded .sidebar-scrollable .nav-item {
             order: var(--top-tab-order, 0);
         }
@@ -1113,11 +1106,6 @@
         body.horizontal-menu #favoritesList {
             display: flex;
             align-items: center;
-        }
-
-        body.horizontal-menu #dynamicPagesWrapper {
-            display: flex;
-            flex: 0 0 auto;
         }
 
         body.horizontal-menu .main-content {
@@ -1540,10 +1528,6 @@
                     </div>
 
                 </div>
-
-                <!-- Dynamic Custom Pages injected here -->
-                <div id="dynamicPagesWrapper"
-                    style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;"></div>
 
             </div>
 
@@ -4054,73 +4038,12 @@
                 }
             }, true); // The `true` parameter forces capture phase BEFORE anti-debug or child scripts intercept it
 
-            // Inject Dynamic Custom Pages
-            function loadDynamicCustomPages() {
-                const wrapper = document.getElementById('dynamicPagesWrapper');
-                if (!wrapper) return;
-
-                wrapper.replaceChildren();
-                let pages = [];
-                try {
-                    pages = JSON.parse(localStorage.getItem('crmCustomPages') || '[]');
-                } catch (error) {
-                    console.warn('Failed to load custom menu pages:', error);
-                }
-
-                const currentUser = localStorage.getItem('currentUser') || 'System';
-                pages.filter(page => page && page.pageId && (page.createdBy || 'System') === currentUser)
-                    .forEach(page => {
-                        const button = document.createElement('button');
-                        button.type = 'button';
-                        button.className = 'nav-item';
-                        button.dataset.tabId = `custom_page_${page.pageId}`;
-                        button.title = page.label || page.pageId;
-
-                        const icon = document.createElement('i');
-                        icon.className = page.icon || 'fas fa-folder-open';
-                        const label = document.createElement('span');
-                        label.className = 'nav-text';
-                        label.textContent = page.label || page.pageId;
-
-                        button.append(icon, label);
-                        button.addEventListener('click', () => {
-                            openWindow(`custom_dash.html?pageId=${encodeURIComponent(page.pageId)}`, 1200, 800);
-                        });
-                        wrapper.appendChild(button);
-                    });
-
-                if (document.body.classList.contains('top-tab-unfolded')) {
-                    initTopTabDragAndDrop();
-                    restoreTopTabOrder();
-                    updateTopTabOverflow();
-                }
+            if (typeof apiClient !== 'undefined' && apiClient.getCustomFields) {
+                apiClient.getCustomFields().then(fields => {
+                    if (fields) localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields));
+                }).catch(error => console.warn('Failed to fetch custom fields config:', error));
             }
 
-            async function fetchCustomFieldsConfig() {
-                try {
-                    if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
-                        try {
-                            const response = await apiClient.getSettings();
-                            const settings = response?.data || response || {};
-                            if (Array.isArray(settings.crmCustomPages)) {
-                                localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
-                                loadDynamicCustomPages();
-                            }
-                        } catch (e) { console.warn("Failed to fetch custom pages config", e); }
-                    }
-
-                    const fields = await apiClient.getCustomFields();
-                    if (fields) {
-                        localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields));
-                    }
-                    loadDynamicCustomPages();
-                } catch (error) {
-                    console.warn("Failed to fetch custom fields config from server:", error);
-                }
-            }
-
-            loadDynamicCustomPages();
-            fetchCustomFieldsConfig();
         });
 
         async function syncRemoteConfig() {
