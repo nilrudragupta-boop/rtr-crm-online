@@ -792,6 +792,17 @@
             display: none !important;
         }
 
+        body.top-tab-unfolded #dynamicPagesWrapper {
+            display: contents;
+            margin: 0 !important;
+            border: 0 !important;
+            padding: 0 !important;
+        }
+
+        body.top-tab-unfolded .sidebar-scrollable .nav-item {
+            order: var(--top-tab-order, 0);
+        }
+
         body.top-tab-unfolded .horizontal-menu-group {
             display: contents !important;
         }
@@ -3756,17 +3767,31 @@
 
         function saveTopTabOrder() {
             const scrollable = document.querySelector('.sidebar-scrollable');
+            const overflowMenu = document.getElementById('topTabOverflowMenu');
             if (!scrollable) return;
 
-            const orderedButtons = scrollable.querySelectorAll('.nav-item[data-tab-id]');
-            const orderList = [];
+            const visibleOrder = Array.from(scrollable.querySelectorAll('.nav-item[data-tab-id]'))
+                .map(btn => btn.getAttribute('data-tab-id'));
+            const visibleIds = new Set(visibleOrder);
+            let nextVisibleIndex = 0;
+            let orderList = [];
 
-            orderedButtons.forEach(btn => {
-                const id = btn.getAttribute('data-tab-id');
-                if (id && !orderList.includes(id)) {
-                    orderList.push(id);
+            try {
+                const saved = JSON.parse(localStorage.getItem(TOP_TAB_ORDER_KEY) || '[]');
+                if (Array.isArray(saved)) {
+                    orderList = saved.map(id => visibleIds.has(id) ? visibleOrder[nextVisibleIndex++] : id);
                 }
-            });
+            } catch (err) {
+                console.warn('Failed to read Top Tab order:', err);
+            }
+
+            orderList.push(...visibleOrder.slice(nextVisibleIndex));
+            if (overflowMenu) {
+                overflowMenu.querySelectorAll('.nav-item[data-tab-id]').forEach(btn => {
+                    const id = btn.getAttribute('data-tab-id');
+                    if (id && !orderList.includes(id)) orderList.push(id);
+                });
+            }
 
             localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(orderList));
         }
@@ -3782,18 +3807,23 @@
                 const scrollable = document.querySelector('.sidebar-scrollable');
                 if (!scrollable) return;
 
-                const buttons = Array.from(scrollable.querySelectorAll('.nav-item[data-tab-id]'));
+                const buttons = Array.from(document.querySelectorAll('#sidebar .nav-item[data-tab-id]'));
                 const btnMap = new Map();
                 buttons.forEach(btn => btnMap.set(btn.getAttribute('data-tab-id'), btn));
 
-                // In unfolded top bar mode, append in sequential saved order
-                const operationsWrapper = document.getElementById('operationsWrapper');
-                if (!operationsWrapper) return;
-
+                let nextOrder = 0;
+                const orderedButtons = new Set();
                 orderList.forEach(tabId => {
                     const btn = btnMap.get(tabId);
-                    if (btn && btn.parentElement) {
-                        btn.parentElement.appendChild(btn);
+                    if (btn) {
+                        btn.style.setProperty('--top-tab-order', String(nextOrder++));
+                        orderedButtons.add(btn);
+                    }
+                });
+
+                buttons.forEach(btn => {
+                    if (!orderedButtons.has(btn)) {
+                        btn.style.setProperty('--top-tab-order', String(nextOrder++));
                     }
                 });
             } catch (err) {
@@ -4027,8 +4057,42 @@
             // Inject Dynamic Custom Pages
             function loadDynamicCustomPages() {
                 const wrapper = document.getElementById('dynamicPagesWrapper');
-                if (wrapper) {
-                    wrapper.innerHTML = '';
+                if (!wrapper) return;
+
+                wrapper.replaceChildren();
+                let pages = [];
+                try {
+                    pages = JSON.parse(localStorage.getItem('crmCustomPages') || '[]');
+                } catch (error) {
+                    console.warn('Failed to load custom menu pages:', error);
+                }
+
+                const currentUser = localStorage.getItem('currentUser') || 'System';
+                pages.filter(page => page && page.pageId && (page.createdBy || 'System') === currentUser)
+                    .forEach(page => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'nav-item';
+                        button.dataset.tabId = `custom_page_${page.pageId}`;
+                        button.title = page.label || page.pageId;
+
+                        const icon = document.createElement('i');
+                        icon.className = page.icon || 'fas fa-folder-open';
+                        const label = document.createElement('span');
+                        label.className = 'nav-text';
+                        label.textContent = page.label || page.pageId;
+
+                        button.append(icon, label);
+                        button.addEventListener('click', () => {
+                            openWindow(`custom_dash.html?pageId=${encodeURIComponent(page.pageId)}`, 1200, 800);
+                        });
+                        wrapper.appendChild(button);
+                    });
+
+                if (document.body.classList.contains('top-tab-unfolded')) {
+                    initTopTabDragAndDrop();
+                    restoreTopTabOrder();
+                    updateTopTabOverflow();
                 }
             }
 
@@ -4036,9 +4100,11 @@
                 try {
                     if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
                         try {
-                            const settings = await apiClient.getSettings();
-                            if (settings && settings.crmCustomPages) {
+                            const response = await apiClient.getSettings();
+                            const settings = response?.data || response || {};
+                            if (Array.isArray(settings.crmCustomPages)) {
                                 localStorage.setItem('crmCustomPages', JSON.stringify(settings.crmCustomPages));
+                                loadDynamicCustomPages();
                             }
                         } catch (e) { console.warn("Failed to fetch custom pages config", e); }
                     }
@@ -4046,8 +4112,8 @@
                     const fields = await apiClient.getCustomFields();
                     if (fields) {
                         localStorage.setItem('CUSTOM_FIELDS', JSON.stringify(fields));
-                        loadDynamicCustomPages();
                     }
+                    loadDynamicCustomPages();
                 } catch (error) {
                     console.warn("Failed to fetch custom fields config from server:", error);
                 }
@@ -8376,6 +8442,11 @@
             if (!scrollable) return [];
             return Array.from(scrollable.querySelectorAll('button.nav-item')).filter(btn => {
                 return !btn.closest('#topTabOverflowMenu') && !btn.parentElement.matches('div[style*="margin-top: auto"]');
+            }).sort((first, second) => {
+                const firstOrder = Number(first.style.getPropertyValue('--top-tab-order'));
+                const secondOrder = Number(second.style.getPropertyValue('--top-tab-order'));
+                if (!Number.isFinite(firstOrder) || !Number.isFinite(secondOrder)) return 0;
+                return firstOrder - secondOrder;
             });
         }
 
@@ -8441,18 +8512,31 @@
             this.classList.remove('tab-drag-over');
 
             if (draggedTab && this !== draggedTab) {
-                const parent = this.parentElement;
-                const allTabs = Array.from(parent.children);
-                const fromIdx = allTabs.indexOf(draggedTab);
-                const toIdx = allTabs.indexOf(this);
-
-                if (fromIdx < toIdx) {
-                    parent.insertBefore(draggedTab, this.nextSibling);
-                } else {
-                    parent.insertBefore(draggedTab, this);
+                const tabs = Array.from(document.querySelectorAll('#sidebar .nav-item[data-tab-id]'));
+                const tabsById = new Map(tabs.map(tab => [tab.getAttribute('data-tab-id'), tab]));
+                let orderList = [];
+                try {
+                    const saved = JSON.parse(localStorage.getItem(TOP_TAB_ORDER_KEY) || '[]');
+                    if (Array.isArray(saved)) orderList = saved.filter(tabId => tabsById.has(tabId));
+                } catch (err) {
+                    console.warn('Failed to read Top Tab order:', err);
                 }
+                tabs.forEach(tab => {
+                    const tabId = tab.getAttribute('data-tab-id');
+                    if (!orderList.includes(tabId)) orderList.push(tabId);
+                });
 
-                saveTopTabOrder();
+                const draggedId = draggedTab.getAttribute('data-tab-id');
+                const targetId = this.getAttribute('data-tab-id');
+                const fromIdx = orderList.indexOf(draggedId);
+                const toIdx = orderList.indexOf(targetId);
+                if (fromIdx !== -1 && toIdx !== -1) {
+                    orderList.splice(fromIdx, 1);
+                    const targetIndex = orderList.indexOf(targetId);
+                    orderList.splice(fromIdx < toIdx ? targetIndex + 1 : targetIndex, 0, draggedId);
+                    localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(orderList));
+                    restoreTopTabOrder();
+                }
                 updateTopTabOverflow();
             }
         }
