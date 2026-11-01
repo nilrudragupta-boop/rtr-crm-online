@@ -4060,7 +4060,40 @@
                 if (!wrapper) return;
 
                 wrapper.replaceChildren();
-                wrapper.style.setProperty('display', 'none', 'important');
+                let pages = [];
+                try {
+                    pages = JSON.parse(localStorage.getItem('crmCustomPages') || '[]');
+                } catch (error) {
+                    console.warn('Failed to load custom menu pages:', error);
+                }
+
+                const currentUser = localStorage.getItem('currentUser') || 'System';
+                pages.filter(page => page && page.pageId && (page.createdBy || 'System') === currentUser)
+                    .forEach(page => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'nav-item';
+                        button.dataset.tabId = `custom_page_${page.pageId}`;
+                        button.title = page.label || page.pageId;
+
+                        const icon = document.createElement('i');
+                        icon.className = page.icon || 'fas fa-folder-open';
+                        const label = document.createElement('span');
+                        label.className = 'nav-text';
+                        label.textContent = page.label || page.pageId;
+
+                        button.append(icon, label);
+                        button.addEventListener('click', () => {
+                            openWindow(`custom_dash.html?pageId=${encodeURIComponent(page.pageId)}`, 1200, 800);
+                        });
+                        wrapper.appendChild(button);
+                    });
+
+                if (document.body.classList.contains('top-tab-unfolded')) {
+                    initTopTabDragAndDrop();
+                    restoreTopTabOrder();
+                    updateTopTabOverflow();
+                }
             }
 
             async function fetchCustomFieldsConfig() {
@@ -8543,39 +8576,24 @@
 
             if (typeof applyUIPermissions === 'function') applyUIPermissions();
 
-            const tabs = getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu'));
-            const allowedTabs = [];
+            const sidebarWidth = document.getElementById('sidebar').clientWidth;
+            const brandWidth = document.querySelector('.sidebar-brand')?.offsetWidth || 180;
+            const utilitiesWidth = document.querySelector('.sidebar > div:last-child')?.offsetWidth || 150;
+            const maxAvailableWidth = sidebarWidth - brandWidth - utilitiesWidth - 120;
 
-            tabs.forEach(tab => {
+            let accumulatedWidth = 0;
+            const hidden = [];
+
+            getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu')).forEach(tab => {
                 if (!isTabAllowedByPermissions(tab)) {
                     tab.style.display = 'none';
                     return;
                 }
 
                 tab.style.display = 'inline-flex';
-                allowedTabs.push(tab);
-            });
+                const width = tab.offsetWidth || 110;
 
-            const gap = parseFloat(getComputedStyle(scrollable).columnGap) || 0;
-            const totalTabWidth = allowedTabs.reduce((total, tab) => total + (tab.offsetWidth || 110), 0) +
-                Math.max(0, allowedTabs.length - 1) * gap;
-            const overflowButton = document.getElementById('topTabOverflowBtn');
-
-            if (totalTabWidth <= scrollable.clientWidth) {
-                overflowBox.style.display = 'none';
-                overflowMenu.classList.remove('show');
-                return;
-            }
-
-            overflowBox.style.display = 'inline-flex';
-            const availableWidth = scrollable.clientWidth;
-            let accumulatedWidth = 0;
-            const hidden = [];
-
-            allowedTabs.forEach(tab => {
-                const width = (tab.offsetWidth || 110) + gap;
-
-                if (accumulatedWidth + width > availableWidth && accumulatedWidth > 0) {
+                if (accumulatedWidth + width > maxAvailableWidth && accumulatedWidth > 0) {
                     hidden.push(tab);
                 } else {
                     accumulatedWidth += width;
