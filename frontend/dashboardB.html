@@ -8464,9 +8464,27 @@
             }
         }
 
+        function persistTopTabOrderFromLayout() {
+            const orderedIds = Array.from(document.querySelectorAll('#sidebar .nav-item[data-tab-id]'))
+                .map((tab, index) => ({
+                    id: tab.getAttribute('data-tab-id'),
+                    order: Number(tab.style.getPropertyValue('--top-tab-order')),
+                    index
+                }))
+                .sort((first, second) => first.order - second.order || first.index - second.index)
+                .map(tab => tab.id);
+
+            if (orderedIds.length) {
+                localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(orderedIds));
+            }
+        }
+
         function handleTabDragEnd() {
             this.classList.remove('tab-dragging');
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('tab-drag-over'));
+            if (document.body.classList.contains('top-tab-unfolded')) {
+                persistTopTabOrderFromLayout();
+            }
             draggedTab = null;
         }
 
@@ -8499,29 +8517,69 @@
 
             if (typeof applyUIPermissions === 'function') applyUIPermissions();
 
-            const sidebarWidth = document.getElementById('sidebar').clientWidth;
-            const brandWidth = document.querySelector('.sidebar-brand')?.offsetWidth || 180;
-            const utilitiesWidth = document.querySelector('.sidebar > div:last-child')?.offsetWidth || 150;
-            const maxAvailableWidth = sidebarWidth - brandWidth - utilitiesWidth - 120;
+            overflowBox.style.display = 'inline-flex';
+            const tabs = getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu'));
+            const moreLabel = overflowBox.querySelector('#topTabOverflowBtn span');
+            let hidden = [];
+            let previousHiddenIds = '';
 
-            let accumulatedWidth = 0;
-            const hidden = [];
+            for (let pass = 0; pass <= tabs.length; pass++) {
+                const scrollableStyle = getComputedStyle(scrollable);
+                const sidebar = document.getElementById('sidebar');
+                const brand = document.querySelector('.sidebar-brand');
+                const utilities = sidebar?.querySelector(':scope > div:last-child');
+                const sidebarRect = sidebar?.getBoundingClientRect();
+                const scrollableRect = scrollable.getBoundingClientRect();
+                const brandRect = brand?.getBoundingClientRect();
+                const utilitiesRect = utilities?.getBoundingClientRect();
+                const overflowRect = overflowBox.getBoundingClientRect();
+                const paddingLeft = parseFloat(scrollableStyle.paddingLeft) || 0;
+                const paddingRight = parseFloat(scrollableStyle.paddingRight) || 0;
+                const gap = parseFloat(scrollableStyle.columnGap) || 0;
+                const availableStart = Math.max(
+                    sidebarRect?.left || 0,
+                    scrollableRect.left,
+                    brandRect?.right || 0
+                ) + paddingLeft;
+                const availableEnd = Math.min(
+                    sidebarRect?.right || window.innerWidth,
+                    document.documentElement.clientWidth,
+                    window.innerWidth,
+                    scrollableRect.right,
+                    overflowRect.left,
+                    utilitiesRect?.left ?? window.innerWidth
+                ) - paddingRight;
+                const availableWidth = Math.max(0, availableEnd - availableStart);
+                let usedWidth = 0;
+                let visibleCount = 0;
+                const nextHidden = [];
 
-            getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu')).forEach(tab => {
-                if (!isTabAllowedByPermissions(tab)) {
-                    tab.style.display = 'none';
-                    return;
-                }
+                tabs.forEach(tab => {
+                    if (!isTabAllowedByPermissions(tab)) {
+                        tab.style.display = 'none';
+                        return;
+                    }
 
-                tab.style.display = 'inline-flex';
-                const width = tab.offsetWidth || 110;
+                    tab.style.display = 'inline-flex';
+                    const style = getComputedStyle(tab);
+                    const width = tab.getBoundingClientRect().width +
+                        (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0);
+                    const nextWidth = usedWidth + (visibleCount ? gap : 0) + width;
 
-                if (accumulatedWidth + width > maxAvailableWidth && accumulatedWidth > 0) {
-                    hidden.push(tab);
-                } else {
-                    accumulatedWidth += width;
-                }
-            });
+                    if (nextWidth > availableWidth) {
+                        nextHidden.push(tab);
+                    } else {
+                        usedWidth = nextWidth;
+                        visibleCount++;
+                    }
+                });
+
+                hidden = nextHidden;
+                const hiddenIds = hidden.map(tab => tab.getAttribute('data-tab-id')).join('|');
+                if (moreLabel) moreLabel.textContent = hidden.length ? `More (${hidden.length}) ▾` : 'More ▾';
+                if (hiddenIds === previousHiddenIds) break;
+                previousHiddenIds = hiddenIds;
+            }
 
             hidden.forEach(tab => {
                 overflowMenu.appendChild(tab);
@@ -8529,8 +8587,7 @@
             });
 
             if (hidden.length) {
-                overflowBox.style.display = 'inline-flex';
-                overflowBox.querySelector('#topTabOverflowBtn span').innerText = `More (${hidden.length}) ▾`;
+                if (moreLabel) moreLabel.textContent = `More (${hidden.length}) ▾`;
             } else {
                 overflowBox.style.display = 'none';
                 overflowMenu.classList.remove('show');
