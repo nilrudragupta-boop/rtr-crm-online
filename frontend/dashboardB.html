@@ -8543,24 +8543,39 @@
 
             if (typeof applyUIPermissions === 'function') applyUIPermissions();
 
-            const sidebarWidth = document.getElementById('sidebar').clientWidth;
-            const brandWidth = document.querySelector('.sidebar-brand')?.offsetWidth || 180;
-            const utilitiesWidth = document.querySelector('.sidebar > div:last-child')?.offsetWidth || 150;
-            const maxAvailableWidth = sidebarWidth - brandWidth - utilitiesWidth - 120;
+            const tabs = getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu'));
+            const allowedTabs = [];
 
-            let accumulatedWidth = 0;
-            const hidden = [];
-
-            getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu')).forEach(tab => {
+            tabs.forEach(tab => {
                 if (!isTabAllowedByPermissions(tab)) {
                     tab.style.display = 'none';
                     return;
                 }
 
                 tab.style.display = 'inline-flex';
-                const width = tab.offsetWidth || 110;
+                allowedTabs.push(tab);
+            });
 
-                if (accumulatedWidth + width > maxAvailableWidth && accumulatedWidth > 0) {
+            const gap = parseFloat(getComputedStyle(scrollable).columnGap) || 0;
+            const totalTabWidth = allowedTabs.reduce((total, tab) => total + (tab.offsetWidth || 110), 0) +
+                Math.max(0, allowedTabs.length - 1) * gap;
+            const overflowButton = document.getElementById('topTabOverflowBtn');
+
+            if (totalTabWidth <= scrollable.clientWidth) {
+                overflowBox.style.display = 'none';
+                overflowMenu.classList.remove('show');
+                return;
+            }
+
+            overflowBox.style.display = 'inline-flex';
+            const availableWidth = scrollable.clientWidth;
+            let accumulatedWidth = 0;
+            const hidden = [];
+
+            allowedTabs.forEach(tab => {
+                const width = (tab.offsetWidth || 110) + gap;
+
+                if (accumulatedWidth + width > availableWidth && accumulatedWidth > 0) {
                     hidden.push(tab);
                 } else {
                     accumulatedWidth += width;
