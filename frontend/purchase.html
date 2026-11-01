@@ -303,11 +303,11 @@
                 padding: 4px;
             }
 
-            /* Hide Checkbox (1) and Actions (16) columns - Target thead/tbody specifically so tfoot colspans work */
+            /* Hide Checkbox (1) and Actions (34) columns - Target thead/tbody specifically so tfoot colspans work */
             #purchaseTable thead th:nth-child(1),
             #purchaseTable tbody tr:not(.print-only) td:nth-child(1),
-            #purchaseTable thead th:nth-child(16),
-            #purchaseTable tbody tr:not(.print-only) td:nth-child(16) {
+            #purchaseTable thead th:nth-child(35),
+            #purchaseTable tbody tr:not(.print-only) td:nth-child(35) {
                 display: none !important;
             }
 
@@ -821,6 +821,28 @@
                         oninput="calcSalePrice(); calculateTotal();" style="margin:0;" />
                 </div>
                 <div class="input-group">
+                    <label>MRP</label>
+                    <input type="number" id="mrp" placeholder="0.00" step="any" min="0"
+                        oninput="calculatePurchasePriceFromMrp()" style="margin:0;" />
+                </div>
+                <div class="input-group">
+                    <label style="display:flex; align-items:center; gap:6px;">
+                        <input type="checkbox" id="priceFromMrpToggle" onchange="toggleMrpPricing()"
+                            style="width:auto; margin:0;">
+                        Derive Purchase Price from MRP
+                    </label>
+                    <div style="display:flex; gap:0;">
+                        <input type="number" id="mrpDiscountValue" placeholder="MRP discount %" step="any" min="0"
+                            max="100" disabled oninput="calculatePurchasePriceFromMrp()"
+                            style="flex:1; margin:0; border-radius:4px 0 0 4px;" />
+                        <select id="mrpDiscountType" onchange="toggleMrpPricing()" disabled
+                            style="width:55px; margin:0; padding:6px; border:1px solid #ccc; border-left:none; border-radius:0 4px 4px 0; background:#f8f9fa;">
+                            <option value="%">%</option>
+                            <option value="flat">₹</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
                     <label>Discount</label>
                     <div style="display:flex; gap:0;">
                         <input type="number" id="discount" placeholder="0" step="any" value="0"
@@ -833,9 +855,17 @@
                     </div>
                 </div>
                 <div class="input-group" id="marginDiv" style="display:none;">
-                    <label>Margin %</label>
-                    <input type="number" id="margin" placeholder="0.00" step="any"
-                        oninput="calcSalePrice(); calculateTotal();" style="margin:0;" />
+                    <label>Markup / Margin</label>
+                    <div style="display:flex; gap:0;">
+                        <input type="number" id="margin" placeholder="0.00" step="any"
+                            oninput="calcSalePrice(); calculateTotal();"
+                            style="flex:1; margin:0; border-radius:4px 0 0 4px;" />
+                        <select id="marginType" onchange="calcSalePrice(); calculateTotal();"
+                            style="width:55px; margin:0; padding:6px; border:1px solid #ccc; border-left:none; border-radius:0 4px 4px 0; background:#f8f9fa;">
+                            <option value="%">%</option>
+                            <option value="flat">₹</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="input-group" id="salePriceDiv" style="display:none;">
                     <label>Sale Price</label>
@@ -919,6 +949,8 @@
                         <th>UOM</th>
                         <th>Qty</th>
                         <th>Price</th>
+                        <th>MRP</th>
+                        <th>MRP Discount</th>
                         <th>Disc</th>
                         <th class="extra-col" style="display:none;">Item Code</th>
                         <th class="extra-col" style="display:none;">Category</th>
@@ -927,7 +959,7 @@
                         <th class="extra-col" style="display:none;">Batch</th>
                         <th class="extra-col" style="display:none;">Lot</th>
                         <th class="extra-col" style="display:none;">Serial</th>
-                        <th class="sale-price-col" style="display:none;">Margin %</th>
+                        <th class="sale-price-col" style="display:none;">Markup / Margin</th>
                         <th class="sale-price-col" style="display:none;">Sale Price</th>
                         <th>GST %</th>
                         <th>Total</th>
@@ -1073,9 +1105,11 @@
                             <th>Serial</th>
                             <th>UOM</th>
                             <th>Qty</th>
+                            <th>MRP</th>
+                            <th>MRP Discount</th>
                             <th>Price/Unit</th>
                             <th>Disc</th>
-                            <th>Margin %</th>
+                            <th>Markup / Margin</th>
                             <th>Sale Price</th>
                             <th>Taxable Value</th>
                             <th>GST %</th>
@@ -1470,14 +1504,21 @@
         }
 
         // Table Settings Logic
-        // Total columns increased: 33 + 1 (Disc %) = 34 columns (indices 0-33)
-        let columnVisibility = JSON.parse(localStorage.getItem("purchaseColumnVisibility")) || new Array(34).fill(true);
-        // Ensure length matches current table columns (34)
-        if (columnVisibility.length !== 34) {
-            columnVisibility = new Array(34).fill(true);
+        let columnVisibility = JSON.parse(localStorage.getItem("purchaseColumnVisibility"));
+        if (!Array.isArray(columnVisibility)) {
+            columnVisibility = new Array(36).fill(true);
+        } else if (columnVisibility.length === 34) {
+            columnVisibility.splice(15, 0, true);
+            columnVisibility.splice(16, 0, true);
+        } else if (columnVisibility.length === 35) {
+            columnVisibility = [...columnVisibility.slice(0, 15), columnVisibility[34], true, ...columnVisibility.slice(15, 34)];
+        } else if (columnVisibility.length !== 36) {
+            columnVisibility = new Array(36).fill(true);
             // Default hide extra fields if resetting
             [6, 7, 8, 9, 10, 11, 12].forEach(i => columnVisibility[i] = false);
         }
+        localStorage.setItem("purchaseColumnVisibility", JSON.stringify(columnVisibility));
+        localStorage.setItem("purchaseColumnVisibilityVersion", "3");
         let showGrandTotalScreen = localStorage.getItem("purchaseShowGrandTotalScreen") !== "false";
         let showGrandTotalPrint = localStorage.getItem("purchaseShowGrandTotalPrint") !== "false";
         let showTotalQtyScreen = localStorage.getItem("purchaseShowTotalQtyScreen") !== "false";
@@ -1547,6 +1588,17 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        function formatMrpDiscount(purchase) {
+            const value = Number(purchase.mrpDiscountValue ?? purchase.mrpDiscountPercent) || 0;
+            if (value <= 0) return "-";
+            return purchase.mrpDiscountType === 'flat' ? `₹${value.toFixed(2)}` : `${value.toFixed(2)}%`;
+        }
+
+        function formatSaleMarkup(purchase) {
+            if (purchase.margin == null || purchase.margin === "") return "-";
+            return `${purchase.margin}${purchase.marginType === 'flat' ? '₹' : '%'}`;
         }
 
         function highlightMatch(text, term) {
@@ -1723,6 +1775,8 @@
                 const searchVal = document.getElementById("itemInput").value.trim().toLowerCase();
                 if (!searchVal) {
                     document.getElementById("itemCode").value = "";
+                    document.getElementById("mrp").value = "";
+                    calculatePurchasePriceFromMrp();
                     document.getElementById("category").value = "";
                     document.getElementById("hsn").value = "";
                     document.getElementById("imei").value = "";
@@ -1743,6 +1797,8 @@
             if (item) {
                 document.getElementById("itemInput").value = item.name || "";
                 document.getElementById("itemCode").value = item.itemCode || "";
+                document.getElementById("mrp").value = item.mrp || "";
+                calculatePurchasePriceFromMrp();
                 document.getElementById("category").value = item.category || "";
                 document.getElementById("hsn").value = item.hsn || "";
                 document.getElementById("imei").value = item.imei || "";
@@ -1772,6 +1828,8 @@
                 }
             } else {
                 document.getElementById("itemCode").value = "";
+                document.getElementById("mrp").value = "";
+                calculatePurchasePriceFromMrp();
                 document.getElementById("category").value = "";
                 document.getElementById("hsn").value = "";
                 document.getElementById("imei").value = "";
@@ -1887,12 +1945,24 @@
             }
         }
 
+        function calculateSalePriceFromMarkup(price, margin, marginType) {
+            if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(margin)) return null;
+            const salePrice = marginType === 'flat' ? price + margin : price * (1 + margin / 100);
+            return Number(salePrice.toFixed(2));
+        }
+
+        function calculateMarkupFromSalePrice(price, salePrice, marginType) {
+            if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(salePrice) || salePrice <= 0) return null;
+            const margin = marginType === 'flat' ? salePrice - price : ((salePrice - price) / price) * 100;
+            return Number(margin.toFixed(2));
+        }
+
         function calcSalePrice() {
             const price = parseFloat($("price").value) || 0;
-            const margin = parseFloat($("margin").value) || 0;
-            if (price > 0) {
-                const sale = price * (1 + (margin / 100));
-                $("salePrice").value = sale.toFixed(2);
+            const marginValue = $("margin").value.trim();
+            if (marginValue !== "") {
+                const salePrice = calculateSalePriceFromMarkup(price, Number(marginValue), $("marginType").value || '%');
+                $("salePrice").value = salePrice === null ? "" : salePrice.toFixed(2);
             }
         }
 
@@ -1900,9 +1970,46 @@
             const price = parseFloat($("price").value) || 0;
             const sale = parseFloat($("salePrice").value) || 0;
             if (price > 0 && sale > 0) {
-                const margin = ((sale - price) / price) * 100;
-                $("margin").value = margin.toFixed(2);
+                const margin = calculateMarkupFromSalePrice(price, sale, $("marginType").value || '%');
+                $("margin").value = margin === null ? "" : margin.toFixed(2);
             }
+        }
+
+        function toggleMrpPricing() {
+            const enabled = $("priceFromMrpToggle").checked;
+            const discountType = $("mrpDiscountType").value;
+            $("price").readOnly = enabled;
+            $("mrpDiscountValue").disabled = !enabled;
+            $("mrpDiscountType").disabled = !enabled;
+            $("mrpDiscountValue").max = discountType === '%' ? '100' : '';
+            $("mrpDiscountValue").placeholder = discountType === '%' ? 'MRP discount %' : 'MRP discount ₹';
+            if (enabled) calculatePurchasePriceFromMrp();
+        }
+
+        function calculatePriceFromMrp(mrp, discountValue, discountType) {
+            if (!Number.isFinite(mrp) || mrp <= 0 || !Number.isFinite(discountValue) || discountValue < 0) return null;
+            if (discountType === '%') {
+                if (discountValue > 100) return null;
+                const price = Number((mrp * (1 - discountValue / 100)).toFixed(2));
+                return price > 0 ? price : null;
+            }
+            if (discountType === 'flat' && discountValue <= mrp) {
+                const price = Number((mrp - discountValue).toFixed(2));
+                return price > 0 ? price : null;
+            }
+            return null;
+        }
+
+        function calculatePurchasePriceFromMrp() {
+            if (!$("priceFromMrpToggle")?.checked) return;
+
+            const mrp = Number($("mrp").value);
+            const discountValue = Number($("mrpDiscountValue").value) || 0;
+            const discountType = $("mrpDiscountType").value;
+            const price = calculatePriceFromMrp(mrp, discountValue, discountType);
+            $("price").value = price === null ? "" : price.toFixed(2);
+            calcSalePrice();
+            calculateTotal();
         }
 
         function calculateTotal() {
@@ -1933,10 +2040,15 @@
             const uom = $("uomSelect").value;
             const qty = Number($("quantity").value);
             const price = Number($("price").value);
+            const mrp = Number($("mrp").value) || 0;
+            const priceFromMrp = $("priceFromMrpToggle").checked;
+            const mrpDiscountValue = Number($("mrpDiscountValue").value) || 0;
+            const mrpDiscountType = $("mrpDiscountType").value;
             const discount = Number($("discount")?.value) || 0;
             const discType = $("discType") ? $("discType").value : '%';
             const salePrice = Number($("salePrice").value) || 0;
-            const margin = Number($("margin").value) || 0;
+            const margin = $("margin").value.trim() === "" ? null : Number($("margin").value);
+            const marginType = $("marginType").value || '%';
             const gst = Number($("gstRate").value) || 0;
             const category = $("category").value.trim();
             const hsn = $("hsn").value.trim();
@@ -1960,7 +2072,7 @@
                 return;
             }
 
-            draftItems.push({ itemId, itemName, itemCode, category, uom, qty, price, discount, discType, freightCharges, packingCharges, loadingCharges, roundOff, salePrice, margin, gst, hsn, imei, batch, lot, serial });
+            draftItems.push({ itemId, itemName, itemCode, category, uom, qty, price, mrp, priceFromMrp, mrpDiscountValue, mrpDiscountType, discount, discType, freightCharges, packingCharges, loadingCharges, roundOff, salePrice, margin, marginType, gst, hsn, imei, batch, lot, serial });
             renderDraftTable();
 
             // Clear item fields for next entry
@@ -1968,6 +2080,8 @@
             $("uomSelect").value = "";
             $("quantity").value = "";
             $("price").value = "";
+            $("mrp").value = "";
+            $("mrpDiscountValue").value = "";
             $("discount").value = "0";
             if ($("discType")) $("discType").value = "%";
             $("salePrice").value = "";
@@ -2019,7 +2133,14 @@
                         <td>${item.itemName}</td>
                         <td>${item.uom}</td>
                         <td><input type="number" step="any" value="${item.qty}" style="width:80px; padding:4px;" oninput="updateDraftItem(${index}, 'qty', this.value)"></td>
-                        <td><input type="number" step="any" value="${item.price}" style="width:80px; padding:4px;" oninput="updateDraftItem(${index}, 'price', this.value)"></td>
+                        <td><input type="number" id="draftPrice-${index}" step="any" value="${item.price}" ${item.priceFromMrp ? 'readonly' : ''} style="width:80px; padding:4px;" oninput="updateDraftItem(${index}, 'price', this.value)"></td>
+                        <td><input type="number" min="0" step="any" value="${item.mrp || 0}" style="width:80px; padding:4px;" oninput="updateDraftItem(${index}, 'mrp', this.value)"></td>
+                        <td>
+                            <div style="display:flex; gap:2px; justify-content:center;">
+                                <input type="number" min="0" step="any" value="${item.mrpDiscountValue || 0}" style="width:60px; padding:4px;" oninput="updateDraftItem(${index}, 'mrpDiscountValue', this.value)">
+                                <select style="width:45px; padding:4px;" onchange="updateDraftItem(${index}, 'mrpDiscountType', this.value)"><option value="%" ${item.mrpDiscountType !== 'flat' ? 'selected' : ''}>%</option><option value="flat" ${item.mrpDiscountType === 'flat' ? 'selected' : ''}>₹</option></select>
+                            </div>
+                        </td>
                         <td>
                             <div style="display:flex; gap:2px; justify-content:center;">
                                 <input type="number" step="any" value="${item.discount || 0}" style="width:60px; padding:4px;" oninput="updateDraftItem(${index}, 'discount', this.value)">
@@ -2033,8 +2154,8 @@
                         <td class="extra-col" style="${showExtraFields ? '' : 'display:none;'}">${item.batch || ''}</td>
                         <td class="extra-col" style="${showExtraFields ? '' : 'display:none;'}">${item.lot || ''}</td>
                         <td class="extra-col" style="${showExtraFields ? '' : 'display:none;'}">${item.serial || ''}</td>
-                        <td class="sale-price-col" style="${showSalePrice ? '' : 'display:none;'}">${item.margin || 0}%</td>
-                        <td style="${showSalePrice ? '' : 'display:none;'}"><input type="number" step="any" value="${item.salePrice || 0}" style="width:80px; padding:4px;" oninput="updateDraftItem(${index}, 'salePrice', this.value)"></td>
+                        <td class="sale-price-col" id="draftMargin-${index}" style="${showSalePrice ? '' : 'display:none;'}">${formatSaleMarkup(item)}</td>
+                        <td style="${showSalePrice ? '' : 'display:none;'}"><input type="number" id="draftSalePrice-${index}" step="any" value="${item.salePrice || ''}" placeholder="Optional" style="width:80px; padding:4px;" oninput="updateDraftItem(${index}, 'salePrice', this.value)"></td>
                         <td><input type="number" step="any" value="${item.gst || 0}" style="width:60px; padding:4px;" oninput="updateDraftItem(${index}, 'gst', this.value)"></td>
                         <td id="draftTotal-${index}">0.00</td>
                         <td><button class="btn-delete" onclick="removeDraftItem(${index})">Remove</button></td>
@@ -2045,7 +2166,7 @@
                 // Grand Total Row
                 const trTotal = document.createElement("tr");
                 trTotal.style.backgroundColor = "#f8f9fa";
-                let colspan = 5;
+                let colspan = 7;
                 if (showSalePrice) colspan += 2; // Margin + Sale Price
                 if (showExtraFields) colspan += 7; // ItemCode, Category, HSN, IMEI, Batch, Lot, Serial
                 trTotal.innerHTML = `
@@ -2061,11 +2182,32 @@
         }
 
         function updateDraftItem(index, field, value) {
-            if (field === 'discType' || field === 'itemCode' || field === 'category' || field === 'hsn' || field === 'imei' || field === 'batch' || field === 'lot' || field === 'serial') {
+            let purchasePriceChanged = field === 'price';
+            if (field === 'discType' || field === 'mrpDiscountType' || field === 'itemCode' || field === 'category' || field === 'hsn' || field === 'imei' || field === 'batch' || field === 'lot' || field === 'serial') {
                 draftItems[index][field] = value;
             } else {
                 const val = parseFloat(value);
                 draftItems[index][field] = isNaN(val) ? 0 : val;
+            }
+            if (['mrp', 'mrpDiscountValue', 'mrpDiscountType'].includes(field) && draftItems[index].priceFromMrp) {
+                purchasePriceChanged = true;
+                draftItems[index].price = calculatePriceFromMrp(
+                    Number(draftItems[index].mrp) || 0,
+                    Number(draftItems[index].mrpDiscountValue) || 0,
+                    draftItems[index].mrpDiscountType || '%'
+                ) || 0;
+                const priceInput = document.getElementById(`draftPrice-${index}`);
+                if (priceInput) priceInput.value = draftItems[index].price;
+            }
+            const item = draftItems[index];
+            if (field === 'salePrice') {
+                item.margin = calculateMarkupFromSalePrice(item.price, item.salePrice, item.marginType || '%');
+                const marginCell = document.getElementById(`draftMargin-${index}`);
+                if (marginCell) marginCell.textContent = formatSaleMarkup(item);
+            } else if (purchasePriceChanged && item.margin != null) {
+                item.salePrice = calculateSalePriceFromMarkup(item.price, item.margin, item.marginType || '%') || 0;
+                const salePriceInput = document.getElementById(`draftSalePrice-${index}`);
+                if (salePriceInput) salePriceInput.value = item.salePrice;
             }
             updateDraftGrandTotal();
         }
@@ -2115,6 +2257,15 @@
             const supplierName = $("supplierInput").value;
             const supplierInv = $("supplierInv").value;
             const date = $("purchaseDate").value;
+
+            if (draftItems.some(item => item.priceFromMrp && calculatePriceFromMrp(
+                Number(item.mrp) || 0,
+                Number(item.mrpDiscountValue) || 0,
+                item.mrpDiscountType || '%'
+            ) === null)) {
+                showToast("Correct the MRP discount before saving ❗");
+                return;
+            }
 
             if (!supplierName || !date) {
                 showToast("Supplier and Date required ❗");
@@ -2190,8 +2341,12 @@
                     const payload = {
                         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
                         itemId: item.itemId, itemName: item.itemName, supplierName, supplierInv, uom: item.uom, date, qty: item.qty, price: item.price,
+                        mrp: item.mrp || 0,
+                        priceFromMrp: Boolean(item.priceFromMrp),
+                        mrpDiscountValue: item.mrpDiscountValue || 0, mrpDiscountType: item.mrpDiscountType || '%',
+                        mrpDiscountPercent: item.mrpDiscountType === 'flat' ? 0 : (item.mrpDiscountValue || 0),
                         discount: item.discount || 0, discType: item.discType || '%', discountAmt: item.discAmt || 0, freightCharges: item.freightCharges || 0, packingCharges: item.packingCharges || 0, loadingCharges: item.loadingCharges || 0, roundOff: itemRoundOff,
-                        salePrice: item.salePrice || 0, margin: item.margin || 0, itemCode: item.itemCode || "", category: item.category || "", hsn: item.hsn || "",
+                        salePrice: item.salePrice || 0, margin: item.margin ?? 0, marginType: item.marginType || '%', itemCode: item.itemCode || "", category: item.category || "", hsn: item.hsn || "",
                         imei: item.imei || "", batch: item.batch || "", lot: item.lot || "", serial: item.serial || "", gst: item.gst,
                         ...audit
                     };
@@ -2230,6 +2385,10 @@
             const date = $("purchaseDate").value;
             const qty = Number($("quantity").value);
             const price = Number($("price").value);
+            const mrp = Number($("mrp").value) || 0;
+            const priceFromMrp = $("priceFromMrpToggle").checked;
+            const mrpDiscountValue = Number($("mrpDiscountValue").value) || 0;
+            const mrpDiscountType = $("mrpDiscountType").value;
             const discount = Number($("discount")?.value) || 0;
             const discType = $("discType") ? $("discType").value : '%';
             const discountAmt = discType === 'flat' ? discount : (qty * price) * (discount / 100);
@@ -2239,7 +2398,8 @@
             const roundOff = Number($("itemRoundOff")?.value) || 0;
 
             const salePrice = Number($("salePrice").value) || 0;
-            const margin = Number($("margin").value) || 0;
+            const margin = $("margin").value.trim() === "" ? null : Number($("margin").value);
+            const marginType = $("marginType").value || '%';
             const gst = Number($("gstRate").value) || 0;
             const category = $("category").value.trim();
             const hsn = $("hsn").value.trim();
@@ -2275,7 +2435,10 @@
                     id: editingId,
                     itemId, itemName,
                     supplierName, supplierInv,
-                    itemCode, category, uom, date, qty, price, salePrice, margin, gst, hsn, imei, batch, lot, serial,
+                    itemCode, category, uom, date, qty, price, mrp, priceFromMrp,
+                    mrpDiscountValue, mrpDiscountType,
+                    mrpDiscountPercent: mrpDiscountType === 'flat' ? 0 : mrpDiscountValue,
+                    salePrice, margin, marginType, gst, hsn, imei, batch, lot, serial,
                     discount, discType, discountAmt, freightCharges, packingCharges, loadingCharges, roundOff,
                     ...audit
                 };
@@ -2309,7 +2472,7 @@
 
             const tbody = document.getElementById("purchaseTableBody");
             if (tbody && localPurchases.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="34" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="36" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Loading data... Please wait.</td></tr>`;
             }
 
             const overlay = document.getElementById('loadingOverlay');
@@ -2680,7 +2843,7 @@
                 for (let i = 0; i < columnVisibility.length; i++) {
                     if (columnVisibility[i]) visibleCount++;
                 }
-                tbody.innerHTML = `<tr><td colspan="${visibleCount || 34}" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">No records found</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${visibleCount || 36}" style="text-align: center; padding: 20px; font-weight: bold; color: #666;">No records found</td></tr>`;
                 tfoot.innerHTML = "";
                 renderPagination(0, 0, 0, 1);
                 return;
@@ -2779,10 +2942,12 @@
       <td>${p.serial || "-"}</td>
       <td>${p.uom || "-"}</td>
       <td>${p.qty}</td>
+    <td>${Number(p.mrp) > 0 ? Number(p.mrp).toFixed(2) : "-"}</td>
+            <td>${formatMrpDiscount(p)}</td>
       <td>${p.price}</td>
       <td>${p.discount || 0}${p.discType === 'flat' ? '₹' : '%'}</td>
-      <td>${p.margin || 0}%</td>
-      <td>${p.salePrice || 0}</td>      
+    <td>${formatSaleMarkup(p)}</td>
+    <td>${Number(p.salePrice) > 0 ? Number(p.salePrice).toFixed(2) : "-"}</td>
       <td>${taxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td>${p.gst || 0}%</td>
       <td>${taxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -2831,18 +2996,18 @@
 
             // Calculate visible columns for footer groups
             let span1 = 0;
-            for (let i = 0; i <= 18; i++) if (columnVisibility[i]) span1++; // Checkbox to Sale Price
+            for (let i = 0; i <= 20; i++) if (columnVisibility[i]) span1++; // Checkbox to Sale Price
 
             let span2 = 0;
-            for (let i = 27; i <= 32; i++) if (columnVisibility[i]) span2++; // PayDate to Stock (including Created/Edited/Actions)
+            for (let i = 30; i <= 35; i++) if (columnVisibility[i]) span2++;
 
             // Calculate visible columns for print
             let span1_print = 0;
-            for (let i = 1; i <= 18; i++) if (columnVisibility[i]) span1_print++;
+            for (let i = 1; i <= 20; i++) if (columnVisibility[i]) span1_print++;
             let span2_print = 0;
-            if (columnVisibility[28]) span2_print++; // Pay Date
-            if (columnVisibility[29]) span2_print++; // Remarks
-            if (columnVisibility[33]) span2_print++; // Stock (Index shifted)
+            for (let i = 30; i <= 35; i++) {
+                if (i !== 34 && columnVisibility[i]) span2_print++;
+            }
 
             // --- Screen Footer ---
             if (showGrandTotalScreen) {
@@ -2855,48 +3020,48 @@
                     footerHtml += `<td colspan="${span1}" style="text-align:right">Grand Total:</td>`;
                 }
 
-                // Col 19: Gross Amount
-                if (columnVisibility[19]) {
+                // Col 20: Gross Amount
+                if (columnVisibility[21]) {
                     footerHtml += `<td style="font-weight:bold;">${grandTotalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                 }
 
-                // Col 20: GST % (Empty)
-                if (columnVisibility[20]) {
+                // Col 21: GST % (Empty)
+                if (columnVisibility[22]) {
                     footerHtml += `<td></td>`;
                 }
 
-                // Col 21: GST Amt
-                if (columnVisibility[21]) {
+                // Col 22: GST Amt
+                if (columnVisibility[23]) {
                     footerHtml += `<td style="font-weight:bold;">${grandTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                 }
 
-                // Col 22: Total
-                if (columnVisibility[22]) {
+                // Col 23: Total
+                if (columnVisibility[24]) {
                     footerHtml += `<td style="font-weight:bold;">${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                 }
 
-                // Col 23: Avg Price (Empty)
-                if (columnVisibility[23]) {
+                // Col 24: Avg Price (Empty)
+                if (columnVisibility[25]) {
                     footerHtml += `<td></td>`;
                 }
 
-                // Col 24: Cash
-                if (columnVisibility[24]) {
+                // Col 25: Cash
+                if (columnVisibility[26]) {
                     footerHtml += `<td style="font-weight:bold;">${grandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                 }
 
-                // Col 25: Bank
-                if (columnVisibility[25]) {
+                // Col 26: Bank
+                if (columnVisibility[27]) {
                     footerHtml += `<td style="font-weight:bold;">${grandTotalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                 }
 
-                // Col 26: Total Paid
-                if (columnVisibility[26]) {
+                // Col 27: Total Paid
+                if (columnVisibility[28]) {
                     footerHtml += `<td style="font-weight:bold; color:#28a745;">${grandTotalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                 }
 
-                // Col 27: Due
-                if (columnVisibility[27]) {
+                // Col 28: Due
+                if (columnVisibility[29]) {
                     footerHtml += `<td style="font-weight:bold; color:#dc3545;">${grandTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                 }
 
@@ -2917,15 +3082,15 @@
                 let footerHtmlPrint = '';
                 if (span1_print > 0) footerHtmlPrint += `<td colspan="${span1_print}" style="text-align:right">Grand Total:</td>`;
 
-                if (columnVisibility[19]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-                if (columnVisibility[20]) footerHtmlPrint += `<td></td>`;
-                if (columnVisibility[21]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-                if (columnVisibility[22]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-                if (columnVisibility[23]) footerHtmlPrint += `<td></td>`;
-                if (columnVisibility[24]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-                if (columnVisibility[25]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-                if (columnVisibility[26]) footerHtmlPrint += `<td style="font-weight:bold; color:#28a745;">${grandTotalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-                if (columnVisibility[27]) footerHtmlPrint += `<td style="font-weight:bold; color:#dc3545;">${grandTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[21]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalGross.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[22]) footerHtmlPrint += `<td></td>`;
+                if (columnVisibility[23]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[24]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[25]) footerHtmlPrint += `<td></td>`;
+                if (columnVisibility[26]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[27]) footerHtmlPrint += `<td style="font-weight:bold;">${grandTotalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[28]) footerHtmlPrint += `<td style="font-weight:bold; color:#28a745;">${grandTotalPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                if (columnVisibility[29]) footerHtmlPrint += `<td style="font-weight:bold; color:#dc3545;">${grandTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
 
                 if (span2_print > 0) footerHtmlPrint += `<td colspan="${span2_print}"></td>`;
 
@@ -2947,7 +3112,7 @@
                 if (showTotalQtyScreen) {
                     let spanUom1 = span1; // 0-8
                     let spanUom2 = 0;
-                    for (let i = 19; i <= 33; i++) if (columnVisibility[i]) spanUom2++;
+                    for (let i = 21; i <= 35; i++) if (columnVisibility[i]) spanUom2++;
 
                     const trUom = document.createElement("tr");
                     trUom.className = "no-print";
@@ -2974,7 +3139,7 @@
 
                     // Span for content (rest of columns)
                     let spanRest_print = 0;
-                    for (let i = 19; i <= 27; i++) if (columnVisibility[i]) spanRest_print++;
+                    for (let i = 21; i <= 29; i++) if (columnVisibility[i]) spanRest_print++;
                     if (typeof span2_print !== 'undefined') spanRest_print += span2_print;
 
                     if (spanRest_print > 0) {
@@ -3069,9 +3234,15 @@
                     $("purchaseDate").value = p.date || "";
                     $("quantity").value = p.qty || "";
                     $("price").value = p.price || "";
+                    $("mrp").value = p.mrp || "";
+                    $("priceFromMrpToggle").checked = p.priceFromMrp === true;
+                    $("mrpDiscountType").value = p.mrpDiscountType || '%';
+                    $("mrpDiscountValue").value = p.mrpDiscountValue ?? p.mrpDiscountPercent ?? "";
+                    toggleMrpPricing();
                     $("discount").value = p.discount || 0;
                     if ($("discType")) $("discType").value = p.discType || "%";
                     $("margin").value = p.margin || "";
+                    $("marginType").value = p.marginType || "%";
                     $("salePrice").value = p.salePrice || "";
                     $("hsn").value = p.hsn || "";
                     $("imei").value = p.imei || "";
@@ -3289,6 +3460,8 @@
                                 <th style="border:1px solid #ddd; padding:5px; text-align:left;">Item Name</th>
                                 <th style="border:1px solid #ddd; padding:5px; text-align:center;">Qty</th>
                                 <th style="border:1px solid #ddd; padding:5px; text-align:right;">Price</th>
+                                <th style="border:1px solid #ddd; padding:5px; text-align:right;">MRP</th>
+                                <th style="border:1px solid #ddd; padding:5px; text-align:right;">MRP Discount</th>
                                 <th style="border:1px solid #ddd; padding:5px; text-align:center;">UOM</th>
                                 <th style="border:1px solid #ddd; padding:5px; text-align:center;">Disc.</th>
                                 <th style="border:1px solid #ddd; padding:5px; text-align:center;">GST %</th>
@@ -3338,6 +3511,8 @@
                         <td style="border:1px solid #ddd; padding:5px;">${itemDisplay}${extraHtml}</td>
                         <td style="border:1px solid #ddd; padding:5px; text-align:center;">${item.qty}</td>
                         <td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${parseFloat(item.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${(parseFloat(item.mrp) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td style="border:1px solid #ddd; padding:5px; text-align:right;">${formatMrpDiscount(item)}</td>
                         <td style="border:1px solid #ddd; padding:5px; text-align:center;">${escapeHtml(item.uom || '')}</td>
                         <td style="border:1px solid #ddd; padding:5px; text-align:center;">${item.discount || 0}${discType === 'flat' ? '₹' : '%'}</td>
                         <td style="border:1px solid #ddd; padding:5px; text-align:center;">${item.gst || 0}%</td>
@@ -3347,19 +3522,19 @@
             });
 
             if (totalFreight > 0) {
-                itemsHtml += `<tr><td colspan="7" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>FREIGHT CHARGES</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalFreight.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+                itemsHtml += `<tr><td colspan="9" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>FREIGHT CHARGES</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalFreight.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
             }
             if (totalPacking > 0) {
-                itemsHtml += `<tr><td colspan="7" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>PACKING CHARGES</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalPacking.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+                itemsHtml += `<tr><td colspan="9" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>PACKING CHARGES</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalPacking.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
             }
             if (totalLoading > 0) {
-                itemsHtml += `<tr><td colspan="7" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>LOADING CHARGES</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalLoading.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+                itemsHtml += `<tr><td colspan="9" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>LOADING CHARGES</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalLoading.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
             }
-            itemsHtml += `<tr><td colspan="7" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>TOTAL GST</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalTaxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+            itemsHtml += `<tr><td colspan="9" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>TOTAL GST</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalTaxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
             if (totalRoundOff !== 0) {
-                itemsHtml += `<tr><td colspan="7" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>ROUNDED OFF</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalRoundOff.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+                itemsHtml += `<tr><td colspan="9" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>ROUNDED OFF</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right;">₹${totalRoundOff.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
             }
-            itemsHtml += `<tr><td colspan="7" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>Grand Total</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right; font-weight:bold; color:#0d6efd;">₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+            itemsHtml += `<tr><td colspan="9" style="border:1px solid #ddd; padding:5px; text-align:right;"><b>Grand Total</b></td><td style="border:1px solid #ddd; padding:5px; text-align:right; font-weight:bold; color:#0d6efd;">₹${grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
 
             itemsHtml += `</tbody></table></div>`;
 
@@ -3621,9 +3796,15 @@
             $("purchaseDate").value = "";
             $("quantity").value = "";
             $("price").value = "";
+            $("mrp").value = "";
+            $("priceFromMrpToggle").checked = false;
+            $("mrpDiscountValue").value = "";
+            $("mrpDiscountType").value = "%";
+            toggleMrpPricing();
             $("discount").value = "0";
             if ($("discType")) $("discType").value = "%";
             $("margin").value = "";
+            $("marginType").value = "%";
             $("salePrice").value = "";
             $("itemCode").value = "";
             $("category").value = "";
@@ -3903,10 +4084,11 @@
         }
 
         function resetTableSettings() {
-            columnVisibility = new Array(33).fill(true);
+            columnVisibility = new Array(36).fill(true);
             // Default hide extra fields
             [6, 7, 8, 9, 10, 11, 12].forEach(i => columnVisibility[i] = false);
-            localStorage.removeItem("purchaseColumnVisibility");
+            localStorage.setItem("purchaseColumnVisibility", JSON.stringify(columnVisibility));
+            localStorage.setItem("purchaseColumnVisibilityVersion", "3");
 
             showGrandTotalScreen = true;
             localStorage.removeItem("purchaseShowGrandTotalScreen");
@@ -3997,14 +4179,16 @@
                     "UOM": p.uom || "-",
                     "Qty": p.qty,
                     "Price": p.price,
+                    "MRP": p.mrp || 0,
+                    "MRP Discount": formatMrpDiscount(p),
                     "Discount": `${p.discount || 0}${discType === 'flat' ? '₹' : '%'}`,
                     "HSN": p.hsn || "",
                     "IMEI": p.imei || "",
                     "Batch": p.batch || "",
                     "Lot": p.lot || "",
                     "Serial": p.serial || "",
-                    "Margin": p.margin || 0,
-                    "Sale Price": p.salePrice || 0,
+                    "Markup / Margin": formatSaleMarkup(p),
+                    "Sale Price": Number(p.salePrice) > 0 ? p.salePrice : "",
                     "Taxable Value": taxable.toFixed(2),
                     "GST %": (p.gst || 0) + "%",
                     "GST Amt": taxAmt.toFixed(2),
@@ -4080,11 +4264,22 @@
                 widths.push(th.style.width);
             });
             localStorage.setItem('purchaseColumnWidths', JSON.stringify(widths));
+            localStorage.setItem('purchaseColumnWidthsVersion', '3');
         }
 
         function loadColumnWidths() {
-            const savedWidths = JSON.parse(localStorage.getItem('purchaseColumnWidths'));
+            let savedWidths = JSON.parse(localStorage.getItem('purchaseColumnWidths'));
             if (savedWidths && Array.isArray(savedWidths)) {
+                if (savedWidths.length === 34) {
+                    savedWidths.splice(15, 0, '');
+                    savedWidths.splice(16, 0, '');
+                } else if (savedWidths.length === 35) {
+                    savedWidths = [...savedWidths.slice(0, 15), savedWidths[34], '', ...savedWidths.slice(15, 34)];
+                }
+                if (savedWidths.length === 36) {
+                    localStorage.setItem('purchaseColumnWidths', JSON.stringify(savedWidths));
+                    localStorage.setItem('purchaseColumnWidthsVersion', '3');
+                }
                 const headers = document.querySelectorAll('#purchaseTable th');
                 headers.forEach((th, index) => {
                     if (savedWidths[index]) {
@@ -4283,7 +4478,13 @@
                     $("purchaseDate").value = p.date || "";
                     $("quantity").value = p.qty || "";
                     $("price").value = p.price || "";
+                    $("mrp").value = p.mrp || "";
+                    $("priceFromMrpToggle").checked = p.priceFromMrp === true;
+                    $("mrpDiscountType").value = p.mrpDiscountType || '%';
+                    $("mrpDiscountValue").value = p.mrpDiscountValue ?? p.mrpDiscountPercent ?? "";
+                    toggleMrpPricing();
                     $("margin").value = p.margin || "";
+                    $("marginType").value = p.marginType || "%";
                     $("salePrice").value = p.salePrice || "";
                     $("itemCode").value = p.itemCode || "";
                     $("category").value = p.category || "";
