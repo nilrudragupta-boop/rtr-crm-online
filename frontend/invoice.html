@@ -2448,8 +2448,16 @@
 
                             const pPrice = parseFloat(purchases[i].price) || 0;
                             const pQty = parseFloat(purchases[i].qty) || 0;
+                            const base = pPrice * pQty;
+                            const discount = parseFloat(purchases[i].discount) || 0;
+                            const discountAmount = (purchases[i].discType || '%') === 'flat'
+                                ? discount
+                                : base * (discount / 100);
+                            const extraCharges = (parseFloat(purchases[i].freightCharges) || 0)
+                                + (parseFloat(purchases[i].packingCharges) || 0)
+                                + (parseFloat(purchases[i].loadingCharges) || 0);
                             lastPrice = pPrice;
-                            totalCost += pPrice * pQty;
+                            totalCost += base - discountAmount + extraCharges;
                             totalQty += pQty;
                         }
                     }
@@ -2460,7 +2468,7 @@
                             const avgPrice = totalCost / totalQty;
                             const diff = currentPrice - avgPrice;
                             const percent = (diff / avgPrice) * 100;
-                            avgInfo = `\nAvg Price: ${avgPrice.toFixed(2)} (${percent > 0 ? '+' : ''}${percent.toFixed(2)}%)`;
+                            avgInfo = `\nAvg. Purchase Price (₹): ${avgPrice.toFixed(2)} (${percent > 0 ? '+' : ''}${percent.toFixed(2)}%)`;
                         }
 
                         if (Math.abs(currentPrice - lastPrice) < 0.01) {
