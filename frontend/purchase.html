@@ -2769,6 +2769,8 @@
             const supplierFilter = $("search_supplier").value.trim();
             const invFilter = $("search_inv").value.trim();
             const itemFilter = $("search_item").value.trim();
+            const itemMasters = JSON.parse(localStorage.getItem("items")) || [];
+            const itemCodesById = new Map(itemMasters.map(item => [String(item.id), item.itemCode]));
 
             // --- Stock Calculation Start ---
             let stockMap = precalcStockMap;
@@ -2912,6 +2914,7 @@
 
                 const u = p.uom || "N/A";
                 uomTotals[u] = (uomTotals[u] || 0) + (parseFloat(p.qty) || 0);
+                const itemCode = itemCodesById.get(String(p.itemId)) || p.itemCode || "-";
 
                 const key = (p.itemId || p.itemName) + "_" + p.uom;
                 const avgPriceVal = parseFloat(avgMap[key]?.avg || 0);
@@ -2943,7 +2946,7 @@
       <td><a href="#" onclick="filterBySupplier('${escapeHtml(p.supplierName)}'); return false;" style="color: #0056b3; text-decoration: none;">${displaySupplier || "-"}</a></td>
       <td>${displayInv || "-"}</td>
       <td>${displayItem || "-"}</td>
-      <td>${p.itemCode || "-"}</td>
+    <td>${itemCode}</td>
       <td>${p.category || "-"}</td>
       <td>${p.hsn || "-"}</td>
       <td>${p.imei || "-"}</td>
