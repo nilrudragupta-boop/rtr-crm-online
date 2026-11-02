@@ -2733,7 +2733,7 @@
             const endIndex = startIndex + rowsPerPage;
             const paginatedData = data.slice(startIndex, endIndex);
 
-            renderPurchases(paginatedData, startIndex, stockMap);
+            renderPurchases(paginatedData, startIndex, stockMap, data);
             renderPagination(totalItems, startIndex + 1, Math.min(endIndex, totalItems), totalPages);
 
             requestAnimationFrame(() => {
@@ -2758,7 +2758,7 @@
             }
         }
 
-        function renderPurchases(data, startIndex = 0, precalcStockMap = null) {
+        function renderPurchases(data, startIndex = 0, precalcStockMap = null, averageData = data) {
             const tbody = $("purchaseTableBody");
             tbody.innerHTML = "";
             const tfoot = $("purchaseTableFooter");
@@ -2849,18 +2849,28 @@
                 return;
             }
 
-            // --- Compute Avg Price per (itemId + uom) ---
+            // --- Compute average taxable purchase price per (itemId + uom) ---
             const avgMap = {};
-            data.forEach(p => {
+            averageData.forEach(p => {
                 const key = (p.itemId || p.itemName) + "_" + p.uom;
                 const qty = parseFloat(p.qty) || 0;
-                const cost = (parseFloat(p.price) || 0) * qty;
-                if (!avgMap[key]) avgMap[key] = { totalQty: 0, totalCost: 0 };
+                const base = (parseFloat(p.price) || 0) * qty;
+                const discountValue = parseFloat(p.discount) || 0;
+                const discountAmount = (p.discType || '%') === 'flat'
+                    ? discountValue
+                    : base * (discountValue / 100);
+                const extraCharges = (parseFloat(p.freightCharges) || 0)
+                    + (parseFloat(p.packingCharges) || 0)
+                    + (parseFloat(p.loadingCharges) || 0);
+                const taxableValue = base - discountAmount + extraCharges;
+                if (!avgMap[key]) avgMap[key] = { totalQty: 0, totalTaxableValue: 0 };
                 avgMap[key].totalQty += qty;
-                avgMap[key].totalCost += cost;
+                avgMap[key].totalTaxableValue += taxableValue;
             });
             Object.keys(avgMap).forEach(k => {
-                avgMap[k].avg = avgMap[k].totalQty ? (avgMap[k].totalCost / avgMap[k].totalQty).toFixed(2) : "0.00";
+                avgMap[k].avg = avgMap[k].totalQty
+                    ? (avgMap[k].totalTaxableValue / avgMap[k].totalQty).toFixed(2)
+                    : "0.00";
             });
 
             let grandTotal = 0;
