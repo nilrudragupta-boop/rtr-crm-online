@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day Book - Visual Step-by-Step Operational Guide</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent-blue: #0d6efd;
+            --success: #198754;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --gray-btn: #6c757d;
+            --bg-main: #0f172a;
+            --card-dark: #1e293b;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-light);
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .app-header {
+            max-width: 1350px;
+            margin: 0 auto 24px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .app-title h1 {
+            font-size: 24px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .app-title p {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .main-layout {
+            max-width: 1350px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 980px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Steps navigation */
+        .steps-nav {
+            background: var(--card-dark);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            height: fit-content;
+            position: sticky;
+            top: 24px;
+        }
+
+        .nav-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 12px;
+            padding-left: 6px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .step-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .step-item.active {
+            background: var(--accent-blue);
+            border-color: #60a5fa;
+            color: #fff;
+        }
+
+        .step-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .step-info h4 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .step-info p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        /* Showcase viewer */
+        .showcase-area {
+            background: var(--card-dark);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .showcase-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 16px;
+        }
+
+        .step-header-text h2 {
+            font-size: 20px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .step-header-text p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Simulated Screenshot Frame */
+        .screenshot-frame {
+            background: #cbd5e1;
+            padding: 24px;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.15);
+            overflow-x: auto;
+        }
+
+        /* Simulated Module UI - Matches Day Book */
+        .sim-container {
+            width: 100%;
+            max-width: 960px;
+            margin: 0 auto;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            color: #333;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            box-sizing: border-box;
+        }
+
+        .sim-title {
+            text-align: center;
+            margin-bottom: 18px;
+            color: #2c3e50;
+            font-weight: 700;
+            font-size: 20px;
+        }
+
+        .sim-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            font-size: 13px;
+        }
+
+        .sim-controls label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .sim-controls input,
+        .sim-controls select {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 13px;
+            background: #fff;
+        }
+
+        .sim-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12.5px;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .sim-btn-primary {
+            background: #0d6efd;
+        }
+
+        .sim-btn-success {
+            background: #198754;
+        }
+
+        .sim-btn-secondary {
+            background: #6c757d;
+        }
+
+        .sim-table-wrap {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            overflow-x: auto;
+            max-height: 520px;
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+        }
+
+        .sim-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .sim-table th,
+        .sim-table td {
+            padding: 9px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .sim-table th {
+            background: #343a40;
+            color: #fff;
+            font-weight: 600;
+            font-size: 12.5px;
+        }
+
+        .sim-table tfoot tr {
+            font-weight: bold;
+            background: #e9ecef;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        /* Explanation card */
+        .step-explainer {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 18px 20px;
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .step-explainer h3 {
+            font-size: 15px;
+            color: #fff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step-explainer ul {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .step-explainer li {
+            font-size: 13px;
+            color: #cbd5e1;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .step-explainer li i {
+            color: #10b981;
+            font-size: 11px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="app-header">
+        <div class="app-title">
+            <h1><i class="fas fa-book-open" style="color: #38bdf8;"></i> Day Book — Step-by-Step Visual Operational
+                Guide</h1>
+            <p>Complete operational walkthrough of the central daily audit journal aggregating multi-module
+                transactions, liquid cash/bank flows, and double-entry balance verification.</p>
+        </div>
+    </header>
+
+    <main class="main-layout">
+        <!-- Left Navigation -->
+        <aside class="steps-nav">
+            <div class="nav-title">Workflow Stages</div>
+            <div class="step-item active" onclick="switchStep(1)">
+                <div class="step-badge">1</div>
+                <div class="step-info">
+                    <h4>Single-Day Journal Snapshot</h4>
+                    <p>Default date & 8-column layout</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(2)">
+                <div class="step-badge">2</div>
+                <div class="step-info">
+                    <h4>Voucher Type Segmentation</h4>
+                    <p>Sales, Purchase, Payments, JV</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(3)">
+                <div class="step-badge">3</div>
+                <div class="step-info">
+                    <h4>Multi-Module Data Aggregation</h4>
+                    <p>Cross-register auto ingestion</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(4)">
+                <div class="step-badge">4</div>
+                <div class="step-info">
+                    <h4>Cash & Bank Flow Auditing</h4>
+                    <p>Liquid movements & account info</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(5)">
+                <div class="step-badge">5</div>
+                <div class="step-info">
+                    <h4>Double-Entry Balance Verification</h4>
+                    <p>Dr vs Cr totals & difference row</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(6)">
+                <div class="step-badge">6</div>
+                <div class="step-info">
+                    <h4>Sorting, Search & Pagination</h4>
+                    <p>Particulars filter & column sorts</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(7)">
+                <div class="step-badge">7</div>
+                <div class="step-info">
+                    <h4>Excel Export & Clean Print</h4>
+                    <p>Spreadsheet & formal paper view</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Showcase Container -->
+        <section class="showcase-area">
+            <div class="showcase-toolbar">
+                <div class="step-header-text">
+                    <h2 id="stepHeading">Step 1: Single-Day Journal Snapshot & Layout</h2>
+                    <p id="stepSubheading">When an auditor or accountant opens the Day Book, the system defaults to
+                        today's date and presents an 8-column transaction grid.</p>
+                </div>
+            </div>
+
+            <!-- Render Target -->
+            <div class="screenshot-frame">
+                <div id="simulatedScreen" class="sim-container">
+                    <!-- Content dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Step Explanation -->
+            <div class="step-explainer" id="stepExplainer">
+                <!-- Dynamic explanation -->
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const stepData = {
+            1: {
+                heading: "Step 1: Single-Day Journal Snapshot & Layout",
+                subheading: "On load, the module sets both From and To dates to the current working day, rendering all transactions logged across the business.",
+                html: `
+            <div class="sim-title">RISE Tech Revolution - Day Book</div>
+
+            <div class="sim-controls">
+                <label>From:</label>
+                <input type="date" value="2026-11-03">
+                <label>To:</label>
+                <input type="date" value="2026-11-03">
+                <label>Type:</label>
+                <select style="font-weight:bold;">
+                    <option selected>All Types</option>
+                    <option>Sales</option>
+                    <option>Purchase</option>
+                    <option>Payment</option>
+                    <option>Journal</option>
+                    <option>Credit Note</option>
+                    <option>Debit Note</option>
+                </select>
+                <input type="text" placeholder="Search Particulars/Voucher..." style="width: 190px;">
+                <button class="sim-btn sim-btn-primary">🔄 Refresh</button>
+                <button class="sim-btn sim-btn-success">📊 Export Excel</button>
+                <button class="sim-btn sim-btn-secondary">🖨️ Print</button>
+            </div>
+
+            <div class="sim-table-wrap">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Voucher Type</th>
+                            <th>Voucher No</th>
+                            <th>Particulars</th>
+                            <th class="text-right">Debit Amount</th>
+                            <th class="text-right">Credit Amount</th>
+                            <th class="text-right">Cash</th>
+                            <th class="text-right">Bank</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="font-weight:bold; color:#0d6efd;">Sales</span></td>
+                            <td>INV-2026-088</td>
+                            <td>Apex Industrial Engineering Ltd.</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#198754; font-weight:bold;">₹ 48,380.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 10,000.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 38,380.00</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="font-weight:bold; color:#f39c12;">Purchase</span></td>
+                            <td>TS-99120</td>
+                            <td>Tata Steel Spares & Alloys Div</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">₹ 32,094.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 10,000.00</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 22,094.00</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-right">Total</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 32,094.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 48,380.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 0.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 16,286.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <p style="font-size:12px; color:#666; margin:0; text-align:center;">
+                Showing complete transactions for 03/11/2026. The Day Book acts as the master daily book of original entry.
+            </p>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Daily Audit Architecture:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Current Date Initialization:</strong> <code>valueAsDate = new Date()</code> binds both date inputs to the active working day on initialization [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Comprehensive 8-Column Format:</strong> Date, Voucher Type, Voucher No, Particulars, Debit Amount, Credit Amount, Cash Flow, and Bank Flow [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Real-Time Running Footers:</strong> Totals compute dynamically based on visible and filtered records [cite: 22].</li>
+            </ul>
+        `
+            },
+            2: {
+                heading: "Step 2: Voucher Type Filtering & Classification",
+                subheading: "Filtering by voucher categories to inspect specific trading, financial, or adjustment transactions.",
+                html: `
+            <div class="sim-controls" style="background:#eef2ff; border:1px solid #c7d2fe;">
+                <label style="color:#3730a3;">Filter Active:</label>
+                <select style="font-weight:bold; color:#0d6efd; border-color:#0d6efd;">
+                    <option>All Types</option>
+                    <option>Sales (Customer Invoices)</option>
+                    <option>Purchase (Vendor Bills)</option>
+                    <option selected>Payment (Overhead & Vendor Payouts)</option>
+                    <option>Journal (Manual Double-Entry Vouchers)</option>
+                    <option>Credit Note (Sales Return)</option>
+                    <option>Debit Note (Purchase Return)</option>
+                </select>
+                <span style="font-size:12.5px; color:#4338ca; font-weight:bold; margin-left:10px;">
+                    Showing 2 Payment Vouchers for 03/11/2026
+                </span>
+            </div>
+
+            <div class="sim-table-wrap">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Voucher Type</th>
+                            <th>Voucher No</th>
+                            <th>Particulars</th>
+                            <th class="text-right">Debit Amount</th>
+                            <th class="text-right">Credit Amount</th>
+                            <th class="text-right">Cash</th>
+                            <th class="text-right">Bank</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="font-weight:bold; color:#6c757d;">Payment</span></td>
+                            <td>EXP-1092</td>
+                            <td>Shop Electricity Bill (WBSEDCL)</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">₹ 3,400.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 3,400.00</td>
+                            <td class="text-right">-</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="font-weight:bold; color:#6c757d;">Payment</span></td>
+                            <td>EXP-1095</td>
+                            <td>Machine Lubricants & Oil (Bharat Lubes)</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">₹ 12,000.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 12,000.00<div style="font-size:11px; color:#666;">SBI (...7788)</div></td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-right">Total Payments:</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 15,400.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 3,400.00</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 12,000.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Transaction Segregation:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Multi-Voucher Filter:</strong> Dropdown isolates Sales, Purchases, Payments, Journals, Credit Notes, and Debit Notes [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Instant Footing Refresh:</strong> Total Debit, Credit, Cash, and Bank footers re-tally immediately when filtered [cite: 22].</li>
+            </ul>
+        `
+            },
+            3: {
+                heading: "Step 3: Multi-Module Cross-Ledger Aggregation",
+                subheading: "The Day Book ingests data from 5 independent subsystems without manual double-entry posting.",
+                html: `
+            <div class="sim-table-wrap">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Voucher Type</th>
+                            <th>Voucher No</th>
+                            <th>Particulars / Source Origin</th>
+                            <th class="text-right">Debit (₹)</th>
+                            <th class="text-right">Credit (₹)</th>
+                            <th class="text-right">Cash Flow</th>
+                            <th class="text-right">Bank Flow</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="color:#0d6efd; font-weight:bold;">Sales</span></td>
+                            <td>INV-2026-088</td>
+                            <td>Apex Industrial [From Smart Invoice module]</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#198754; font-weight:bold;">48,380.00</td>
+                            <td class="text-right" style="color:#198754;">10,000.00</td>
+                            <td class="text-right" style="color:#198754;">38,380.00</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="color:#f39c12; font-weight:bold;">Purchase</span></td>
+                            <td>TS-99120</td>
+                            <td>Tata Steel [From Purchase Entries module]</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">32,094.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545;">10,000.00</td>
+                            <td class="text-right" style="color:#dc3545;">22,094.00</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="color:#8e44ad; font-weight:bold;">Credit Note</span></td>
+                            <td>CN-2026-015</td>
+                            <td>Damaged Goods Return [From Credit/Debit module]</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">4,248.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">-</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="color:#6c757d; font-weight:bold;">Payment</span></td>
+                            <td>EXP-1092</td>
+                            <td>Electricity Expense [From Expense Manager module]</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">3,400.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545;">3,400.00</td>
+                            <td class="text-right">-</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td><span style="color:#1f2937; font-weight:bold;">Journal</span></td>
+                            <td>JV-0442</td>
+                            <td>Office Rent Provision [From Journal Voucher module]</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">12,000.00</td>
+                            <td class="text-right" style="color:#198754; font-weight:bold;">12,000.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Integrated Data Sources:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Invoices:</strong> Ingests sales total as Credit, tagging cash/bank collections [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Purchases:</strong> Ingests inward bill total as Debit, recording cash/bank payouts [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Expenses:</strong> Ingests overhead outflows as Debit with linked bank account numbers [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Journal Vouchers:</strong> Pulls double-entry adjustments with equal Debit and Credit balancing [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Credit/Debit Notes:</strong> Adjusts receivable or payable allowances [cite: 22].</li>
+            </ul>
+        `
+            },
+            4: {
+                heading: "Step 4: Real-Time Cash & Bank Liquid Flow Auditing",
+                subheading: "Dedicated columns track cash till movements and bank withdrawals/deposits with account identification.",
+                html: `
+            <div style="background:#fff; padding:16px; border-radius:8px; border:1px solid #ddd;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="margin:0; font-size:15px; color:#2c3e50;">Liquid Flow Tracking (Cash Drawer & Bank Ledgers)</h3>
+                    <span style="font-size:12px; color:#198754; font-weight:bold;"><i class="fas fa-check-circle"></i> Reconciled against Bank Accounts Master</span>
+                </div>
+
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Voucher</th>
+                            <th>Particulars</th>
+                            <th>Mode / Details</th>
+                            <th class="text-right">Cash Inflow (+)</th>
+                            <th class="text-right">Cash Outflow (-)</th>
+                            <th class="text-right">Bank Flow (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>INV-2026-088</td>
+                            <td>Apex Industrial Engineering Ltd.</td>
+                            <td>Cash Till + Online RTGS</td>
+                            <td class="text-right" style="color:#198754; font-weight:bold;">+ ₹ 10,000.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#198754; font-weight:bold;">
+                                + ₹ 38,380.00
+                                <div style="font-size:11px; color:#666;">SBI A/c ...7788</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>TS-99120</td>
+                            <td>Tata Steel Spares & Alloys Div</td>
+                            <td>Counter Cash + NEFT Outflow</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">- ₹ 10,000.00</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">
+                                - ₹ 22,094.00
+                                <div style="font-size:11px; color:#666;">SBI A/c ...7788</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>EXP-1092</td>
+                            <td>WBSEDCL Electricity Payment</td>
+                            <td>Petty Cash Drawer</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#dc3545; font-weight:bold;">- ₹ 3,400.00</td>
+                            <td class="text-right">-</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-right">Net Daily Liquid Position:</td>
+                            <td class="text-right" style="color:#198754;">+ ₹ 10,000.00</td>
+                            <td class="text-right" style="color:#dc3545;">- ₹ 13,400.00</td>
+                            <td class="text-right" style="color:#198754; font-weight:bold;">+ ₹ 16,286.00 Net Bank</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Liquid Reconciliation Mechanics:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Color-Coded Float Flows:</strong> Green indicates inflow/receipts; red indicates outflow/disbursements [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Account Number Annotation:</strong> Automatically queries <code>bank_transactions</code> and displays the bank account name and number (e.g. <code>SBI A/c ...7788</code>) below the amount [cite: 22].</li>
+            </ul>
+        `
+            },
+            5: {
+                heading: "Step 5: Double-Entry Balance Verification & Difference Row",
+                subheading: "Automatic calculation of net debit vs. credit difference, ensuring trial balance consistency.",
+                html: `
+            <div style="background:#fff; padding:18px; border-radius:8px; border:1px solid #ddd;">
+                <table class="sim-table" style="margin-bottom:10px;">
+                    <tfoot>
+                        <tr style="background:#e9ecef; font-weight:bold; font-size:13.5px;">
+                            <td colspan="4" class="text-right">Total Day Book Footing:</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 51,742.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 60,380.00</td>
+                            <td class="text-right" style="color:#dc3545;">₹ 3,400.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 16,286.00</td>
+                        </tr>
+                        <!-- Difference Row Simulation -->
+                        <tr style="font-weight:bold; background:#f8fafc; font-size:14px;">
+                            <td colspan="4" class="text-right" style="color:#198754;">
+                                <i class="fas fa-balance-scale"></i> Difference (Net Day Position):
+                            </td>
+                            <td colspan="4" class="text-center" style="color:#198754; font-size:15px;">
+                                ₹ 8,638.00 Cr (Net Credit Surplus)
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:10px 14px; font-size:12.5px; color:#15803d;">
+                    <strong><i class="fas fa-check-double"></i> Balanced Verification:</strong> If total Debits equal total Credits, the status row highlights <code>Balanced</code> in solid green. If unbalanced, it computes the exact difference with <code>Dr</code> or <code>Cr</code> indicators [cite: 22].
+                </div>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Verification Logic:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Difference Formula:</strong> <code>diff = totalDebit - totalCredit</code> [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Color Status Indicator:</strong> When difference is near zero, displays green "Balanced"; if debit exceeds credit, displays red with <code>Dr</code> suffix; if credit exceeds debit, displays green with <code>Cr</code> suffix [cite: 22].</li>
+            </ul>
+        `
+            },
+            6: {
+                heading: "Step 6: Sorting, Real-Time Search & Pagination Controls",
+                subheading: "Sorting by column headers, instant searching across particulars/vouchers, and variable page sizing.",
+                html: `
+            <div style="background:#fff; padding:16px; border-radius:8px; border:1px solid #ddd;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" value="Apex" style="padding:5px 8px; border:1px solid #0d6efd; border-radius:4px; font-size:12px; width:180px;">
+                        <span style="font-size:12px; color:#0d6efd; font-weight:bold;">Filtered by "Apex"</span>
+                    </div>
+                    <div style="font-size:12px; color:#666;">
+                        Showing 1 of 1 entries
+                    </div>
+                </div>
+
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th style="cursor:pointer;">Date ▲</th>
+                            <th style="cursor:pointer;">Voucher Type</th>
+                            <th style="cursor:pointer;">Voucher No</th>
+                            <th style="cursor:pointer;">Particulars</th>
+                            <th class="text-right">Debit Amount</th>
+                            <th class="text-right">Credit Amount</th>
+                            <th class="text-right">Cash</th>
+                            <th class="text-right">Bank</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td>Sales</td>
+                            <td>INV-2026-088</td>
+                            <td style="font-weight:bold;"><span style="background:#fff176;">Apex</span> Industrial Engineering Ltd.</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#198754; font-weight:bold;">₹ 48,380.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 10,000.00</td>
+                            <td class="text-right" style="color:#198754;">₹ 38,380.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <select style="padding:3px 6px; border:1px solid #ccc; border-radius:4px;">
+                            <option>10 rows</option>
+                            <option selected>20 rows</option>
+                            <option>50 rows</option>
+                            <option>100 rows</option>
+                        </select>
+                        <span>Showing 1 to 1 of 1 entries</span>
+                    </div>
+                    <div style="display:flex; gap:4px;">
+                        <button disabled class="sim-btn sim-btn-secondary" style="padding:2px 8px; font-size:11px;">Prev</button>
+                        <span style="padding:2px 6px; font-weight:bold;">Page 1 of 1</span>
+                        <button disabled class="sim-btn sim-btn-secondary" style="padding:2px 8px; font-size:11px;">Next</button>
+                    </div>
+                </div>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Operational Controls:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Multi-Directional Sort:</strong> Clicking any column header toggles ascending/descending order with icon updates (▲ / ▼) [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Sub-Second Search:</strong> <code>searchInput</code> filters across voucher numbers and party particulars in real time [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Flexible Row Limits:</strong> Allows configuring view size from 10 up to 500 rows per page [cite: 22].</li>
+            </ul>
+        `
+            },
+            7: {
+                heading: "Step 7: Excel Workbook Export & Clean Paper Printout",
+                subheading: "Exporting day records into Excel spreadsheets and triggering clean print formatting.",
+                html: `
+            <div style="background:white; border:2px solid #2c3e50; padding:20px; border-radius:6px; max-width:700px; margin:0 auto; font-size:12px;">
+                <div style="text-align:center; border-bottom:1px solid #000; padding-bottom:8px; margin-bottom:12px;">
+                    <h2 style="margin:0; font-size:19px; color:#2c3e50;">RISE TECH REVOLUTION</h2>
+                    <p style="margin:2px 0 0 0; font-size:11px; color:#555;">Memari, Purba Bardhaman, West Bengal | Ph: +91 98765 43210</p>
+                    <h3 style="margin:6px 0 0 0; font-size:14px; text-decoration:underline;">DAILY AUDIT REGISTER (DAY BOOK)</h3>
+                    <p style="margin:2px 0 0 0; font-size:11px;">Period: 03/11/2026 to 03/11/2026</p>
+                </div>
+
+                <table class="sim-table" style="font-size:11px; margin-bottom:10px;">
+                    <thead>
+                        <tr style="background:#eee; color:#000;">
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Vch No</th>
+                            <th>Particulars</th>
+                            <th class="text-right">Debit</th>
+                            <th class="text-right">Credit</th>
+                            <th class="text-right">Cash</th>
+                            <th class="text-right">Bank</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td>Sales</td>
+                            <td>INV-2026-088</td>
+                            <td>Apex Industrial Engineering Ltd.</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">48,380.00</td>
+                            <td class="text-right">10,000.00</td>
+                            <td class="text-right">38,380.00</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td>Purchase</td>
+                            <td>TS-99120</td>
+                            <td>Tata Steel Spares & Alloys Div</td>
+                            <td class="text-right">32,094.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">-10,000.00</td>
+                            <td class="text-right">-22,094.00</td>
+                        </tr>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td>Payment</td>
+                            <td>EXP-1092</td>
+                            <td>Shop Electricity Bill (WBSEDCL)</td>
+                            <td class="text-right">3,400.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">-3,400.00</td>
+                            <td class="text-right">-</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="4" class="text-right">Totals:</th>
+                            <th class="text-right">₹ 35,494.00</th>
+                            <th class="text-right">₹ 48,380.00</th>
+                            <th class="text-right">- ₹ 3,400.00</th>
+                            <th class="text-right">₹ 16,286.00</th>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="display:flex; justify-content:space-between; margin-top:40px; text-align:center; font-size:11px;">
+                    <div style="width:160px; border-top:1px solid #333; padding-top:4px;">Cashier / Preparer</div>
+                    <div style="width:160px; border-top:1px solid #333; padding-top:4px;">Internal Auditor</div>
+                    <div style="width:160px; border-top:1px solid #333; padding-top:4px;">Authorized Signatory</div>
+                </div>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Archival & Printing Quality:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Spreadsheet Compilation:</strong> <code>exportToExcel()</code> uses SheetJS to export raw transactions along with date filters and footing totals [cite: 22].</li>
+                <li><i class="fas fa-check"></i> <strong>Clean Print Stylesheet:</strong> Media query rules strip interactive controls and buttons for clean, audit-ready paper printing [cite: 22].</li>
+            </ul>
+        `
+            }
+        };
+
+        function switchStep(stepNum) {
+            document.querySelectorAll('.step-item').forEach((el, idx) => {
+                if (idx + 1 === stepNum) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
+            const data = stepData[stepNum];
+            document.getElementById('stepHeading').innerText = data.heading;
+            document.getElementById('stepSubheading').innerText = data.subheading;
+            document.getElementById('simulatedScreen').innerHTML = data.html;
+            document.getElementById('stepExplainer').innerHTML = data.explanation;
+        }
+
+        // Initialize Step 1
+        switchStep(1);
+    </script>
+</body>
+
+</html>
