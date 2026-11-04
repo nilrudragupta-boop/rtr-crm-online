@@ -1021,14 +1021,34 @@
 
         function refreshItemList(itemData) {
             const list = document.getElementById("itemList");
-            if (list) {
-                list.innerHTML = "";
-                itemData.forEach(i => {
+            if (!list) return;
+
+            list.innerHTML = "";
+            (Array.isArray(itemData) ? itemData : [])
+                .filter(item => item && item.name)
+                .forEach(item => {
                     const opt = document.createElement("option");
-                    opt.value = i.name;
+                    opt.value = formatItemSuggestion(item);
                     list.appendChild(opt);
                 });
-            }
+        }
+
+        function formatItemSuggestion(item) {
+            const details = [
+                ["Code", item.itemCode],
+                ["Index", item.indexNo],
+                ["Category", item.category],
+                ["HSN", item.hsn],
+                ["Type", item.itemType],
+                ["UOM", item.uom],
+                ["Description", item.description],
+                ["Sale Price", item.salePrice],
+                ["GST", item.gst]
+            ]
+                .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
+                .map(([label, value]) => `${label}: ${value}`);
+
+            return details.length ? `${item.name} | ${details.join(" | ")}` : item.name;
         }
 
         function loadItems() {
@@ -1131,15 +1151,22 @@
         }
 
         function autofillItem(input) {
-            const name = input.value.trim().toLowerCase();
-            if (!name) return;
+            const value = input.value.trim();
+            const searchValue = value.toLowerCase();
+            if (!searchValue) return;
 
             const items = JSON.parse(localStorage.getItem("items")) || [];
-            const itemObj = items.find(i => (i.name || "").toLowerCase() === name || (i.itemCode || "").toLowerCase() === name);
+            const itemObj = items.find(i =>
+                i && (
+                    formatItemSuggestion(i).toLowerCase() === searchValue ||
+                    String(i.name || "").toLowerCase() === searchValue ||
+                    String(i.itemCode || "").toLowerCase() === searchValue
+                )
+            );
 
             if (itemObj) {
                 const tr = input.closest("tr");
-                input.value = itemObj.name;
+                input.value = itemObj.name || "";
 
                 const uomInput = tr.querySelector(".item-uom");
                 const rateInput = tr.querySelector(".rate");
