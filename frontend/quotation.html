@@ -237,6 +237,7 @@
             .remove-btn-col,
             .remove-btn,
             #editTermsBtn,
+            #saveTermsBtn,
             .load-section {
                 display: none !important;
             }
@@ -559,16 +560,20 @@
             <div id="statusStamp" class="status-stamp">DRAFT</div>
 
             <!-- Terms and Conditions -->
-            <div class="terms-section" style="margin-top: 30px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
-                    <label style="text-decoration: underline; margin:0;">Terms & Conditions:</label>
-                    <button id="editTermsBtn" class="secondary" style="padding: 2px 8px; font-size: 12px;"
-                        onclick="toggleTermsEdit()">✏️ Edit</button>
-                </div>
-                <textarea id="termsConditions" rows="4" readonly
-                    style="width: 100%; font-family: inherit; border: 1px solid #ccc; padding: 8px; border-radius: 4px; background-color: #f9f9f9;"
-                    placeholder="Enter terms here..." oninput="saveTerms(this)"></textarea>
-            </div>
+<div class="terms-section" style="margin-top: 30px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+        <label style="text-decoration: underline; margin:0;">Terms & Conditions:</label>
+        <div>
+            <!-- Added Save Button -->
+            <button id="saveTermsBtn" class="success" style="padding: 2px 8px; font-size: 12px; margin-right: 4px;" onclick="explicitSaveTerms()">💾 Save</button>
+            <button id="editTermsBtn" class="secondary" style="padding: 2px 8px; font-size: 12px;"
+                onclick="toggleTermsEdit()">✏️ Edit</button>
+        </div>
+    </div>
+    <textarea id="termsConditions" rows="4" readonly
+        style="width: 100%; font-family: inherit; border: 1px solid #ccc; padding: 8px; border-radius: 4px; background-color: #f9f9f9;"
+        placeholder="Enter terms here..." oninput="saveTerms(this)"></textarea>
+</div>
 
             <!-- Signature -->
             <div class="footer">
@@ -883,6 +888,9 @@
                     companyGstin: APP_SETTINGS.COMPANY_GSTIN
                 });
             }
+            loadQuotationTermsFromServer().catch(error => {
+                console.warn("Failed to load shared quotation terms:", error);
+            });
             fetchCustomFieldsConfig().then(() => fetchQuotationsData());
             loadItems();
             updateLastReferenceDisplay();
@@ -1204,9 +1212,25 @@
             termsEl.value = savedTerms;
             setTimeout(() => { termsEl.style.height = 'auto'; termsEl.style.height = termsEl.scrollHeight + 'px'; }, 100);
         }
+        const initialTerms = termsEl.value;
+        let quotationTermsLoaded = false;
+
         function saveTerms(el) {
             localStorage.setItem("quotationTerms", el.value);
             el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
+        }
+
+        async function loadQuotationTermsFromServer() {
+            if (typeof apiClient === 'undefined' || !apiClient.getSettings) return;
+
+            const settings = await apiClient.getSettings();
+            if (!settings || typeof settings.quotationTerms !== 'string') return;
+
+            if (quotationTermsLoaded || termsEl.value !== initialTerms) return;
+
+            localStorage.setItem("quotationTerms", settings.quotationTerms);
+            termsEl.value = settings.quotationTerms;
+            saveTerms(termsEl);
         }
 
         function toggleTermsEdit() {
@@ -1226,6 +1250,59 @@
                 btn.classList.remove("success");
                 btn.classList.add("secondary");
             }
+        }
+
+
+        async function explicitSaveTerms() {
+            const el = document.getElementById("termsConditions");
+            if (!el) return;
+
+            saveTerms(el);
+            const syncErrors = [];
+            const refNo = document.getElementById("refNo")?.value.trim() || "";
+
+            if (refNo) {
+                const quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+                const existingQuote = quotations.find(q => q.refNo === refNo);
+                if (existingQuote) {
+                    existingQuote.terms = el.value;
+                    localStorage.setItem("quotations", JSON.stringify(quotations));
+
+                    if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) {
+                        try {
+                            const result = await apiClient.saveQuotation(existingQuote);
+                            if (!result || result.success !== true) {
+                                syncErrors.push("the quotation");
+                            }
+                        } catch (error) {
+                            console.error("Failed to sync quotation terms:", error);
+                            syncErrors.push("the quotation");
+                        }
+                    } else {
+                        syncErrors.push("the quotation");
+                    }
+                }
+            }
+
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) {
+                try {
+                    const result = await apiClient.saveSettings({ quotationTerms: el.value });
+                    if (!result || result.success !== true) {
+                        syncErrors.push("the shared terms template");
+                    }
+                } catch (error) {
+                    console.error("Failed to sync shared quotation terms:", error);
+                    syncErrors.push("the shared terms template");
+                }
+            } else {
+                syncErrors.push("the shared terms template");
+            }
+
+            if (syncErrors.length) {
+                showInfo("Warning", `Terms saved on this device, but remote sync failed for ${syncErrors.join(" and ")}.`, true);
+                return;
+            }
+            showInfo("Success", "Terms & Conditions saved and synced successfully!");
         }
 
         // 5. Save Logic
@@ -1306,6 +1383,7 @@
             const quotation = quotations.find(q => q.refNo === searchRef);
 
             if (quotation) {
+                quotationTermsLoaded = true;
                 document.getElementById("refNo").value = quotation.refNo;
                 document.getElementById("quotationStatus").value = quotation.status || "Draft";
                 document.getElementById("quotationDate").value = quotation.date;

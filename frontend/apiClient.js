@@ -175,6 +175,7 @@ const apiClient = {
         } catch (error) { return { success: false, message: error.message }; }
     },
 
+    
     // --- Invoices ---
     getInvoices: async () => {
         try {
@@ -800,3 +801,39 @@ apiClient.getBoms = apiClient.getBOMs;
 apiClient.deleteBom = apiClient.deleteBOM;
 
 window.apiClient = apiClient;
+
+
+async function explicitSaveTerms() {
+    const el = document.getElementById("termsConditions");
+    if (!el) return;
+
+    // 1. Keep local storage for offline fallback
+    saveTerms(el);
+
+    // 2. Sync to active loaded quotation if one is open
+    const refNo = document.getElementById("refNo") ? document.getElementById("refNo").value.trim() : "";
+    if (refNo) {
+        let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
+        const existingQuote = quotations.find(q => q.refNo === refNo);
+        if (existingQuote) {
+            existingQuote.terms = el.value;
+            localStorage.setItem("quotations", JSON.stringify(quotations));
+            if (typeof apiClient !== 'undefined' && apiClient.saveQuotation) {
+                apiClient.saveQuotation(existingQuote).catch(err => console.warn(err));
+            }
+        }
+    }
+
+    // 3. Sync default template across all devices via backend settings
+    if (typeof apiClient !== 'undefined' && apiClient.saveSettings) {
+        try {
+            await apiClient.saveSettings({ quotationTerms: el.value });
+        } catch (err) {
+            console.warn("Backend settings sync failed:", err);
+        }
+    }
+
+    if (typeof showInfo === 'function') {
+        showInfo("Success", "Terms & Conditions saved and synced successfully!");
+    }
+}
