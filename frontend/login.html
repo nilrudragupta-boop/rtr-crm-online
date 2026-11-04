@@ -13,6 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/otpauth/9.2.3/otpauth.umd.min.js"></script>
     <script src="settings.js"></script>
+    <script src="apiClient.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
     <script src="global_urgent_notice.js"></script>
@@ -1142,8 +1143,9 @@
                 } catch (e) { console.error(e); }
             } else {
                 try {
-                    const res = await fetch('/api/admin-creds');
-                    const creds = await res.json();
+                    const creds = typeof apiClient !== 'undefined' && apiClient.getAdminCreds
+                        ? await apiClient.getAdminCreds()
+                        : null;
                     if (creds.success && creds.adminUsers && creds.adminUsers.length > 0) {
                         ADMIN_USERS = attachPreserved2FA(creds.adminUsers);
                         localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
@@ -1898,6 +1900,36 @@
             document.getElementById('resetModal').style.display = 'none';
         }
 
+        async function savePasswordToRemote(username, newPassword) {
+            if (typeof apiClient === 'undefined' || !apiClient.getAdminCreds || !apiClient.saveAdminCreds) {
+                return { success: false, message: "Remote credential sync is unavailable." };
+            }
+
+            const creds = await apiClient.getAdminCreds();
+            if (!creds || !creds.success || !Array.isArray(creds.adminUsers)) {
+                return { success: false, message: "Could not load remote user credentials." };
+            }
+
+            const userIndex = creds.adminUsers.findIndex(user =>
+                user && user.username === username
+            );
+            if (userIndex < 0) {
+                return { success: false, message: `User "${username}" was not found on the remote server.` };
+            }
+
+            const users = creds.adminUsers.map(user => ({ ...user }));
+            users[userIndex].password = newPassword;
+            const result = await apiClient.saveAdminCreds({ adminUsers: users, adminPass: newPassword });
+            if (!result || !result.success) {
+                return { success: false, message: result?.message || "Remote password update failed." };
+            }
+
+            ADMIN_USERS = attachPreserved2FA(users);
+            localStorage.setItem('ADMIN_USERS', JSON.stringify(ADMIN_USERS));
+            localStorage.setItem("appPassword", newPassword);
+            return { success: true };
+        }
+
         async function confirmReset() {
             const newPass = document.getElementById('newPassword').value;
             const resetToken = sessionStorage.getItem('resetToken');
@@ -1914,10 +1946,8 @@
             let users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
             let mainUser = localStorage.getItem('adminUser') || (users.length > 0 ? users[0].username : "Admin");
 
-            const userIdx = users.findIndex(u => u.username === mainUser);
+            const userIdx = users.findIndex(u => u && u.username === mainUser);
             if (userIdx > -1) users[userIdx].password = newPass;
-            else if (users.length > 0) users[0].password = newPass;
-            else users.push({ username: mainUser, password: newPass, role: "Admin" });
 
             // Synchronize the new password to the cloud
             let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
@@ -1952,25 +1982,44 @@
             }
 
             if (window.electronAPI && window.electronAPI.resetPassword) {
-                const res = await window.electronAPI.resetPassword({ newPassword: newPass, resetToken });
+                const res = await window.electronAPI.resetPassword({ newPassword: newPass, resetToken, username: mainUser });
                 if (res.success) {
-                    openSuccessModal("Password reset process initiated. You will be able to login with the new password shortly.");
+                    const localCreds = await window.electronAPI.getAdminCreds();
+                    if (localCreds?.success && Array.isArray(localCreds.adminUsers)) {
+                        users = attachPreserved2FA(localCreds.adminUsers);
+                        ADMIN_USERS = users;
+                        localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
+                    }
+                    localStorage.setItem("appPassword", newPass);
+                    const remoteResult = await savePasswordToRemote(mainUser, newPass);
+                    if (remoteResult.success) {
+                        openSuccessModal("Password reset successfully and synced to your remote devices.");
+                    } else {
+                        console.error("Remote password sync failed:", remoteResult.message);
+                        openWarningModal(`Password reset on this device, but remote sync failed: ${remoteResult.message}`);
+                    }
                     closeResetModal();
                     sessionStorage.removeItem('resetToken');
                 } else {
                     openWarningModal(res.message || "Reset failed.");
                 }
             } else {
-                localStorage.setItem("appPassword", newPass);
+                if (userIdx > -1) {
+                    users[userIdx].password = newPass;
+                } else if (users.length === 0) {
+                    users.push({ username: mainUser, password: newPass, role: "Admin" });
+                }
                 localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
+                localStorage.setItem("appPassword", newPass);
 
-                fetch('/api/admin-creds', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminUsers: users, adminPass: newPass })
-                }).catch(console.error);
+                const remoteResult = await savePasswordToRemote(mainUser, newPass);
+                if (!remoteResult.success) {
+                    console.error("Remote password reset failed:", remoteResult.message);
+                    openWarningModal(`Password reset on this device, but remote sync failed: ${remoteResult.message}`);
+                } else {
+                    openSuccessModal("Password reset successfully. You can now login with your new password on any device.");
+                }
 
-                openSuccessModal("Password reset successfully. You can now login with your new password.");
                 closeResetModal();
                 sessionStorage.removeItem('resetToken');
             }

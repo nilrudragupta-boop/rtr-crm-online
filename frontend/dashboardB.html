@@ -6573,23 +6573,50 @@
             });
         }
 
+        async function syncPasswordChangeToRemote(username, newPassword) {
+            if (typeof apiClient === 'undefined' || !apiClient.getAdminCreds || !apiClient.saveAdminCreds) {
+                return { success: false, message: "Remote credential sync is unavailable." };
+            }
+
+            const creds = await apiClient.getAdminCreds();
+            if (!creds || !creds.success || !Array.isArray(creds.adminUsers)) {
+                return { success: false, message: "Could not load remote user credentials." };
+            }
+
+            const userIndex = creds.adminUsers.findIndex(user => user && user.username === username);
+            if (userIndex < 0) {
+                return { success: false, message: `User "${username}" was not found on the remote server.` };
+            }
+
+            const users = creds.adminUsers.map(user => ({ ...user }));
+            users[userIndex].password = newPassword;
+            const result = await apiClient.saveAdminCreds({ adminUsers: users, adminPass: newPassword });
+            if (!result || !result.success) {
+                return { success: false, message: result?.message || "Remote password update failed." };
+            }
+
+            localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
+            localStorage.setItem('appPassword', newPassword);
+            return { success: true };
+        }
+
         async function saveNewAppPassword() {
             const newPass = document.getElementById('newAppPass').value;
             const confirmPass = document.getElementById('confirmAppPass').value;
             if (!newPass) return alert("Password cannot be empty");
             if (newPass !== confirmPass) return alert("Passwords do not match");
+            const currentUser = localStorage.getItem("currentUser");
+            if (!currentUser) return alert("Could not identify the signed-in user.");
 
             try {
                 if (window.electronAPI && window.electronAPI.getAdminCreds) {
                     const credsRes = await window.electronAPI.getAdminCreds();
                     if (credsRes.success) {
                         // Update current user in ADMIN_USERS
-                        let users = credsRes.adminUsers || [];
-                        const currentUser = localStorage.getItem("currentUser");
+                        let users = Array.isArray(credsRes.adminUsers) ? credsRes.adminUsers : [];
                         const userIdx = users.findIndex(u => u.username === currentUser);
-                        if (userIdx > -1) {
-                            users[userIdx].password = newPass;
-                        }
+                        if (userIdx < 0) return alert(`User "${currentUser}" was not found.`);
+                        users[userIdx] = { ...users[userIdx], password: newPass };
 
                         const payload = {
                             devId: "OTP_VERIFIED",
@@ -6601,10 +6628,16 @@
                         };
                         const res = await window.electronAPI.saveAdminCreds(payload);
                         if (res.success) {
-                            localStorage.setItem("appPassword", newPass);
+                            localStorage.setItem('appPassword', newPass);
+                            localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
                             document.getElementById('changePasswordModal').style.display = 'none';
-                            alert("Password updated successfully!");
-
+                            const remoteResult = await syncPasswordChangeToRemote(currentUser, newPass);
+                            if (remoteResult.success) {
+                                alert("Password updated successfully and synced to your remote devices.");
+                            } else {
+                                console.error("Remote password sync failed:", remoteResult.message);
+                                alert(`Password updated on this device, but remote sync failed: ${remoteResult.message}`);
+                            }
                             triggerCredentialSync();
                         } else {
                             alert("Failed to update: " + res.message);
@@ -6612,24 +6645,21 @@
                     }
                 } else {
                     // Browser Fallback
-                    localStorage.setItem("appPassword", newPass);
                     let users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
-                    const currentUser = localStorage.getItem("currentUser");
                     const userIdx = users.findIndex(u => u.username === currentUser);
                     if (userIdx > -1) {
-                        users[userIdx].password = newPass;
+                        users[userIdx] = { ...users[userIdx], password: newPass };
                         localStorage.setItem('ADMIN_USERS', JSON.stringify(users));
                     }
-
-                    fetch('/api/admin-creds', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ adminUsers: users, adminPass: newPass })
-                    }).catch(console.error);
-
-
+                    localStorage.setItem('appPassword', newPass);
                     document.getElementById('changePasswordModal').style.display = 'none';
-                    alert("Password updated successfully (Local Browser)!");
+                    const remoteResult = await syncPasswordChangeToRemote(currentUser, newPass);
+                    if (remoteResult.success) {
+                        alert("Password updated successfully and synced to your remote devices.");
+                    } else {
+                        console.error("Remote password sync failed:", remoteResult.message);
+                        alert(`Password updated on this device, but remote sync failed: ${remoteResult.message}`);
+                    }
                 }
             } catch (e) { console.error(e); alert("Error updating password."); }
         }

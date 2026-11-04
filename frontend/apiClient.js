@@ -93,11 +93,30 @@ const apiClient = {
     getAdminCreds: async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
             return result;
         } catch (error) {
             console.error('Error fetching admin creds:', error);
             return null;
+        }
+    },
+
+    saveAdminCreds: async (creds) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/admin-creds${apiClient._getAuthQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(creds)
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                return { success: false, message: result.message || `HTTP ${response.status}` };
+            }
+            return result;
+        } catch (error) {
+            console.error('Error saving admin creds:', error);
+            return { success: false, message: error.message };
         }
     },
 
