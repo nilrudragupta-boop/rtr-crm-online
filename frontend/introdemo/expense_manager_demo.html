@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Manager - Visual Step-by-Step Operational Guide</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent-blue: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #dc3545;
+            --purple: #8e44ad;
+            --teal: #16a085;
+            --gray-btn: #6c757d;
+            --bg-main: #0f172a;
+            --card-dark: #1e293b;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-light);
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .app-header {
+            max-width: 1350px;
+            margin: 0 auto 24px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .app-title h1 {
+            font-size: 24px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .app-title p {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .main-layout {
+            max-width: 1350px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 980px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Steps navigation */
+        .steps-nav {
+            background: var(--card-dark);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            height: fit-content;
+            position: sticky;
+            top: 24px;
+        }
+
+        .nav-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 12px;
+            padding-left: 6px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .step-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .step-item.active {
+            background: var(--accent-blue);
+            border-color: #60a5fa;
+            color: #fff;
+        }
+
+        .step-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .step-info h4 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .step-info p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        /* Showcase viewer */
+        .showcase-area {
+            background: var(--card-dark);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .showcase-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 16px;
+        }
+
+        .step-header-text h2 {
+            font-size: 20px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .step-header-text p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Simulated Screenshot Frame */
+        .screenshot-frame {
+            background: #cbd5e1;
+            padding: 24px;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.15);
+            overflow-x: auto;
+        }
+
+        /* Simulated Module UI - Matches Expense Manager 1:1 */
+        .sim-container {
+            width: 100%;
+            max-width: 950px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            color: #333;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            box-sizing: border-box;
+        }
+
+        .sim-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .sim-header h2 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        /* KPI Dashboard */
+        .sim-kpi-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .sim-kpi-card {
+            flex: 1;
+            background: #fff;
+            padding: 14px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #3498db;
+        }
+
+        .sim-kpi-card h4 {
+            margin: 0 0 5px 0;
+            color: #7f8c8d;
+            font-size: 11.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sim-kpi-card .val {
+            font-size: 19px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* Entry Form */
+        .sim-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+            background: #f1f3f5;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12.5px;
+        }
+
+        .sim-form-grid label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .sim-form-grid input,
+        .sim-form-grid select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12.5px;
+            background: #fff;
+            box-sizing: border-box;
+        }
+
+        .sim-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12.5px;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .sim-btn-save {
+            background: #27ae60;
+        }
+
+        .sim-btn-clear {
+            background: #6c757d;
+        }
+
+        .sim-btn-recurring {
+            background: #8e44ad;
+        }
+
+        .sim-btn-vendor {
+            background: #16a085;
+        }
+
+        .sim-btn-export {
+            background: #2980b9;
+        }
+
+        .sim-btn-refresh {
+            background: #17a2b8;
+        }
+
+        .sim-btn-danger {
+            background: #dc3545;
+        }
+
+        .sim-btn-settings {
+            background: #607d8b;
+        }
+
+        .sim-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 12.5px;
+        }
+
+        .sim-table th,
+        .sim-table td {
+            border: 1px solid #dee2e6;
+            padding: 7px 8px;
+            text-align: left;
+        }
+
+        .sim-table th {
+            background: #2c3e50;
+            color: white;
+            font-weight: 600;
+        }
+
+        .sim-table tfoot tr {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+
+        /* Modal Simulation */
+        .sim-modal-card {
+            background: white;
+            padding: 22px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+            width: 100%;
+            max-width: 650px;
+            margin: 0 auto;
+            text-align: left;
+        }
+
+        .sim-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+            margin-bottom: 14px;
+        }
+
+        .sim-modal-header h3 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        /* Explanation card */
+        .step-explainer {
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 18px 20px;
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .step-explainer h3 {
+            font-size: 15px;
+            color: #fff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step-explainer ul {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .step-explainer li {
+            font-size: 13px;
+            color: #cbd5e1;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .step-explainer li i {
+            color: #10b981;
+            font-size: 11px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="app-header">
+        <div class="app-title">
+            <h1><i class="fas fa-wallet" style="color: #38bdf8;"></i> Expense Manager — Step-by-Step Visual Operational
+                Guide</h1>
+            <p>Complete operational walkthrough of the Expense Ledger for categorizing direct/indirect overheads,
+                managing vendors, and automated recurring voucher execution.</p>
+        </div>
+    </header>
+
+    <main class="main-layout">
+        <!-- Left Navigation -->
+        <aside class="steps-nav">
+            <div class="nav-title">Workflow Stages</div>
+            <div class="step-item active" onclick="switchStep(1)">
+                <div class="step-badge">1</div>
+                <div class="step-info">
+                    <h4>Dashboard & Spend KPIs</h4>
+                    <p>Monthly total & high category</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(2)">
+                <div class="step-badge">2</div>
+                <div class="step-info">
+                    <h4>Category & Sub-Category</h4>
+                    <p>Parent schema & reorder</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(3)">
+                <div class="step-badge">3</div>
+                <div class="step-info">
+                    <h4>Vendor Management Modal</h4>
+                    <p>GSTIN, PAN & similarity guard</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(4)">
+                <div class="step-badge">4</div>
+                <div class="step-info">
+                    <h4>Banking Auto-Feed & Modes</h4>
+                    <p>Bank withdrawal reflection</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(5)">
+                <div class="step-badge">5</div>
+                <div class="step-info">
+                    <h4>Recurring Expense Setup</h4>
+                    <p>Auto-generation on due dates</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(6)">
+                <div class="step-badge">6</div>
+                <div class="step-info">
+                    <h4>Expense Ledger & Sorting</h4>
+                    <p>Search, nature filter & pagination</p>
+                </div>
+            </div>
+            <div class="step-item" onclick="switchStep(7)">
+                <div class="step-badge">7</div>
+                <div class="step-info">
+                    <h4>Settings & Customization</h4>
+                    <p>Compact view & export controls</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Showcase Container -->
+        <section class="showcase-area">
+            <div class="showcase-toolbar">
+                <div class="step-header-text">
+                    <h2 id="stepHeading">Step 1: Operational Header & Live Spend KPIs</h2>
+                    <p id="stepSubheading">High-level financial view aggregating active monthly overheads, highest cost
+                        driver, and historical average.</p>
+                </div>
+            </div>
+
+            <!-- Render Target -->
+            <div class="screenshot-frame">
+                <div id="simulatedScreen" class="sim-container">
+                    <!-- Content dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Step Explanation -->
+            <div class="step-explainer" id="stepExplainer">
+                <!-- Dynamic explanation -->
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const stepData = {
+            1: {
+                heading: "Step 1: Operational Header & Live Spend KPIs",
+                subheading: "On load, the module aggregates all recorded expenses for the current month and computes top spend categories.",
+                html: `
+            <div class="sim-header">
+                <h2><span>💸 Expense Ledger - RISE Tech Revolution</span></h2>
+                <div>
+                    <button class="sim-btn sim-btn-recurring">🔄 Manage Recurring</button>
+                </div>
+            </div>
+
+            <div class="sim-kpi-row">
+                <div class="sim-kpi-card">
+                    <h4>Total Expenses (This Month)</h4>
+                    <div class="val">₹ 48,250.00</div>
+                </div>
+                <div class="sim-kpi-card" style="border-left-color: #e74c3c;">
+                    <h4>Highest Category</h4>
+                    <div class="val">Factory Electricity</div>
+                </div>
+                <div class="sim-kpi-card" style="border-left-color: #f39c12;">
+                    <h4>Avg Monthly Spend</h4>
+                    <div class="val">₹ 42,100</div>
+                </div>
+            </div>
+
+            <p style="font-size:12px; color:#666; margin:0;">
+                Live KPI metrics update instantly whenever expenses are saved, edited, or auto-generated by the recurring scheduler.
+            </p>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> KPI Computation Architecture:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Month-to-Date Filtering:</strong> <code>updateKPIs()</code> compares transaction timestamps against the active calendar month [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Highest Category Detection:</strong> Iterates across parent categories to flag the principal expenditure drain (e.g. Factory Electricity) [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Historical Run-Rate:</strong> Computes the mean spend across unique historical year-month records [cite: 18].</li>
+            </ul>
+        `
+            },
+            2: {
+                heading: "Step 2: Category Hierarchy & Sub-Category Reordering",
+                subheading: "Managing Parent Categories (Direct/Indirect) and drag-and-drop reordering for sub-categories.",
+                html: `
+            <div class="sim-form-grid" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div>
+                    <label>Date</label>
+                    <input type="date" value="2026-11-03">
+                </div>
+                <div>
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        Parent Category
+                        <span>
+                            <button style="padding:1px 5px; font-size:10px; background:#ffc107; border:none; border-radius:2px;">✎</button>
+                            <button style="padding:1px 5px; font-size:10px; background:#dc3545; border:none; color:white; border-radius:2px;">🗑️</button>
+                            <button style="padding:1px 5px; font-size:10px; background:#17a2b8; border:none; color:white; border-radius:2px;">+ Add</button>
+                        </span>
+                    </label>
+                    <input type="text" value="Manufacturing Expenses" style="border-color:#3498db; font-weight:bold;">
+                    <small style="color:#16a085; font-weight:bold;">Nature: Direct Expense</small>
+                </div>
+                <div>
+                    <label style="display:flex; justify-content:space-between; align-items:center;">
+                        Sub-Category
+                        <span>
+                            <button style="padding:1px 5px; font-size:10px; background:#8e44ad; border:none; color:white; border-radius:2px;">↕️</button>
+                            <button style="padding:1px 5px; font-size:10px; background:#ffc107; border:none; border-radius:2px;">✎</button>
+                            <button style="padding:1px 5px; font-size:10px; background:#dc3545; border:none; color:white; border-radius:2px;">🗑️</button>
+                            <button style="padding:1px 5px; font-size:10px; background:#17a2b8; border:none; color:white; border-radius:2px;">+ Add</button>
+                        </span>
+                    </label>
+                    <input type="text" value="Machine Lubricants & Coolants" style="border-color:#3498db; font-weight:bold;">
+                </div>
+                <div>
+                    <label>Invoice / Ref No</label>
+                    <input type="text" value="REF-99210">
+                </div>
+            </div>
+
+            <!-- Reorder Modal Simulation -->
+            <div class="sim-modal-card" style="max-width:380px; margin-top:15px; border-left:4px solid #8e44ad;">
+                <div class="sim-modal-header">
+                    <h3 style="color:#8e44ad; font-size:14px;"><i class="fas fa-arrows-alt-v"></i> Reorder Sub-Categories: Manufacturing</h3>
+                    <span style="font-size:16px; color:#999; cursor:pointer;">&times;</span>
+                </div>
+                <ul style="list-style:none; padding:0; border:1px solid #ddd; border-radius:4px; font-size:12px;">
+                    <li style="padding:6px 10px; border-bottom:1px solid #eee; background:#f9fafb; cursor:grab;">☰ 1. Machine Lubricants & Coolants</li>
+                    <li style="padding:6px 10px; border-bottom:1px solid #eee; background:#fff; cursor:grab;">☰ 2. Factory Power & Utilities</li>
+                    <li style="padding:6px 10px; background:#f9fafb; cursor:grab;">☰ 3. Tool Sharpening & Die Maintenance</li>
+                </ul>
+                <div style="text-align:right; margin-top:10px;">
+                    <button class="sim-btn sim-btn-save" style="background:#8e44ad; font-size:11px;">Save Order</button>
+                </div>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Categorisation Intelligence:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>P&L Nature Mapping:</strong> Automatically associates groups with <strong>Direct Expense</strong> (Trading Account) or <strong>Indirect Expense</strong> (Profit & Loss Account) [cite: 16, 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Historical Rename Propagation:</strong> Modifying a category alerts the user and propagates updates across existing historical ledger lines [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Drag-and-Drop Prioritisation:</strong> Enables operators to position frequently used sub-items at the top of quick dropdowns [cite: 18].</li>
+            </ul>
+        `
+            },
+            3: {
+                heading: "Step 3: Vendor Directory & Duplicate Prevention Guard",
+                subheading: "Managing vendor profiles with GSTIN, PAN, and similarity algorithm to prevent duplicate records.",
+                html: `
+            <div class="sim-modal-card">
+                <div class="sim-modal-header">
+                    <h3>👤 Add / Edit Vendor</h3>
+                    <span style="font-size:18px; color:#999; cursor:pointer;">&times;</span>
+                </div>
+
+                <div class="sim-form-grid" style="background:none; padding:0; grid-template-columns: 1fr 1fr;">
+                    <div style="grid-column: span 2;">
+                        <label>Vendor Name *</label>
+                        <input type="text" value="Bharat Lubricants & Spares Corp" style="font-weight:bold; border-color:#3498db;">
+                    </div>
+                    <div>
+                        <label>Alias / Trade Nickname</label>
+                        <input type="text" value="Bharat Lubes">
+                    </div>
+                    <div>
+                        <label>Mobile Number</label>
+                        <input type="text" value="9831099887">
+                    </div>
+                    <div>
+                        <label>Email</label>
+                        <input type="email" value="billing@bharatlubes.in">
+                    </div>
+                    <div>
+                        <label>GSTIN</label>
+                        <input type="text" value="19AAACB1122D1Z4" style="font-weight:bold;">
+                    </div>
+                    <div>
+                        <label>PAN</label>
+                        <input type="text" value="AAACB1122D">
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label>Address</label>
+                        <input type="text" value="Plot 88, GT Road Industrial Complex, Burdwan">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; border-top:1px solid #eee; padding-top:10px;">
+                    <span style="font-size:11.5px; color:#16a085;"><i class="fas fa-shield-alt"></i> Similarity algorithm verifies against existing database entries.</span>
+                    <button class="sim-btn sim-btn-save">💾 Save Vendor</button>
+                </div>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Vendor Integrity Controls:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Strict Duplicate Guard:</strong> Flags exact matches across Name + Mobile Number or GSTIN numbers to eliminate duplicate ledgers [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Levenshtein Similarity Check:</strong> Detects typo variations (e.g., "Bharat Lubes" vs "Bharat Lubricants") and prompts confirmation before saving [cite: 18].</li>
+            </ul>
+        `
+            },
+            4: {
+                heading: "Step 4: Amount Entry & Automated Banking Feed",
+                subheading: "Splitting Taxable Amount from Input GST and auto-feeding payment withdrawals into Bank Transactions.",
+                html: `
+            <div class="sim-form-grid" style="background:#f1f3f5; border:1px solid #ddd;">
+                <div>
+                    <label>Payment Mode</label>
+                    <select style="border-color:#3498db; font-weight:bold;">
+                        <option>Cash</option>
+                        <option selected>Bank Transfer</option>
+                        <option>UPI</option>
+                        <option>Card</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Linked Bank Account</label>
+                    <select style="border-color:#3498db; font-weight:bold; background:#e8f4fd;">
+                        <option selected>State Bank of India (A/c: ...7788)</option>
+                        <option>HDFC Current Account (A/c: ...1144)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Taxable Amount (Cost)</label>
+                    <input type="number" value="12000.00" style="font-weight:bold; border-color:#27ae60;">
+                </div>
+                <div>
+                    <label>GST Input (Eligible)</label>
+                    <input type="number" value="2160.00" style="font-weight:bold;">
+                </div>
+                <div>
+                    <label>Total Amount (Outflow)</label>
+                    <input type="number" value="14160.00" readonly style="background:#e9ecef; font-weight:bold; color:#2c3e50;">
+                </div>
+                <div style="grid-column: span 3;">
+                    <label>Remarks</label>
+                    <input type="text" value="Quarterly barrel purchase of CNC cutting oil.">
+                </div>
+            </div>
+
+            <div style="background:#e8f5e9; border:1px solid #c8e6c9; border-radius:6px; padding:10px 14px; font-size:12.5px; color:#2e7d32;">
+                <strong><i class="fas fa-link"></i> Automated Banking Synchronisation:</strong> Non-cash payment will automatically log a <strong>Withdrawal of ₹ 14,160.00</strong> to <code>bank_transactions</code> under SBI (A/c: ...7788) [cite: 18].
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Double-Entry Banking Bridge:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Dynamic Bank Select:</strong> Non-cash selections automatically expose bank selection dropdowns [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Automated Ledger Withdrawal:</strong> Pushes an uncleared transaction entry directly to the Banking Reconciliation module without re-typing [cite: 1, 18].</li>
+            </ul>
+        `
+            },
+            5: {
+                heading: "Step 5: Recurring Expense Setup & Automatic Execution",
+                subheading: "Automating fixed monthly overheads like Rent, Salaries, and Internet subscriptions with custom frequencies.",
+                html: `
+            <div class="sim-modal-card">
+                <div class="sim-modal-header">
+                    <h3 style="color:#8e44ad;"><i class="fas fa-sync-alt"></i> Active Recurring Expenses <span style="font-size:15px; color:#666;">(3 Active)</span></h3>
+                    <span style="font-size:18px; color:#999; cursor:pointer;">&times;</span>
+                </div>
+
+                <div style="border:1px solid #eee; border-radius:4px; overflow:hidden;">
+                    <table class="sim-table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Vendor</th>
+                                <th>Amount</th>
+                                <th>Frequency</th>
+                                <th>Next Due</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Rent & Premises<br><small style="color:#666;">Office Lease</small></td>
+                                <td>Burdwan Commercial Towers</td>
+                                <td style="font-weight:bold;">₹ 25,000.00</td>
+                                <td>Monthly</td>
+                                <td>01/12/2026</td>
+                                <td>
+                                    <button class="sim-btn" style="padding:2px 6px; font-size:11px; background:#ffc107; color:black;">Edit</button>
+                                    <button class="sim-btn" style="padding:2px 6px; font-size:11px; background:#f39c12;">Pause</button>
+                                    <button class="sim-btn sim-btn-danger" style="padding:2px 6px; font-size:11px;">Stop</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Utilities & Power<br><small style="color:#666;">Broadband</small></td>
+                                <td>Alliance Broadband Services</td>
+                                <td style="font-weight:bold;">₹ 1,200.00</td>
+                                <td>Monthly</td>
+                                <td>15/11/2026</td>
+                                <td>
+                                    <button class="sim-btn" style="padding:2px 6px; font-size:11px; background:#ffc107; color:black;">Edit</button>
+                                    <button class="sim-btn" style="padding:2px 6px; font-size:11px; background:#f39c12;">Pause</button>
+                                    <button class="sim-btn sim-btn-danger" style="padding:2px 6px; font-size:11px;">Stop</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12px; color:#666;">
+                    <span><i class="fas fa-magic" style="color:#8e44ad;"></i> Scheduler runs silently on startup to execute due vouchers automatically.</span>
+                    <button class="sim-btn sim-btn-secondary" style="font-size:11px;">Close</button>
+                </div>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Recurring Scheduler Workflow:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Zero-Touch Execution:</strong> <code>checkRecurringExpenses()</code> runs on page load, evaluating today's date against scheduled due dates and issuing vouchers [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Lifecycle Controls:</strong> Pause schedules during seasonal shutdowns or configure finite occurrence limits [cite: 18].</li>
+            </ul>
+        `
+            },
+            6: {
+                heading: "Step 6: Filterable Expense Ledger & Running Totals",
+                subheading: "Comprehensive chronological audit register with nature filters, date ranges, and column sorting.",
+                html: `
+            <div style="background:#fff; padding:18px; border-radius:8px; border:1px solid #ddd;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" placeholder="Search..." value="Lubricants" style="padding:5px 8px; border:1px solid #3498db; border-radius:4px; font-size:12px; width:150px;">
+                        <select style="padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                            <option selected>Direct Expense</option>
+                        </select>
+                    </div>
+                    <div style="font-size:12px; font-weight:bold; color:#2c3e50;">
+                        Showing 1 of 1 filtered entries
+                    </div>
+                </div>
+
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Parent Category</th>
+                            <th>Nature</th>
+                            <th>Sub-Category</th>
+                            <th>Vendor</th>
+                            <th>Ref No</th>
+                            <th>Mode</th>
+                            <th style="text-align:right;">Debit (Cost)</th>
+                            <th style="text-align:right;">GST</th>
+                            <th style="text-align:right;">Total</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>03/11/2026</td>
+                            <td>Manufacturing Expenses</td>
+                            <td><span style="color:#16a085; font-weight:bold;">Direct Expense</span></td>
+                            <td>Machine Lubricants</td>
+                            <td>Bharat Lubricants Corp</td>
+                            <td>REF-99210</td>
+                            <td>Bank Transfer</td>
+                            <td style="text-align:right;">₹ 12,000.00</td>
+                            <td style="text-align:right;">₹ 2,160.00</td>
+                            <td style="text-align:right; font-weight:bold;">₹ 14,160.00</td>
+                            <td>
+                                <button class="sim-btn sim-btn-primary" style="padding:2px 6px; font-size:11px;">Edit</button>
+                                <button class="sim-btn sim-btn-danger" style="padding:2px 6px; font-size:11px;">Del</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="7" style="text-align:right;">Total Filtered:</td>
+                            <td style="text-align:right;">₹ 12,000.00</td>
+                            <td style="text-align:right;">₹ 2,160.00</td>
+                            <td style="text-align:right; color:#27ae60;">₹ 14,160.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Audit Table Value:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Multi-Column Sorting:</strong> Clickable headers allow instantaneous sorting by Date, Category, Vendor, or Debit amount [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Client-Side Pagination:</strong> Supports variable row sets from 10 to 500 rows per page with page jump inputs [cite: 18].</li>
+            </ul>
+        `
+            },
+            7: {
+                heading: "Step 7: Table Customization & Excel Ledger Export",
+                subheading: "Configure compact table modes, hide optional columns, and export data directly to spreadsheets.",
+                html: `
+            <div class="sim-modal-card" style="max-width:380px;">
+                <div class="sim-modal-header">
+                    <h3 style="color:#607d8b;"><i class="fas fa-sliders-h"></i> Display Settings</h3>
+                    <span style="font-size:18px; color:#999; cursor:pointer;">&times;</span>
+                </div>
+
+                <div style="font-size:12.5px; color:#444; display:flex; flex-direction:column; gap:8px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:bold;">
+                        <input type="checkbox" checked> Show Export Vendors Button
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:bold;">
+                        <input type="checkbox" checked> Show Export Expenses Button
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:bold;">
+                        <input type="checkbox" checked> Show Row Action Buttons
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:bold;">
+                        <input type="checkbox"> Compact View (Dense Rows)
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:bold;">
+                        <input type="checkbox"> Grey Buttons Mode
+                    </label>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; border-top:1px solid #eee; padding-top:10px;">
+                    <button class="sim-btn sim-btn-export" style="font-size:11.5px;"><i class="fas fa-file-excel"></i> Export Ledger (.xlsx)</button>
+                    <button class="sim-btn sim-btn-secondary" style="font-size:11.5px;">Close</button>
+                </div>
+            </div>
+        `,
+                explanation: `
+            <h3><i class="fas fa-info-circle"></i> Customization & Archival:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Compact Data View:</strong> Toggles dense table padding for counter screens with smaller display resolutions [cite: 18].</li>
+                <li><i class="fas fa-check"></i> <strong>Complete Data Export:</strong> Exports structured Excel workbooks detailing dates, categories, vendors, and bank accounts [cite: 18].</li>
+            </ul>
+        `
+            }
+        };
+
+        function switchStep(stepNum) {
+            document.querySelectorAll('.step-item').forEach((el, idx) => {
+                if (idx + 1 === stepNum) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
+            const data = stepData[stepNum];
+            document.getElementById('stepHeading').innerText = data.heading;
+            document.getElementById('stepSubheading').innerText = data.subheading;
+            document.getElementById('simulatedScreen').innerHTML = data.html;
+            document.getElementById('stepExplainer').innerHTML = data.explanation;
+        }
+
+        // Initialize Step 1
+        switchStep(1);
+    </script>
+</body>
+
+</html>

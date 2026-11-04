@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Invoice — Complete Visual Walkthrough & Screenshot Studio</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    \<!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --bg-dark: #0f172a;
+            --surface-dark: #1e293b;
+            --border-dark: #334155;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+            --accent-purple: #8b5cf6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Top Bar */
+        .top-navbar {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-dark);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .brand-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .brand-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .controls-cluster {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .action-btn {
+            background: var(--surface-dark);
+            border: 1px solid var(--border-dark);
+            color: var(--text-light);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #334155;
+            border-color: #475569;
+        }
+
+        .action-btn.primary {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .action-btn.primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .action-btn.screenshot {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border: none;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .action-btn.screenshot:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
+
+        /* Main Workspace */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            height: calc(100vh - 65px);
+        }
+
+        /* Sidebar Nav */
+        .steps-sidebar {
+            width: 320px;
+            background: #111827;
+            border-right: 1px solid var(--border-dark);
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sidebar-header {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 1px;
+            padding: 6px 8px;
+        }
+
+        .step-item {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 12px 14px;
+            text-align: left;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.15s;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .step-item:hover {
+            background: var(--surface-dark);
+            color: var(--text-light);
+        }
+
+        .step-item.active {
+            background: rgba(37, 99, 235, 0.15);
+            border-color: var(--primary);
+            color: #60a5fa;
+        }
+
+        .step-num-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: #1f2937;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .step-item.active .step-num-badge {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .step-info-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .step-info-desc {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        /* Viewer Stage */
+        .stage-container {
+            flex: 1;
+            background: #0b0f19;
+            overflow-y: auto;
+            padding: 24px 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stage-card {
+            width: 100%;
+            max-width: 1100px;
+            background: var(--surface-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stage-header {
+            padding: 16px 20px;
+            background: #1e293b;
+            border-bottom: 1px solid var(--border-dark);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stage-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #93c5fd;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stage-tags {
+            display: flex;
+            gap: 6px;
+        }
+
+        .tag-pill {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #cbd5e1;
+            font-size: 0.72rem;
+            font-family: monospace;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        /* The Exact Simulated Screenshot Screen (Target for html2canvas) */
+        .screenshot-target-viewport {
+            background: #eef2f6;
+            padding: 24px;
+            color: #333;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            position: relative;
+        }
+
+        .window-frame {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 30px 36px;
+            margin: 0 auto;
+            max-width: 1040px;
+            position: relative;
+        }
+
+        .browser-mockup-header {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 1040px;
+            margin: 0 auto;
+        }
+
+        .window-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .w-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .w-red {
+            background: #ef4444;
+        }
+
+        .w-yellow {
+            background: #f59e0b;
+        }
+
+        .w-green {
+            background: #10b981;
+        }
+
+        .w-url {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 2px 12px;
+            font-size: 11px;
+            font-family: monospace;
+            color: #64748b;
+            flex: 1;
+            max-width: 420px;
+            margin-left: 10px;
+        }
+
+        /* Common Elements inside Screenshot */
+        .sc-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            color: #000;
+        }
+
+        .sc-address {
+            text-align: center;
+            font-size: 13px;
+            color: #555;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .sc-input,
+        .sc-select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            background: #fff;
+            color: #222;
+        }
+
+        .sc-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #444;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .sc-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sc-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+            margin-top: 10px;
+        }
+
+        .sc-table th {
+            background: #f8f9fa;
+            color: #2c3e50;
+            border: 1px solid #e9ecef;
+            padding: 8px 6px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .sc-table td {
+            border: 1px solid #e9ecef;
+            padding: 6px 8px;
+            text-align: center;
+            background: #fff;
+        }
+
+        /* Annotation Highlights */
+        .annotated-box {
+            position: relative;
+            outline: 2px dashed #f59e0b;
+            outline-offset: 3px;
+            background-color: rgba(245, 158, 11, 0.05);
+        }
+
+        .annot-tag {
+            position: absolute;
+            top: -12px;
+            right: 10px;
+            background: #f59e0b;
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
+        /* Toast Popup Simulation */
+        .sim-toast {
+            background: #222;
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 12px;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Modal Simulation inside Screenshot */
+        .sim-modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            border-radius: 8px;
+        }
+
+        .sim-modal-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            width: 440px;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+        }
+
+        /* Stage Bottom Explanation */
+        .stage-footer {
+            padding: 16px 24px;
+            background: #111827;
+            border-top: 1px solid var(--border-dark);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-note {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .footer-note b {
+            color: #e2e8f0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Top Navigation Bar -->
+    <div class="top-navbar">
+        <div class="brand-heading">
+            <div class="brand-icon">
+                <i class="fa-solid fa-file-invoice"></i>
+            </div>
+            <div>
+                <div class="brand-title">Smart Invoice — Exact Screenshot Walkthrough Studio</div>
+                <div class="brand-subtitle">Interactive visual simulations of Smart Invoice</div>
+            </div>
+        </div>
+
+        <div class="controls-cluster">
+            <button class="action-btn" onclick="prevStep()"><i class="fa-solid fa-chevron-left"></i> Previous</button>
+            <span id="stepCounter" style="font-size: 0.85rem; font-weight: 700; color: #94a3b8; padding: 0 6px;">1 /
+                9</span>
+            <button class="action-btn" onclick="nextStep()">Next <i class="fa-solid fa-chevron-right"></i></button>
+
+            <button class="action-btn screenshot" onclick="captureCurrentStepScreenshot()">
+                <i class="fa-solid fa-camera"></i> 📸 Capture PNG Screenshot
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="main-layout">
+
+        <!-- Step Navigation Sidebar -->
+        <div class="steps-sidebar">
+            <div class="sidebar-header">Operational Steps</div>
+
+            <div class="step-item active" onclick="goToStep(1)">
+                <div class="step-num-badge">1</div>
+                <div>
+                    <div class="step-info-title">Initial Landing Screen</div>
+                    <div class="step-info-desc">Header, sequence counters, and blank form</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(2)">
+                <div class="step-num-badge">2</div>
+                <div>
+                    <div class="step-info-title">Buyer & Consignee Routing</div>
+                    <div class="step-info-desc">Customer selection, PIN, and GSTIN check</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(3)">
+                <div class="step-num-badge">3</div>
+                <div>
+                    <div class="step-info-title">Real-Time Credit Guard</div>
+                    <div class="step-info-desc">Live debt calculations and limit alarms</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(4)">
+                <div class="step-num-badge">4</div>
+                <div>
+                    <div class="step-info-title">Barcode Scan & Autocomplete</div>
+                    <div class="step-info-desc">SKU search, HSN auto-fill, and live stock</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(5)">
+                <div class="step-num-badge">5</div>
+                <div>
+                    <div class="step-info-title">Profit Margin Borders & History</div>
+                    <div class="step-info-desc">Green/Red profit signals and 🕒 past rates modal</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(6)">
+                <div class="step-num-badge">6</div>
+                <div>
+                    <div class="step-info-title">Tax Breakdown & GST Calculator</div>
+                    <div class="step-info-desc">CGST/SGST vs IGST & floating 🧮 reverse tool</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(7)">
+                <div class="step-num-badge">7</div>
+                <div>
+                    <div class="step-info-title">Table Settings & Column Customizer</div>
+                    <div class="step-info-desc">Configure visible columns and validation rules</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(8)">
+                <div class="step-num-badge">8</div>
+                <div>
+                    <div class="step-info-title">Save Confirmation Interlocks</div>
+                    <div class="step-info-desc">Duplicate warnings and overwrite protection</div>
+                </div>
+            </div>
+
+            <div class="step-item" onclick="goToStep(9)">
+                <div class="step-num-badge">9</div>
+                <div>
+                    <div class="step-info-title">Standard Tax Invoice Output</div>
+                    <div class="step-info-desc">Dual copy PDF layout (Customer & Office copies)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Central Stage / Viewport -->
+        <div class="stage-container">
+            <div class="stage-card">
+
+                <div class="stage-header">
+                    <div class="stage-title" id="stageStepTitle">
+                        <i class="fa-solid fa-desktop"></i> Step 1: Initial Page View upon Loading
+                    </div>
+                    <div class="stage-tags">
+                        <span class="tag-pill">Smart Invoice</span>
+                        <span class="tag-pill" id="stageDomPill">#invoiceNo, #invoiceDate</span>
+                    </div>
+                </div>
+
+                <!-- Live Screenshot Capture Area -->
+                <div class="screenshot-target-viewport" id="captureContainer">
+
+                    <!-- Browser Window Mock Header -->
+                    <div class="browser-mockup-header">
+                        <div class="window-dots">
+                            <span class="w-dot w-red"></span>
+                            <span class="w-dot w-yellow"></span>
+                            <span class="w-dot w-green"></span>
+                        </div>
+                        <span class="w-url" id="mockUrl">Smart Invoice</span>
+                        <span style="font-size:11px; color:#64748b; margin-left:auto;">🌙 Dark Mode [ ]</span>
+                    </div>
+
+                    <!-- Inner Window Content (Rendered View) -->
+                    <div class="window-frame" id="dynamicFrameContent">
+                        <!-- Dynamic step injected here via JavaScript -->
+                    </div>
+
+                </div>
+
+                <div class="stage-footer">
+                    <div class="footer-note" id="stageExplanation">
+                        <b>What Happens Here:</b> The page executes <code>loadLastInvoiceNo()</code> to fetch previous
+                        voucher sequences and auto-fills today's date.
+                    </div>
+                    <div>
+                        <button class="action-btn primary" onclick="nextStep()">
+                            Next Step <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Step Templates Engine -->
+    <script>
+        let currentStep = 1;
+        const totalSteps = 9;
+
+        const stepsData = {
+            1: {
+                title: "Step 1: Initial Screen on Opening Smart Invoice",
+                url: "Smart Invoice",
+                pills: "#invoiceNo, #invoiceDate, #lastInvoiceNoDisplay",
+                explanation: "<b>Initial Load:</b> The system reads previous invoices from memory, shows the last invoice sequence, sets today's date, and readies customer dropdowns.",
+                render: () => `
+                    <div class="sc-title">INVOICE</div>
+                    <div class="sc-address">RISE Tech Revolution • Kolkata, West Bengal • GSTIN: 19AAACR1234F1Z5</div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px;">
+                        <div>
+                            <label class="sc-label">Invoice No:</label>
+                            <input class="sc-input" value="INV-2026-089" style="font-weight:bold; color:#1e40af;">
+                            <small style="color:#64748b; font-weight:bold; font-size:11px;">Last Invoice No: INV-2026-088</small>
+                        </div>
+                        <div>
+                            <label class="sc-label">Invoice Date:</label>
+                            <input class="sc-input" type="date" value="2026-11-03">
+                            <small style="color:#64748b; font-weight:bold; font-size:11px;">Last Invoice Date: 02/11/2026</small>
+                        </div>
+                        <div>
+                            <label class="sc-label">Invoice Type:</label>
+                            <select class="sc-select" style="font-weight:bold;">
+                                <option selected>TAX INVOICE</option>
+                                <option>COMMISSION INVOICE</option>
+                                <option>PROFORMA INVOICE</option>
+                                <option>SALE INVOICE</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="border-bottom:1px solid #eee; padding-bottom:6px; margin-bottom:14px; font-weight:700; color:#1e293b; display:flex; justify-content:space-between;">
+                        <span>Customer Details: (Please save Customer details before proceeding further)</span>
+                        <span style="color:#64748b;">▼</span>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                        <div style="border:1px solid #e2e8f0; border-radius:6px; padding:12px; background:#fff;">
+                            <div style="font-weight:700; color:#1e293b; margin-bottom:8px;">Bill To</div>
+                            <input class="sc-input" placeholder="Customer Name (Search datalist...)">
+                            <input class="sc-input" placeholder="Address (optional)">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <input class="sc-input" placeholder="Contact">
+                                <input class="sc-input" placeholder="PIN No">
+                            </div>
+                        </div>
+
+                        <div style="border:1px solid #e2e8f0; border-radius:6px; padding:12px; background:#fff;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <div style="font-weight:700; color:#1e293b;">Ship To</div>
+                                <div style="font-size:11px; color:#555;">
+                                    <label><input type="checkbox" checked> Print in PDF</label> &nbsp;
+                                    <label><input type="checkbox" checked> Same as Bill To</label>
+                                </div>
+                            </div>
+                            <input class="sc-input" placeholder="Receiver Name" disabled style="background:#f9f9f9;">
+                            <input class="sc-input" placeholder="Delivery Address" disabled style="background:#f9f9f9;">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <input class="sc-input" placeholder="Contact No" disabled style="background:#f9f9f9;">
+                                <input class="sc-input" placeholder="PIN No" disabled style="background:#f9f9f9;">
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            2: {
+                title: "Step 2: Buyer Selection & Consignee Auto-Routing",
+                url: "Smart Invoice — [Customer Selected]",
+                pills: "#custName, #custGST, #shipSameAsBill",
+                explanation: "<b>Buyer Auto-Fill:</b> Selecting a client automatically fills state code, district, contact, and GSTIN. Clicking the 🔍 icon copies the GSTIN and opens the verification portal.",
+                render: () => `
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                        <!-- Bill To -->
+                        <div class="annotated-box" style="border:1px solid #e2e8f0; border-radius:6px; padding:14px; background:#fff;">
+                            <span class="annot-tag">AUTO-POPULATED PROFILE</span>
+                            <div style="font-weight:700; color:#1e293b; margin-bottom:8px;">Bill To</div>
+                            <input class="sc-input" value="Apex Global Logistics Pvt Ltd" style="font-weight:bold; color:#0f172a; border-color:#3b82f6;">
+                            <input class="sc-input" value="Plot 45, Sector V, Salt Lake City">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <input class="sc-input" value="9876543210">
+                                <input class="sc-input" value="700091">
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <select class="sc-select"><option>North 24 Parganas</option></select>
+                                <div style="display:flex; gap:4px;">
+                                    <select class="sc-select"><option>West Bengal</option></select>
+                                    <input class="sc-input" value="19" readonly style="width:45px; background:#eee; text-align:center;">
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <input class="sc-input" value="19AABCA1234D1ZP" style="font-weight:bold; flex:1;">
+                                <button class="sc-btn" style="background:#17a2b8; height:36px; padding:0 10px;" title="Verify on GST Portal">🔍</button>
+                            </div>
+                        </div>
+
+                        <!-- Ship To -->
+                        <div style="border:1px solid #e2e8f0; border-radius:6px; padding:14px; background:#fff;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <div style="font-weight:700; color:#1e293b;">Ship To</div>
+                                <div style="font-size:11px; color:#555;">
+                                    <label><input type="checkbox" checked> Print in PDF</label> &nbsp;
+                                    <label><input type="checkbox" checked> Same as Bill To</label>
+                                </div>
+                            </div>
+                            <input class="sc-input" value="Apex Global Logistics Pvt Ltd" disabled style="background:#f9f9f9;">
+                            <input class="sc-input" value="Plot 45, Sector V, Salt Lake City" disabled style="background:#f9f9f9;">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <input class="sc-input" value="9876543210" disabled style="background:#f9f9f9;">
+                                <input class="sc-input" value="700091" disabled style="background:#f9f9f9;">
+                            </div>
+                            <input class="sc-input" value="19AABCA1234D1ZP" disabled style="background:#f9f9f9;">
+                        </div>
+                    </div>
+                `
+            },
+            3: {
+                title: "Step 3: Real-Time Ledger Balance & Credit Guard Alarm",
+                url: "Smart Invoice — [Credit Audit Triggered]",
+                pills: "#custOutstanding, window.currentBalanceCredit",
+                explanation: "<b>Credit Limit Guard:</b> Dynamically aggregates opening ledger balance, unpaid invoices, and credit notes. If debt exceeds limit, an alert turns red and item additions are blocked.",
+                render: () => `
+                    <div style="max-width:800px; margin:0 auto;">
+                        <div style="margin-bottom:8px; font-weight:700; color:#1e293b;">Customer Ledger Audit State:</div>
+                        
+                        <input class="sc-input" value="Kolkata Hardware & Tech Traders" style="font-weight:700; font-size:14px; border:2px solid #ef4444; color:#991b1b;">
+
+                        <!-- Active Credit Warning Callout -->
+                        <div class="annotated-box" style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:14px 18px; margin-bottom:16px;">
+                            <span class="annot-tag" style="background:#dc2626; color:#fff;">RISK CONTROL ALERT</span>
+                            <div style="font-size:14px; font-weight:800; color:#991b1b; display:flex; justify-content:space-between; align-items:center;">
+                                <span>Total Outstanding: ₹ 48,250.00 | Credit Limit: ₹ 50,000.00</span>
+                                <span style="background:#dc2626; color:#fff; font-size:11px; padding:2px 8px; border-radius:4px;">⚠️ NEAR CEILING</span>
+                            </div>
+                            <div style="font-size:12px; font-weight:700; color:#15803d; margin-top:4px;">
+                                Remaining Allowed Credit: ₹ 1,750.00
+                            </div>
+                            <div style="font-size:11px; color:#7f1d1d; margin-top:6px;">
+                                *Computed live across Unpaid Invoices (INV-041, INV-065) minus approved Credit Vouchers.
+                            </div>
+                        </div>
+
+                        <!-- Toast simulation -->
+                        <div style="display:flex; justify-content:center; margin-top:24px;">
+                            <div class="sim-toast">
+                                <span style="color:#ef4444; font-size:14px;">⚠️</span> Credit Limit Exceeded for Kolkata Hardware & Tech Traders!
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            4: {
+                title: "Step 4: Barcode Scanning & Item Dropdown Search",
+                url: "Smart Invoice — [SKU Fetch & Dropdown]",
+                pills: "#fetchItemCodeInvoice, .autocomplete-list, #itemTable",
+                explanation: "<b>Product Entry:</b> Staff can scan barcodes or type SKU titles. Autocomplete displays category, HSN, and item master rates, while tooltips show live warehouse stock counts.",
+                render: () => `
+                    <!-- Toolbar row -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button class="sc-btn" style="background:#3c91e6;">➕ Add Item</button>
+                            <button class="sc-btn" style="background:#e74c3c;">🗑️ Clear Items</button>
+                            
+                            <!-- Scan Box -->
+                            <div class="annotated-box" style="display:flex; align-items:center; gap:2px; border:1px solid #16a34a; border-radius:4px; padding:2px; background:#fff;">
+                                <span class="annot-tag" style="background:#16a34a; color:#fff;">BARCODE SCANNER</span>
+                                <input class="sc-input" value="SKU-88210" style="width:130px; margin:0; border:none; font-weight:bold; color:#15803d; padding:4px 8px;">
+                                <button class="sc-btn" style="background:#27ae60; padding:4px 8px;">Fetch</button>
+                            </div>
+
+                            <button class="sc-btn" style="background:#607d8b;">⚙️ Settings</button>
+                            <button class="sc-btn" style="background:#6f42c1;">🧮 GST Calc</button>
+                        </div>
+                        <div style="font-size:11px; color:#475569; font-weight:600;">
+                            [✔] Validate UOM &nbsp; [✔] Validate Purchase [L=R / E & H=G]
+                        </div>
+                    </div>
+
+                    <!-- Items Table with Active Dropdown -->
+                    <table class="sc-table">
+                        <thead>
+                            <tr>
+                                <th style="width:25px;">Sl</th>
+                                <th>Supplier</th>
+                                <th style="width:260px;">Item Description</th>
+                                <th>HSN</th>
+                                <th>Qty</th>
+                                <th>UOM</th>
+                                <th>Price</th>
+                                <th>Disc</th>
+                                <th>Taxable</th>
+                                <th>GST%</th>
+                                <th>Total</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><select class="sc-select" style="margin:0; padding:2px;"><option>All Suppliers</option></select></td>
+                                <td style="text-align:left; position:relative;">
+                                    <input class="sc-input" value="Samsung 27" style="margin:0; font-weight:bold; border:2px solid #2563eb;">
+                                    
+                                    <!-- Autocomplete Dropdown Simulator -->
+                                    <div style="position:absolute; top:34px; left:0; width:100%; background:#fff; border:1px solid #cbd5e1; border-radius:4px; box-shadow:0 10px 20px rgba(0,0,0,0.18); z-index:20; text-align:left;">
+                                        <div style="padding:6px 10px; background:#eff6ff; font-weight:bold; color:#1e40af;">Samsung 27 inch FHD Monitor</div>
+                                        <div style="padding:2px 10px 6px 10px; font-size:10px; color:#64748b;">Code: SKU-88210 | Cat: IT Monitors | HSN: 8471</div>
+                                    </div>
+                                </td>
+                                <td><input class="sc-input" value="8471" style="width:50px; margin:0;"></td>
+                                <td><input class="sc-input" value="2" style="width:36px; margin:0; text-align:center; font-weight:bold;"></td>
+                                <td><select class="sc-select" style="margin:0; padding:2px;"><option>Pcs</option></select></td>
+                                <td><input class="sc-input" value="14500.00" style="width:80px; margin:0; text-align:right; border:2px solid #22c55e; font-weight:bold;"></td>
+                                <td><input class="sc-input" value="0" style="width:30px; margin:0;"></td>
+                                <td>29,000.00</td>
+                                <td><input class="sc-input" value="18" style="width:32px; margin:0;"></td>
+                                <td style="font-weight:bold; color:#15803d;">34,220.00</td>
+                                <td><button class="sc-btn" style="background:#dc2626; padding:2px 8px;">✕</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `
+            },
+            5: {
+                title: "Step 5: Cost Margin Border Signals & 🕒 Past Rates Modal",
+                url: "Smart Invoice — [Sale History Inspection]",
+                pills: "#historyModal, showPriceHistory(this)",
+                explanation: "<b>Cost Protection:</b> Green borders verify price is above purchase cost; red signals a loss. Clicking the 🕒 button pops up the transaction history showing past rates charged to other customers.",
+                render: () => `
+                    <div style="position:relative; min-height:360px; display:flex; align-items:center; justify-content:center;">
+                        
+                        <!-- Dimmed Form Background -->
+                        <div style="opacity:0.25; width:100%;">
+                            <div style="display:flex; gap:12px; margin-bottom:12px;">
+                                <input class="sc-input" value="14,500.00" style="border:2px solid #22c55e;">
+                                <input class="sc-input" value="11,200.00" style="border:2px solid #ef4444;">
+                            </div>
+                        </div>
+
+                        <!-- Sale History Modal Replica -->
+                        <div class="sim-modal-card" style="position:relative; width:480px;">
+                            <div style="background:#f8fafc; border-bottom:1px solid #eee; padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
+                                <div style="font-weight:700; color:#17a2b8; font-size:14px;"><i class="fa-solid fa-clock-rotate-left"></i> Sale History</div>
+                                <span style="font-size:20px; cursor:pointer; color:#666;">&times;</span>
+                            </div>
+                            <div style="padding:16px 20px;">
+                                <div style="font-weight:700; font-size:13px; color:#1e293b; margin-bottom:10px;">
+                                    Samsung 27 inch FHD Monitor [Code: SKU-88210] (Pcs)
+                                </div>
+                                <table class="sc-table" style="margin-top:0;">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Customer</th>
+                                            <th>Qty</th>
+                                            <th>Billed Price</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>28/10/2026</td>
+                                            <td>Apex Global Logistics</td>
+                                            <td>4 Pcs</td>
+                                            <td style="font-weight:bold; color:#15803d;">₹ 14,500.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>14/10/2026</td>
+                                            <td>Kolkata Tech Traders</td>
+                                            <td>2 Pcs</td>
+                                            <td style="font-weight:bold; color:#15803d;">₹ 14,200.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>02/09/2026</td>
+                                            <td>Modern Office Hub</td>
+                                            <td>1 Pcs</td>
+                                            <td style="font-weight:bold; color:#15803d;">₹ 14,800.00</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div style="text-align:center; margin-top:16px;">
+                                    <button class="sc-btn" style="background:#6c757d; padding:6px 20px;">Close</button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                `
+            },
+            6: {
+                title: "Step 6: Taxes, Round Off & Draggable 🧮 GST Calculator",
+                url: "Smart Invoice — [Grand Totals & Floating Calc]",
+                pills: "#gstCalculatorModal, #Total, #taxBreakdown",
+                explanation: "<b>Tax & Reverse Calculations:</b> Displays CGST/SGST/IGST breakdown and round-off adjustments. The floating draggable calculator lets staff back-calculate pre-tax rates from negotiated lump-sum prices.",
+                render: () => `
+                    <div style="display:flex; gap:18px; align-items:flex-start;">
+                        
+                        <!-- Left: Bottom Form Summary -->
+                        <div style="flex:1; border:1px solid #e2e8f0; border-radius:8px; padding:16px; background:#fff;">
+                            <div style="font-weight:700; font-size:12px; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px;">
+                                Invoice Summary Adjustments
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                                <div>
+                                    <label class="sc-label">Overall Discount (Before GST):</label>
+                                    <input class="sc-input" value="500.00" style="color:#c0392b; font-weight:bold;">
+                                </div>
+                                <div>
+                                    <label class="sc-label">Freight Charges:</label>
+                                    <input class="sc-input" value="650.00" style="font-weight:bold;">
+                                </div>
+                            </div>
+
+                            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px; margin-bottom:12px;">
+                                <div style="font-weight:700; color:#1e293b; font-size:12px;">Tax Breakdown:</div>
+                                <div style="font-size:13px; font-weight:bold; color:#2563eb; margin-top:2px;">
+                                    CGST: ₹ 2,610.00 | SGST: ₹ 2,610.00
+                                </div>
+                                <div style="font-size:11px; color:#64748b; margin-top:2px;">Round Off Variance: -0.40</div>
+                            </div>
+
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-top:2px dashed #cbd5e1; padding-top:10px;">
+                                <span style="font-size:12px; font-weight:bold;"><input type="checkbox" checked> Round Off</span>
+                                <div style="font-size:19px; font-weight:800; color:#1e40af;">Grand Total: ₹ 34,980.00</div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Floating GST Calculator -->
+                        <div class="annotated-box" style="width:330px; background:#fff; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 8px 24px rgba(0,0,0,0.12); overflow:hidden;">
+                            <span class="annot-tag" style="background:#6f42c1; color:#fff;">DRAGGABLE UTILITY</span>
+                            <div style="background:#6f42c1; color:#fff; padding:8px 12px; font-weight:700; font-size:12px; display:flex; justify-content:space-between;">
+                                <span>🧮 GST Calculator</span>
+                                <span>&times;</span>
+                            </div>
+                            <div style="padding:12px;">
+                                <div style="display:flex; justify-content:center; gap:8px; background:#f1f1f1; padding:4px; border-radius:12px; font-size:10px; margin-bottom:8px;">
+                                    <label><input type="radio" checked> Reverse (Inclusive)</label>
+                                    <label><input type="radio"> Forward (Exclusive)</label>
+                                </div>
+                                <label class="sc-label" style="font-size:10px;">Total Amount:</label>
+                                <input class="sc-input" value="10000" style="font-size:14px; font-weight:bold; margin-bottom:8px;">
+                                <div style="background:#f8fafc; padding:8px; border-radius:4px; font-size:11px; line-height:1.6;">
+                                    <div>Net Taxable: <b>₹ 8,474.58</b></div>
+                                    <div>GST @ 18%: <b style="color:#c0392b;">₹ 1,525.42</b></div>
+                                    <div>CGST + SGST: <b>762.71 each</b></div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                `
+            },
+            7: {
+                title: "Step 7: Table Settings & Operator Column Customizer Modal",
+                url: "Smart Invoice — [Settings Modal]",
+                pills: "#settingsModal, #columnToggles, #preventNegativeStock",
+                explanation: "<b>Workspace Tailoring:</b> Counter operators can hide irrelevant columns (like IMEI, Serial, or Batch) to speed up billing, or activate the 'Prevent Negative Stock' interlock.",
+                render: () => `
+                    <div style="position:relative; min-height:360px; display:flex; align-items:center; justify-content:center;">
+                        <div class="sim-modal-card" style="width:420px;">
+                            <div style="background:#f8fafc; border-bottom:1px solid #eee; padding:10px 16px; display:flex; justify-content:space-between; align-items:center;">
+                                <div style="font-weight:700; color:#607d8b; font-size:14px;">⚙️ Table Settings</div>
+                                <span style="font-size:18px; cursor:pointer;">&times;</span>
+                            </div>
+                            <div style="padding:14px 18px; font-size:11px;">
+                                <div style="font-weight:700; color:#333; margin-bottom:6px;">Validation Options Visibility:</div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:12px;">
+                                    <label><input type="checkbox" checked> Show 'Validate UOM'</label>
+                                    <label><input type="checkbox" checked> Show 'Validate Purchase'</label>
+                                    <label><input type="checkbox" checked> Prevent Negative Stock</label>
+                                    <label><input type="checkbox"> Grey Buttons Mode</label>
+                                </div>
+
+                                <div style="border-top:1px solid #eee; padding-top:8px; font-weight:700; color:#333; margin-bottom:6px;">
+                                    Select Columns to Display:
+                                </div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#f8fafc; padding:8px; border-radius:4px;">
+                                    <label><input type="checkbox" checked> Sl No</label>
+                                    <label><input type="checkbox" checked> Item Name</label>
+                                    <label><input type="checkbox"> IMEI Number</label>
+                                    <label><input type="checkbox"> Batch No</label>
+                                    <label><input type="checkbox" checked> HSN / SAC</label>
+                                    <label><input type="checkbox" checked> Unit Price</label>
+                                </div>
+
+                                <div style="text-align:center; margin-top:16px;">
+                                    <button class="sc-btn" style="background:#e74c3c; margin-right:8px;">Reset Default</button>
+                                    <button class="sc-btn" style="background:#6c757d;">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            8: {
+                title: "Step 8: Save Confirmation & Overwrite Audit Warnings",
+                url: "Smart Invoice — [Save Interlock]",
+                pills: "#saveConfirmModal, #actionConfirmModal, AuditManager",
+                explanation: "<b>Audit Trail & Safety:</b> Prompts explicit confirmation before committing ledger changes. If editing an existing invoice number, an overwrite warning protects historical records.",
+                render: () => `
+                    <div style="display:flex; justify-content:center; align-items:center; gap:24px; min-height:300px;">
+                        
+                        <!-- Confirmation Modal -->
+                        <div class="sim-modal-card" style="width:310px; padding:20px; text-align:center;">
+                            <div style="font-size:30px; margin-bottom:8px;">💾</div>
+                            <h3 style="color:#27ae60; font-size:16px; margin-bottom:6px;">Confirm Save</h3>
+                            <p style="font-size:12px; color:#64748b; margin-bottom:16px;">
+                                Are you sure you want to save invoice <b>INV-2026-089</b>?
+                            </p>
+                            <div style="display:flex; justify-content:center; gap:8px;">
+                                <button class="sc-btn" style="background:#27ae60;">Yes, Save</button>
+                                <button class="sc-btn" style="background:#6c757d;">Cancel</button>
+                            </div>
+                        </div>
+
+                        <!-- Overwrite Warning -->
+                        <div class="sim-modal-card" style="width:310px; padding:20px; text-align:center; border-color:#fecaca;">
+                            <div style="font-size:30px; margin-bottom:8px;">⚠️</div>
+                            <h3 style="color:#d35400; font-size:16px; margin-bottom:6px;">Overwrite Invoice?</h3>
+                            <p style="font-size:12px; color:#64748b; margin-bottom:16px;">
+                                Invoice number exists. Overwrite ledger accounts?
+                            </p>
+                            <div style="display:flex; justify-content:center; gap:8px;">
+                                <button class="sc-btn" style="background:#d35400;">Yes</button>
+                                <button class="sc-btn" style="background:#6c757d;">No</button>
+                            </div>
+                        </div>
+
+                    </div>
+                `
+            },
+            9: {
+                title: "Step 9: Standard GST Tax Invoice (invoiceB.html / Tally Format)",
+                url: "PDF Export — Apex_Global_Logistics_INV-2026-089_customer.pdf",
+                pills: "generateTallyInvoicePDF(), Prime Format",
+                explanation: "<b>Final Printed Output:</b> Generates two-compliant copies: 'Customer Copy' and 'Office Copy' with dynamic amounts in words, bank account details, and signature blocks.",
+                render: () => `
+                    <div style="background:#fff; border:1px solid #000; padding:18px; max-width:820px; margin:0 auto; font-family:Arial, sans-serif; font-size:11px; color:#000;">
+                        
+                        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #000; padding-bottom:4px; margin-bottom:6px;">
+                            <span style="font-size:13px; font-weight:bold;">TAX INVOICE</span>
+                            <span style="font-size:11px; font-weight:bold; color:#444;">Customer Copy</span>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; border:1px solid #000; margin-bottom:6px;">
+                            <div style="padding:6px; border-right:1px solid #000;">
+                                <div style="font-weight:bold; font-size:12px;">RISE Tech Revolution</div>
+                                <div>Sector V, Salt Lake, Kolkata - 700091</div>
+                                <div>GSTIN: 19AAACR1234F1Z5</div>
+                            </div>
+                            <div style="padding:6px;">
+                                <div>Invoice No: <b>INV-2026-089</b></div>
+                                <div>Dated: <b>03/11/2026</b></div>
+                                <div>Dispatched Through: <b>Road (Courier)</b></div>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; border:1px solid #000; margin-bottom:6px;">
+                            <div style="padding:6px; border-right:1px solid #000;">
+                                <div style="font-weight:bold;">Buyer (Bill to):</div>
+                                <div>Apex Global Logistics Pvt Ltd</div>
+                                <div>GSTIN: 19AABCA1234D1ZP</div>
+                            </div>
+                            <div style="padding:6px;">
+                                <div style="font-weight:bold;">Consignee (Ship to):</div>
+                                <div>Apex Global Logistics Pvt Ltd</div>
+                                <div>Delivery Site: Salt Lake Hub</div>
+                            </div>
+                        </div>
+
+                        <table style="width:100%; border-collapse:collapse; border:1px solid #000; text-align:center; margin-bottom:6px;">
+                            <thead>
+                                <tr style="background:#f0f0f0; border-bottom:1px solid #000;">
+                                    <th style="padding:4px; border-right:1px solid #000;">Sl</th>
+                                    <th style="padding:4px; border-right:1px solid #000; text-align:left;">Description of Goods</th>
+                                    <th style="padding:4px; border-right:1px solid #000;">HSN</th>
+                                    <th style="padding:4px; border-right:1px solid #000;">Qty</th>
+                                    <th style="padding:4px; border-right:1px solid #000;">Rate</th>
+                                    <th style="padding:4px;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="border-right:1px solid #000; padding:4px;">1</td>
+                                    <td style="border-right:1px solid #000; padding:4px; text-align:left;">Samsung 27 inch FHD Monitor</td>
+                                    <td style="border-right:1px solid #000; padding:4px;">8471</td>
+                                    <td style="border-right:1px solid #000; padding:4px;">2 Pcs</td>
+                                    <td style="border-right:1px solid #000; padding:4px;">14,500.00</td>
+                                    <td style="padding:4px; font-weight:bold;">34,220.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="display:flex; justify-content:space-between; border-top:1px solid #000; padding-top:6px;">
+                            <div>Amount in Words: <b>Thirty-Four Thousand Nine Hundred Eighty Rupees Only</b></div>
+                            <div style="font-size:13px; font-weight:bold;">Total: ₹ 34,980.00</div>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; margin-top:20px; padding-top:10px;">
+                            <div>Receiver's Signature</div>
+                            <div><b>For RISE Tech Revolution</b><br><br>Authorized Signatory</div>
+                        </div>
+                    </div>
+                `
+            }
+        };
+
+        function renderStep(step) {
+            const data = stepsData[step];
+            if (!data) return;
+
+            document.getElementById("stageStepTitle").innerHTML = `<i class="fa-solid fa-desktop"></i> ${data.title}`;
+            document.getElementById("mockUrl").textContent = data.url;
+            document.getElementById("stageDomPill").textContent = data.pills;
+            document.getElementById("stageExplanation").innerHTML = data.explanation;
+            document.getElementById("dynamicFrameContent").innerHTML = data.render();
+            document.getElementById("stepCounter").textContent = `${step} / ${totalSteps}`;
+
+            // Update sidebar selection
+            document.querySelectorAll(".step-item").forEach((el, index) => {
+                if (index + 1 === step) el.classList.add("active");
+                else el.classList.remove("active");
+            });
+        }
+
+        function goToStep(step) {
+            currentStep = step;
+            renderStep(currentStep);
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                currentStep++;
+                renderStep(currentStep);
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                renderStep(currentStep);
+            }
+        }
+
+        // Real Screenshot Engine: captures the exact rendered screen as a PNG file
+        function captureCurrentStepScreenshot() {
+            const targetElement = document.getElementById("captureContainer");
+            const btn = document.querySelector(".action-btn.screenshot");
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Capturing...`;
+
+            html2canvas(targetElement, {
+                scale: 2, // High resolution retina capture
+                useCORS: true,
+                backgroundColor: "#eef2f6"
+            }).then(canvas => {
+                const link = document.createElement("a");
+                link.download = `SmartInvoice_Step_${currentStep}_Screenshot.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                btn.innerHTML = `<i class="fa-solid fa-check"></i> Saved!`;
+                setTimeout(() => { btn.innerHTML = originalText; }, 1800);
+            }).catch(err => {
+                console.error(err);
+                alert("Could not capture screenshot: " + err.message);
+                btn.innerHTML = originalText;
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener("DOMContentLoaded", () => {
+            renderStep(1);
+        });
+
+        // Keyboard arrow navigation
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowRight") nextStep();
+            if (e.key === "ArrowLeft") prevStep();
+        });
+    </script>
+</body>
+
+</html>
