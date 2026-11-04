@@ -909,7 +909,7 @@ ipcMain.handle('mark-email-read', async (event, uid) => {
 });
 
 // New handler for resetting the password after OTP verification
-ipcMain.handle('reset-password', async (event, { newPassword, resetToken }) => {
+ipcMain.handle('reset-password', async (event, { newPassword, resetToken, username }) => {
     if (!userOtpState.resetToken || userOtpState.resetToken !== resetToken) {
         return { success: false, message: 'Invalid or missing password reset token.' };
     }
@@ -920,9 +920,6 @@ ipcMain.handle('reset-password', async (event, { newPassword, resetToken }) => {
     const email = userOtpState.email;
     if (!email) return { success: false, message: 'User session not found. Please start over.' };
 
-    // Invalidate the token immediately after checking it
-    userOtpState.resetToken = null;
-
     // The login password is not hashed, so we send the plain password.
     // The renderer will store it in localStorage.
     try {
@@ -931,20 +928,25 @@ ipcMain.handle('reset-password', async (event, { newPassword, resetToken }) => {
             // FIX: Update persistent settings so the new password works on restart/reload
             const s = getPersistentSettings();
             const updates = {};
+            const mainUser = String(username || s.ADMIN_USERNAME || "Admin").trim();
+            const users = Array.isArray(s.ADMIN_USERS) ? s.ADMIN_USERS.slice() : [];
+            if (users.length === 0) {
+                users.push({ username: s.ADMIN_USERNAME || "Admin", password: s.ADMIN_LOGIN_PASS || "" });
+            }
+            const idx = users.findIndex(u =>
+                u && String(u.username || '').trim().toLowerCase() === mainUser.toLowerCase()
+            );
+            if (idx === -1) {
+                return { success: false, message: `User "${mainUser}" was not found.` };
+            }
 
-            // 1. Update legacy password field
-            updates.ADMIN_LOGIN_PASS = newPassword;
-
-            // 2. Update password for the main admin user in ADMIN_USERS
-            // We assume the main admin is the one defined by ADMIN_USERNAME
-            let users = s.ADMIN_USERS || [];
-            const mainUser = s.ADMIN_USERNAME || "Admin";
-            const idx = users.findIndex(u => u.username === mainUser);
-            if (idx !== -1) {
-                users[idx].password = newPassword;
-                updates.ADMIN_USERS = users;
+            users[idx] = { ...users[idx], password: newPassword };
+            updates.ADMIN_USERS = users;
+            if (mainUser.toLowerCase() === String(s.ADMIN_USERNAME || "Admin").trim().toLowerCase()) {
+                updates.ADMIN_LOGIN_PASS = newPassword;
             }
             savePersistentSettings(updates);
+            userOtpState.resetToken = null;
 
             windows[0].webContents.send('update-password', newPassword);
             return { success: true, message: 'Password reset process initiated.' };
