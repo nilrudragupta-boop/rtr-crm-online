@@ -1227,19 +1227,44 @@
             const items = JSON.parse(localStorage.getItem('items')) || [];
             const dl = document.getElementById('itemList');
             dl.innerHTML = '';
-            items.forEach(i => {
+            items.filter(item => item && item.name).forEach(i => {
                 const opt = document.createElement('option');
-                opt.value = i.name;
+                opt.value = formatItemSuggestion(i);
                 dl.appendChild(opt);
             });
         }
 
+        function formatItemSuggestion(item) {
+            const details = [
+                ['Code', item.itemCode],
+                ['Index', item.indexNo],
+                ['Category', item.category],
+                ['HSN', item.hsn],
+                ['Type', item.itemType],
+                ['UOM', item.uom],
+                ['Description', item.description],
+                ['Sale Price', item.salePrice],
+                ['GST', item.gst]
+            ]
+                .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+                .map(([label, value]) => `${label}: ${value}`);
+
+            return details.length ? `${item.name} | ${details.join(' | ')}` : item.name;
+        }
+
 
         function autofillItem(input) {
-            const name = input.value;
+            const searchValue = input.value.trim().toLowerCase();
+            if (!searchValue) return;
+
             const items = JSON.parse(localStorage.getItem('items')) || [];
-            const item = items.find(x => x.name === name);
+            const item = items.find(x => x && (
+                formatItemSuggestion(x).toLowerCase() === searchValue ||
+                String(x.name || '').toLowerCase() === searchValue ||
+                String(x.itemCode || '').toLowerCase() === searchValue
+            ));
             if (item) {
+                input.value = item.name || '';
                 const row = input.closest('tr');
                 if (row.querySelector('.hsn')) row.querySelector('.hsn').value = item.hsn || '';
                 if (row.querySelector('.imei')) row.querySelector('.imei').value = item.imei || '';
