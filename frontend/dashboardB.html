@@ -2688,9 +2688,38 @@
                 onclick="document.getElementById('bankDetailsModal').style.display='none'">&times;</span>
             <h3 style="color: #2c3e50; text-align: center; margin-top: 0;">🏦 Bank Details</h3>
             <p style="font-size: 13px; color: #666; text-align: center;">These details will appear on invoices.</p>
-            <textarea id="bankDetailsInput" rows="5"
-                style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; resize:vertical; box-sizing:border-box;"
-                placeholder="Enter Bank Details here..."></textarea>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                <button type="button" onmousedown="rememberBankDetailsSelection()" onclick="formatBankDetails('bold')"
+                    title="Bold" style="padding:4px 9px; font-weight:bold;">B</button>
+                <button type="button" onmousedown="rememberBankDetailsSelection()" onclick="formatBankDetails('italic')"
+                    title="Italic" style="padding:4px 9px; font-style:italic;">I</button>
+                <button type="button" onmousedown="rememberBankDetailsSelection()"
+                    onclick="formatBankDetails('underline')" title="Underline"
+                    style="padding:4px 9px; text-decoration:underline;">U</button>
+                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Color
+                    <input type="color" id="bankDetailsColor" value="#222222"
+                        onmousedown="rememberBankDetailsSelection()"
+                        onchange="applyBankDetailsStyle('color', this.value)"
+                        style="width:32px; height:28px; padding:2px;">
+                </label>
+                <label style="display:flex; align-items:center; gap:4px; font-size:12px;">Size
+                    <select id="bankDetailsFontSize" onmousedown="rememberBankDetailsSelection()"
+                        onchange="applyBankDetailsStyle('fontSize', this.value)" style="padding:4px;">
+                        <option value="12">12</option>
+                        <option value="14" selected>14</option>
+                        <option value="16">16</option>
+                        <option value="18">18</option>
+                        <option value="20">20</option>
+                        <option value="24">24</option>
+                    </select>
+                </label>
+                <button type="button" onmousedown="rememberBankDetailsSelection()"
+                    onclick="formatBankDetails('removeFormat')" title="Clear formatting"
+                    style="padding:4px 8px;">Clear</button>
+            </div>
+            <div id="bankDetailsInput" contenteditable="true" role="textbox" aria-multiline="true"
+                style="width:100%; min-height:110px; padding:10px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; white-space:pre-wrap; overflow-wrap:anywhere;"
+                data-placeholder="Enter Bank Details here..."></div>
             <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
                 <label style="display:block; font-weight:bold; margin-bottom:5px; color:#2c3e50;">Payment QR Code
                     (Image):</label>
@@ -6962,18 +6991,131 @@
         }
 
         // --- Bank Details ---
+        let bankDetailsSelection = null;
+
+        function rememberBankDetailsSelection() {
+            const editor = document.getElementById('bankDetailsInput');
+            const selection = window.getSelection();
+            if (editor && selection && selection.rangeCount && editor.contains(selection.anchorNode)) {
+                bankDetailsSelection = selection.getRangeAt(0).cloneRange();
+            }
+        }
+
+        function restoreBankDetailsSelection() {
+            const selection = window.getSelection();
+            if (!selection || !bankDetailsSelection) return;
+            selection.removeAllRanges();
+            selection.addRange(bankDetailsSelection);
+        }
+
+        function formatBankDetails(command) {
+            const editor = document.getElementById('bankDetailsInput');
+            editor.focus();
+            restoreBankDetailsSelection();
+            document.execCommand(command, false);
+            rememberBankDetailsSelection();
+        }
+
+        function applyBankDetailsStyle(property, value) {
+            const editor = document.getElementById('bankDetailsInput');
+            editor.focus();
+            restoreBankDetailsSelection();
+            const selection = window.getSelection();
+            if (!selection || !selection.rangeCount || selection.isCollapsed || !editor.contains(selection.anchorNode)) return;
+
+            const span = document.createElement('span');
+            if (property === 'color') span.style.color = value;
+            if (property === 'fontSize') span.style.fontSize = `${value}px`;
+            const range = selection.getRangeAt(0);
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+            selection.removeAllRanges();
+            const updatedRange = document.createRange();
+            updatedRange.selectNodeContents(span);
+            selection.addRange(updatedRange);
+            rememberBankDetailsSelection();
+        }
+
+        function sanitizeBankDetailsHtml(html) {
+            const parsed = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').body.firstElementChild;
+            const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'SPAN']);
+            const cleanNode = node => {
+                if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent);
+                if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
+                if (!allowedTags.has(node.tagName)) {
+                    const fragment = document.createDocumentFragment();
+                    Array.from(node.childNodes).forEach(child => fragment.appendChild(cleanNode(child)));
+                    return fragment;
+                }
+                const clean = document.createElement(node.tagName.toLowerCase());
+                if (node.tagName === 'SPAN') {
+                    let color = node.style.color;
+                    const rgb = color.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i);
+                    if (rgb) color = `#${rgb.slice(1).map(value => Number(value).toString(16).padStart(2, '0')).join('')}`;
+                    const fontSize = parseFloat(node.style.fontSize);
+                    if (/^#[0-9a-f]{3,8}$/i.test(color)) clean.style.color = color;
+                    if (Number.isFinite(fontSize) && fontSize >= 8 && fontSize <= 40) clean.style.fontSize = `${fontSize}px`;
+                }
+                Array.from(node.childNodes).forEach(child => clean.appendChild(cleanNode(child)));
+                return clean;
+            };
+            Array.from(parsed.childNodes).forEach(child => parsed.replaceChild(cleanNode(child), child));
+            return parsed.innerHTML;
+        }
+
         function openBankDetailsSecurely() {
-            initiateSecureAction('Bank Details', () => {
-                document.getElementById('bankDetailsInput').value = localStorage.getItem("invoiceBankDetails") || "";
+            initiateSecureAction('Bank Details', async () => {
+                const editor = document.getElementById('bankDetailsInput');
+                let savedHtml = localStorage.getItem('invoiceBankDetailsRichHtml');
+                if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
+                    try {
+                        const settings = await apiClient.getSettings();
+                        if (settings && typeof settings.invoiceBankDetails === 'string') {
+                            localStorage.setItem('invoiceBankDetails', settings.invoiceBankDetails);
+                        }
+                        if (settings && typeof settings.invoiceBankDetailsRichHtml === 'string') {
+                            savedHtml = settings.invoiceBankDetailsRichHtml;
+                            localStorage.setItem('invoiceBankDetailsRichHtml', savedHtml);
+                        } else if (settings && typeof settings.invoiceBankDetails === 'string') {
+                            savedHtml = '';
+                            localStorage.removeItem('invoiceBankDetailsRichHtml');
+                        }
+                    } catch (error) {
+                        console.warn('Failed to load shared bank details:', error);
+                    }
+                }
+                if (savedHtml) editor.innerHTML = sanitizeBankDetailsHtml(savedHtml);
+                else editor.textContent = localStorage.getItem('invoiceBankDetails') || '';
                 const savedQr = localStorage.getItem("invoiceQrCode");
                 showQrPreview(savedQr);
                 document.getElementById('bankDetailsModal').style.display = 'flex';
             });
         }
 
-        function saveBankDetails() {
-            const val = document.getElementById("bankDetailsInput").value;
-            localStorage.setItem("invoiceBankDetails", val);
+        async function saveBankDetails() {
+            const editor = document.getElementById('bankDetailsInput');
+            const richHtml = sanitizeBankDetailsHtml(editor.innerHTML);
+            const plainText = editor.innerText.replace(/\u00a0/g, ' ').trim();
+            localStorage.setItem('invoiceBankDetails', plainText);
+            localStorage.setItem('invoiceBankDetailsRichHtml', richHtml);
+            if (typeof apiClient !== 'undefined' && apiClient.saveSettings) {
+                try {
+                    const result = await apiClient.saveSettings({
+                        invoiceBankDetails: plainText,
+                        invoiceBankDetailsRichHtml: richHtml
+                    });
+                    if (!result || result.success !== true) {
+                        alert('Bank details saved on this device, but remote sync failed.');
+                        document.getElementById('bankDetailsModal').style.display = 'none';
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('Failed to sync bank details:', error);
+                    alert('Bank details saved on this device, but remote sync failed.');
+                    document.getElementById('bankDetailsModal').style.display = 'none';
+                    return;
+                }
+            }
             alert("Bank Details Saved!");
             document.getElementById('bankDetailsModal').style.display = 'none';
         }
