@@ -511,8 +511,13 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;"
                     class="no-print">
                     <label style="text-decoration: underline; margin:0;">Terms & Conditions:</label>
-                    <button id="editTermsBtn" class="btn btn-secondary" style="padding: 2px 8px; font-size: 12px;"
-                        onclick="toggleTermsEdit()">✏️ Edit</button>
+                    <div>
+                        <button id="saveTermsBtn" class="btn btn-success"
+                            style="padding: 2px 8px; font-size: 12px; margin-right: 4px;"
+                            onclick="explicitSaveTerms()">💾 Save</button>
+                        <button id="editTermsBtn" class="btn btn-secondary" style="padding: 2px 8px; font-size: 12px;"
+                            onclick="toggleTermsEdit()">✏️ Edit</button>
+                    </div>
                 </div>
                 <div class="print-only-label"
                     style="display:none; font-weight:bold; margin-bottom:5px; font-size: 13px;">Terms & Conditions:
@@ -719,6 +724,12 @@
             if (savedTerms && termsEl) {
                 termsEl.value = savedTerms;
                 setTimeout(() => { termsEl.style.height = 'auto'; termsEl.style.height = termsEl.scrollHeight + 'px'; }, 100);
+            }
+            if (termsEl) {
+                const initialTerms = termsEl.value;
+                loadOrderTermsFromServer(initialTerms).catch(error => {
+                    console.warn("Failed to load shared order terms:", error);
+                });
             }
 
             updateColumnStyles();
@@ -1090,6 +1101,40 @@
         function saveTerms(el) {
             localStorage.setItem("orderTerms", el.value);
             el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
+        }
+
+        async function loadOrderTermsFromServer(initialTerms) {
+            if (typeof apiClient === 'undefined' || !apiClient.getSettings) return;
+
+            const settings = await apiClient.getSettings();
+            const el = document.getElementById("termsConditions");
+            if (!settings || typeof settings.orderTerms !== 'string' || !el || el.value !== initialTerms) return;
+
+            el.value = settings.orderTerms;
+            saveTerms(el);
+        }
+
+        async function explicitSaveTerms() {
+            const el = document.getElementById("termsConditions");
+            if (!el) return;
+
+            saveTerms(el);
+            if (typeof apiClient === 'undefined' || !apiClient.saveSettings) {
+                showWarning("Terms saved on this device, but remote sync is unavailable.");
+                return;
+            }
+
+            try {
+                const result = await apiClient.saveSettings({ orderTerms: el.value });
+                if (!result || result.success !== true) {
+                    showWarning("Terms saved on this device, but remote sync failed.");
+                    return;
+                }
+                showSuccess("Terms & Conditions saved and synced successfully!");
+            } catch (error) {
+                console.error("Failed to sync shared order terms:", error);
+                showWarning("Terms saved on this device, but remote sync failed.");
+            }
         }
 
         function toggleTermsEdit() {
