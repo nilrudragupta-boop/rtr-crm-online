@@ -2028,12 +2028,12 @@
 
             // Terms & Bank Details
             const terms = document.getElementById('termsConditions').value;
-            await syncQuotationBankDetailsFromServer();
-            const bankDetails = getFormattedBankDetails();
-            const bankDetailsRichHtml = localStorage.getItem('invoiceBankDetailsRichHtml') || '';
+            const bankDetailsData = await getBankDetailsForPdf();
+            const bankDetails = bankDetailsData.text;
             const showBankDetails = document.getElementById('showBankDetailsToggle') ? document.getElementById('showBankDetailsToggle').checked : true;
 
             let splitTerms = [];
+            let bankLayout = null;
             let qrCodeBase64 = null;
 
             if (showBankDetails) {
@@ -2043,11 +2043,11 @@
             }
 
             if (terms) splitTerms = doc.splitTextToSize(terms, 90);
-            const bankLines = showBankDetails && bankDetails
-                ? buildBankDetailsLines(doc, bankDetailsRichHtml, bankDetails, 55)
-                : [];
+            if (showBankDetails && bankDetails) {
+                bankLayout = createBankDetailsLayout(doc, bankDetailsData.richHtml, bankDetails, 60);
+            }
 
-            let bankBlockHeight = bankLines.reduce((height, line) => height + line.height, 0);
+            let bankBlockHeight = bankLayout ? bankLayout.height : 0;
             let qrBlockHeight = (showBankDetails && qrCodeBase64) ? 35 : 0;
             let maxOffset = Math.max(splitTerms.length * 5, Math.max(bankBlockHeight, qrBlockHeight));
 
@@ -2073,14 +2073,14 @@
             if (showBankDetails && bankDetails) {
                 doc.setFont(undefined, 'bold');
                 doc.text("Bank Details:", 110, finalY + 20);
-                drawBankDetailsLines(doc, bankLines, 110, finalY + 25);
+                drawBankDetailsLayout(doc, bankLayout, 110, finalY + 25);
 
                 if (qrCodeBase64) {
                     try {
                         doc.setFont(undefined, 'bold');
-                        doc.text("Scan to Pay", 170, finalY + 20);
+                        doc.text("Scan to Pay", 175, finalY + 20);
                         doc.setFont(undefined, 'normal');
-                        doc.addImage(qrCodeBase64, 'PNG', 170, finalY + 22, 25, 25);
+                        doc.addImage(qrCodeBase64, 'PNG', 175, finalY + 22, 25, 25);
                     } catch (e) { console.warn("Error adding QR to PDF:", e); }
                 }
             }
@@ -2097,216 +2097,174 @@
             doc.save(`Quotation_${refNo}.pdf`);
         }
 
-        function getFormattedBankDetails() {
-            const raw = localStorage.getItem("invoiceBankDetails");
-            if (!raw) return null;
-            try {
-                const data = JSON.parse(raw);
-                if (typeof data === 'object' && data !== null && (data.bankName || data.accountNumber)) {
-                    let lines = [];
-                    if (data.bankName) lines.push(`Bank: ${data.bankName}`);
-                    if (data.accountName) lines.push(`A/c Name: ${data.accountName}`);
-                    if (data.accountNumber) lines.push(`A/c No: ${data.accountNumber}`);
-                    if (data.ifscCode) lines.push(`IFSC: ${data.ifscCode}`);
-                    if (data.branchName) lines.push(`Branch: ${data.branchName}`);
-                    if (data.upiId) lines.push(`UPI ID: ${data.upiId}`);
-                    return lines.join("\n");
-                }
-                return raw;
-            } catch (e) {
-                return raw;
-            }
-        }
+        async function getBankDetailsForPdf() {
+            let text = localStorage.getItem("invoiceBankDetails") || "";
+            let richHtml = localStorage.getItem("invoiceBankDetailsRichHtml") || "";
 
-        async function syncQuotationBankDetailsFromServer() {
-            if (typeof apiClient === 'undefined' || !apiClient.getSettings) return;
-            try {
+            if (typeof apiClient !== 'undefined' && apiClient.getSettings) {
                 const settings = await apiClient.getSettings();
-                if (!settings) return;
-                if (typeof settings.invoiceBankDetails === 'string') {
-                    localStorage.setItem('invoiceBankDetails', settings.invoiceBankDetails);
+                if (settings && typeof settings.invoiceBankDetails === 'string') {
+                    text = settings.invoiceBankDetails;
+                    localStorage.setItem("invoiceBankDetails", text);
                 }
-                if (typeof settings.invoiceBankDetailsRichHtml === 'string') {
-                    localStorage.setItem('invoiceBankDetailsRichHtml', settings.invoiceBankDetailsRichHtml);
-                } else if (typeof settings.invoiceBankDetails === 'string') {
-                    localStorage.removeItem('invoiceBankDetailsRichHtml');
-                }
-            } catch (error) {
-                console.warn('Failed to load shared bank details for quotation:', error);
-            }
-        }
-
-        function buildBankDetailsLines(doc, richHtml, fallbackText, maxWidth) {
-            const source = richHtml ? new DOMParser().parseFromString(richHtml, 'text/html').body : null;
-            const richText = source ? source.textContent : '';
-            const normalizedRichText = normalizeBankDetailsText(richText);
-            const normalizedPlainText = normalizeBankDetailsText(fallbackText);
-            const useRichHtml = source && richText === normalizedRichText &&
-                normalizedRichText.replace(/\s+/g, '') === normalizedPlainText.replace(/\s+/g, '');
-            const rawLines = [[]];
-            const addBreak = () => {
-                if (rawLines[rawLines.length - 1].length) rawLines.push([]);
-            };
-            const appendText = (text, style) => {
-                const parts = String(text).split('\n');
-                parts.forEach((part, index) => {
-                    if (part) rawLines[rawLines.length - 1].push({ text: part, ...style });
-                    if (index < parts.length - 1) addBreak();
-                });
-            };
-            const visit = (node, parentStyle = {}) => {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    appendText(node.nodeValue, parentStyle);
-                    return;
-                }
-                if (node.nodeType !== Node.ELEMENT_NODE) return;
-                const tag = node.tagName.toLowerCase();
-                if (tag === 'br') { addBreak(); return; }
-                if ((tag === 'div' || tag === 'p') && rawLines[rawLines.length - 1].length) addBreak();
-                const style = { ...parentStyle };
-                if (tag === 'b' || tag === 'strong') style.bold = true;
-                if (tag === 'i' || tag === 'em') style.italic = true;
-                if (tag === 'u') style.underline = true;
-                if (node.style.color) style.color = node.style.color;
-                const size = parseFloat(node.style.fontSize);
-                if (Number.isFinite(size)) style.fontSize = Math.max(6, Math.min(24, size * 0.75));
-                Array.from(node.childNodes).forEach(child => visit(child, style));
-                if ((tag === 'div' || tag === 'p') && rawLines[rawLines.length - 1].length) addBreak();
-            };
-            if (useRichHtml && source.childNodes.length) {
-                Array.from(source.childNodes).forEach(node => visit(node));
-            } else {
-                appendText(normalizedPlainText, {});
-            }
-
-            const lines = [];
-            rawLines.forEach(rawLine => {
-                let currentLine = [];
-                let currentWidth = 0;
-                let lineFontSize = 9;
-                const flush = () => {
-                    lines.push({ runs: currentLine, height: Math.max(5, lineFontSize * 0.45) });
-                    currentLine = [];
-                    currentWidth = 0;
-                    lineFontSize = 9;
-                };
-                rawLine.forEach(run => {
-                    const style = { bold: false, italic: false, fontSize: 9, ...run };
-                    const tokens = style.text.match(/\s+|\S+/g) || [];
-                    tokens.forEach(token => {
-                        doc.setFont(undefined, style.bold && style.italic ? 'bolditalic' : style.bold ? 'bold' : style.italic ? 'italic' : 'normal');
-                        doc.setFontSize(style.fontSize);
-                        const width = doc.getTextWidth(token);
-                        if (/^\s+$/.test(token) && currentWidth === 0) return;
-                        if (currentWidth + width > maxWidth && currentWidth > 0) flush();
-                        currentLine.push({ text: token, ...style });
-                        currentWidth += width;
-                        lineFontSize = Math.max(lineFontSize, style.fontSize);
-                    });
-                });
-                if (currentLine.length || !lines.length) flush();
-            });
-            return lines;
-        }
-
-        function normalizeBankDetailsText(value) {
-            const labels = [
-                'Account Name', 'Account Number', 'Account No', 'Bank Name',
-                'Branch Address', 'Branch Name', 'Branch Code', 'IFSC Code',
-                'MICR No', 'MICR Number', 'UPI ID'
-            ];
-            const labelPattern = labels.map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-            const marker = new RegExp(`(${labelPattern})\\s*:?`, 'gi');
-            const text = String(value || '').replace(/\u00a0/g, ' ').replace(/\r/g, '').trim();
-            const matches = Array.from(text.matchAll(marker));
-            if (matches.length < 2) return collapseRepeatedBankWords(text);
-
-            const orderedLabels = [];
-            const valuesByLabel = new Map();
-            matches.forEach((match, index) => {
-                const label = labels.find(item => item.toLowerCase() === match[1].toLowerCase());
-                if (!label) return;
-                if (!valuesByLabel.has(label)) {
-                    orderedLabels.push(label);
-                    valuesByLabel.set(label, []);
-                }
-                const nextDifferent = matches.slice(index + 1).find(next => next[1].toLowerCase() !== label.toLowerCase());
-                const valueStart = match.index + match[0].length;
-                const valueEnd = nextDifferent ? nextDifferent.index : text.length;
-                const fieldValue = text.slice(valueStart, valueEnd)
-                    .replace(new RegExp(`(?:${labelPattern})\\s*:?`, 'gi'), ' ')
-                    .replace(/[\s|,;]+$/g, '')
-                    .trim();
-                if (fieldValue) valuesByLabel.get(label).push(normalizeBankFieldValue(label, fieldValue));
-            });
-
-            if (!orderedLabels.length) return collapseRepeatedBankWords(text);
-            return orderedLabels.map(label => {
-                const candidates = valuesByLabel.get(label) || [];
-                const fieldValue = candidates.sort((a, b) => b.length - a.length)[0] || '';
-                return `${label}: ${collapseRepeatedBankWords(fieldValue)}`;
-            }).filter(line => !line.endsWith(': ')).join('\n');
-        }
-
-        function collapseRepeatedBankWords(value) {
-            const text = String(value || '')
-                .replace(/([a-z])([A-Z])/g, '$1 $2')
-                .replace(/(\d)([A-Z][a-z]+)/g, '$1 $2');
-            const words = text.match(/[A-Za-z0-9]+|[^A-Za-z0-9\s]+/g) || [];
-            let changed = true;
-            while (changed) {
-                changed = false;
-                for (let size = Math.floor(words.length / 2); size >= 1 && !changed; size--) {
-                    for (let start = 0; start + size * 2 <= words.length; start++) {
-                        const first = words.slice(start, start + size).join('').toLowerCase();
-                        const second = words.slice(start + size, start + size * 2).join('').toLowerCase();
-                        if (first === second) {
-                            words.splice(start + size, size);
-                            changed = true;
-                            break;
-                        }
-                    }
+                if (settings && typeof settings.invoiceBankDetailsRichHtml === 'string') {
+                    richHtml = settings.invoiceBankDetailsRichHtml;
+                    localStorage.setItem("invoiceBankDetailsRichHtml", richHtml);
                 }
             }
-            return words.join(' ').replace(/\s+([,.;:])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+
+            return { text, richHtml };
         }
 
-        function normalizeBankFieldValue(label, value) {
-            const normalized = collapseRepeatedBankWords(value);
-            if (/^(Account No|Account Number|IFSC Code|Branch Code|MICR No|MICR Number)$/i.test(label)) {
-                return (normalized.replace(/(?:IFSC|MICR|Branch|Account|Bank)$/i, '').match(/[A-Za-z0-9-]+/) || [''])[0];
-            }
-            return normalized;
-        }
-
-        function drawBankDetailsLines(doc, lines, x, y) {
-            lines.forEach(line => {
-                let cursorX = x;
-                line.runs.forEach(run => {
-                    doc.setFont(undefined, run.bold && run.italic ? 'bolditalic' : run.bold ? 'bold' : run.italic ? 'italic' : 'normal');
-                    doc.setFontSize(run.fontSize);
-                    const color = parseBankDetailsColor(run.color);
-                    doc.setTextColor(...color);
-                    doc.text(run.text, cursorX, y);
-                    if (run.underline) doc.line(cursorX, y + 0.7, cursorX + doc.getTextWidth(run.text), y + 0.7);
-                    cursorX += doc.getTextWidth(run.text);
-                });
-                y += line.height;
-            });
-            doc.setTextColor(0);
-            doc.setFontSize(9);
-            doc.setFont(undefined, 'normal');
-        }
-
-        function parseBankDetailsColor(value) {
-            if (!value) return [0, 0, 0];
-            const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        function normalizeBankDetailsColor(color, fallback = '#222222') {
+            const value = String(color || '').trim();
+            const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
             if (hex) {
-                const digits = hex[1].length === 3 ? hex[1].split('').map(char => char + char).join('') : hex[1];
-                return digits.match(/[0-9a-f]{2}/ig).map(channel => parseInt(channel, 16));
+                const digits = hex[1].slice(0, 6);
+                if (digits.length === 3) return `#${digits.split('').map(char => char + char).join('')}`;
+                return `#${digits}`;
             }
             const rgb = value.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
-            return rgb ? rgb.slice(1).map(channel => Math.min(255, Number(channel))) : [0, 0, 0];
+            if (rgb) return `#${rgb.slice(1, 4).map(channel => Math.min(255, Number(channel)).toString(16).padStart(2, '0')).join('')}`;
+            return fallback;
+        }
+
+        function createBankDetailsLayout(doc, richHtml, plainText, maxWidth) {
+            const defaultStyle = { bold: false, italic: false, underline: false, color: '#222222', fontSize: 10.5 };
+            const runs = [];
+            const appendRun = (text, style) => {
+                if (text) runs.push({ text, style });
+            };
+
+            if (richHtml) {
+                const parsed = new DOMParser().parseFromString(`<div>${richHtml}</div>`, 'text/html');
+                const root = parsed.body.firstElementChild;
+                const visit = (node, style) => {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        appendRun(node.nodeValue, style);
+                        return;
+                    }
+                    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+                    const tag = node.tagName.toLowerCase();
+                    const nextStyle = { ...style };
+                    if (tag === 'b' || tag === 'strong') nextStyle.bold = true;
+                    if (tag === 'i' || tag === 'em') nextStyle.italic = true;
+                    if (tag === 'u') nextStyle.underline = true;
+                    if (tag === 'span') {
+                        if (node.style.color) nextStyle.color = normalizeBankDetailsColor(node.style.color, style.color);
+                        const fontSize = parseFloat(node.style.fontSize);
+                        if (Number.isFinite(fontSize)) nextStyle.fontSize = fontSize * 0.75;
+                    }
+                    if (tag === 'br') {
+                        appendRun('\n', style);
+                        return;
+                    }
+
+                    const isBlock = tag === 'div' || tag === 'p';
+                    if (isBlock && runs.length && !runs[runs.length - 1].text.endsWith('\n')) appendRun('\n', style);
+                    Array.from(node.childNodes).forEach(child => visit(child, nextStyle));
+                    if (isBlock && runs.length && !runs[runs.length - 1].text.endsWith('\n')) appendRun('\n', style);
+                };
+                if (root) Array.from(root.childNodes).forEach(child => visit(child, defaultStyle));
+            }
+
+            if (runs.length === 0) appendRun(plainText, defaultStyle);
+            while (runs.length && runs[runs.length - 1].text.endsWith('\n')) {
+                runs[runs.length - 1].text = runs[runs.length - 1].text.replace(/\n+$/, '');
+                if (!runs[runs.length - 1].text) runs.pop();
+            }
+
+            const lines = [{ runs: [], fontSize: defaultStyle.fontSize }];
+            let line = lines[0];
+            let lineWidth = 0;
+            const setRunFont = style => {
+                const fontStyle = style.bold && style.italic ? 'bolditalic' : style.bold ? 'bold' : style.italic ? 'italic' : 'normal';
+                doc.setFont('helvetica', fontStyle);
+                doc.setFontSize(style.fontSize);
+            };
+            const startNewLine = () => {
+                line = { runs: [], fontSize: defaultStyle.fontSize };
+                lines.push(line);
+                lineWidth = 0;
+            };
+            const addText = (text, style) => {
+                if (!text) return;
+                line.runs.push({ text, style });
+                line.fontSize = Math.max(line.fontSize, style.fontSize);
+                lineWidth += doc.getTextWidth(text);
+            };
+
+            runs.forEach(run => {
+                setRunFont(run.style);
+                run.text.split(/(\r\n|\r|\n|[^\S\r\n]+|[^\s]+)/).filter(Boolean).forEach(token => {
+                    if (/^(\r\n|\r|\n)$/.test(token)) {
+                        startNewLine();
+                        return;
+                    }
+
+                    const isWhitespace = /^\s+$/.test(token);
+                    const tokenWidth = doc.getTextWidth(token);
+                    if (isWhitespace && lineWidth === 0) return;
+                    if (lineWidth > 0 && lineWidth + tokenWidth > maxWidth) {
+                        startNewLine();
+                        if (isWhitespace) return;
+                    }
+
+                    if (!isWhitespace && tokenWidth > maxWidth) {
+                        const pieces = doc.splitTextToSize(token, maxWidth);
+                        pieces.forEach((piece, index) => {
+                            if (index > 0) startNewLine();
+                            addText(piece, run.style);
+                        });
+                    } else {
+                        addText(token, run.style);
+                    }
+                });
+            });
+
+            while (lines.length > 1 && lines[lines.length - 1].runs.length === 0) lines.pop();
+            const lineHeights = lines.map(item => Math.max(4, item.fontSize * 0.4));
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            return { lines, lineHeights, height: lineHeights.reduce((total, height) => total + height, 0) };
+        }
+
+        function drawBankDetailsLayout(doc, layout, startX, startY) {
+            if (!layout) return;
+            let y = startY;
+
+            layout.lines.forEach((line, index) => {
+                const lineHeight = layout.lineHeights[index];
+                const baseline = y + lineHeight * 0.8;
+                let x = startX;
+
+                line.runs.forEach(run => {
+                    const style = run.style;
+                    const fontStyle = style.bold && style.italic ? 'bolditalic' : style.bold ? 'bold' : style.italic ? 'italic' : 'normal';
+                    doc.setFont('helvetica', fontStyle);
+                    doc.setFontSize(style.fontSize);
+                    const normalizedColor = normalizeBankDetailsColor(style.color);
+                    const colorValue = parseInt(normalizedColor.slice(1), 16);
+                    const red = (colorValue >> 16) & 255;
+                    const green = (colorValue >> 8) & 255;
+                    const blue = colorValue & 255;
+                    doc.setTextColor(red, green, blue);
+                    doc.text(run.text, x, baseline);
+                    const runWidth = doc.getTextWidth(run.text);
+                    if (style.underline && runWidth > 0) {
+                        doc.setDrawColor(red, green, blue);
+                        doc.setLineWidth(0.2);
+                        doc.line(x, baseline + 0.5, x + runWidth, baseline + 0.5);
+                    }
+                    x += runWidth;
+                });
+                y += lineHeight;
+            });
+
+            doc.setTextColor(0);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
         }
 
         function confirmLoad() { askConfirm("Load", "Unsaved changes will be lost. Load?", () => loadQuotation()); }
