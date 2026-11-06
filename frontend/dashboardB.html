@@ -2589,6 +2589,15 @@
                     </div>
                 </div>
                 <div class="lock-item">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Bank Details Password:</label>
+                    <div style="position:relative; margin-bottom:10px;">
+                        <input type="password" id="setBankDetailsPass" placeholder="Default: Admin Pass"
+                            style="width:100%; padding:8px; padding-right:30px; box-sizing:border-box;">
+                        <i class="fas fa-eye" onclick="togglePasswordVisibility('setBankDetailsPass', this)"
+                            style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; color:#777;"></i>
+                    </div>
+                </div>
+                <div class="lock-item">
                     <label style="display:block; margin-bottom:5px; font-weight:bold;">Tally Gateway Password:</label>
                     <div style="position:relative; margin-bottom:10px;">
                         <input type="password" id="setTallyPass" placeholder="Default: Admin Pass"
@@ -6763,6 +6772,7 @@
             document.getElementById('setExpPass').value = localStorage.getItem('pass_expense') || '';
             document.getElementById('setCdPass').value = localStorage.getItem('pass_credit_debit') || '';
             document.getElementById('setBankingPass').value = localStorage.getItem('pass_banking') || '';
+            document.getElementById('setBankDetailsPass').value = localStorage.getItem('pass_bank_details') || '';
             document.getElementById('setTallyPass').value = localStorage.getItem('pass_tally_gateway') || '';
             document.getElementById('setSupplierPass').value = localStorage.getItem('pass_supplier') || '';
             document.getElementById('setBackupPass').value = localStorage.getItem('pass_backup') || '';
@@ -6931,6 +6941,7 @@
             const exp = document.getElementById('setExpPass').value;
             const cd = document.getElementById('setCdPass').value;
             const banking = document.getElementById('setBankingPass').value;
+            const bankDetails = document.getElementById('setBankDetailsPass').value;
             const tally = document.getElementById('setTallyPass').value;
             const supplier = document.getElementById('setSupplierPass').value;
             const backup = document.getElementById('setBackupPass').value;
@@ -6952,6 +6963,7 @@
             if (exp) localStorage.setItem('pass_expense', exp); else localStorage.removeItem('pass_expense');
             if (cd) localStorage.setItem('pass_credit_debit', cd); else localStorage.removeItem('pass_credit_debit');
             if (banking) localStorage.setItem('pass_banking', banking); else localStorage.removeItem('pass_banking');
+            if (bankDetails) localStorage.setItem('pass_bank_details', bankDetails); else localStorage.removeItem('pass_bank_details');
             if (tally) localStorage.setItem('pass_tally_gateway', tally); else localStorage.removeItem('pass_tally_gateway');
             if (supplier) localStorage.setItem('pass_supplier', supplier); else localStorage.removeItem('pass_supplier');
             if (backup) localStorage.setItem('pass_backup', backup); else localStorage.removeItem('pass_backup');
@@ -6978,6 +6990,7 @@
             document.getElementById('setExpPass').value = '';
             document.getElementById('setCdPass').value = '';
             document.getElementById('setBankingPass').value = '';
+            document.getElementById('setBankDetailsPass').value = '';
             document.getElementById('setTallyPass').value = '';
             document.getElementById('setSupplierPass').value = '';
             document.getElementById('setBackupPass').value = '';
@@ -7066,6 +7079,13 @@
         }
 
         function openBankDetailsSecurely() {
+            const bankDetailsPassword = localStorage.getItem('pass_bank_details');
+            if (bankDetailsPassword) {
+                const entered = prompt('Enter Bank Details Password:');
+                if (entered !== bankDetailsPassword && entered !== localStorage.getItem('appPassword') && entered !== '88937') {
+                    return;
+                }
+            }
             initiateSecureAction('Bank Details', async () => {
                 const editor = document.getElementById('bankDetailsInput');
                 let savedHtml = localStorage.getItem('invoiceBankDetailsRichHtml');
