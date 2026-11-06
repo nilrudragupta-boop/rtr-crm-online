@@ -2540,6 +2540,11 @@
                         <i class="fas fa-eye" onclick="togglePasswordVisibility('setLockPass', this)"
                             style="position:absolute; right:10px; top:50%; transform:translateY(-50%); cursor:pointer; color:#777;"></i>
                     </div>
+                    <label for="setDashboardIdleMinutes"
+                        style="display:block; margin-bottom:5px; font-weight:bold;">Dashboard Idle Time
+                        (Minutes):</label>
+                    <input type="number" id="setDashboardIdleMinutes" min="1" step="1" placeholder="Disabled when empty"
+                        style="width:100%; padding:8px; margin-bottom:10px; box-sizing:border-box;">
                 </div>
                 <div class="lock-item">
                     <label style="display:block; margin-bottom:5px; font-weight:bold;">Balance Sheet Password:</label>
@@ -2696,9 +2701,12 @@
             <span class="close-modal"
                 onclick="document.getElementById('bankDetailsModal').style.display='none'">&times;</span>
             <h3 style="color: #2c3e50; text-align: center; margin-top: 0;">🏦 Bank Details</h3>
-            <p style="font-size: 13px; font-weight:bold; color: #666; text-align: center;">These details will appear on Invoices & Quotations.</p>
-            <p style="font-size: 13px; font-weight:bold; color: #666; text-align: center;">Put  "UPI ID: xxx@bank"  to place auto amount in QR Code</p>
-            <p style="font-size: 16px; font-weight:bold; color: #666; text-align: center;">Replace "xxx@bank" with your actual UPI ID</p>
+            <p style="font-size: 13px; font-weight:bold; color: #666; text-align: center;">These details will appear on
+                Invoices & Quotations.</p>
+            <p style="font-size: 13px; font-weight:bold; color: #666; text-align: center;">Put "UPI ID: xxx@bank" to
+                place auto amount in QR Code</p>
+            <p style="font-size: 16px; font-weight:bold; color: #666; text-align: center;">Replace "xxx@bank" with your
+                actual UPI ID</p>
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
                 <button type="button" onmousedown="rememberBankDetailsSelection()" onclick="formatBankDetails('bold')"
                     title="Bold" style="padding:4px 9px; font-weight:bold;">B</button>
@@ -3887,7 +3895,7 @@
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            featureLocksSyncPromise = syncFeatureLocksFromRemote();
+            featureLocksSyncPromise = syncFeatureLocksFromRemote().then(configureDashboardIdleLock);
             const lastSync = localStorage.getItem('lastAutoSync');
             if (lastSync) {
                 const syncStatusEl = document.getElementById('lastSyncStatus');
@@ -3897,7 +3905,7 @@
             setInterval(checkPendingSync, 5000); // Check for unsynced local data every 5 seconds
             checkPendingSync();
 
-            loadSettings();
+            loadSettings().then(configureDashboardIdleLock);
             restoreSectionStates();
             loadDashboardData();
             startClock();
@@ -6756,6 +6764,7 @@
             'pass_profitLoss',
             'pass_summary',
             'pass_dashboard',
+            'dashboardIdleMinutes',
             'pass_balance_sheet',
             'pass_employee',
             'pass_expense',
@@ -6774,6 +6783,62 @@
             'purchaseBackDateLimit'
         ];
         let featureLocksSyncPromise = Promise.resolve();
+        let dashboardIdleLockTimer = null;
+        let dashboardIsLocked = false;
+
+        function configureDashboardIdleLock() {
+            clearTimeout(dashboardIdleLockTimer);
+            dashboardIdleLockTimer = null;
+
+            const idleMinutes = Number(localStorage.getItem('dashboardIdleMinutes'));
+            const unlockPassword = localStorage.getItem('pass_dashboard') || localStorage.getItem('appPassword');
+            if (!Number.isFinite(idleMinutes) || idleMinutes <= 0 || !unlockPassword || dashboardIsLocked) return;
+
+            dashboardIdleLockTimer = setTimeout(lockDashboard, idleMinutes * 60 * 1000);
+        }
+
+        function resetDashboardIdleLockTimer() {
+            if (!dashboardIsLocked) configureDashboardIdleLock();
+        }
+
+        function lockDashboard() {
+            const modal = document.getElementById('lockScreenModal');
+            if (!modal || dashboardIsLocked) return;
+
+            dashboardIsLocked = true;
+            clearTimeout(dashboardIdleLockTimer);
+            dashboardIdleLockTimer = null;
+            document.getElementById('unlockPasswordInput').value = '';
+            document.getElementById('unlockError').style.display = 'none';
+            modal.style.display = 'flex';
+            document.getElementById('unlockPasswordInput').focus();
+        }
+
+        function unlockDashboard() {
+            const input = document.getElementById('unlockPasswordInput');
+            const enteredPassword = input.value;
+            const dashboardPassword = localStorage.getItem('pass_dashboard');
+            const adminPassword = localStorage.getItem('appPassword');
+
+            if (enteredPassword !== dashboardPassword && (!adminPassword || enteredPassword !== adminPassword)) {
+                document.getElementById('unlockError').style.display = 'block';
+                input.select();
+                return;
+            }
+
+            dashboardIsLocked = false;
+            document.getElementById('lockScreenModal').style.display = 'none';
+            document.getElementById('unlockError').style.display = 'none';
+            resetDashboardIdleLockTimer();
+        }
+
+        ['pointerdown', 'keydown', 'mousemove', 'scroll'].forEach(eventName => {
+            window.addEventListener(eventName, resetDashboardIdleLockTimer, { passive: true });
+        });
+
+        document.getElementById('unlockPasswordInput').addEventListener('keydown', event => {
+            if (event.key === 'Enter') unlockDashboard();
+        });
 
         function getFeatureLockSettingsPayload() {
             return FEATURE_LOCK_STORAGE_KEYS.reduce((settings, key) => {
@@ -6821,6 +6886,7 @@
         async function openFeatureLocksModal() {
             await featureLocksSyncPromise;
             await syncFeatureLocksFromRemote();
+            configureDashboardIdleLock();
             const hasAccessPassword = !!localStorage.getItem('pass_feature_locks_access');
             const accessModal = document.getElementById('featureLocksAccessModal');
             const unlockPanel = document.getElementById('featureLocksUnlockPanel');
@@ -6854,6 +6920,7 @@
             document.getElementById('setPlPass').value = localStorage.getItem('pass_profitLoss') || '';
             document.getElementById('setSumPass').value = localStorage.getItem('pass_summary') || '';
             document.getElementById('setLockPass').value = localStorage.getItem('pass_dashboard') || '';
+            document.getElementById('setDashboardIdleMinutes').value = localStorage.getItem('dashboardIdleMinutes') || '';
             document.getElementById('setBsPass').value = localStorage.getItem('pass_balance_sheet') || '';
             document.getElementById('setEmpPass').value = localStorage.getItem('pass_employee') || '';
             document.getElementById('setExpPass').value = localStorage.getItem('pass_expense') || '';
@@ -7030,6 +7097,12 @@
             const pl = document.getElementById('setPlPass').value;
             const sum = document.getElementById('setSumPass').value;
             const lock = document.getElementById('setLockPass').value;
+            const idleMinutesInput = document.getElementById('setDashboardIdleMinutes').value;
+            const idleMinutes = idleMinutesInput === '' ? null : Number(idleMinutesInput);
+            if (idleMinutes !== null && (!Number.isInteger(idleMinutes) || idleMinutes < 1)) {
+                alert('Dashboard idle time must be a whole number of at least 1 minute.');
+                return;
+            }
             const bs = document.getElementById('setBsPass').value;
             const emp = document.getElementById('setEmpPass').value;
             const exp = document.getElementById('setExpPass').value;
@@ -7050,6 +7123,7 @@
             if (pl) localStorage.setItem('pass_profitLoss', pl); else localStorage.removeItem('pass_profitLoss');
             if (sum) localStorage.setItem('pass_summary', sum); else localStorage.removeItem('pass_summary');
             if (lock) localStorage.setItem('pass_dashboard', lock); else localStorage.removeItem('pass_dashboard');
+            if (idleMinutes !== null) localStorage.setItem('dashboardIdleMinutes', String(idleMinutes)); else localStorage.removeItem('dashboardIdleMinutes');
             localStorage.setItem('pass_feature_locks_access', featureLocksPassword);
 
             if (bs) localStorage.setItem('pass_balance_sheet', bs); else localStorage.removeItem('pass_balance_sheet');
@@ -7070,6 +7144,7 @@
             if (dataAnalysis) localStorage.setItem('pass_data_analysis', dataAnalysis); else localStorage.removeItem('pass_data_analysis');
 
             const remoteSaved = await persistFeatureLocksToRemote();
+            configureDashboardIdleLock();
             alert(remoteSaved === false
                 ? "Feature passwords and settings updated on this device, but remote sync failed."
                 : "Feature passwords and settings updated!");
@@ -7082,6 +7157,7 @@
             document.getElementById('setPlPass').value = '';
             document.getElementById('setSumPass').value = '';
             document.getElementById('setLockPass').value = '';
+            document.getElementById('setDashboardIdleMinutes').value = '';
             document.getElementById('setBsPass').value = '';
             document.getElementById('setEmpPass').value = '';
             document.getElementById('setExpPass').value = '';
