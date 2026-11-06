@@ -3887,6 +3887,7 @@
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
+            featureLocksSyncPromise = syncFeatureLocksFromRemote();
             const lastSync = localStorage.getItem('lastAutoSync');
             if (lastSync) {
                 const syncStatusEl = document.getElementById('lastSyncStatus');
@@ -4201,7 +4202,24 @@
             btn.style.display = hasOpen ? '' : 'none';
         }
 
-        function openWindow(url, width, height) {
+        async function openWindow(url, width, height) {
+            const featureLockedPages = [
+                'profit_loss_report.html',
+                'balance_sheet.html',
+                'employee.html',
+                'expense_manager.html',
+                'credit_debit_notes.html',
+                'banking.html',
+                'tally-gateway.html',
+                'supplier.html',
+                'cash_flow.html',
+                'day_book.html'
+            ];
+            if (featureLockedPages.some(page => url.includes(page))) {
+                await featureLocksSyncPromise;
+                await syncFeatureLocksFromRemote();
+            }
+
             if (!isSpaMode && openedWindows[url] && !openedWindows[url].closed) {
                 openedWindows[url].focus();
                 return;
@@ -6733,7 +6751,76 @@
         }
 
         // --- Feature Locks ---
-        function openFeatureLocksModal() {
+        const FEATURE_LOCK_STORAGE_KEYS = [
+            'pass_feature_locks_access',
+            'pass_profitLoss',
+            'pass_summary',
+            'pass_dashboard',
+            'pass_balance_sheet',
+            'pass_employee',
+            'pass_expense',
+            'pass_credit_debit',
+            'pass_banking',
+            'pass_bank_details',
+            'pass_tally_gateway',
+            'pass_supplier',
+            'pass_backup',
+            'pass_restore',
+            'pass_cash_flow',
+            'pass_day_book',
+            'pass_data_analysis',
+            'cashLimit',
+            'applyCashLimitToPurchase',
+            'purchaseBackDateLimit'
+        ];
+        let featureLocksSyncPromise = Promise.resolve();
+
+        function getFeatureLockSettingsPayload() {
+            return FEATURE_LOCK_STORAGE_KEYS.reduce((settings, key) => {
+                const value = localStorage.getItem(key);
+                settings[key] = value === null ? '' : value;
+                return settings;
+            }, {});
+        }
+
+        async function persistFeatureLocksToRemote() {
+            if (typeof apiClient === 'undefined' || !apiClient.saveSettings) return null;
+            const result = await apiClient.saveSettings(getFeatureLockSettingsPayload());
+            return result && result.success === true;
+        }
+
+        async function syncFeatureLocksFromRemote() {
+            if (typeof apiClient === 'undefined' || !apiClient.getSettings) return false;
+            const settings = await apiClient.getSettings();
+            if (!settings || typeof settings !== 'object') return false;
+
+            const remoteHasFeatureLocks = FEATURE_LOCK_STORAGE_KEYS.some(key =>
+                Object.prototype.hasOwnProperty.call(settings, key)
+            );
+            if (!remoteHasFeatureLocks) {
+                const localHasFeatureLocks = FEATURE_LOCK_STORAGE_KEYS.some(key => {
+                    const value = localStorage.getItem(key);
+                    return value !== null && value !== '' && value !== 'false';
+                });
+                if (!localHasFeatureLocks) return true;
+
+                const saved = await persistFeatureLocksToRemote();
+                if (!saved) console.warn('Feature Locks are configured locally but could not be synced to the server.');
+                return saved;
+            }
+
+            FEATURE_LOCK_STORAGE_KEYS.forEach(key => {
+                if (!Object.prototype.hasOwnProperty.call(settings, key)) return;
+                const value = settings[key];
+                if (value === null || value === '') localStorage.removeItem(key);
+                else localStorage.setItem(key, String(value));
+            });
+            return true;
+        }
+
+        async function openFeatureLocksModal() {
+            await featureLocksSyncPromise;
+            await syncFeatureLocksFromRemote();
             const hasAccessPassword = !!localStorage.getItem('pass_feature_locks_access');
             const accessModal = document.getElementById('featureLocksAccessModal');
             const unlockPanel = document.getElementById('featureLocksUnlockPanel');
@@ -6804,7 +6891,7 @@
             showFeatureLocksEditor();
         }
 
-        function createFeatureLocksAccessPassword() {
+        async function createFeatureLocksAccessPassword() {
             const adminPassword = localStorage.getItem('appPassword');
             const enteredAdminPassword = document.getElementById('featureLocksAdminPass').value;
             const newPassword = document.getElementById('featureLocksNewPass').value;
@@ -6828,7 +6915,11 @@
             }
 
             localStorage.setItem('pass_feature_locks_access', newPassword);
+            const remoteSaved = await persistFeatureLocksToRemote();
             closeFeatureLocksAccessModal();
+            if (remoteSaved === false) {
+                showToast('Feature Locks password was set on this device, but remote sync failed.', 'error');
+            }
             showFeatureLocksEditor();
         }
 
@@ -6907,7 +6998,7 @@
             }
         }
 
-        function finishFeatureLocksPasswordReset() {
+        async function finishFeatureLocksPasswordReset() {
             const newPassword = prompt('Enter a new Feature Locks password (at least 4 characters):');
             if (newPassword === null) return;
             if (newPassword.length < 4) {
@@ -6920,12 +7011,15 @@
                 return;
             }
             localStorage.setItem('pass_feature_locks_access', newPassword);
+            const remoteSaved = await persistFeatureLocksToRemote();
             closeFeatureLocksAccessModal();
-            showToast('Feature Locks password reset successfully.', 'success');
+            showToast(remoteSaved === false
+                ? 'Feature Locks password reset on this device, but remote sync failed.'
+                : 'Feature Locks password reset successfully.', remoteSaved === false ? 'error' : 'success');
             showFeatureLocksEditor();
         }
 
-        function saveFeatureLocks() {
+        async function saveFeatureLocks() {
             const featureLocksPassword = document.getElementById('setFeatureLocksPass').value;
             const confirmFeatureLocksPassword = document.getElementById('confirmFeatureLocksPass').value;
             if (featureLocksPassword.length < 4 || featureLocksPassword !== confirmFeatureLocksPassword) {
@@ -6975,7 +7069,10 @@
             if (dayBook) localStorage.setItem('pass_day_book', dayBook); else localStorage.removeItem('pass_day_book');
             if (dataAnalysis) localStorage.setItem('pass_data_analysis', dataAnalysis); else localStorage.removeItem('pass_data_analysis');
 
-            alert("Feature passwords and settings updated!");
+            const remoteSaved = await persistFeatureLocksToRemote();
+            alert(remoteSaved === false
+                ? "Feature passwords and settings updated on this device, but remote sync failed."
+                : "Feature passwords and settings updated!");
             document.getElementById('featureLocksModal').style.display = 'none';
         }
 
@@ -7078,7 +7175,9 @@
             return parsed.innerHTML;
         }
 
-        function openBankDetailsSecurely() {
+        async function openBankDetailsSecurely() {
+            await featureLocksSyncPromise;
+            await syncFeatureLocksFromRemote();
             const bankDetailsPassword = localStorage.getItem('pass_bank_details');
             if (bankDetailsPassword) {
                 const entered = prompt('Enter Bank Details Password:');
