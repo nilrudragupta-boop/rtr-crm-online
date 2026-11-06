@@ -3707,11 +3707,14 @@
 
         function getTabButtonId(btn) {
             if (!btn) return null;
+            const onclick = btn.getAttribute('onclick') || '';
+            const route = onclick.match(/openWindow\(['"]([^'"]+)['"]/);
             return btn.getAttribute('data-tab-id') ||
-                btn.getAttribute('data-permission-id') ||
                 btn.getAttribute('id') ||
+                route?.[1] ||
                 btn.getAttribute('title')?.trim().toLowerCase().replace(/\s+/g, '_') ||
-                btn.querySelector('.nav-text')?.innerText.trim().toLowerCase().replace(/\s+/g, '_');
+                btn.querySelector('.nav-text')?.innerText.trim().toLowerCase().replace(/\s+/g, '_') ||
+                btn.getAttribute('data-permission-id');
         }
 
         function initTopTabDragAndPersistence() {
@@ -3802,21 +3805,17 @@
             activeDraggedTab = null;
         }
 
-        function saveTopTabOrder() {
-            const scrollable = document.querySelector('.sidebar-scrollable');
-            if (!scrollable) return;
+        function getTopTabOrderButtons() {
+            return Array.from(document.querySelectorAll(
+                '.sidebar-scrollable .nav-item[data-tab-id], #topTabOverflowMenu .nav-item[data-tab-id]'
+            ));
+        }
 
-            const orderedButtons = scrollable.querySelectorAll('.nav-item[data-tab-id]');
-            const orderList = [];
-
-            orderedButtons.forEach(btn => {
-                const id = btn.getAttribute('data-tab-id');
-                if (id && !orderList.includes(id)) {
-                    orderList.push(id);
-                }
-            });
-
-            localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(orderList));
+        function saveTopTabOrder(orderList) {
+            const uniqueOrder = [...new Set(orderList || getTopTabOrderButtons()
+                .map(btn => btn.getAttribute('data-tab-id'))
+                .filter(Boolean))];
+            localStorage.setItem(TOP_TAB_ORDER_KEY, JSON.stringify(uniqueOrder));
         }
 
         function restoreTopTabOrder() {
@@ -3827,22 +3826,17 @@
                 const orderList = JSON.parse(saved);
                 if (!Array.isArray(orderList) || orderList.length === 0) return;
 
-                const scrollable = document.querySelector('.sidebar-scrollable');
-                if (!scrollable) return;
-
-                const buttons = Array.from(scrollable.querySelectorAll('.nav-item[data-tab-id]'));
+                const buttons = getTopTabOrderButtons();
                 const btnMap = new Map();
                 buttons.forEach(btn => btnMap.set(btn.getAttribute('data-tab-id'), btn));
+                const orderedIds = orderList.filter(tabId => btnMap.has(tabId));
+                buttons.forEach(btn => {
+                    const id = btn.getAttribute('data-tab-id');
+                    if (!orderedIds.includes(id)) orderedIds.push(id);
+                });
 
-                // In unfolded top bar mode, append in sequential saved order
-                const operationsWrapper = document.getElementById('operationsWrapper');
-                if (!operationsWrapper) return;
-
-                orderList.forEach(tabId => {
-                    const btn = btnMap.get(tabId);
-                    if (btn && btn.parentElement) {
-                        btn.parentElement.appendChild(btn);
-                    }
+                orderedIds.forEach((tabId, index) => {
+                    btnMap.get(tabId).style.order = String(index);
                 });
             } catch (err) {
                 console.warn('Failed to restore Top Tab order:', err);
@@ -8767,12 +8761,14 @@
 
         function initTopTabDragAndDrop() {
             const tabs = getTopTabButtons();
+            const usedTabIds = new Set();
             tabs.forEach(tab => {
-                if (!tab.getAttribute('data-tab-id')) {
-                    const permId = tab.getAttribute('data-permission-id') || '';
-                    const title = tab.getAttribute('title') || tab.innerText.trim();
-                    tab.setAttribute('data-tab-id', permId || title.replace(/\s+/g, '_').toLowerCase());
-                }
+                const baseTabId = getTabButtonId(tab) || `tab_item_${tabs.indexOf(tab)}`;
+                let tabId = baseTabId;
+                let suffix = 2;
+                while (usedTabIds.has(tabId)) tabId = `${baseTabId}_${suffix++}`;
+                usedTabIds.add(tabId);
+                tab.setAttribute('data-tab-id', tabId);
 
                 tab.setAttribute('draggable', 'true');
                 tab.ondragstart = handleTabDragStart;
@@ -8810,18 +8806,30 @@
             this.classList.remove('tab-drag-over');
 
             if (draggedTab && this !== draggedTab) {
-                const parent = this.parentElement;
-                const allTabs = Array.from(parent.children);
-                const fromIdx = allTabs.indexOf(draggedTab);
-                const toIdx = allTabs.indexOf(this);
+                const draggedId = draggedTab.getAttribute('data-tab-id');
+                const targetId = this.getAttribute('data-tab-id');
+                const availableIds = getTopTabOrderButtons().map(tab => tab.getAttribute('data-tab-id')).filter(Boolean);
+                let orderList = [];
+                try {
+                    const saved = JSON.parse(localStorage.getItem(TOP_TAB_ORDER_KEY) || '[]');
+                    if (Array.isArray(saved)) orderList = saved.filter(id => availableIds.includes(id));
+                } catch (err) { }
+                availableIds.forEach(id => {
+                    if (!orderList.includes(id)) orderList.push(id);
+                });
 
-                if (fromIdx < toIdx) {
-                    parent.insertBefore(draggedTab, this.nextSibling);
-                } else {
-                    parent.insertBefore(draggedTab, this);
-                }
+                orderList = orderList.filter(id => id !== draggedId);
+                const targetIndex = orderList.indexOf(targetId);
+                if (targetIndex < 0) return;
+                const targetRect = this.getBoundingClientRect();
+                const isOverflowTarget = !!this.closest('#topTabOverflowMenu');
+                const dropAfter = isOverflowTarget
+                    ? e.clientY > targetRect.top + targetRect.height / 2
+                    : e.clientX > targetRect.left + targetRect.width / 2;
+                orderList.splice(targetIndex + (dropAfter ? 1 : 0), 0, draggedId);
 
-                saveTopTabOrder();
+                saveTopTabOrder(orderList);
+                restoreTopTabOrder();
                 updateTopTabOverflow();
             }
         }
@@ -8869,21 +8877,24 @@
             let accumulatedWidth = 0;
             const hidden = [];
 
-            getTopTabButtons().filter(tab => !tab.closest('#topTabOverflowMenu')).forEach(tab => {
-                if (!isTabAllowedByPermissions(tab)) {
-                    tab.style.display = 'none';
-                    return;
-                }
+            getTopTabButtons()
+                .filter(tab => !tab.closest('#topTabOverflowMenu'))
+                .sort((first, second) => Number(first.style.order || 0) - Number(second.style.order || 0))
+                .forEach(tab => {
+                    if (!isTabAllowedByPermissions(tab)) {
+                        tab.style.display = 'none';
+                        return;
+                    }
 
-                tab.style.display = 'inline-flex';
-                const width = tab.offsetWidth || 110;
+                    tab.style.display = 'inline-flex';
+                    const width = tab.offsetWidth || 110;
 
-                if (accumulatedWidth + width > maxAvailableWidth && accumulatedWidth > 0) {
-                    hidden.push(tab);
-                } else {
-                    accumulatedWidth += width;
-                }
-            });
+                    if (accumulatedWidth + width > maxAvailableWidth && accumulatedWidth > 0) {
+                        hidden.push(tab);
+                    } else {
+                        accumulatedWidth += width;
+                    }
+                });
 
             hidden.forEach(tab => {
                 overflowMenu.appendChild(tab);
@@ -8973,6 +8984,7 @@
                     updateTopTabOverflow();
                 }, 50);
             } else if (placement === 'horizontal') {
+                getTopTabOrderButtons().forEach(tab => tab.style.removeProperty('order'));
                 document.body.classList.remove('top-tab-unfolded');
                 document.body.classList.add('horizontal-menu');
                 if (sidebar) sidebar.classList.remove('collapsed');
@@ -8981,6 +8993,7 @@
                 if (typeof applyUIPermissions === 'function') applyUIPermissions();
             } else {
                 // Vertical Sidebar (Default)
+                getTopTabOrderButtons().forEach(tab => tab.style.removeProperty('order'));
                 document.body.classList.remove('top-tab-unfolded');
                 document.body.classList.remove('horizontal-menu');
                 if (overflowBox) overflowBox.style.display = 'none';
