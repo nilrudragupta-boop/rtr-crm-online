@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Journal (Entry & Exit) - Visual Operational Walkthrough</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+<style>
+    :root {
+        --primary: #2c3e50;
+        --accent-blue: #0d6efd;
+        --success: #198754;
+        --warning: #ffc107;
+        --danger: #dc3545;
+        --secondary: #6c757d;
+        --bg-main: #0f172a;
+        --card-dark: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-light);
+        padding: 24px;
+        line-height: 1.5;
+    }
+
+    .app-header {
+        max-width: 1400px;
+        margin: 0 auto 24px auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .app-title h1 {
+        font-size: 24px;
+        font-weight: 800;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .app-title p {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .main-layout {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        gap: 24px;
+    }
+    @media (max-width: 1024px) {
+        .main-layout { grid-template-columns: 1fr; }
+    }
+
+    /* Steps navigation */
+    .steps-nav {
+        background: var(--card-dark);
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+        height: fit-content;
+        position: sticky;
+        top: 24px;
+    }
+    .nav-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 12px;
+        padding-left: 6px;
+    }
+    .step-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid transparent;
+        background: rgba(255,255,255,0.02);
+    }
+    .step-item:hover {
+        background: rgba(255,255,255,0.06);
+    }
+    .step-item.active {
+        background: var(--accent-blue);
+        border-color: #60a5fa;
+        color: #fff;
+    }
+    .step-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+    .step-info h4 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+    .step-info p {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+
+    /* Showcase viewer */
+    .showcase-area {
+        background: var(--card-dark);
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.08);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .showcase-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 16px;
+    }
+    .step-header-text h2 {
+        font-size: 20px;
+        color: #fff;
+        margin-bottom: 4px;
+    }
+    .step-header-text p {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* Simulated Screenshot Frame */
+    .screenshot-frame {
+        background: #cbd5e1;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+        overflow-x: auto;
+    }
+
+    /* Simulated Module UI */
+    .sim-container {
+        width: 100%;
+        max-width: 960px;
+        margin: 0 auto;
+        background: #f8f9fa;
+        padding: 22px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        color: #333;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+
+    .sim-card {
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+
+    .sim-card-header {
+        background: #0d6efd;
+        color: #fff;
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .sim-card-body {
+        padding: 24px;
+    }
+
+    .sim-form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .sim-form-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .sim-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .sim-input, .sim-select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 5px;
+        font-size: 13.5px;
+        background: #fff;
+        box-sizing: border-box;
+    }
+
+    .sim-btn {
+        padding: 7px 16px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: white;
+    }
+    .sim-btn-primary { background: #0d6efd; }
+    .sim-btn-success { background: #198754; }
+    .sim-btn-danger { background: #dc3545; }
+    .sim-btn-secondary { background: #6c757d; }
+
+    /* Metadata details row */
+    .sim-item-meta {
+        background: #e9ecef;
+        padding: 12px 16px;
+        border-radius: 6px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        font-size: 12.5px;
+        margin-bottom: 16px;
+    }
+
+    /* Explanation card */
+    .step-explainer {
+        background: #1e293b;
+        border-radius: 10px;
+        padding: 18px 20px;
+        border-left: 4px solid var(--accent-blue);
+    }
+    .step-explainer h3 {
+        font-size: 15px;
+        color: #fff;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .step-explainer ul {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .step-explainer li {
+        font-size: 13px;
+        color: #cbd5e1;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .step-explainer li i {
+        color: #10b981;
+        font-size: 11px;
+    }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="app-title">
+        <h1><i class="fas fa-exchange-alt" style="color: #38bdf8;"></i> Stock Journal (Entry &amp; Exit) — Step-by-Step Visual Operational Guide</h1>
+        <p>Complete operational walkthrough of fast-track warehouse adjustments, physical stock reconciliations, damage write-offs, and inward batch corrections.</p>
+    </div>
+</header>
+
+<main class="main-layout">
+    <!-- Left Navigation -->
+    <aside class="steps-nav">
+        <div class="nav-title">Journal Steps</div>
+        <div class="step-item active" onclick="switchStep(1)">
+            <div class="step-badge">1</div>
+            <div class="step-info">
+                <h4>Stock Journal Overview</h4>
+                <p>Fast-track adjustment interface</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(2)">
+            <div class="step-badge">2</div>
+            <div class="step-info">
+                <h4>Item Lookup & Autocomplete</h4>
+                <p>Catalog search & live metadata</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(3)">
+            <div class="step-badge">3</div>
+            <div class="step-info">
+                <h4>Stock IN (Direct Entry)</h4>
+                <p>Physical count found & audit additions</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(4)">
+            <div class="step-badge">4</div>
+            <div class="step-info">
+                <h4>Stock OUT (Exit & Write-Off)</h4>
+                <p>Transit damage & scrap reductions</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(5)">
+            <div class="step-badge">5</div>
+            <div class="step-info">
+                <h4>Audit Trail & Remarks</h4>
+                <p>Mandatory reference tags</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(6)">
+            <div class="step-badge">6</div>
+            <div class="step-info">
+                <h4>Ledger Balance Verification</h4>
+                <p>Instant running balance update</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(7)">
+            <div class="step-badge">7</div>
+            <div class="step-info">
+                <h4>Save, Commit & Intranet Sync</h4>
+                <p>Direct local storage & cloud persistence</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Right Showcase Container -->
+    <section class="showcase-area">
+        <div class="showcase-toolbar">
+            <div class="step-header-text">
+                <h2 id="stepHeading">Step 1: Quick Stock Entry &amp; Exit Workspace</h2>
+                <p id="stepSubheading">Primary adjustment interface designed for warehouse storekeepers to record manual balance corrections without generating commercial invoices.</p>
+            </div>
+        </div>
+
+        <!-- Render Target -->
+        <div class="screenshot-frame">
+            <div id="simulatedScreen" class="sim-container">
+                <!-- Content dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Step Explanation -->
+        <div class="step-explainer" id="stepExplainer">
+            <!-- Dynamic explanation -->
+        </div>
+    </section>
+</main>
+
+<script>
+const stepData = {
+    1: {
+        heading: "Step 1: Quick Stock Entry & Exit Workspace",
+        subheading: "On load, the module provides a streamlined form allowing storekeepers to perform immediate inventory additions or deductions without vendor purchase bills [cite: 52].",
+        html: `
+            <div class="sim-card">
+                <div class="sim-card-header">
+                    <h4 style="margin:0; font-size:17px; font-weight:700;"><i class="fas fa-exchange-alt me-2"></i> Quick Stock Entry &amp; Exit</h4>
+                    <span style="font-size:12px; background:rgba(255,255,255,0.2); padding:3px 8px; border-radius:4px;">
+                        Enterprise: <strong>Apex Industrial Spares &amp; Logistics Ltd.</strong> (Ph: <strong>79080 40851</strong>)
+                    </span>
+                </div>
+                <div class="sim-card-body">
+                    <div class="sim-form-grid">
+                        <div>
+                            <label class="sim-label">Select Item *</label>
+                            <input type="text" class="sim-input" placeholder="Search Item by name or code..." value="">
+                        </div>
+                        <div>
+                            <label class="sim-label">Transaction Date *</label>
+                            <input type="date" class="sim-input" value="2026-11-07">
+                        </div>
+                    </div>
+
+                    <div class="sim-form-grid-3">
+                        <div>
+                            <label class="sim-label">Transaction Type *</label>
+                            <select class="sim-select">
+                                <option selected>Stock IN (Entry / Addition)</option>
+                                <option>Stock OUT (Exit / Deduction)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="sim-label">Quantity *</label>
+                            <input type="number" class="sim-input" placeholder="0.00" value="">
+                        </div>
+                        <div>
+                            <label class="sim-label">Remarks / Reference</label>
+                            <input type="text" class="sim-input" placeholder="e.g. Audit correction, Damaged, Sample">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px; border-top:1px solid #eee; padding-top:14px;">
+                        <button class="sim-btn sim-btn-secondary">Cancel</button>
+                        <button class="sim-btn sim-btn-success"><i class="fas fa-save"></i> Save Transaction</button>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Quick Stock Journal Architecture:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Commercial-Free Stock Adjustment:</strong> Bypasses purchase bills or sales invoices to immediately fix inventory variances [cite: 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Direct Inventory Balance Impact:</strong> Entries immediately update real-time stock availability and item ledgers [cite: 37, 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Current Date Bounding:</strong> Automatically initializes with today's date for audit tracking [cite: 52].</li>
+            </ul>
+        `
+    },
+    2: {
+        heading: "Step 2: Item Lookup & Automatic Specification Extraction",
+        subheading: "Searching the item catalog populates Item Code, Index Number, Category, and measurement Unit (UOM) in an expandable details row [cite: 52].",
+        html: `
+            <div class="sim-card">
+                <div class="sim-card-header">
+                    <h4 style="margin:0; font-size:17px; font-weight:700;"><i class="fas fa-exchange-alt me-2"></i> Quick Stock Entry &amp; Exit</h4>
+                    <span style="font-size:12px; background:rgba(255,255,255,0.2); padding:3px 8px; border-radius:4px;">Catalog Auto-Matched</span>
+                </div>
+                <div class="sim-card-body">
+                    <div class="sim-form-grid">
+                        <div>
+                            <label class="sim-label">Select Item *</label>
+                            <input type="text" class="sim-input" value="Heavy Grade Carbon Steel Rods (25mm)" style="font-weight:bold; color:#0d6efd; border-color:#0d6efd;">
+                        </div>
+                        <div>
+                            <label class="sim-label">Transaction Date *</label>
+                            <input type="date" class="sim-input" value="2026-11-07">
+                        </div>
+                    </div>
+
+                    <!-- Auto-populated Specification Card -->
+                    <div class="sim-item-meta">
+                        <div><strong>Item Code:</strong> <span style="color:#0d6efd; font-weight:bold;">SKU-7721</span></div>
+                        <div><strong>Index No:</strong> <span style="color:#0d6efd; font-weight:bold;">IDX-042</span></div>
+                        <div><strong>Category:</strong> <span style="color:#0d6efd; font-weight:bold;">Raw Material</span></div>
+                        <div><strong>Standard UOM:</strong> <span style="color:#0d6efd; font-weight:bold;">Kg</span></div>
+                    </div>
+
+                    <div class="sim-form-grid-3">
+                        <div>
+                            <label class="sim-label">Transaction Type *</label>
+                            <select class="sim-select" style="font-weight:bold;">
+                                <option selected>Stock IN (Entry)</option>
+                                <option>Stock OUT (Exit)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="sim-label">Quantity (in Kg) *</label>
+                            <input type="number" class="sim-input" value="25.00" style="font-weight:bold;">
+                        </div>
+                        <div>
+                            <label class="sim-label">Remarks / Reference</label>
+                            <input type="text" class="sim-input" value="Physical audit surplus found in Bay 2">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Master Item Datalist Integration:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Item Datalist Query:</strong> Instant autocomplete matches item names or SKU numbers against <code>items</code> master records [cite: 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Automatic Metadata Display:</strong> The <code>itemDetailsRow</code> container reveals item code, warehouse index, and standard UOM to avoid unit mismatch errors [cite: 52].</li>
+            </ul>
+        `
+    },
+    3: {
+        heading: "Step 3: Stock IN (Receipt & Surplus Adjustment)",
+        subheading: "Executing a Stock IN adjustment increments total on-hand inventory when surplus goods or unbilled samples are received [cite: 52].",
+        html: `
+            <div class="sim-card">
+                <div class="sim-card-header" style="background:#198754;">
+                    <h4 style="margin:0; font-size:17px; font-weight:700;"><i class="fas fa-arrow-circle-down me-2"></i> Stock IN (Inward Adjustment Entry)</h4>
+                    <span style="font-size:12px; background:rgba(255,255,255,0.2); padding:3px 8px; border-radius:4px;">Addition Mode</span>
+                </div>
+                <div class="sim-card-body">
+                    <div class="sim-form-grid-3">
+                        <div>
+                            <label class="sim-label">Transaction Type</label>
+                            <select class="sim-select" style="font-weight:bold; color:#198754; border-color:#198754;">
+                                <option selected>Stock IN (Entry / Addition)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="sim-label">Quantity to Add (Kg) *</label>
+                            <input type="number" class="sim-input" value="25.00" style="font-weight:bold; color:#198754; font-size:16px;">
+                        </div>
+                        <div>
+                            <label class="sim-label">Audit Reason / Remarks</label>
+                            <input type="text" class="sim-input" value="Surplus found during annual store verification">
+                        </div>
+                    </div>
+
+                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:12px; font-size:12.5px; color:#14532d;">
+                        <strong><i class="fas fa-plus-circle me-1"></i> Inventory Impact:</strong> 
+                        Adds <strong>+25.00 Kg</strong> directly to <em>Heavy Grade Carbon Steel Rods (SKU-7721)</em>. The item's stock will rise from 100.00 Kg to <strong>125.00 Kg</strong> [cite: 36, 52].
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Inward Adjustment Operations:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Surplus Correction:</strong> Resolves discrepancies when physical stock counts exceed system balances [cite: 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Audit Ledger Integration:</strong> Appears as a distinct <code>Stock IN</code> row in the item ledger, separate from standard purchases [cite: 37, 52].</li>
+            </ul>
+        `
+    },
+    4: {
+        heading: "Step 4: Stock OUT (Disbursement, Damage & Write-Off)",
+        subheading: "Executing a Stock OUT transaction deducts quantities for damaged goods, expired chemicals, or warehouse scraps [cite: 52].",
+        html: `
+            <div class="sim-card">
+                <div class="sim-card-header" style="background:#dc3545;">
+                    <h4 style="margin:0; font-size:17px; font-weight:700;"><i class="fas fa-arrow-circle-up me-2"></i> Stock OUT (Exit / Deduction Entry)</h4>
+                    <span style="font-size:12px; background:rgba(255,255,255,0.2); padding:3px 8px; border-radius:4px;">Deduction Mode</span>
+                </div>
+                <div class="sim-card-body">
+                    <div class="sim-form-grid-3">
+                        <div>
+                            <label class="sim-label">Transaction Type</label>
+                            <select class="sim-select" style="font-weight:bold; color:#dc3545; border-color:#dc3545;">
+                                <option selected>Stock OUT (Exit / Deduction)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="sim-label">Quantity to Deduct (Ltr) *</label>
+                            <input type="number" class="sim-input" value="3.00" style="font-weight:bold; color:#dc3545; font-size:16px;">
+                        </div>
+                        <div>
+                            <label class="sim-label">Damage Reference / Reason</label>
+                            <input type="text" class="sim-input" value="Drum puncture leakage in chemical aisle 4">
+                        </div>
+                    </div>
+
+                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:12px; font-size:12.5px; color:#991b1b;">
+                        <strong><i class="fas fa-minus-circle me-1"></i> Inventory Impact:</strong> 
+                        Deducts <strong>-3.00 Ltr</strong> from <em>Industrial Cutting Lubricant Coolant (SKU-8834)</em>. Reduces active balance without generating a customer sales invoice [cite: 36, 52].
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Outward Write-Off Mechanics:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Loss & Shrinkage Logging:</strong> Documents warehouse spills, expired shelf-life items, and transit damage [cite: 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Accurate Valuation Maintenance:</strong> Prevents non-existent physical stock from inflating book valuation reports [cite: 36, 52].</li>
+            </ul>
+        `
+    },
+    5: {
+        heading: "Step 5: Reference Remarks & Audit Trail Mandatory Logging",
+        subheading: "Every journal entry requires an explicit reference note to maintain accounting transparency and traceability [cite: 52].",
+        html: `
+            <div style="background:#fff; padding:18px; border-radius:8px; border:1px solid #ddd;">
+                <h4 style="margin:0 0 12px 0; font-size:15px; color:#2c3e50;"><i class="fas fa-clipboard-check text-primary me-2"></i> Audit Documentation Standard</h4>
+
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                    <div style="display:flex; justify-content:space-between; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
+                        <span><strong>Inspection Ref:</strong> AUD-2026-Q4-019</span>
+                        <span><strong>Responsible Storekeeper:</strong> Milan Gupta</span>
+                        <span style="color:#0d6efd; font-weight:bold;">Physical Verification Surplus</span>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
+                        <span><strong>Scrap Log:</strong> SCRAP-2026-11-04</span>
+                        <span><strong>Supervisor Approval:</strong> Confirmed</span>
+                        <span style="color:#dc3545; font-weight:bold;">Machine Machining Tolerance Defect</span>
+                    </div>
+                </div>
+
+                <div style="margin-top:14px; font-size:12px; color:#64748b; text-align:center;">
+                    Clear remark descriptions are required so internal auditors can reconcile journal entries against physical store registers [cite: 37, 52].
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Compliance Tracking Features:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Mandatory Reason String:</strong> Captures why inventory was adjusted outside standard sales/purchase workflows [cite: 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Cross-Searchable References:</strong> Journal remark strings are indexed and searchable in the item stock ledger [cite: 37, 52].</li>
+            </ul>
+        `
+    },
+    6: {
+        heading: "Step 6: Instant Stock Ledger & Balance Verification",
+        subheading: "Submitting the journal entry updates the item stock ledger and recalculates running balances immediately [cite: 37, 52].",
+        html: `
+            <div style="background:#fff; border-radius:8px; border:1px solid #ddd; overflow:hidden;">
+                <div style="background:#2c3e50; color:#fff; padding:10px 16px; font-size:13px; font-weight:bold; display:flex; justify-content:space-between;">
+                    <span>Item Stock Ledger: Heavy Grade Carbon Steel Rods (25mm)</span>
+                    <span>SKU: SKU-7721 | Unit: Kg</span>
+                </div>
+
+                <table class="sim-table" style="margin:0;">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Transaction Type</th>
+                            <th style="text-align:left;">Reference / Remarks</th>
+                            <th style="color:#198754; text-align:right;">Stock IN (+)</th>
+                            <th style="color:#dc3545; text-align:right;">Stock OUT (-)</th>
+                            <th style="text-align:right;">Running Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>15/10/2026</td>
+                            <td>Purchase</td>
+                            <td style="text-align:left;">Vendor Bill: TS-99120 · Tata Steel Spares</td>
+                            <td style="color:#198754; text-align:right; font-weight:bold;">+ 150.00</td>
+                            <td style="text-align:right;">-</td>
+                            <td style="text-align:right; font-weight:bold;">150.00 Kg</td>
+                        </tr>
+                        <tr>
+                            <td>28/10/2026</td>
+                            <td>Sales Invoice</td>
+                            <td style="text-align:left;">Dispatched: INV-2026-088 · Apex Industrial</td>
+                            <td style="text-align:right;">-</td>
+                            <td style="color:#dc3545; text-align:right; font-weight:bold;">- 50.00</td>
+                            <td style="text-align:right; font-weight:bold;">100.00 Kg</td>
+                        </tr>
+                        <!-- Highlighted Journal Entry -->
+                        <tr style="background:#e8f4fd; border:1px solid #90caf9;">
+                            <td><strong>07/11/2026</strong></td>
+                            <td><strong style="color:#0d6efd;">Stock Journal (IN)</strong></td>
+                            <td style="text-align:left; font-weight:bold;">Surplus found during annual store verification</td>
+                            <td style="color:#198754; text-align:right; font-weight:bold;">+ 25.00</td>
+                            <td style="text-align:right;">-</td>
+                            <td style="text-align:right; font-weight:bold; color:#0d6efd; font-size:13.5px;">125.00 Kg</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Timeline Verification Highlights:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Sequential Running Balance:</strong> Automatically recalculates on-hand quantities following the journal transaction [cite: 37, 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Unified Register Display:</strong> Integrates journal adjustments directly into the item's historical movement ledger alongside sales and purchases [cite: 37, 52].</li>
+            </ul>
+        `
+    },
+    7: {
+        heading: "Step 7: Transaction Commit & Multi-Device Intranet Sync",
+        subheading: "Saving commits the adjustment to local browser cache and synchronizes changes across network terminals [cite: 52].",
+        html: `
+            <div class="sim-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <h4 style="margin:0; font-size:16px; color:#2c3e50;"><i class="fas fa-check-circle text-success me-2"></i> Ready to Commit Stock Journal</h4>
+                        <p style="margin:3px 0 0; font-size:12px; color:#64748b;">Transaction ready to commit to active inventory registers [cite: 52].</p>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="sim-btn sim-btn-secondary">Cancel</button>
+                        <button class="sim-btn sim-btn-success" style="padding:8px 20px;"><i class="fas fa-save"></i> Save Transaction</button>
+                    </div>
+                </div>
+
+                <div style="margin-top:16px; background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:12px; font-size:12px; color:#475569;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span>Backend Endpoint:</span>
+                        <strong style="color:#0f172a;">apiClient.saveStockJournal()</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span>Local Cache Target:</span>
+                        <strong style="color:#0f172a;">localStorage['stock_journals']</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Network Broadcast:</span>
+                        <strong style="color:#198754;">Live Multi-Terminal Update</strong>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Persistence & Synchronization:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Dual-Layer Storage:</strong> Writes immediately to <code>localStorage</code> for offline speed and calls <code>apiClient.saveStockJournal()</code> for database synchronization [cite: 52].</li>
+                <li><i class="fas fa-check"></i> <strong>Multi-Terminal Consistency:</strong> Other billing and inventory terminals reflect updated stock quantities immediately [cite: 36, 52].</li>
+            </ul>
+        `
+    }
+};
+
+function switchStep(stepNum) {
+    document.querySelectorAll('.step-item').forEach((el, idx) => {
+        if (idx + 1 === stepNum) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    const data = stepData[stepNum];
+    document.getElementById('stepHeading').innerText = data.heading;
+    document.getElementById('stepSubheading').innerText = data.subheading;
+    document.getElementById('simulatedScreen').innerHTML = data.html;
+    document.getElementById('stepExplainer').innerHTML = data.explanation;
+}
+
+// Initialize Step 1
+switchStep(1);
+</script>
+<script src="../intro-demo-navigation.js"></script>
+</body>
+</html>
