@@ -3,6 +3,51 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sj-date').value = new Date().toISOString().split('T')[0];
     loadItems();
 
+    const transactionType = document.getElementById('sj-type');
+    const cardHeader = document.getElementById('sj-card-header');
+    const headerIcon = document.getElementById('sj-header-icon');
+    const headerTitle = document.getElementById('sj-header-title');
+    const modeBadge = document.getElementById('sj-mode-badge');
+    const quantityInput = document.getElementById('sj-qty');
+
+    function updateTransactionTypeColors() {
+        const color = transactionType.value === 'IN' ? 'success'
+            : transactionType.value === 'OUT' ? 'danger'
+                : null;
+
+        cardHeader.classList.remove('bg-primary', 'bg-success', 'bg-danger');
+        transactionType.classList.remove('text-success', 'text-danger', 'border-success', 'border-danger');
+        quantityInput.classList.remove('text-success', 'text-danger');
+        transactionType.classList.remove('fw-bold');
+        quantityInput.classList.remove('fw-bold');
+        quantityInput.style.removeProperty('font-size');
+
+        if (!color) {
+            cardHeader.classList.add('bg-primary');
+            headerIcon.className = 'fas fa-exchange-alt';
+            headerTitle.textContent = 'Quick Stock Entry & Exit';
+            modeBadge.textContent = '';
+            modeBadge.classList.add('d-none');
+            return;
+        }
+
+        cardHeader.classList.add(`bg-${color}`);
+        transactionType.classList.add(`text-${color}`, `border-${color}`, 'fw-bold');
+        quantityInput.classList.add(`text-${color}`, 'fw-bold');
+        quantityInput.style.fontSize = '16px';
+
+        const isStockIn = transactionType.value === 'IN';
+        headerIcon.className = `fas ${isStockIn ? 'fa-arrow-circle-down' : 'fa-arrow-circle-up'}`;
+        headerTitle.textContent = isStockIn
+            ? 'Stock IN (Inward Adjustment Entry)'
+            : 'Stock OUT (Exit / Deduction Entry)';
+        modeBadge.textContent = isStockIn ? 'Addition Mode' : 'Deduction Mode';
+        modeBadge.classList.remove('d-none');
+    }
+
+    transactionType.addEventListener('change', updateTransactionTypeColors);
+    updateTransactionTypeColors();
+
     document.getElementById('stockJournalForm').addEventListener('submit', function (e) {
         e.preventDefault();
         saveStockTransaction();
