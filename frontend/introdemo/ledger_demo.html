@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>General Ledger - Visual Step-by-Step Operational Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+<style>
+    :root {
+        --primary: #2c3e50;
+        --accent-blue: #4e73df;
+        --success: #1cc88a;
+        --danger: #e74a3b;
+        --warning: #f6c23e;
+        --gray: #858796;
+        --bg-main: #0f172a;
+        --card-dark: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-light);
+        padding: 24px;
+        line-height: 1.5;
+    }
+
+    .app-header {
+        max-width: 1400px;
+        margin: 0 auto 24px auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .app-title h1 {
+        font-size: 24px;
+        font-weight: 800;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .app-title p {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .main-layout {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 24px;
+    }
+    @media (max-width: 1024px) {
+        .main-layout { grid-template-columns: 1fr; }
+    }
+
+    /* Steps navigation */
+    .steps-nav {
+        background: var(--card-dark);
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+        height: fit-content;
+        position: sticky;
+        top: 24px;
+    }
+    .nav-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 12px;
+        padding-left: 6px;
+    }
+    .step-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid transparent;
+        background: rgba(255,255,255,0.02);
+    }
+    .step-item:hover {
+        background: rgba(255,255,255,0.06);
+    }
+    .step-item.active {
+        background: var(--accent-blue);
+        border-color: #7092fc;
+        color: #fff;
+    }
+    .step-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+    .step-info h4 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+    .step-info p {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+
+    /* Showcase viewer */
+    .showcase-area {
+        background: var(--card-dark);
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.08);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .showcase-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 16px;
+    }
+    .step-header-text h2 {
+        font-size: 20px;
+        color: #fff;
+        margin-bottom: 4px;
+    }
+    .step-header-text p {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* Simulated Screenshot Frame */
+    .screenshot-frame {
+        background: #cbd5e1;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+        overflow-x: auto;
+    }
+
+    /* Simulated Module UI - Matches General Ledger */
+    .sim-container {
+        width: 100%;
+        max-width: 980px;
+        margin: 0 auto;
+        background: #f4f6f9;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        color: #495057;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        box-sizing: border-box;
+    }
+
+    .sim-header-card {
+        background: #fff;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-left: 5px solid var(--accent-blue);
+    }
+    .sim-header-card h1 {
+        margin: 0;
+        font-size: 20px;
+        color: #2c3e50;
+    }
+
+    .sim-filters-card {
+        background: #fff;
+        padding: 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 16px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        align-items: end;
+        font-size: 12.5px;
+    }
+    .sim-form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .sim-form-group label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #666;
+        text-transform: uppercase;
+    }
+    .sim-form-group input,
+    .sim-form-group select {
+        padding: 6px 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 13px;
+        background: #fff;
+    }
+
+    .sim-btn {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 12.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: white;
+    }
+    .sim-btn-primary { background: #4e73df; }
+    .sim-btn-success { background: #1cc88a; }
+    .sim-btn-secondary { background: #858796; }
+    .sim-btn-warning { background: #f6c23e; color: #000; }
+    .sim-btn-danger { background: #e74a3b; }
+
+    /* Grand Summary Bar */
+    .sim-grand-bar {
+        background: #e3f2fd;
+        border: 1px solid #90caf9;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        text-align: center;
+        font-size: 12.5px;
+    }
+
+    /* KPI Grid */
+    .sim-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .sim-kpi-card {
+        background: #fff;
+        padding: 14px;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 4px solid var(--accent-blue);
+    }
+    .sim-kpi-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        color: white;
+        flex-shrink: 0;
+    }
+    .sim-kpi-content h3 {
+        margin: 0 0 2px 0;
+        font-size: 11px;
+        color: #858796;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+    .sim-kpi-content p {
+        margin: 0;
+        font-size: 16px;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    /* Table Styles */
+    .sim-table-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        overflow: hidden;
+        border: 1px solid #e3e6f0;
+    }
+    .sim-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+    }
+    .sim-table th, .sim-table td {
+        padding: 9px 12px;
+        border-bottom: 1px solid #e3e6f0;
+        text-align: left;
+    }
+    .sim-table th {
+        background: #4e73df;
+        color: white;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    .row-opening { background-color: #fff9c4; font-weight: bold; }
+    .row-closing { background-color: #eaecf4; font-weight: bold; border-top: 2px solid #5a5c69; }
+    .row-outstanding { background-color: #fff0f0; }
+    .row-settled { background-color: #f0fff0; }
+
+    .badge {
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        display: inline-block;
+    }
+    .badge-Receivable { background: #a5d6a7; color: #2e7d32; }
+    .badge-Payable { background: #ef9a9a; color: #c62828; }
+    .badge-Settled { background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; }
+
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+
+    /* Modal Simulation */
+    .sim-modal-card {
+        background: white;
+        padding: 22px;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+        width: 100%;
+        max-width: 650px;
+        margin: 0 auto;
+        text-align: left;
+    }
+    .sim-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
+    }
+    .sim-modal-header h3 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 16px;
+    }
+
+    /* Explanation card */
+    .step-explainer {
+        background: #1e293b;
+        border-radius: 10px;
+        padding: 18px 20px;
+        border-left: 4px solid var(--accent-blue);
+    }
+    .step-explainer h3 {
+        font-size: 15px;
+        color: #fff;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .step-explainer ul {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .step-explainer li {
+        font-size: 13px;
+        color: #cbd5e1;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .step-explainer li i {
+        color: #10b981;
+        font-size: 11px;
+    }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="app-title">
+        <h1><i class="fas fa-book" style="color: #38bdf8;"></i> General Ledger — Step-by-Step Visual Operational Guide</h1>
+        <p>Complete operational walkthrough of Customer, Supplier, and Expense account statements, running debit/credit balances, aging schedules, and statement generation.</p>
+    </div>
+</header>
+
+<main class="main-layout">
+    <!-- Left Navigation -->
+    <aside class="steps-nav">
+        <div class="nav-title">Ledger Workflows</div>
+        <div class="step-item active" onclick="switchStep(1)">
+            <div class="step-badge">1</div>
+            <div class="step-info">
+                <h4>Summary View & Grand Totals</h4>
+                <p>Balances across all parties</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(2)">
+            <div class="step-badge">2</div>
+            <div class="step-info">
+                <h4>Detailed Running Statement</h4>
+                <p>Opening, running balance & KPIs</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(3)">
+            <div class="step-badge">3</div>
+            <div class="step-info">
+                <h4>Overdue Invoices Schedule</h4>
+                <p>30+ days overdue & reminders</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(4)">
+            <div class="step-badge">4</div>
+            <div class="step-info">
+                <h4>Cross-Voucher Drill-Down</h4>
+                <p>Inspecting invoices & bills</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(5)">
+            <div class="step-badge">5</div>
+            <div class="step-info">
+                <h4>In-Place Remarks Management</h4>
+                <p>Audit trail updates</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(6)">
+            <div class="step-badge">6</div>
+            <div class="step-info">
+                <h4>Printable Receipt Vouchers</h4>
+                <p>Formal receipt generator</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(7)">
+            <div class="step-badge">7</div>
+            <div class="step-info">
+                <h4>Statement PDF & Signature</h4>
+                <p>Official statement export</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Right Showcase Container -->
+    <section class="showcase-area">
+        <div class="showcase-toolbar">
+            <div class="step-header-text">
+                <h2 id="stepHeading">Step 1: Summary View & Grand Portfolio Totals</h2>
+                <p id="stepSubheading">High-level register summarizing total debits, total credits, and net balances across all registered entities.</p>
+            </div>
+        </div>
+
+        <!-- Render Target -->
+        <div class="screenshot-frame">
+            <div id="simulatedScreen" class="sim-container">
+                <!-- Content dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Step Explanation -->
+        <div class="step-explainer" id="stepExplainer">
+            <!-- Dynamic explanation -->
+        </div>
+    </section>
+</main>
+
+<script>
+const stepData = {
+    1: {
+        heading: "Step 1: Summary View & Grand Portfolio Totals",
+        subheading: "Shows cumulative debtor or creditor balances, color-coded outstanding rows, and the top-level financial standing bar.",
+        html: `
+            <div class="sim-header-card">
+                <div>
+                    <h1>RISE TECH REVOLUTION - CRM</h1>
+                    <p style="margin:2px 0 0; font-size:12px; color:#666;">Station Road, Memari, Purba Bardhaman | GSTIN: 19ABCDE1234F1Z5</p>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:16px; font-weight:bold; color:#858796;">📒 LEDGER ACCOUNT</div>
+                    <div style="font-size:12px; color:#4e73df; font-weight:600;">FY 2026-27 · All Time</div>
+                </div>
+            </div>
+
+            <div class="sim-filters-card">
+                <div class="sim-form-group">
+                    <label>Party Type</label>
+                    <select style="font-weight:bold;">
+                        <option selected>Customer (Receivable)</option>
+                        <option>Supplier (Payable)</option>
+                        <option>Expense Ledger</option>
+                    </select>
+                </div>
+                <div class="sim-form-group" style="grid-column: span 2;">
+                    <label>Party Name</label>
+                    <input type="text" placeholder="Search Party..." value="">
+                </div>
+                <div class="sim-form-group">
+                    <label>Date Range</label>
+                    <select>
+                        <option selected>Financial Year</option>
+                        <option>Last 3 Months</option>
+                        <option>This Quarter</option>
+                    </select>
+                </div>
+                <div class="sim-form-group">
+                    <label>Mode</label>
+                    <select style="font-weight:bold; color:#4e73df;">
+                        <option selected>Summary View</option>
+                        <option>Detailed Ledger</option>
+                        <option>Overdue Invoices</option>
+                    </select>
+                </div>
+                <button class="sim-btn sim-btn-primary"><i class="fas fa-search"></i> Go</button>
+            </div>
+
+            <!-- Grand Summary Bar -->
+            <div class="sim-grand-bar">
+                <div><strong>Total Receivable:</strong><br><span style="color:#1cc88a; font-weight:bold; font-size:15px;">₹ 1,72,880.00</span></div>
+                <div><strong>Total Payable:</strong><br><span style="color:#e74a3b; font-weight:bold; font-size:15px;">₹ 0.00</span></div>
+                <div><strong>Net Position:</strong><br><span style="color:#1cc88a; font-weight:bold; font-size:15px;">₹ 1,72,880.00 (Dr)</span></div>
+                <div><strong>Overdue (30+ Days):</strong><br><span style="color:#e74a3b; font-weight:bold; font-size:15px;">₹ 48,380.00</span></div>
+            </div>
+
+            <div class="sim-table-card">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Party Name</th>
+                            <th class="text-right">Total Debit</th>
+                            <th class="text-right">Total Credit</th>
+                            <th class="text-right">Balance</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="row-outstanding" style="cursor:pointer;">
+                            <td><strong>RISE TECH REVOLUTION - CRM - CRM - CRM - CRM - CRM- CRM</strong></td>
+                            <td class="text-right">₹ 96,760.00</td>
+                            <td class="text-right">₹ 48,380.00</td>
+                            <td class="text-right" style="color:#e74a3b; font-weight:bold;">₹ 48,380.00 Dr</td>
+                            <td class="text-center"><span class="badge badge-Receivable">Receivable</span></td>
+                        </tr>
+                        <tr class="row-outstanding" style="cursor:pointer;">
+                            <td><strong>Bihar Alloy & Steel Fabricators</strong></td>
+                            <td class="text-right">₹ 84,370.00</td>
+                            <td class="text-right">₹ 0.00</td>
+                            <td class="text-right" style="color:#e74a3b; font-weight:bold;">₹ 84,370.00 Dr</td>
+                            <td class="text-center"><span class="badge badge-Receivable">Receivable</span></td>
+                        </tr>
+                        <tr class="row-settled" style="cursor:pointer;">
+                            <td><strong>Bengal Foundry & Engineering</strong></td>
+                            <td class="text-right">₹ 42,480.00</td>
+                            <td class="text-right">₹ 42,480.00</td>
+                            <td class="text-right" style="color:#1cc88a; font-weight:bold;">₹ 0.00 Dr</td>
+                            <td class="text-center"><span class="badge badge-Settled">Settled</span></td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="row-closing">
+                            <td>Grand Total</td>
+                            <td class="text-right">₹ 2,23,610.00</td>
+                            <td class="text-right">₹ 90,860.00</td>
+                            <td class="text-right">₹ 1,32,750.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Summary View Mechanics:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Portfolio Overview:</strong> Displays all customer or supplier balances in a clean single-screen register [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Status Badging:</strong> Automatically tags accounts as <strong>Receivable</strong>, <strong>Payable</strong>, or <strong>Settled</strong> [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Click to Drill Down:</strong> Clicking any row instantly loads that party's detailed running ledger [cite: 30].</li>
+            </ul>
+        `
+    },
+    2: {
+        heading: "Step 2: Detailed Running Statement & KPI Cards",
+        subheading: "Chronological transaction statement tracking Opening Balance, debits, credits, and continuous running balances.",
+        html: `
+            <div class="sim-header-card" style="border-left-color: #e74a3b;">
+                <div>
+                    <h3 style="margin:0; color:#2c3e50; font-size:18px;">RISE TECH REVOLUTION - CRM</h3>
+                    <span style="font-size:12px; color:#666;">Customer Ledger · GSTIN: 19AAACA8899F1Z2</span>
+                    <div style="font-size:11.5px; color:#555; margin-top:4px;">Plot 14, Phase II, Durgapur, Paschim Bardhaman - 713212 | Mob: +91 79080 40851</div>
+                </div>
+                <div style="text-align:right;">
+                    <button class="sim-btn sim-btn-primary" style="font-size:12px;"><i class="fas fa-file-pdf"></i> Export Statement PDF</button>
+                </div>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="sim-kpi-grid">
+                <div class="sim-kpi-card" style="border-bottom-color:#4e73df;">
+                    <div class="sim-kpi-icon" style="background:#4e73df;"><i class="fas fa-wallet"></i></div>
+                    <div class="sim-kpi-content">
+                        <h3>Opening Balance</h3>
+                        <p>₹ 0.00</p>
+                    </div>
+                </div>
+                <div class="sim-kpi-card" style="border-bottom-color:#e74a3b;">
+                    <div class="sim-kpi-icon" style="background:#e74a3b;"><i class="fas fa-arrow-up"></i></div>
+                    <div class="sim-kpi-content">
+                        <h3>Total Debit (Invoices)</h3>
+                        <p>₹ 96,760.00</p>
+                    </div>
+                </div>
+                <div class="sim-kpi-card" style="border-bottom-color:#1cc88a;">
+                    <div class="sim-kpi-icon" style="background:#1cc88a;"><i class="fas fa-arrow-down"></i></div>
+                    <div class="sim-kpi-content">
+                        <h3>Total Credit (Receipts)</h3>
+                        <p>₹ 48,380.00</p>
+                    </div>
+                </div>
+                <div class="sim-kpi-card" style="border-bottom-color:#f6c23e;">
+                    <div class="sim-kpi-icon" style="background:#f6c23e;"><i class="fas fa-coins"></i></div>
+                    <div class="sim-kpi-content">
+                        <h3>Closing Balance</h3>
+                        <p style="color:#e74a3b;">₹ 48,380.00 Dr</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sim-table-card">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Inv/Ref No</th>
+                            <th>Particulars</th>
+                            <th>Remarks</th>
+                            <th>Vch Type</th>
+                            <th class="text-right">Debit</th>
+                            <th class="text-right">Credit</th>
+                            <th class="text-right">Running Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="row-opening">
+                            <td>01/04/2026</td>
+                            <td>-</td>
+                            <td>Opening Balance</td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">₹ 0.00 Dr</td>
+                        </tr>
+                        <tr>
+                            <td>15/09/2026</td>
+                            <td>INV-2026-061</td>
+                            <td><a href="#" style="color:#0d6efd; text-decoration:none; font-weight:bold;">Invoice #INV-2026-061</a></td>
+                            <td><input type="text" value="Flange batch 1 supply" style="font-size:12px; border:1px solid #ccc; border-radius:3px; padding:3px; width:100%;"></td>
+                            <td>Sales</td>
+                            <td class="text-right">₹ 48,380.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="font-weight:bold;">₹ 48,380.00 Dr</td>
+                        </tr>
+                        <tr>
+                            <td>10/10/2026</td>
+                            <td>INV-2026-061</td>
+                            <td><a href="#" style="color:#0d6efd; text-decoration:none; font-weight:bold;">Payment Received (Bank Transfer)</a></td>
+                            <td><input type="text" value="NEFT Ref: 99201" style="font-size:12px; border:1px solid #ccc; border-radius:3px; padding:3px; width:100%;"></td>
+                            <td>Receipt</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="color:#1cc88a; font-weight:bold;">₹ 48,380.00</td>
+                            <td class="text-right" style="font-weight:bold;">₹ 0.00 Dr</td>
+                        </tr>
+                        <tr>
+                            <td>28/10/2026</td>
+                            <td>INV-2026-088</td>
+                            <td><a href="#" style="color:#0d6efd; text-decoration:none; font-weight:bold;">Invoice #INV-2026-088</a></td>
+                            <td><input type="text" value="500mm MS Flange supply" style="font-size:12px; border:1px solid #ccc; border-radius:3px; padding:3px; width:100%;"></td>
+                            <td>Sales</td>
+                            <td class="text-right">₹ 48,380.00</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right" style="font-weight:bold; color:#e74a3b;">₹ 48,380.00 Dr</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="row-closing">
+                            <td colspan="5" class="text-right">Total / Closing Balance</td>
+                            <td class="text-right">₹ 96,760.00</td>
+                            <td class="text-right">₹ 48,380.00</td>
+                            <td class="text-right" style="color:#e74a3b;">₹ 48,380.00 Dr</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Detailed Statement Intelligence:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Continuous Balance Calculation:</strong> Each transaction updates the running ledger balance (<code>Balance += Debit - Credit</code>) [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Top KPI Summary:</strong> Displays Opening, Debit, Credit, and Closing figures at a glance [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Integrated Customer Metadata:</strong> Shows address, contact details, and GSTIN at the top of the statement [cite: 30].</li>
+            </ul>
+        `
+    },
+    3: {
+        heading: "Step 3: Overdue Invoices Aging Schedule (30+ Days)",
+        subheading: "Isolates unpaid customer bills exceeding statutory credit terms, detailing exact days overdue with reminder shortcuts.",
+        html: `
+            <div class="sim-header-card" style="border-left-color: #e74a3b;">
+                <div>
+                    <h3 style="margin:0; color:#e74a3b; font-size:18px;"><i class="fas fa-clock"></i> Overdue Invoices Schedule</h3>
+                    <span style="font-size:12px; color:#666;">Filter threshold: Unpaid balances older than 30 days</span>
+                </div>
+                <div>
+                    <button class="sim-btn sim-btn-danger"><i class="fas fa-file-pdf"></i> Export Overdue PDF</button>
+                </div>
+            </div>
+
+            <div class="sim-table-card">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Inv No</th>
+                            <th>Inv Date</th>
+                            <th>Customer Name</th>
+                            <th class="text-right">Total Amount</th>
+                            <th class="text-right">Amount Due</th>
+                            <th class="text-center">Days Overdue</th>
+                            <th>Created By</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><a href="#" style="color:#0d6efd; font-weight:bold; text-decoration:none;">INV-2026-074</a></td>
+                            <td>12/09/2026</td>
+                            <td>RISE TECH REVOLUTION - CRM</td>
+                            <td class="text-right">₹ 48,380.00</td>
+                            <td class="text-right" style="color:#e74a3b; font-weight:bold;">₹ 48,380.00</td>
+                            <td class="text-center" style="color:#e74a3b; font-weight:bold;">56 Days</td>
+                            <td>Admin</td>
+                            <td class="text-center">
+                                <button class="sim-btn sim-btn-warning" style="padding:3px 8px; font-size:11px;"><i class="fas fa-bell"></i> Remind</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><a href="#" style="color:#0d6efd; font-weight:bold; text-decoration:none;">INV-2026-068</a></td>
+                            <td>05/09/2026</td>
+                            <td>Bihar Alloy & Steel Fabricators</td>
+                            <td class="text-right">₹ 84,370.00</td>
+                            <td class="text-right" style="color:#e74a3b; font-weight:bold;">₹ 84,370.00</td>
+                            <td class="text-center" style="color:#e74a3b; font-weight:bold;">63 Days</td>
+                            <td>Admin</td>
+                            <td class="text-center">
+                                <button class="sim-btn sim-btn-warning" style="padding:3px 8px; font-size:11px;"><i class="fas fa-bell"></i> Remind</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="row-closing">
+                            <td colspan="4" class="text-right">Total Overdue Outstanding:</td>
+                            <td class="text-right" style="color:#e74a3b;">₹ 1,32,750.00</td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Debt Recovery Features:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Age Calculation:</strong> Compares current date against invoice date to flag overdue accounts [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Reminder Workflow:</strong> Clicking <strong>Remind</strong> opens the reminder module pre-filled with customer details and overdue amounts [cite: 30].</li>
+            </ul>
+        `
+    },
+    4: {
+        heading: "Step 4: Cross-Voucher Transaction Drill-Down Modal",
+        subheading: "Clicking any transaction description opens an itemized modal displaying products, taxes, and payment status.",
+        html: `
+            <div class="sim-modal-card">
+                <div class="sim-modal-header">
+                    <h3><i class="fas fa-file-invoice" style="color:#0d6efd; margin-right:6px;"></i> Invoice Details: INV-2026-088</h3>
+                    <span style="font-size:20px; color:#999; cursor:pointer;">&times;</span>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:14px; font-size:12.5px;">
+                    <div>
+                        <strong style="color:#0d6efd;">Invoice Metadata</strong>
+                        <div>Invoice No: <strong>INV-2026-088</strong></div>
+                        <div>Date: 28/10/2026</div>
+                        <div>Type: TAX INVOICE</div>
+                    </div>
+                    <div>
+                        <strong style="color:#0d6efd;">Customer Particulars</strong>
+                        <div>Name: <strong>RISE TECH REVOLUTION - CRM</strong></div>
+                        <div>Contact: +91 79080 40851</div>
+                    </div>
+                </div>
+
+                <table class="sim-table" style="font-size:12px; margin-bottom:12px;">
+                    <thead>
+                        <tr><th>#</th><th>Item Description</th><th class="text-right">Qty</th><th class="text-right">Price</th><th class="text-right">GST</th><th class="text-right">Total</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td>500mm Industrial MS Flange</td><td class="text-right">10 Pcs</td><td class="text-right">3,200.00</td><td class="text-right">18%</td><td class="text-right">37,760.00</td></tr>
+                        <tr><td>2</td><td>Silicone Gasket Set (500mm)</td><td class="text-right">10 Set</td><td class="text-right">450.00</td><td class="text-right">18%</td><td class="text-right">5,310.00</td></tr>
+                        <tr><td>3</td><td>Machining & Bevel Job Work</td><td class="text-right">1 Job</td><td class="text-right">4,500.00</td><td class="text-right">18%</td><td class="text-right">5,310.00</td></tr>
+                    </tbody>
+                </table>
+
+                <div style="text-align:right; font-size:12.5px; border-top:1px solid #eee; padding-top:8px;">
+                    <div>Taxable Value: <strong>₹ 41,000.00</strong></div>
+                    <div>GST Amount: <strong>₹ 7,380.00</strong></div>
+                    <div style="font-size:14px; font-weight:bold; color:#0d6efd;">Grand Total: ₹ 48,380.00</div>
+                    <div style="color:#e74a3b; font-weight:bold;">Amount Due: ₹ 48,380.00 (Unpaid)</div>
+                </div>
+
+                <div style="text-align:right; margin-top:14px;">
+                    <button class="sim-btn sim-btn-secondary" style="font-size:11.5px;">Close</button>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Audit Inspection:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Zero Screen Jumps:</strong> Inspect exact item line items, GST amounts, and payment status directly from the ledger [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Cross-Module Support:</strong> Renders sales invoices, purchase bills, and double-entry journal vouchers seamlessly [cite: 30].</li>
+            </ul>
+        `
+    },
+    5: {
+        heading: "Step 5: In-Place Remarks Management & Audit Logging",
+        subheading: "Operators can update notes directly on any ledger line, triggering an audit update confirmation.",
+        html: `
+            <div class="sim-table-card" style="padding:15px;">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Inv/Ref No</th>
+                            <th>Particulars</th>
+                            <th>Remarks (Editable)</th>
+                            <th class="text-right">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>28/10/2026</td>
+                            <td>INV-2026-088</td>
+                            <td>Invoice #INV-2026-088</td>
+                            <td style="width:260px;">
+                                <input type="text" value="Client confirmed payment release by 15th Nov" style="border:1px solid #4e73df; background:#fff; padding:4px 8px; font-size:12px; width:100%; border-radius:3px;">
+                            </td>
+                            <td class="text-right font-bold" style="color:#e74a3b;">₹ 48,380.00 Dr</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Confirmation Modal Simulation -->
+                <div class="sim-modal-card" style="max-width:320px; margin-top:15px; text-align:center; border-top:3px solid #f6c23e;">
+                    <h3 style="color:#f6c23e; font-size:15px; margin:0 0 6px 0;">⚠️ Confirm Update</h3>
+                    <p style="font-size:12px; color:#555; margin:0 0 12px 0;">Update remarks for invoice INV-2026-088 across system ledgers?</p>
+                    <div style="display:flex; justify-content:center; gap:8px;">
+                        <button class="sim-btn sim-btn-primary" style="font-size:11.5px;">Yes, Update</button>
+                        <button class="sim-btn sim-btn-secondary" style="font-size:11.5px;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Operational Audit Trail:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>In-Place Editing:</strong> Edit collection status and payment follow-ups without opening the source invoice [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Audit Confirmation:</strong> <code>confirmUpdateRemarks()</code> prompts confirmation before committing updates [cite: 30].</li>
+            </ul>
+        `
+    },
+    6: {
+        heading: "Step 6: Printable Payment Receipt Generation",
+        subheading: "Generate formal payment receipts directly from payment receipt entries in the customer ledger.",
+        html: `
+            <div style="background:white; border:2px solid #828cfa; padding:20px; border-radius:6px; max-width:650px; margin:0 auto; font-size:12px; color:#333;">
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #9696ff; padding-bottom:6px; margin-bottom:12px;">
+                    <div>
+                        <h2 style="margin:0; font-size:18px; color:#2c3e50;">RISE TECH REVOLUTION - CRM</h2>
+                        <p style="margin:2px 0 0; font-size:11px; color:#555;">Memari, Purba Bardhaman, West Bengal | Ph: +91 98765 43210</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <h3 style="margin:0; font-size:16px; color:#828cfa;">PAYMENT RECEIPT</h3>
+                        <div style="font-size:11px;">Receipt No: <strong>REC-2026-104</strong></div>
+                        <div style="font-size:11px;">Date: 10/10/2026</div>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; padding:10px; border-radius:4px; margin-bottom:12px; font-size:11.5px;">
+                    <strong>Received From:</strong> RISE TECH REVOLUTION - CRM<br>
+                    <strong>Address:</strong> Plot 14, Phase II, Durgapur, Paschim Bardhaman - 713212
+                </div>
+
+                <table class="sim-table" style="font-size:11.5px; margin-bottom:12px;">
+                    <thead><tr><th>Description</th><th>Mode</th><th class="text-right">Amount Received</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td>Part Payment against Invoice #INV-2026-061</td>
+                            <td>Bank Transfer (NEFT)</td>
+                            <td class="text-right" style="font-weight:bold; color:#1cc88a;">₹ 48,380.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:11.5px;">
+                    <div>
+                        <strong>Amount in Words:</strong><br>
+                        Forty-Eight Thousand Three Hundred Eighty Rupees Only
+                    </div>
+                    <div style="text-align:right;">
+                        <div>Previous Due: <strong>₹ 48,380.00</strong></div>
+                        <div style="font-weight:bold; color:#1cc88a;">Current Balance: ₹ 0.00</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:35px; text-align:center; font-size:11px;">
+                    <div style="width:140px; border-top:1px solid #333; padding-top:4px;">Customer Signature</div>
+                    <div style="width:160px; border-top:1px solid #333; padding-top:4px;">Authorized Signatory</div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Official Receipt Capabilities:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Instant Receipt Creation:</strong> Generates customer-ready payment receipts directly from receipt ledger lines [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Balance Tracking:</strong> Displays previous balance, current payment, and revised ledger balance [cite: 30].</li>
+            </ul>
+        `
+    },
+    7: {
+        heading: "Step 7: Statement PDF Export & Signature Customization",
+        subheading: "Export formal Statement of Accounts with running totals and an uploaded digital signature image.",
+        html: `
+            <div style="background:white; border:2px solid #2c3e50; padding:20px; border-radius:6px; max-width:680px; margin:0 auto; font-size:11.5px; color:#333;">
+                <div style="text-align:center; border-bottom:1px solid #2c3e50; padding-bottom:6px; margin-bottom:12px;">
+                    <h2 style="margin:0; font-size:18px; color:#2c3e50;">RISE TECH REVOLUTION - CRM</h2>
+                    <p style="margin:2px 0 0; font-size:10.5px; color:#555;">Memari, Purba Bardhaman, West Bengal | GSTIN: 19ABCDE1234F1Z5</p>
+                    <h3 style="margin:6px 0 0; font-size:14px; text-decoration:underline;">STATEMENT OF ACCOUNTS</h3>
+                    <p style="margin:2px 0 0; font-size:10.5px;">Period: 01/04/2026 to 31/03/2027</p>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px;">
+                    <div><strong>To:</strong> RISE TECH REVOLUTION - CRM<br>Durgapur, Paschim Bardhaman - 713212</div>
+                    <div style="text-align:right;"><strong>Generated:</strong> 03/11/2026<br><strong>Status:</strong> Debit Balance (Receivable)</div>
+                </div>
+
+                <table class="sim-table" style="font-size:10.5px; margin-bottom:8px;">
+                    <thead>
+                        <tr style="background:#eee; color:#000;">
+                            <th>Date</th>
+                            <th>Ref No</th>
+                            <th>Particulars</th>
+                            <th>Type</th>
+                            <th class="text-right">Debit</th>
+                            <th class="text-right">Credit</th>
+                            <th class="text-right">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>01/04/2026</td><td>-</td><td>Opening Balance</td><td>-</td><td class="text-right">-</td><td class="text-right">-</td><td class="text-right">0.00 Dr</td></tr>
+                        <tr><td>15/09/2026</td><td>INV-061</td><td>Invoice #INV-2026-061</td><td>Sales</td><td class="text-right">48,380.00</td><td class="text-right">-</td><td class="text-right">48,380.00 Dr</td></tr>
+                        <tr><td>10/10/2026</td><td>INV-061</td><td>Payment Received</td><td>Receipt</td><td class="text-right">-</td><td class="text-right">48,380.00</td><td class="text-right">0.00 Dr</td></tr>
+                        <tr><td>28/10/2026</td><td>INV-088</td><td>Invoice #INV-2026-088</td><td>Sales</td><td class="text-right">48,380.00</td><td class="text-right">-</td><td class="text-right">48,380.00 Dr</td></tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="4" class="text-right">Total / Closing Balance:</th>
+                            <th class="text-right">₹ 96,760.00</th>
+                            <th class="text-right">₹ 48,380.00</th>
+                            <th class="text-right">₹ 48,380.00 Dr</th>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="display:flex; justify-content:space-between; margin-top:35px; align-items:flex-end;">
+                    <div style="font-size:10px; color:#777;">Report compiled via General Ledger Engine · Page 1 of 1</div>
+                    <div style="text-align:right;">
+                        <div style="font-family:'Brush Script MT', cursive; font-size:20px; color:#014486; margin-bottom:2px;">Milan Gupta</div>
+                        <div style="border-top:1px solid #333; padding-top:2px; width:150px; text-align:center; font-weight:bold;">Authorized Signatory</div>
+                        <div style="font-size:10px; color:#555;">For RISE TECH REVOLUTION - CRM</div>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Official Statement Export:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Multi-Page Support:</strong> Generates formatted statements with automatic running balance carryovers [cite: 30].</li>
+                <li><i class="fas fa-check"></i> <strong>Digital Signature Integration:</strong> Embeds the authorized signature directly into exported PDF statements [cite: 30].</li>
+            </ul>
+        `
+    }
+};
+
+function switchStep(stepNum) {
+    document.querySelectorAll('.step-item').forEach((el, idx) => {
+        if (idx + 1 === stepNum) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    const data = stepData[stepNum];
+    document.getElementById('stepHeading').innerText = data.heading;
+    document.getElementById('stepSubheading').innerText = data.subheading;
+    document.getElementById('simulatedScreen').innerHTML = data.html;
+    document.getElementById('stepExplainer').innerHTML = data.explanation;
+}
+
+// Initialize Step 1
+switchStep(1);
+</script>
+<script src="../intro-demo-navigation.js"></script>
+</body>
+</html>

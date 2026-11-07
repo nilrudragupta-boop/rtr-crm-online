@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Reports - Visual Operational Walkthrough</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+<style>
+    :root {
+        --primary: #2c3e50;
+        --accent-blue: #2980b9;
+        --success: #27ae60;
+        --warning: #f39c12;
+        --danger: #c0392b;
+        --purple: #8e44ad;
+        --bg-main: #0f172a;
+        --card-dark: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-light);
+        padding: 24px;
+        line-height: 1.5;
+    }
+
+    .app-header {
+        max-width: 1400px;
+        margin: 0 auto 24px auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .app-title h1 {
+        font-size: 24px;
+        font-weight: 800;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .app-title p {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .main-layout {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        gap: 24px;
+    }
+    @media (max-width: 1024px) {
+        .main-layout { grid-template-columns: 1fr; }
+    }
+
+    /* Steps navigation */
+    .steps-nav {
+        background: var(--card-dark);
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+        height: fit-content;
+        position: sticky;
+        top: 24px;
+    }
+    .nav-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 12px;
+        padding-left: 6px;
+    }
+    .step-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid transparent;
+        background: rgba(255,255,255,0.02);
+    }
+    .step-item:hover {
+        background: rgba(255,255,255,0.06);
+    }
+    .step-item.active {
+        background: var(--accent-blue);
+        border-color: #60a5fa;
+        color: #fff;
+    }
+    .step-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+    .step-info h4 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+    .step-info p {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+
+    /* Showcase viewer */
+    .showcase-area {
+        background: var(--card-dark);
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.08);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .showcase-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 16px;
+    }
+    .step-header-text h2 {
+        font-size: 20px;
+        color: #fff;
+        margin-bottom: 4px;
+    }
+    .step-header-text p {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* Simulated Screenshot Frame */
+    .screenshot-frame {
+        background: #cbd5e1;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+        overflow-x: auto;
+    }
+
+    /* Simulated Module Workspace */
+    .sim-container {
+        width: 100%;
+        max-width: 980px;
+        margin: 0 auto;
+        background: #f4f6f8;
+        padding: 22px;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        color: #333;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+
+    .sim-title {
+        text-align: center;
+        margin-bottom: 18px;
+        color: #2c3e50;
+        font-weight: 700;
+        font-size: 19px;
+    }
+
+    .sim-controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+        background: #fff;
+        padding: 12px;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        font-size: 13px;
+    }
+
+    .sim-controls input, .sim-controls select {
+        padding: 6px 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        font-size: 13px;
+        background: #fff;
+    }
+
+    .sim-btn {
+        padding: 6px 12px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .sim-btn-primary { background: #2980b9; }
+    .sim-btn-success { background: #27ae60; }
+    .sim-btn-danger { background: #ff4d4f; }
+    .sim-btn-warning { background: #f39c12; }
+    .sim-btn-secondary { background: #6c757d; }
+    .sim-btn-purple { background: #8e44ad; }
+
+    /* Summary Bar */
+    .sim-summary-box {
+        background: #fff;
+        padding: 10px 16px;
+        margin-bottom: 14px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        font-size: 13px;
+        flex-wrap: wrap;
+    }
+
+    /* Tables */
+    .sim-table-wrap {
+        background: #fff;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        overflow-x: auto;
+        border: 1px solid #ccc;
+    }
+    .sim-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+    }
+    .sim-table th, .sim-table td {
+        border: 1px solid #ccc;
+        padding: 8px 10px;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .sim-table th {
+        background: #2980b9;
+        color: #fff;
+        font-weight: 600;
+    }
+    .sim-table tfoot tr {
+        font-weight: bold;
+        background: #eee;
+    }
+
+    /* Modal Simulation */
+    .sim-modal-card {
+        background: white;
+        padding: 22px;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+        text-align: left;
+    }
+    .sim-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+        margin-bottom: 14px;
+    }
+    .sim-modal-header h3 {
+        margin: 0;
+        color: #2980b9;
+        font-size: 16px;
+    }
+
+    /* Explanation card */
+    .step-explainer {
+        background: #1e293b;
+        border-radius: 10px;
+        padding: 18px 20px;
+        border-left: 4px solid var(--accent-blue);
+    }
+    .step-explainer h3 {
+        font-size: 15px;
+        color: #fff;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .step-explainer ul {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .step-explainer li {
+        font-size: 13px;
+        color: #cbd5e1;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .step-explainer li i {
+        color: #10b981;
+        font-size: 11px;
+    }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="app-title">
+        <h1><i class="fas fa-file-invoice" style="color: #38bdf8;"></i> Invoice Reports — Step-by-Step Visual Operational Guide</h1>
+        <p>Complete operational walkthrough of billing registers, live search, multi-split payment reconciliation, 1-click WhatsApp messaging, and PDF generation.</p>
+    </div>
+</header>
+
+<main class="main-layout">
+    <!-- Left Navigation -->
+    <aside class="steps-nav">
+        <div class="nav-title">Invoice Report Workflows</div>
+        <div class="step-item active" onclick="switchStep(1)">
+            <div class="step-badge">1</div>
+            <div class="step-info">
+                <h4>Billing Register & Summary</h4>
+                <p>Receivables, collections & dues</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(2)">
+            <div class="step-badge">2</div>
+            <div class="step-info">
+                <h4>Live Search & Multi-Filters</h4>
+                <p>Status, district & party filters</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(3)">
+            <div class="step-badge">3</div>
+            <div class="step-info">
+                <h4>Split Payment Settlement</h4>
+                <p>Cash/Bank splits & ledger feed</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(4)">
+            <div class="step-badge">4</div>
+            <div class="step-info">
+                <h4>Payment Receipt Log</h4>
+                <p>Receipt history & reprints</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(5)">
+            <div class="step-badge">5</div>
+            <div class="step-info">
+                <h4>1-Click WhatsApp Invoicing</h4>
+                <p>Pre-filled customer messaging</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(6)">
+            <div class="step-badge">6</div>
+            <div class="step-info">
+                <h4>Split-View Ledger Preview</h4>
+                <p>Side-by-side voucher audit</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(7)">
+            <div class="step-badge">7</div>
+            <div class="step-info">
+                <h4>Multi-Copy PDF & Print Formats</h4>
+                <p>Customer, Office, Transporter</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Right Showcase Container -->
+    <section class="showcase-area">
+        <div class="showcase-toolbar">
+            <div class="step-header-text">
+                <h2 id="stepHeading">Step 1: Billing Register & Portfolio Summary Bar</h2>
+                <p id="stepSubheading">High-level sales register displaying comprehensive transaction columns and real-time receivables totals.</p>
+            </div>
+        </div>
+
+        <!-- Render Target -->
+        <div class="screenshot-frame">
+            <div id="simulatedScreen" class="sim-container">
+                <!-- Content dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Step Explanation -->
+        <div class="step-explainer" id="stepExplainer">
+            <!-- Dynamic explanation -->
+        </div>
+    </section>
+</main>
+
+<script>
+const stepData = {
+    1: {
+        heading: "Step 1: Billing Register & Portfolio Summary Bar",
+        subheading: "On load, the module aggregates all customer invoices, showing Grand Total, Total Due, Invoices Count, and Paid/Unpaid statistics.",
+        html: `
+            <div class="sim-title">
+                Apex Industrial Spares &amp; Logistics Ltd. (Ph: 79080 40851) - Invoice Reports
+            </div>
+
+            <div class="sim-controls">
+                <input type="text" placeholder="Live Search..." value="" style="width:200px;">
+                <select style="width:110px;">
+                    <option selected>All Status</option>
+                    <option>Paid</option>
+                    <option>Unpaid</option>
+                    <option>Partial</option>
+                </select>
+                <select style="width:120px;">
+                    <option selected>All Types</option>
+                    <option>TAX INVOICE</option>
+                    <option>SALE INVOICE</option>
+                </select>
+                <button class="sim-btn sim-btn-primary">Search</button>
+                <button class="sim-btn sim-btn-danger">Reset</button>
+                <button class="sim-btn sim-btn-secondary">Refresh</button>
+                <button class="sim-btn sim-btn-purple">📈 Sale Analytics</button>
+                <button class="sim-btn sim-btn-success">Export CSV</button>
+                <button class="sim-btn sim-btn-secondary" style="background:#607d8b;">⚙️ Settings</button>
+            </div>
+
+            <!-- Summary Bar -->
+            <div class="sim-summary-box">
+                <strong style="color:#2c3e50;">Summary:</strong>
+                <span style="color:#8e44ad; font-weight:bold;">Grand Total: ₹ 1,75,230.00</span>
+                <span style="color:#e67e22; font-weight:bold;">Total Due: ₹ 48,380.00</span>
+                <span style="color:#0d6efd; font-weight:bold;">Total Invoices: 3</span>
+                <span style="color:#27ae60; font-weight:bold;">Paid: 2</span>
+                <span style="color:#c0392b; font-weight:bold;">Unpaid: 1</span>
+                <span style="color:#d35400; font-weight:bold;">Partial: 0</span>
+            </div>
+
+            <div class="sim-table-wrap">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th style="width:35px;"><input type="checkbox"></th>
+                            <th style="width:45px;">Sl No</th>
+                            <th>Invoice No</th>
+                            <th>Invoice Date</th>
+                            <th style="text-align:left;">Customer Name</th>
+                            <th>Contact</th>
+                            <th style="text-align:right;">Invoice Total (₹)</th>
+                            <th style="text-align:right;">Paid (₹)</th>
+                            <th style="text-align:right;">Due (₹)</th>
+                            <th>Payment Date</th>
+                            <th style="width:110px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td>1</td>
+                            <td><strong style="color:#0056b3;">INV-2026-088</strong></td>
+                            <td>28/10/2026</td>
+                            <td style="text-align:left; font-weight:bold;">Pinnacle Engineering &amp; Logistics Ltd.</td>
+                            <td><i class="fab fa-whatsapp" style="color:#27ae60;"></i> +91 94340 11223</td>
+                            <td style="text-align:right; font-weight:bold; color:#2980b9;">₹ 48,380.00</td>
+                            <td style="text-align:right; color:#27ae60; font-weight:bold;">₹ 0.00</td>
+                            <td style="text-align:right; font-weight:bold; color:#c0392b;">₹ 48,380.00</td>
+                            <td>-</td>
+                            <td>
+                                <button class="sim-btn sim-btn-secondary" style="padding:2px 8px; font-size:11px;">Actions ▼</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td>2</td>
+                            <td><strong style="color:#0056b3;">INV-2026-061</strong></td>
+                            <td>15/09/2026</td>
+                            <td style="text-align:left; font-weight:bold;">Pinnacle Engineering &amp; Logistics Ltd.</td>
+                            <td><i class="fab fa-whatsapp" style="color:#27ae60;"></i> +91 94340 11223</td>
+                            <td style="text-align:right; font-weight:bold; color:#2980b9;">₹ 42,480.00</td>
+                            <td style="text-align:right; color:#27ae60; font-weight:bold;">₹ 42,480.00</td>
+                            <td style="text-align:right; font-weight:bold; color:#27ae60;">₹ 0.00</td>
+                            <td>10/10/2026</td>
+                            <td>
+                                <button class="sim-btn sim-btn-secondary" style="padding:2px 8px; font-size:11px;">Actions ▼</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td>3</td>
+                            <td><strong style="color:#0056b3;">INV-2026-052</strong></td>
+                            <td>04/09/2026</td>
+                            <td style="text-align:left; font-weight:bold;">Eastern Heavy Movers Corp</td>
+                            <td><i class="fab fa-whatsapp" style="color:#27ae60;"></i> +91 98310 99887</td>
+                            <td style="text-align:right; font-weight:bold; color:#2980b9;">₹ 84,370.00</td>
+                            <td style="text-align:right; color:#27ae60; font-weight:bold;">₹ 84,370.00</td>
+                            <td style="text-align:right; font-weight:bold; color:#27ae60;">₹ 0.00</td>
+                            <td>15/09/2026</td>
+                            <td>
+                                <button class="sim-btn sim-btn-secondary" style="padding:2px 8px; font-size:11px;">Actions ▼</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="6" style="text-align:right;">Grand Totals (₹):</td>
+                            <td style="text-align:right; color:#2980b9;">₹ 1,75,230.00</td>
+                            <td style="text-align:right; color:#27ae60;">₹ 1,26,850.00</td>
+                            <td style="text-align:right; color:#c0392b;">₹ 48,380.00</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Sales Audit Overview:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Live Financial Status:</strong> Ingests invoice data from local and cloud databases, computing real-time gross, discount, GST, paid, and balance dues [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Status Breakdown:</strong> Segregates invoices into Paid (due &le; 0.50), Unpaid (paid = 0), and Partial statuses [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Multi-Movement Sync:</strong> Cross-references invoice entries against customer master records to keep contact information updated [cite: 41].</li>
+            </ul>
+        `
+    },
+    2: {
+        heading: "Step 2: Live Search & Multi-Axis Filtering",
+        subheading: "Instant multi-parameter filtering across live text queries, payment statuses, invoice types, and regional districts.",
+        html: `
+            <div style="background:#fff; padding:18px; border-radius:8px; border:1px solid #ddd;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" value="Pinnacle" style="padding:5px 8px; border:1px solid #0d6efd; border-radius:4px; font-size:12px; width:160px;">
+                        <select style="padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                            <option selected>Unpaid Only</option>
+                        </select>
+                        <select style="padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                            <option selected>Purba Bardhaman</option>
+                        </select>
+                    </div>
+                    <div style="font-size:12px; font-weight:bold; color:#0d6efd;">
+                        Showing 1 filtered bill matching "Pinnacle"
+                    </div>
+                </div>
+
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice No</th>
+                            <th>Date</th>
+                            <th style="text-align:left;">Customer Name</th>
+                            <th>District</th>
+                            <th style="text-align:right;">Invoice Total</th>
+                            <th style="text-align:right;">Due Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong style="color:#0056b3;">INV-2026-088</strong></td>
+                            <td>28/10/2026</td>
+                            <td style="text-align:left; font-weight:bold;">
+                                <span style="background:#fff176;">Pinnacle</span> Engineering &amp; Logistics Ltd.
+                            </td>
+                            <td>Purba Bardhaman</td>
+                            <td style="text-align:right; font-weight:bold; color:#2980b9;">₹ 48,380.00</td>
+                            <td style="text-align:right; font-weight:bold; color:#c0392b;">₹ 48,380.00</td>
+                            <td><span style="color:#c0392b; font-weight:bold;">Unpaid</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Granular Search Architecture:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Live Regex Highlighting:</strong> Evaluates search terms against customer names, item codes, and remarks with soft-yellow highlighting [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Regional Demographics:</strong> Filters invoices by district and state code to facilitate regional GST compliance checks [cite: 41].</li>
+            </ul>
+        `
+    },
+    3: {
+        heading: "Step 3: Split Payment Settlement & Auto-Feed to Banking",
+        subheading: "Splitting received customer amounts across counter cash and selected corporate bank accounts with automatic ledger integration.",
+        html: `
+            <div class="sim-modal-card" style="max-width:380px;">
+                <div class="sim-modal-header">
+                    <h3>Record Invoice Payment</h3>
+                    <span style="font-size:18px; color:#999; cursor:pointer;">&times;</span>
+                </div>
+
+                <p style="font-weight:bold; color:#2980b9; margin:0 0 8px 0; font-size:13px;">Invoice: INV-2026-088 | Pinnacle Engineering</p>
+                <div style="margin-bottom:10px; font-size:13px;">
+                    <strong>Total Invoice Amount:</strong> ₹ 48,380.00
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:8px; font-size:12.5px;">
+                    <div>
+                        <label style="font-weight:bold;">Cash Amount:</label>
+                        <div style="display:flex; gap:4px;">
+                            <input type="number" value="10000.00" style="flex:1; padding:5px; font-weight:bold;">
+                            <input type="date" value="2026-11-03" style="width:115px; padding:5px;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-weight:bold;">Bank Amount:</label>
+                        <div style="display:flex; gap:4px;">
+                            <input type="number" value="38380.00" style="flex:1; padding:5px; font-weight:bold;">
+                            <input type="date" value="2026-11-03" style="width:115px; padding:5px;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-weight:bold;">Deposit Bank Account:</label>
+                        <select style="width:100%; padding:5px; font-weight:bold;">
+                            <option selected>State Bank of India (A/c: ...7788)</option>
+                            <option>HDFC Current Account (A/c: ...1144)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="text-align:right; margin:10px 0; font-weight:bold; font-size:13px; border-top:1px solid #eee; padding-top:6px;">
+                    Remaining Due: <span style="color:#27ae60;">₹ 0.00 (Settled)</span>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:6px;">
+                    <button class="sim-btn sim-btn-primary" style="padding:5px 12px;">Save Payment</button>
+                    <button class="sim-btn sim-btn-danger" style="padding:5px 12px;">Cancel</button>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Dual-Ledger Payment Settlement:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Cash & Bank Allocations:</strong> Enables mixed payment modes, tracking receipts across physical cash drawers and electronic transfers [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Automated Banking Sync:</strong> Online receipts automatically create a deposit record in <code>bank_transactions</code> for the specified account [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Cash Limit Adherence:</strong> Checks transactions against statutory cash ceiling rules to prevent compliance violations [cite: 41].</li>
+            </ul>
+        `
+    },
+    4: {
+        heading: "Step 4: Payment Receipt History & Archive Log",
+        subheading: "Audit log tracking every money receipt issued to customers with 1-click reprinting capabilities.",
+        html: `
+            <div style="background:#fff; border-radius:8px; border:1px solid #ddd; overflow:hidden;">
+                <div style="background:#0313f3; color:#fff; padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
+                    <h4 style="margin:0; font-size:16px;"><i class="fas fa-history"></i> Payment Receipt History Log</h4>
+                    <span style="font-size:12px; background:rgba(255,255,255,0.2); padding:3px 8px; border-radius:4px;">Audit Archive</span>
+                </div>
+
+                <div style="padding:16px;">
+                    <table class="sim-table">
+                        <thead>
+                            <tr style="background:#f8f9fa;">
+                                <th>Date Generated</th>
+                                <th>Receipt No</th>
+                                <th style="text-align:left;">Customer Name</th>
+                                <th style="text-align:right;">Amount (₹)</th>
+                                <th>Payment Mode</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>03/11/2026, 11:30 AM</td>
+                                <td><strong>REC-2026-104</strong></td>
+                                <td style="text-align:left;">Pinnacle Engineering &amp; Logistics Ltd.</td>
+                                <td style="text-align:right; color:#27ae60; font-weight:bold;">₹ 48,380.00</td>
+                                <td>Mixed (Cash + Bank)</td>
+                                <td>
+                                    <button class="sim-btn sim-btn-primary" style="padding:3px 8px; font-size:11px;"><i class="fas fa-print"></i> Re-Print</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>10/10/2026, 04:15 PM</td>
+                                <td><strong>REC-2026-081</strong></td>
+                                <td style="text-align:left;">Pinnacle Engineering &amp; Logistics Ltd.</td>
+                                <td style="text-align:right; color:#27ae60; font-weight:bold;">₹ 42,480.00</td>
+                                <td>Bank Transfer</td>
+                                <td>
+                                    <button class="sim-btn sim-btn-primary" style="padding:3px 8px; font-size:11px;"><i class="fas fa-print"></i> Re-Print</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Receipt Logging & Audit:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Historical Archive:</strong> Retains a sequential log of all generated receipt vouchers, timestamps, and customer acknowledgments [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Lossless Re-Printing:</strong> Generates identical receipt copies and acknowledgment vouchers for audits [cite: 41].</li>
+            </ul>
+        `
+    },
+    5: {
+        heading: "Step 5: 1-Click WhatsApp Invoicing & Notification",
+        subheading: "Instant messaging integration that composes pre-filled WhatsApp billing notifications directly to customer contacts.",
+        html: `
+            <div style="background:#fff; padding:18px; border-radius:8px; border:1px solid #ddd;">
+                <h3 style="margin:0 0 12px 0; font-size:15px; color:#2c3e50;">Automated Customer WhatsApp Messaging</h3>
+
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice No</th>
+                            <th>Customer Name</th>
+                            <th>Contact Phone</th>
+                            <th>Invoice Total</th>
+                            <th>Direct Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>INV-2026-088</td>
+                            <td style="font-weight:bold;">Pinnacle Engineering &amp; Logistics Ltd.</td>
+                            <td>+91 94340 11223</td>
+                            <td style="color:#2980b9; font-weight:bold;">₹ 48,380.00</td>
+                            <td>
+                                <button class="sim-btn" style="background:#25D366; font-size:11px; padding:4px 10px;">
+                                    <i class="fab fa-whatsapp"></i> Send WhatsApp
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:12px; font-size:12px; color:#14532d;">
+                    <strong><i class="fab fa-whatsapp" style="color:#25D366; font-size:14px;"></i> Pre-Formatted WhatsApp Message Payload:</strong>
+                    <div style="background:#fff; border:1px solid #dcfce7; padding:8px 12px; border-radius:4px; margin-top:6px; font-family:monospace; line-height:1.6;">
+                        Dear Pinnacle Engineering &amp; Logistics Ltd.,<br><br>
+                        Greetings from Apex Industrial Spares &amp; Logistics Ltd. (Ph: 79080 40851)!<br><br>
+                        This is a friendly notification regarding your invoice <strong>INV-2026-088</strong> for the amount of <strong>Rs. 48,380.00</strong>.<br><br>
+                        Thank you for your business!
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Instant Communication Workflow:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Pre-Encoded URL Dispatch:</strong> <code>sendWhatsApp()</code> formats the telephone number and encodes invoice details into a ready-to-send chat [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Document Attachment Option:</strong> Prompts to download the invoice PDF so operators can attach it in the chat [cite: 41].</li>
+            </ul>
+        `
+    },
+    6: {
+        heading: "Step 6: Split-View Side-by-Side Voucher Inspection",
+        subheading: "Toggling split mode allows operators to review full invoice line items side-by-side without leaving the main register.",
+        html: `
+            <div style="display:flex; gap:14px; background:#fff; padding:14px; border-radius:8px; border:1px solid #ddd; min-height:260px;">
+                <!-- Left Pane: Condensed List -->
+                <div style="width:40%; border-right:1px solid #eee; padding-right:12px;">
+                    <div style="font-weight:bold; font-size:12px; color:#666; margin-bottom:8px;">INVOICE REGISTER</div>
+                    <div style="background:#e3f2fd; border:1px solid #90caf9; padding:8px; border-radius:4px; margin-bottom:6px; font-size:12px;">
+                        <strong>INV-2026-088</strong> · 28/10/2026<br>
+                        <span style="color:#0056b3;">Pinnacle Engineering Ltd.</span><br>
+                        <strong style="color:#2980b9;">₹ 48,380.00</strong>
+                    </div>
+                    <div style="background:#f8f9fa; border:1px solid #ddd; padding:8px; border-radius:4px; font-size:12px;">
+                        <strong>INV-2026-061</strong> · 15/09/2026<br>
+                        <span>Pinnacle Engineering Ltd.</span><br>
+                        <strong>₹ 42,480.00</strong>
+                    </div>
+                </div>
+
+                <!-- Right Pane: Comprehensive Invoice Breakdown -->
+                <div style="flex:1; padding-left:6px; font-size:12px;">
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:6px; margin-bottom:8px;">
+                        <h4 style="margin:0; color:#2980b9;">Invoice Details: INV-2026-088</h4>
+                        <span style="color:#27ae60; font-weight:bold;">TAX INVOICE</span>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
+                        <div><strong>Customer:</strong> Pinnacle Engineering &amp; Logistics</div>
+                        <div><strong>GSTIN:</strong> 19AAACA8899F1Z2</div>
+                        <div><strong>Address:</strong> Durgapur Phase II, WB</div>
+                        <div><strong>Contact:</strong> +91 94340 11223</div>
+                    </div>
+
+                    <table class="sim-table" style="font-size:11.5px; margin-bottom:8px;">
+                        <thead>
+                            <tr><th>Item Description</th><th>Qty</th><th>Price</th><th>GST</th><th style="text-align:right;">Total</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>500mm Industrial Flange</td><td>10 Pcs</td><td>3,200.00</td><td>18%</td><td style="text-align:right;">37,760.00</td></tr>
+                            <tr><td>Silicone Gasket Set</td><td>10 Set</td><td>450.00</td><td>18%</td><td style="text-align:right;">5,310.00</td></tr>
+                            <tr><td>Machining Job Work</td><td>1 Job</td><td>4,500.00</td><td>18%</td><td style="text-align:right;">5,310.00</td></tr>
+                        </tbody>
+                    </table>
+
+                    <div style="text-align:right; font-weight:bold; color:#2980b9;">
+                        Invoice Total: ₹ 48,380.00 | Due: ₹ 48,380.00
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Operational Audit Layout:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Zero Screen Jumps:</strong> Clicking any invoice row displays its products, taxes, and shipping addresses side-by-side [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Real-Time Selection:</strong> Operators can quickly audit accounts without opening separate modal windows [cite: 41].</li>
+            </ul>
+        `
+    },
+    7: {
+        heading: "Step 7: Multi-Copy PDF Generation & Print Layouts",
+        subheading: "Generating Customer, Office, and Transporter copies with dynamic UPI QR codes and digital signature integration.",
+        html: `
+            <div style="background:white; border:2px solid #2980b9; padding:20px; border-radius:6px; max-width:680px; margin:0 auto; font-size:11.5px; color:#333;">
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #2980b9; padding-bottom:6px; margin-bottom:10px;">
+                    <div>
+                        <h2 style="margin:0; font-size:18px; color:#2c3e50;">Apex Industrial Spares &amp; Logistics Ltd.</h2>
+                        <p style="margin:2px 0 0; font-size:10.5px; color:#555;">Memari, Purba Bardhaman, West Bengal | Ph: 79080 40851</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <h3 style="margin:0; font-size:14px; color:#2980b9;">TAX INVOICE</h3>
+                        <div style="font-size:10px; font-weight:bold; color:#e67e22;">ORIGINAL FOR RECIPIENT</div>
+                        <div style="font-size:10.5px;">Invoice No: <strong>INV-2026-088</strong></div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px;">
+                    <div><strong>Bill To:</strong> Pinnacle Engineering &amp; Logistics Ltd.<br>Durgapur, Paschim Bardhaman - 713212<br>GSTIN: 19AAACA8899F1Z2</div>
+                    <div style="text-align:right;"><strong>Dated:</strong> 28/10/2026<br><strong>State Code:</strong> 19 (West Bengal)</div>
+                </div>
+
+                <table class="sim-table" style="font-size:10.5px; margin-bottom:8px;">
+                    <thead>
+                        <tr style="background:#eee; color:#000;">
+                            <th>Sl</th>
+                            <th style="text-align:left;">Description of Goods</th>
+                            <th>Qty</th>
+                            <th>Rate</th>
+                            <th>Taxable</th>
+                            <th>CGST (9%)</th>
+                            <th>SGST (9%)</th>
+                            <th style="text-align:right;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td style="text-align:left;">500mm Industrial Flange</td><td>10 Pcs</td><td>3,200.00</td><td>32,000.00</td><td>2,880.00</td><td>2,880.00</td><td style="text-align:right;">37,760.00</td></tr>
+                        <tr><td>2</td><td style="text-align:left;">Silicone Gasket Set</td><td>10 Set</td><td>450.00</td><td>4,500.00</td><td>405.00</td><td>405.00</td><td style="text-align:right;">5,310.00</td></tr>
+                        <tr><td>3</td><td style="text-align:left;">Machining Job Work</td><td>1 Job</td><td>4,500.00</td><td>4,500.00</td><td>405.00</td><td>405.00</td><td style="text-align:right;">5,310.00</td></tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="7" style="text-align:right;">Grand Total:</th>
+                            <th style="text-align:right; color:#2980b9;">₹ 48,380.00</th>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div style="display:flex; justify-content:space-between; margin-top:20px; align-items:flex-end;">
+                    <div style="font-size:10px; color:#555;">
+                        <strong>Bank:</strong> State Bank of India | <strong>A/c:</strong> 39882010992 | <strong>IFSC:</strong> SBIN0001234<br>
+                        Amount in words: Forty-Eight Thousand Three Hundred Eighty Rupees Only
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-family:'Brush Script MT', cursive; font-size:20px; color:#014486; margin-bottom:2px;">Milan Gupta</div>
+                        <div style="border-top:1px solid #333; padding-top:2px; width:150px; text-align:center; font-weight:bold;">Authorized Signatory</div>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Corporate Output Features:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Multi-Copy Printing:</strong> Generates distinct copies for Customer, Office, and Transporter records [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Dynamic UPI QR Integration:</strong> Automatically embeds payable UPI QR codes containing the invoice total [cite: 41].</li>
+                <li><i class="fas fa-check"></i> <strong>Smart & Standard Templates:</strong> Supports both structured Tally-style layouts and modern enterprise invoices [cite: 41].</li>
+            </ul>
+        `
+    }
+};
+
+function switchStep(stepNum) {
+    document.querySelectorAll('.step-item').forEach((el, idx) => {
+        if (idx + 1 === stepNum) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    const data = stepData[stepNum];
+    document.getElementById('stepHeading').innerText = data.heading;
+    document.getElementById('stepSubheading').innerText = data.subheading;
+    document.getElementById('simulatedScreen').innerHTML = data.html;
+    document.getElementById('stepExplainer').innerHTML = data.explanation;
+}
+
+// Initialize Step 1
+switchStep(1);
+</script>
+<script src="../intro-demo-navigation.js"></script>
+</body>
+</html>

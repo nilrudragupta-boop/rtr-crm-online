@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>In-Browser PDF Studio - Visual Step-by-Step Operational Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+<style>
+    :root {
+        --primary: #1e293b;
+        --accent-blue: #4f46e5;
+        --teal: #0d9488;
+        --emerald: #059669;
+        --amber: #d97706;
+        --rose: #e11d48;
+        --bg-main: #0f172a;
+        --card-dark: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-light);
+        padding: 24px;
+        line-height: 1.5;
+    }
+
+    .app-header {
+        max-width: 1400px;
+        margin: 0 auto 24px auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .app-title h1 {
+        font-size: 24px;
+        font-weight: 800;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .app-title p {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .main-layout {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        gap: 24px;
+    }
+    @media (max-width: 1024px) {
+        .main-layout { grid-template-columns: 1fr; }
+    }
+
+    /* Steps navigation */
+    .steps-nav {
+        background: var(--card-dark);
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+        height: fit-content;
+        position: sticky;
+        top: 24px;
+    }
+    .nav-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 12px;
+        padding-left: 6px;
+    }
+    .step-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid transparent;
+        background: rgba(255,255,255,0.02);
+    }
+    .step-item:hover {
+        background: rgba(255,255,255,0.06);
+    }
+    .step-item.active {
+        background: var(--accent-blue);
+        border-color: #818cf8;
+        color: #fff;
+    }
+    .step-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+    .step-info h4 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+    .step-info p {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+
+    /* Showcase viewer */
+    .showcase-area {
+        background: var(--card-dark);
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.08);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .showcase-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 16px;
+    }
+    .step-header-text h2 {
+        font-size: 20px;
+        color: #fff;
+        margin-bottom: 4px;
+    }
+    .step-header-text p {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* Simulated Screenshot Frame */
+    .screenshot-frame {
+        background: #cbd5e1;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+        overflow-x: auto;
+    }
+
+    /* Simulated Suite Workspace */
+    .sim-shell {
+        width: 100%;
+        max-width: 980px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        color: #1e293b;
+        font-family: inherit;
+        overflow: hidden;
+        border: 1px solid #cbd5e1;
+    }
+
+    .sim-topbar {
+        background: #ffffff;
+        border-bottom: 2px solid #0284c7;
+        padding: 12px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .sim-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 750;
+        font-size: 18px;
+        color: #0369a1;
+    }
+
+    .sim-privacy-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #059669;
+        font-weight: 600;
+        background: #ecfdf5;
+        padding: 4px 10px;
+        border-radius: 20px;
+        border: 1px solid #a7f3d0;
+    }
+
+    .sim-body {
+        padding: 24px;
+        background: #f8fafc;
+        min-height: 480px;
+    }
+
+    /* Tool Card Grid */
+    .sim-tool-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+    @media (max-width: 768px) {
+        .sim-tool-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .sim-tool-card {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 16px 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: 0.15s;
+    }
+    .sim-tool-card:hover {
+        border-color: #0284c7;
+        background: #f0f9ff;
+        transform: translateY(-2px);
+    }
+    .sim-tool-icon {
+        width: 44px;
+        height: 44px;
+        margin: 0 auto 10px auto;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+
+    /* Tool Workspaces */
+    .sim-panel {
+        background: #ffffff;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 20px;
+    }
+    .sim-dropzone {
+        border: 2px dashed #94a3b8;
+        border-radius: 10px;
+        padding: 28px;
+        text-align: center;
+        background: #f8fafc;
+        cursor: pointer;
+    }
+    .sim-dropzone:hover {
+        border-color: #4f46e5;
+        background: #f5f3ff;
+    }
+
+    .sim-btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: white;
+    }
+    .sim-btn-indigo { background: #4f46e5; }
+    .sim-btn-emerald { background: #059669; }
+    .sim-btn-rose { background: #e11d48; }
+    .sim-btn-secondary { background: #64748b; }
+
+    /* Page Thumbnails */
+    .sim-page-card {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 8px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .sim-page-thumb {
+        height: 120px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        margin-bottom: 6px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-size: 11px;
+        color: #64748b;
+        position: relative;
+    }
+
+    /* Explanation card */
+    .step-explainer {
+        background: #1e293b;
+        border-radius: 10px;
+        padding: 18px 20px;
+        border-left: 4px solid var(--accent-blue);
+    }
+    .step-explainer h3 {
+        font-size: 15px;
+        color: #fff;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .step-explainer ul {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .step-explainer li {
+        font-size: 13px;
+        color: #cbd5e1;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .step-explainer li i {
+        color: #10b981;
+        font-size: 11px;
+    }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="app-title">
+        <h1><i class="fas fa-file-pdf" style="color: #38bdf8;"></i> In-Browser PDF Studio — Visual Operational Walkthrough</h1>
+        <p>Step-by-step visual documentation of the private client-side PDF document toolkit for merging, splitting, OCR, native password encryption, and visual comparison.</p>
+    </div>
+</header>
+
+<main class="main-layout">
+    <!-- Left Navigation -->
+    <aside class="steps-nav">
+        <div class="nav-title">PDF Studio Utilities</div>
+        <div class="step-item active" onclick="switchStep(1)">
+            <div class="step-badge">1</div>
+            <div class="step-info">
+                <h4>Private Tool Directory</h4>
+                <p>21 Client-side PDF modules</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(2)">
+            <div class="step-badge">2</div>
+            <div class="step-info">
+                <h4>Multi-PDF File Merger</h4>
+                <p>Combine & live preview grid</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(3)">
+            <div class="step-badge">3</div>
+            <div class="step-info">
+                <h4>Page Organizer & Rotation</h4>
+                <p>Delete, reorder & 360° rotate</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(4)">
+            <div class="step-badge">4</div>
+            <div class="step-info">
+                <h4>Native 256-Bit Encryption</h4>
+                <p>Open & master owner passwords</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(5)">
+            <div class="step-badge">5</div>
+            <div class="step-info">
+                <h4>Visual PDF Comparator</h4>
+                <p>Dual swipe slider & diff map</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(6)">
+            <div class="step-badge">6</div>
+            <div class="step-info">
+                <h4>Digital Signature & Annotation</h4>
+                <p>Canvas draw, opacity & resize</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(7)">
+            <div class="step-badge">7</div>
+            <div class="step-info">
+                <h4>Realistic Scanned Effect</h4>
+                <p>Mechanical tilt, blur & paper age</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Right Showcase Container -->
+    <section class="showcase-area">
+        <div class="showcase-toolbar">
+            <div class="step-header-text">
+                <h2 id="stepHeading">Step 1: 100% Private Tool Directory Hub</h2>
+                <p id="stepSubheading">Main directory containing 21 dedicated document processing tools running entirely in browser memory.</p>
+            </div>
+        </div>
+
+        <!-- Render Target -->
+        <div class="screenshot-frame">
+            <div id="simulatedScreen" class="sim-shell">
+                <!-- Content dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Step Explanation -->
+        <div class="step-explainer" id="stepExplainer">
+            <!-- Dynamic explanation -->
+        </div>
+    </section>
+</main>
+
+<script>
+const stepData = {
+    1: {
+        heading: "Step 1: 100% Private Tool Directory Hub",
+        subheading: "All document manipulations execute in local client-side memory using WebAssembly and Web Crypto — zero server uploads [cite: 34].",
+        html: `
+            <div class="sim-topbar">
+                <div class="sim-brand">
+                    <span style="background:#0284c7; color:#fff; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; font-size:14px;"><i class="fas fa-layer-group"></i></span>
+                    <span>In-Browser PDF Studio</span>
+                </div>
+                <div class="sim-privacy-tag">
+                    <i class="fas fa-shield-alt"></i> 100% Client-Side Private • Zero Server Upload
+                </div>
+            </div>
+
+            <div class="sim-body">
+                <div style="text-align:center; margin-bottom:24px;">
+                    <h2 style="font-size:24px; color:#0f172a; margin-bottom:6px; font-weight:800;">Enterprise Document Toolkit</h2>
+                    <p style="font-size:13px; color:#64748b; margin:0;">Enterprise Client: <strong>Pinnacle Engineering &amp; Logistics Ltd.</strong> (Helpline: <strong>+91 79080 40851</strong>)</p>
+                </div>
+
+                <div class="sim-tool-grid">
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#e8f6f1; color:#178c70;"><i class="fas fa-object-group"></i></div>
+                        <strong style="font-size:13px; display:block;">Merge PDF</strong>
+                        <span style="font-size:11px; color:#64748b;">Combine multiple files</span>
+                    </div>
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#fff4e4; color:#dc8a25;"><i class="fas fa-cut"></i></div>
+                        <strong style="font-size:13px; display:block;">Split PDF</strong>
+                        <span style="font-size:11px; color:#64748b;">Extract separate pages</span>
+                    </div>
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#fff0f1; color:#d95868;"><i class="fas fa-lock"></i></div>
+                        <strong style="font-size:13px; display:block;">Password Security</strong>
+                        <span style="font-size:11px; color:#64748b;">Native 256-bit AES</span>
+                    </div>
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#e9f7f7; color:#2799a4;"><i class="fas fa-th-large"></i></div>
+                        <strong style="font-size:13px; display:block;">Organize Pages</strong>
+                        <span style="font-size:11px; color:#64748b;">Reorder, rotate & delete</span>
+                    </div>
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#ffe4e6; color:#e11d48;"><i class="fas fa-code-branch"></i></div>
+                        <strong style="font-size:13px; display:block;">Compare PDF</strong>
+                        <span style="font-size:11px; color:#64748b;">Visual revision diff</span>
+                    </div>
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#f0fdfa; color:#0d9488;"><i class="fas fa-signature"></i></div>
+                        <strong style="font-size:13px; display:block;">Sign & Annotate</strong>
+                        <span style="font-size:11px; color:#64748b;">Draw or stamp signs</span>
+                    </div>
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#ecfdf5; color:#059669;"><i class="fas fa-print"></i></div>
+                        <strong style="font-size:13px; display:block;">Look Scanned</strong>
+                        <span style="font-size:11px; color:#64748b;">Simulate paper photocopy</span>
+                    </div>
+                    <div class="sim-tool-card">
+                        <div class="sim-tool-icon" style="background:#edf4ff; color:#4384dc;"><i class="fas fa-file-image"></i></div>
+                        <strong style="font-size:13px; display:block;">PDF to JPG</strong>
+                        <span style="font-size:11px; color:#64748b;">Convert pages to images</span>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Private Architecture Standards:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Zero Cloud Exposure:</strong> All parsing and byte operations run inside client RAM using <code>pdf-lib</code> and <code>pdf.js</code> [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>GDPR & HIPAA Compliance:</strong> Highly confidential corporate invoices, contracts, and tenders never traverse third-party networks [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Offline Capability:</strong> Fully functional on disconnected local enterprise intranets without internet connectivity [cite: 34].</li>
+            </ul>
+        `
+    },
+    2: {
+        heading: "Step 2: Multi-PDF File Merger & Sequencing Grid",
+        subheading: "Staging multiple separate documents, reordering them sequentially, and compiling into a consolidated PDF [cite: 34].",
+        html: `
+            <div class="sim-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div>
+                        <h3 style="margin:0; font-size:18px; color:#0f172a;">Merge PDF Files</h3>
+                        <p style="margin:2px 0 0; font-size:12px; color:#64748b;">Drop 2 or more files to concatenate into a single master binder [cite: 34].</p>
+                    </div>
+                    <button class="sim-btn sim-btn-indigo"><i class="fas fa-file-export"></i> Merge &amp; Download PDF</button>
+                </div>
+
+                <div class="sim-panel" style="margin-bottom:16px;">
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="background:#e2e8f0; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold;">1</span>
+                                <div>
+                                    <strong style="font-size:13px; color:#1e293b;">Commercial_Tender_Proposal_PartA.pdf</strong>
+                                    <div style="font-size:11px; color:#64748b;">4 Pages • 1.24 MB</div>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="sim-btn sim-btn-secondary" style="padding:4px 8px; font-size:11px;"><i class="fas fa-arrow-down"></i></button>
+                                <button class="sim-btn sim-btn-rose" style="padding:4px 8px; font-size:11px;"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="background:#e2e8f0; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold;">2</span>
+                                <div>
+                                    <strong style="font-size:13px; color:#1e293b;">Technical_Specifications_Annexure_B.pdf</strong>
+                                    <div style="font-size:11px; color:#64748b;">8 Pages • 2.65 MB</div>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="sim-btn sim-btn-secondary" style="padding:4px 8px; font-size:11px;"><i class="fas fa-arrow-up"></i></button>
+                                <button class="sim-btn sim-btn-rose" style="padding:4px 8px; font-size:11px;"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background:#f1f5f9; padding:12px; border-radius:6px; font-size:12px; color:#475569; display:flex; justify-content:space-between;">
+                    <span>Total Output: <strong>12 Pages</strong> ready to concatenate</span>
+                    <span style="color:#059669; font-weight:bold;"><i class="fas fa-check-circle"></i> Vector text and font tables preserved</span>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Merging Engine Capabilities:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Lossless Assembly:</strong> Preserves original embedded vector fonts, hyperlinks, and form fields [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Reordering Handles:</strong> Operators adjust document sequences via up/down controls before building the output [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Multi-Document Preview:</strong> Allows inspecting all pages in current merge order prior to final compilation [cite: 34].</li>
+            </ul>
+        `
+    },
+    3: {
+        heading: "Step 3: Visual Page Organizer, Deletion & 360° Rotation",
+        subheading: "Visual page grid allowing operators to delete individual sheets, reorder page indices, and rotate pages permanently [cite: 34].",
+        html: `
+            <div class="sim-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div>
+                        <h3 style="margin:0; font-size:18px; color:#0f172a;">Organize &amp; Rotate PDF Pages</h3>
+                        <p style="margin:2px 0 0; font-size:12px; color:#64748b;">Working on: <strong>Pinnacle_Heavy_Equipment_Contract.pdf</strong> (3 Pages) [cite: 34]</p>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="sim-btn sim-btn-secondary" style="font-size:12px;">+90° All Pages</button>
+                        <button class="sim-btn sim-btn-indigo" style="font-size:12px;"><i class="fas fa-save"></i> Save Organized PDF</button>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:14px;">
+                    <div class="sim-page-card">
+                        <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold; margin-bottom:4px;">
+                            <span>#1 (Page 1)</span>
+                            <span style="color:#e11d48; cursor:pointer;"><i class="fas fa-trash"></i></span>
+                        </div>
+                        <div class="sim-page-thumb">
+                            <i class="fas fa-file-alt" style="font-size:28px; color:#94a3b8; margin-bottom:4px;"></i>
+                            <span>Contract Header</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px solid #f1f5f9; padding-top:4px;">
+                            <button style="border:none; background:none; color:#64748b; font-size:11px;"><i class="fas fa-arrow-left"></i></button>
+                            <button style="border:none; background:none; color:#4f46e5; font-size:11px; font-weight:bold;"><i class="fas fa-redo"></i> 90°</button>
+                            <button style="border:none; background:none; color:#64748b; font-size:11px;"><i class="fas fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="sim-page-card" style="border-color:#38bdf8;">
+                        <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold; margin-bottom:4px;">
+                            <span>#2 (Page 2)</span>
+                            <span style="color:#e11d48; cursor:pointer;"><i class="fas fa-trash"></i></span>
+                        </div>
+                        <div class="sim-page-thumb" style="transform:rotate(90deg); background:#f0f9ff;">
+                            <i class="fas fa-file-invoice-dollar" style="font-size:28px; color:#0284c7; margin-bottom:4px;"></i>
+                            <span>Pricing Table (Rotated)</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px solid #f1f5f9; padding-top:4px;">
+                            <button style="border:none; background:none; color:#64748b; font-size:11px;"><i class="fas fa-arrow-left"></i></button>
+                            <button style="border:none; background:none; color:#4f46e5; font-size:11px; font-weight:bold;"><i class="fas fa-redo"></i> 90°</button>
+                            <button style="border:none; background:none; color:#64748b; font-size:11px;"><i class="fas fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="sim-page-card">
+                        <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:bold; margin-bottom:4px;">
+                            <span>#3 (Page 3)</span>
+                            <span style="color:#e11d48; cursor:pointer;"><i class="fas fa-trash"></i></span>
+                        </div>
+                        <div class="sim-page-thumb">
+                            <i class="fas fa-file-signature" style="font-size:28px; color:#94a3b8; margin-bottom:4px;"></i>
+                            <span>Signatures</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px solid #f1f5f9; padding-top:4px;">
+                            <button style="border:none; background:none; color:#64748b; font-size:11px;"><i class="fas fa-arrow-left"></i></button>
+                            <button style="border:none; background:none; color:#4f46e5; font-size:11px; font-weight:bold;"><i class="fas fa-redo"></i> 90°</button>
+                            <button style="border:none; background:none; color:#64748b; font-size:11px;"><i class="fas fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Page Reorganization Details:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Orientation Adjustments:</strong> Permanent 90°, 180°, and 270° clockwise/counter-clockwise sheet rotations [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Page Culling:</strong> Instant deletion of blank or unwanted pages from scanned packets [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Drag Positioning:</strong> Rebuilds the final document structure according to modified card orders [cite: 34].</li>
+            </ul>
+        `
+    },
+    4: {
+        heading: "Step 4: Native PDF Password & Permission Security",
+        subheading: "Applying standard native 256-bit AES encryption with User & Master Owner passwords and granular rights [cite: 34].",
+        html: `
+            <div class="sim-body">
+                <div style="margin-bottom:16px;">
+                    <h3 style="margin:0; font-size:18px; color:#0f172a;">Native PDF Password &amp; Permissions Security</h3>
+                    <p style="margin:2px 0 0; font-size:12px; color:#64748b;">Protects the PDF file using Adobe Acrobat standard native security handlers [cite: 34].</p>
+                </div>
+
+                <div class="sim-panel" style="margin-bottom:16px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                        <div style="background:#f8fafc; padding:12px; border-radius:6px; border:1px solid #e2e8f0;">
+                            <label style="display:block; font-size:11px; font-weight:bold; color:#475569; text-transform:uppercase; margin-bottom:4px;">
+                                <i class="fas fa-key" style="color:#4f46e5;"></i> User Password (Open Password)
+                            </label>
+                            <input type="password" value="Client@2026" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
+                            <small style="color:#64748b; font-size:10px; display:block; margin-top:4px;">Mandatory to open and view document content [cite: 34].</small>
+                        </div>
+
+                        <div style="background:#f8fafc; padding:12px; border-radius:6px; border:1px solid #e2e8f0;">
+                            <label style="display:block; font-size:11px; font-weight:bold; color:#475569; text-transform:uppercase; margin-bottom:4px;">
+                                <i class="fas fa-shield-alt" style="color:#e11d48;"></i> Owner Password (Permissions Master)
+                            </label>
+                            <input type="password" value="AdminMaster#99" style="width:100%; padding:6px 10px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
+                            <small style="color:#64748b; font-size:10px; display:block; margin-top:4px;">Required to modify security settings or override limits [cite: 34].</small>
+                        </div>
+                    </div>
+
+                    <div style="background:#f8fafc; padding:14px; border-radius:6px; border:1px solid #e2e8f0;">
+                        <div style="font-size:12px; font-weight:bold; color:#1e293b; text-transform:uppercase; margin-bottom:10px;">Document Restrictions &amp; Permissions</div>
+                        
+                        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; font-size:12px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Printing Rights</label>
+                                <select style="width:100%; padding:5px; border:1px solid #cbd5e1; border-radius:4px;">
+                                    <option>Allow High Resolution</option>
+                                    <option selected>Block / Disable Printing</option>
+                                </select>
+                            </div>
+                            <div style="display:flex; flex-direction:column; justify-content:center;">
+                                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600;">
+                                    <input type="checkbox" style="width:15px; height:15px;"> Allow Content Copying
+                                </label>
+                                <small style="color:#64748b; font-size:10px;">Blocks text &amp; table extraction [cite: 34]</small>
+                            </div>
+                            <div style="display:flex; flex-direction:column; justify-content:center;">
+                                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600;">
+                                    <input type="checkbox" style="width:15px; height:15px;"> Allow Page Assembly
+                                </label>
+                                <small style="color:#64748b; font-size:10px;">Blocks page insertion &amp; rotation [cite: 34]</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:12px; color:#475569;">Encryption: <strong>256-bit AES (Acrobat X and later)</strong> [cite: 34]</span>
+                    <button class="sim-btn sim-btn-rose"><i class="fas fa-lock"></i> Encrypt &amp; Download Native PDF</button>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Cryptographic Standards:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Native PDF Specification:</strong> Injects security dictionaries into the PDF trailer directly — no ZIP containers required [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Dual Password Hierarchy:</strong> Distinct User Passwords (reading) vs Owner Passwords (security overrides) [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Permission Bits:</strong> Flags enforce print locks, copy restrictions, and assembly guards in Adobe Acrobat and web viewers [cite: 34].</li>
+            </ul>
+        `
+    },
+    5: {
+        heading: "Step 5: Visual PDF Comparator & Difference Map",
+        subheading: "Comparing two revisions of a PDF with an interactive swipe slider or highlighted difference map [cite: 34].",
+        html: `
+            <div class="sim-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div>
+                        <h3 style="margin:0; font-size:18px; color:#0f172a;">Compare PDF Revisions</h3>
+                        <p style="margin:2px 0 0; font-size:12px; color:#64748b;">File A: <strong>Rev1_Proposal.pdf</strong> vs File B: <strong>Rev2_Updated.pdf</strong> [cite: 34]</p>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="sim-btn sim-btn-indigo" style="font-size:11.5px;">Swipe Slider</button>
+                        <button class="sim-btn sim-btn-secondary" style="font-size:11.5px;">Side-by-Side</button>
+                        <button class="sim-btn sim-btn-secondary" style="font-size:11.5px;">Highlight Diff</button>
+                    </div>
+                </div>
+
+                <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:20px; display:flex; justify-content:center;">
+                    <!-- Simulated Swipe Slider -->
+                    <div style="position:relative; width:440px; height:260px; background:#fff; border:1px solid #94a3b8; border-radius:4px; box-shadow:0 4px 10px rgba(0,0,0,0.1); overflow:hidden;">
+                        <!-- Underneath layer (Modified B) -->
+                        <div style="padding:16px; font-size:11px; line-height:1.6; color:#0284c7;">
+                            <strong style="font-size:13px;">Commercial Clause 4.2 (Updated Revision)</strong><br>
+                            Payment shall be released within <strong>45 days</strong> of delivery.<br>
+                            Freight &amp; Transit insurance: Borne by supplier.<br>
+                            Warranty: 24 Months on-site guarantee.
+                        </div>
+
+                        <!-- Clipped layer (Original A) -->
+                        <div style="position:absolute; inset:0; width:50%; background:#fff; border-right:2px solid #4f46e5; padding:16px; font-size:11px; line-height:1.6; color:#e11d48; overflow:hidden;">
+                            <strong style="font-size:13px;">Commercial Clause 4.2 (Original Draft)</strong><br>
+                            Payment shall be released within <strong>30 days</strong> of delivery.<br>
+                            Freight &amp; Transit insurance: Borne by customer.<br>
+                            Warranty: 12 Months standard.
+                        </div>
+
+                        <!-- Slider Handle -->
+                        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:28px; height:28px; border-radius:50%; background:#4f46e5; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; box-shadow:0 2px 6px rgba(0,0,0,0.3); cursor:ew-resize;">
+                            <i class="fas fa-arrows-alt-h"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:12px;">
+                    <span><span style="color:#e11d48; font-weight:bold;">Red:</span> Removed / Original Clause &nbsp;|&nbsp; <span style="color:#0284c7; font-weight:bold;">Blue:</span> Added / Modified Terms</span>
+                    <span>Page 1 of 4</span>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Revision Auditing Engine:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Dual-Layer Canvas Swipe:</strong> Interactive slider clips original and revised renders to spot micro-modifications [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Diff Pixel Map:</strong> Generates color-coded difference overlays identifying altered figures and modified dates [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Side-by-Side Synchronized Scroll:</strong> Keeps multi-page documents in lockstep for side-by-side legal review [cite: 34].</li>
+            </ul>
+        `
+    },
+    6: {
+        heading: "Step 6: Digital Signature & Transparent Image Stamping",
+        subheading: "Drawing custom signatures, uploading logos, setting opacity, and precision 8-way handle resizing [cite: 34].",
+        html: `
+            <div class="sim-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div>
+                        <h3 style="margin:0; font-size:18px; color:#0f172a;">Sign &amp; Annotate PDF</h3>
+                        <p style="margin:2px 0 0; font-size:12px; color:#64748b;">Placing transparent signature on: <strong>Machinery_Delivery_Challan.pdf</strong> [cite: 34]</p>
+                    </div>
+                    <button class="sim-btn sim-btn-emerald"><i class="fas fa-download"></i> Apply Signature &amp; Download</button>
+                </div>
+
+                <!-- Floating Element Action Bar -->
+                <div style="background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span><strong>Opacity:</strong> 100%</span>
+                        <span><strong>Rotation:</strong> 0°</span>
+                        <span><input type="checkbox" checked> Lock Aspect Ratio</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="sim-btn sim-btn-secondary" style="padding:3px 8px; font-size:11px;"><i class="fas fa-copy"></i> Clone</button>
+                        <button class="sim-btn sim-btn-rose" style="padding:3px 8px; font-size:11px;"><i class="fas fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+
+                <div style="background:#cbd5e1; padding:20px; border-radius:8px; display:flex; justify-content:center;">
+                    <!-- Document Canvas with Signature Overlay -->
+                    <div style="position:relative; width:400px; height:240px; background:#fff; border:1px solid #94a3b8; border-radius:4px; padding:20px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                        <div style="font-size:11px; color:#475569; border-bottom:1px solid #eee; padding-bottom:8px;">
+                            Goods received in proper condition and verified against technical invoice.
+                        </div>
+
+                        <!-- Stamped Signature Box with 8-way handles -->
+                        <div style="position:absolute; bottom:30px; right:30px; width:140px; height:60px; border:1px dashed #0d9488; background:rgba(13,148,136,0.05); display:flex; align-items:center; justify-content:center;">
+                            <span style="font-family:'Brush Script MT', cursive; font-size:24px; color:#0f172a;">Milan Gupta</span>
+                            <!-- Resizer Handle -->
+                            <div style="position:absolute; bottom:-4px; right:-4px; width:8px; height:8px; background:#0d9488; border:1px solid #fff; cursor:nwse-resize;"></div>
+                        </div>
+
+                        <div style="position:absolute; bottom:12px; right:30px; font-size:10px; font-weight:bold; color:#64748b;">
+                            Authorized Signatory
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Signature Placement Features:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Interactive Canvas Pad:</strong> Draw signatures with touch/mouse or upload transparent PNG files [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>8-Way Handle Scaling:</strong> Proportional scaling preserves aspect ratios without distorting legal signatures [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Direct PDF Injection:</strong> Renders directly into PDF coordinates without degrading base document resolution [cite: 34].</li>
+            </ul>
+        `
+    },
+    7: {
+        heading: "Step 7: Realistic Scanned & Aged Photocopy Simulation",
+        subheading: "Applying mechanical tilt, optical blur, sensor noise, paper oxidation, and glass edge shadows [cite: 34].",
+        html: `
+            <div class="sim-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div>
+                        <h3 style="margin:0; font-size:18px; color:#0f172a;">Make PDF Look Scanned (Real-Time Physics)</h3>
+                        <p style="margin:2px 0 0; font-size:12px; color:#64748b;">Photocopy simulator running 100% in client WebAssembly [cite: 34].</p>
+                    </div>
+                    <button class="sim-btn sim-btn-emerald"><i class="fas fa-file-pdf"></i> Export Scanned PDF</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1.2fr; gap:16px;">
+                    <!-- Control Sliders -->
+                    <div class="sim-panel" style="font-size:12px; display:flex; flex-direction:column; gap:10px;">
+                        <div>
+                            <label style="font-weight:bold; display:block; margin-bottom:2px;">Color Profile</label>
+                            <select style="width:100%; padding:5px; border:1px solid #cbd5e1; border-radius:4px;">
+                                <option>Grayscale Scanner Copy</option>
+                                <option>Black &amp; White High-Contrast Xerox</option>
+                                <option>Full Color Aged</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-weight:600;">
+                                <span>Paper Ageing (Oxidation)</span>
+                                <span style="color:#b45309;">65% (Vintage)</span>
+                            </div>
+                            <input type="range" value="65" style="width:100%; accent-color:#d97706;">
+                        </div>
+
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-weight:600;">
+                                <span>Mechanical Scanner Tilt</span>
+                                <span>0.8°</span>
+                            </div>
+                            <input type="range" value="60" style="width:100%; accent-color:#059669;">
+                        </div>
+
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-weight:600;">
+                                <span>Optical Lens Blur</span>
+                                <span>0.4 px</span>
+                            </div>
+                            <input type="range" value="35" style="width:100%; accent-color:#059669;">
+                        </div>
+
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-weight:600;">
+                                <span>Sensor Noise (Grain)</span>
+                                <span>22%</span>
+                            </div>
+                            <input type="range" value="40" style="width:100%; accent-color:#059669;">
+                        </div>
+
+                        <div style="border-top:1px solid #eee; padding-top:6px;">
+                            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600;">
+                                <input type="checkbox" checked> Add Scanner Glass Edge Shadow [cite: 34]
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Output Canvas Preview with Scanned Artifacts -->
+                    <div style="background:#cbd5e1; padding:16px; border-radius:8px; display:flex; justify-content:center; align-items:center;">
+                        <div style="width:260px; height:340px; background:#fef3c7; border:1px solid #d97706; border-radius:2px; box-shadow:6px 6px 14px rgba(0,0,0,0.25); transform:rotate(0.8deg); padding:16px; font-size:10px; color:#333; position:relative; overflow:hidden;">
+                            <!-- Edge Shadow -->
+                            <div style="position:absolute; top:0; left:0; bottom:0; width:6px; background:linear-gradient(to right, rgba(0,0,0,0.3), transparent);"></div>
+                            
+                            <strong style="font-size:11px; display:block; border-bottom:1px dashed #b45309; padding-bottom:4px; margin-bottom:8px;">
+                                ARCHIVAL VOUCHER COPY
+                            </strong>
+                            <p style="margin:4px 0; filter:blur(0.3px);">Bill No: TS-99120 · Delivered: 03/11/2026</p>
+                            <p style="margin:4px 0; filter:blur(0.3px);">Supplier: Tata Steel Spares &amp; Alloys Div</p>
+                            <p style="margin:4px 0; filter:blur(0.3px);">Landed Gross Amount: ₹ 32,094.00</p>
+                            
+                            <div style="position:absolute; bottom:16px; right:16px; border:2px solid #b45309; padding:4px 8px; transform:rotate(-6deg); color:#b45309; font-weight:bold; font-size:11px;">
+                                RECEIVED
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Physical Scanned Emulation:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Rotational Misalignment:</strong> Randomizes subtle angular offsets (±0.4° to ±2.0°) to replicate manual feeder trays [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>Paper Oxidation Matrix:</strong> Recreates realistic fiber yellowing, dark edge gradients, and printer roller marks [cite: 34].</li>
+                <li><i class="fas fa-check"></i> <strong>No Hardware Needed:</strong> Converts modern vector PDFs into realistic scanned records for administrative compliance [cite: 34].</li>
+            </ul>
+        `
+    }
+};
+
+function switchStep(stepNum) {
+    document.querySelectorAll('.step-item').forEach((el, idx) => {
+        if (idx + 1 === stepNum) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    const data = stepData[stepNum];
+    document.getElementById('stepHeading').innerText = data.heading;
+    document.getElementById('stepSubheading').innerText = data.subheading;
+    document.getElementById('simulatedScreen').innerHTML = data.html;
+    document.getElementById('stepExplainer').innerHTML = data.explanation;
+}
+
+// Initialize Step 1
+switchStep(1);
+</script>
+<script src="../intro-demo-navigation.js"></script>
+</body>
+</html>

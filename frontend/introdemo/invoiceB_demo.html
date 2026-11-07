@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Standard GST Invoice Generator - Visual Operational Walkthrough</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+<style>
+    :root {
+        --primary: #2c3e50;
+        --accent-blue: #007bff;
+        --success: #28a745;
+        --warning: #f39c12;
+        --danger: #dc3545;
+        --purple: #6f42c1;
+        --border-color: #333;
+        --bg-main: #0f172a;
+        --card-dark: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-light);
+        padding: 24px;
+        line-height: 1.5;
+    }
+
+    .app-header {
+        max-width: 1400px;
+        margin: 0 auto 24px auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .app-title h1 {
+        font-size: 24px;
+        font-weight: 800;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .app-title p {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .main-layout {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        gap: 24px;
+    }
+    @media (max-width: 1024px) {
+        .main-layout { grid-template-columns: 1fr; }
+    }
+
+    /* Steps navigation */
+    .steps-nav {
+        background: var(--card-dark);
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+        height: fit-content;
+        position: sticky;
+        top: 24px;
+    }
+    .nav-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 12px;
+        padding-left: 6px;
+    }
+    .step-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid transparent;
+        background: rgba(255,255,255,0.02);
+    }
+    .step-item:hover {
+        background: rgba(255,255,255,0.06);
+    }
+    .step-item.active {
+        background: var(--accent-blue);
+        border-color: #60a5fa;
+        color: #fff;
+    }
+    .step-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+    .step-info h4 {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 2px;
+    }
+    .step-info p {
+        font-size: 12px;
+        opacity: 0.8;
+    }
+
+    /* Showcase viewer */
+    .showcase-area {
+        background: var(--card-dark);
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.08);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .showcase-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 16px;
+    }
+    .step-header-text h2 {
+        font-size: 20px;
+        color: #fff;
+        margin-bottom: 4px;
+    }
+    .step-header-text p {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* Simulated Screenshot Frame */
+    .screenshot-frame {
+        background: #cbd5e1;
+        padding: 24px;
+        border-radius: 10px;
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+        overflow-x: auto;
+    }
+
+    /* Simulated Standard Invoice Sheet */
+    .sim-invoice-sheet {
+        width: 100%;
+        max-width: 820px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 2px solid #000;
+        padding: 12px;
+        color: #000;
+        font-family: Arial, sans-serif;
+        box-sizing: border-box;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        font-size: 13px;
+    }
+
+    .sim-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .sim-table td, .sim-table th {
+        border: 1px solid #000;
+        padding: 6px 8px;
+        vertical-align: top;
+    }
+
+    .sim-input {
+        border: none;
+        border-bottom: 1px dashed #777;
+        font-family: inherit;
+        font-size: inherit;
+        background: transparent;
+        padding: 2px 4px;
+    }
+
+    .sim-btn {
+        padding: 6px 14px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 12.5px;
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .sim-btn-save { background: #28a745; }
+    .sim-btn-print { background: #007bff; }
+    .sim-btn-calc { background: #6f42c1; }
+    .sim-btn-danger { background: #dc3545; }
+
+    /* Modal Simulation */
+    .sim-modal-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+        width: 100%;
+        max-width: 380px;
+        margin: 0 auto;
+        text-align: left;
+        color: #333;
+    }
+    .sim-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+        margin-bottom: 12px;
+    }
+    .sim-modal-header h3 {
+        margin: 0;
+        color: #6f42c1;
+        font-size: 16px;
+    }
+
+    /* Explanation card */
+    .step-explainer {
+        background: #1e293b;
+        border-radius: 10px;
+        padding: 18px 20px;
+        border-left: 4px solid var(--accent-blue);
+    }
+    .step-explainer h3 {
+        font-size: 15px;
+        color: #fff;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .step-explainer ul {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .step-explainer li {
+        font-size: 13px;
+        color: #cbd5e1;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .step-explainer li i {
+        color: #10b981;
+        font-size: 11px;
+    }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="app-title">
+        <h1><i class="fas fa-receipt" style="color: #38bdf8;"></i> Standard GST Invoice — Step-by-Step Visual Operational Guide</h1>
+        <p>Complete operational walkthrough of classic bordered tax invoicing, buyer/consignee split details, forward/reverse GST calculation, and multi-slab tax breakups.</p>
+    </div>
+</header>
+
+<main class="main-layout">
+    <!-- Left Navigation -->
+    <aside class="steps-nav">
+        <div class="nav-title">Invoice Generator Steps</div>
+        <div class="step-item active" onclick="switchStep(1)">
+            <div class="step-badge">1</div>
+            <div class="step-info">
+                <h4>Invoice Header & Company Profile</h4>
+                <p>Tax invoice branding & document tags</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(2)">
+            <div class="step-badge">2</div>
+            <div class="step-info">
+                <h4>Buyer & Consignee Logistics</h4>
+                <p>Bill-to, Ship-to & transport fields</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(3)">
+            <div class="step-badge">3</div>
+            <div class="step-info">
+                <h4>Itemized Goods & Auto-Fill</h4>
+                <p>Autocomplete items, rates & discounts</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(4)">
+            <div class="step-badge">4</div>
+            <div class="step-info">
+                <h4>Built-In GST Calculator</h4>
+                <p>Forward & reverse GST computation</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(5)">
+            <div class="step-badge">5</div>
+            <div class="step-info">
+                <h4>Multi-Slab Tax Breakup Matrix</h4>
+                <p>CGST, SGST & IGST rate segregation</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(6)">
+            <div class="step-badge">6</div>
+            <div class="step-info">
+                <h4>Freight, Round-Off & Totals</h4>
+                <p>Landed charges & amount in words</p>
+            </div>
+        </div>
+        <div class="step-item" onclick="switchStep(7)">
+            <div class="step-badge">7</div>
+            <div class="step-info">
+                <h4>Editable Declarations & Banking</h4>
+                <p>Terms lock, bank print & save</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Right Showcase Container -->
+    <section class="showcase-area">
+        <div class="showcase-toolbar">
+            <div class="step-header-text">
+                <h2 id="stepHeading">Step 1: Document Header, Seller Profile & Invoice Tags</h2>
+                <p id="stepSubheading">Establishing enterprise credentials, invoice numbering, date stamps, and intra-state vs inter-state tax mode selection.</p>
+            </div>
+        </div>
+
+        <!-- Render Target -->
+        <div class="screenshot-frame">
+            <div id="simulatedScreen" class="sim-invoice-sheet">
+                <!-- Content dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Step Explanation -->
+        <div class="step-explainer" id="stepExplainer">
+            <!-- Dynamic explanation -->
+        </div>
+    </section>
+</main>
+
+<script>
+const stepData = {
+    1: {
+        heading: "Step 1: Document Header, Seller Profile & Invoice Tags",
+        subheading: "Initial document setup displaying seller legal entity, contact credentials, sequential invoice number, and GST routing type.",
+        html: `
+            <h2 style="text-align:center; margin:0 0 8px 0; font-size:18px; letter-spacing:1px;">TAX INVOICE</h2>
+
+            <table class="sim-table">
+                <tr>
+                    <td style="width:50%;">
+                        <div style="font-weight:bold; font-size:1.15em; color:#0f172a;">Apex Industrial Spares &amp; Logistics Ltd.</div>
+                        <div style="font-size:0.9em; margin-top:4px; color:#475569; line-height:1.4;">
+                            Station Road, Industrial Hub, Memari, Purba Bardhaman<br>
+                            West Bengal - 713146 | Phone: <strong>+91 79080 40851</strong><br>
+                            GSTIN: <strong>19AAACA8899F1Z2</strong>
+                        </div>
+                    </td>
+                    <td style="width:50%; line-height:1.7;">
+                        Invoice No : <input type="text" class="sim-input" value="INV-2026-088" style="font-weight:bold; width:55%;"><br>
+                        Dated : <input type="text" class="sim-input" value="2026-11-03" style="font-weight:bold; width:35%;"> 
+                        <span style="font-size:11.5px; color:#666;">Time: 11:30 AM</span><br>
+                        Reference No. &amp; Date : <input type="text" class="sim-input" value="REF-PO-9910" style="width:50%;"><br>
+                        E-Way Bill No. : <input type="text" class="sim-input" value="EWB-8839001290" style="width:55%;"><br>
+                        Mode/Terms of Payment : <span class="sim-input" style="display:inline-block; width:50%;">Immediate NEFT / Cash</span><br>
+                        GST Type : <strong style="color:#007bff;">Intra-State (CGST + SGST)</strong>
+                    </td>
+                </tr>
+            </table>
+
+            <p style="font-size:11.5px; color:#666; text-align:center; margin-top:8px;">
+                Selecting Intra-State automatically routes tax into equal CGST and SGST splits; Inter-State assigns all tax to IGST.
+            </p>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Header Configuration Highlights:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Automated GST Type Selector:</strong> Toggles calculation routines between intra-state (equal CGST/SGST splits) and inter-state (IGST) [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Statutory Regulatory Tags:</strong> Built-in entry fields for E-Way Bill Number, Purchase Reference Date, and Payment Terms [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Brand Profile Synchronization:</strong> Automatically pulls corporate address, telephone, and tax numbers from system brand services [cite: 43].</li>
+            </ul>
+        `
+    },
+    2: {
+        heading: "Step 2: Buyer (Bill To) & Consignee (Ship To) Logistics",
+        subheading: "Recording customer billing details with customer master autocomplete, 'Same as Buyer' replication, and transport logistics.",
+        html: `
+            <table class="sim-table">
+                <tr>
+                    <td style="width:50%; line-height:1.6;">
+                        <strong>Buyer (Bill To)</strong><br>
+                        <input type="text" class="sim-input" value="Pinnacle Engineering &amp; Logistics Ltd." style="font-weight:bold; width:95%;"><br>
+                        <input type="text" class="sim-input" value="Plot 14, Phase II Industrial Zone" style="width:95%;"><br>
+                        <input type="text" class="sim-input" value="Contact: +91 79080 40851" style="width:48%;">
+                        <input type="text" class="sim-input" value="PIN: 713212" style="width:45%;"><br>
+                        <input type="text" class="sim-input" value="Durgapur" style="width:40%;">
+                        <input type="text" class="sim-input" value="West Bengal" style="width:35%;">
+                        <input type="text" class="sim-input" value="Code: 19" style="width:15%;"><br>
+                        GSTIN : <input type="text" class="sim-input" value="19AAACP9922K1Z9" style="font-weight:bold; width:70%;">
+                    </td>
+                    <td style="width:50%; line-height:1.6;">
+                        <strong>Consignee (Ship To)</strong> 
+                        <label style="font-size:11px; color:#007bff; margin-left:10px;"><input type="checkbox" checked> Same as Buyer</label><br>
+                        <input type="text" class="sim-input" value="Pinnacle Engineering &amp; Logistics Ltd." style="font-weight:bold; width:95%;"><br>
+                        <input type="text" class="sim-input" value="Plot 14, Phase II Industrial Zone" style="width:95%;"><br>
+                        <input type="text" class="sim-input" value="Contact: +91 79080 40851" style="width:48%;">
+                        <input type="text" class="sim-input" value="PIN: 713212" style="width:45%;"><br>
+                        <input type="text" class="sim-input" value="Durgapur" style="width:40%;">
+                        <input type="text" class="sim-input" value="West Bengal" style="width:35%;">
+                        <input type="text" class="sim-input" value="Code: 19" style="width:15%;"><br>
+                        GSTIN : <input type="text" class="sim-input" value="19AAACP9922K1Z9" style="font-weight:bold; width:70%;">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:5px;">
+                        Buyer's Order No : <input type="text" class="sim-input" value="PO-7740" style="font-weight:bold; width:50%;">
+                    </td>
+                    <td style="padding:5px;">
+                        Dated : <input type="text" class="sim-input" value="2026-10-28" style="width:50%;">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:5px;">
+                        Dispatched Through : <input type="text" class="sim-input" value="Speed Transways Logistics" style="width:50%;"><br>
+                        Vehicle No : <input type="text" class="sim-input" value="WB-39-AB-4401" style="font-weight:bold; width:50%;">
+                    </td>
+                    <td style="padding:5px;">
+                        Destination : <input type="text" class="sim-input" value="Durgapur Site Bay" style="width:50%;"><br>
+                        LR No : <input type="text" class="sim-input" value="LR-88204" style="font-weight:bold; width:50%;">
+                    </td>
+                </tr>
+            </table>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Dual-Entity Logistics Management:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Customer Directory Link:</strong> Selecting the buyer automatically populates address, contact, district, and GSTIN numbers via <code>fillCustomerDetails()</code> [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Single-Click Consignee Copy:</strong> The 'Same as Buyer' toggle instantly copies billing details into the shipping destination section [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Transit Compliance Tracking:</strong> Dedicated fields for Dispatch Document Number, Transport Vehicle Number, Destination, and Lorry Receipt (LR) [cite: 43].</li>
+            </ul>
+        `
+    },
+    3: {
+        heading: "Step 3: Itemized Goods, Pricing & Dynamic Autocomplete",
+        subheading: "Live autocomplete item searches, automatic HSN/SAC lookups, and quantity-by-rate line-item math.",
+        html: `
+            <table class="sim-table" style="text-align:center;">
+                <thead>
+                    <tr style="background:#f0f0f0;">
+                        <th style="width:30px;">Sl</th>
+                        <th style="width:30%;">Description of Goods</th>
+                        <th>HSN/SAC</th>
+                        <th style="width:55px;">Qty</th>
+                        <th style="width:55px;">UOM</th>
+                        <th style="width:75px;">Rate (₹)</th>
+                        <th style="width:70px;">Disc</th>
+                        <th style="width:55px;">GST %</th>
+                        <th style="text-align:right;">Taxable Amt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td style="text-align:left;">
+                            <strong>500mm Industrial MS Flange Assembly</strong><br>
+                            <small style="color:#666;">Code: SKU-7721 | Heavy Grade</small>
+                        </td>
+                        <td>7307</td>
+                        <td>10</td>
+                        <td>Pcs</td>
+                        <td style="text-align:right;">3,200.00</td>
+                        <td>0%</td>
+                        <td>18%</td>
+                        <td style="text-align:right; font-weight:bold;">32,000.00</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td style="text-align:left;">
+                            <strong>Silicone Gasket Sealing Rings (500mm)</strong><br>
+                            <small style="color:#666;">Code: SKU-9902 | Heat resistant</small>
+                        </td>
+                        <td>4016</td>
+                        <td>10</td>
+                        <td>Set</td>
+                        <td style="text-align:right;">450.00</td>
+                        <td>0%</td>
+                        <td>18%</td>
+                        <td style="text-align:right; font-weight:bold;">4,500.00</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td style="text-align:left;">
+                            <strong>Machining &amp; Beveling Job Work</strong><br>
+                            <small style="color:#666;">Labor &amp; precision turning</small>
+                        </td>
+                        <td>9988</td>
+                        <td>1</td>
+                        <td>Job</td>
+                        <td style="text-align:right;">4,500.00</td>
+                        <td>0%</td>
+                        <td>18%</td>
+                        <td style="text-align:right; font-weight:bold;">4,500.00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+                <button class="sim-btn sim-btn-primary" style="font-size:11px;">+ Add Item Row</button>
+                <span style="font-size:12px; font-weight:bold; color:#0f172a;">Total Taxable Line Items: ₹ 41,000.00</span>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Line-Item Entry Mechanics:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Catalog Autocomplete:</strong> Typing an item code or description searches master items and purchase history, auto-filling HSN, UOM, and default rates [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Flexible Discount Engines:</strong> Supports both percentage discounts (e.g. 5%) and flat cash discounts (e.g. ₹200) on each individual item [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Item-Level GST Assignment:</strong> Line-item tax percentages allow mixing different GST rates (0%, 5%, 12%, 18%, 28%) on a single bill [cite: 43].</li>
+            </ul>
+        `
+    },
+    4: {
+        heading: "Step 4: Interactive GST Calculator (Forward & Reverse Mode)",
+        subheading: "Floating GST calculator modal allowing operators to determine net amounts from MRP or compute forward tax additions.",
+        html: `
+            <div class="sim-modal-card">
+                <div class="sim-modal-header">
+                    <h3>🧮 GST Calculator</h3>
+                    <span style="font-size:20px; color:#666; cursor:pointer;">&times;</span>
+                </div>
+
+                <div style="display:flex; justify-content:center; gap:12px; background:#f1f5f9; padding:6px; border-radius:15px; margin-bottom:12px; font-size:11.5px; font-weight:bold;">
+                    <label style="color:#007bff;"><input type="radio" checked> Reverse (Inclusive)</label>
+                    <label><input type="radio"> Forward (Exclusive)</label>
+                </div>
+
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:11px; color:#666; display:block;">Amount</label>
+                    <input type="number" value="48380" style="width:100%; font-size:16px; font-weight:bold; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:11px; color:#666; display:block;">GST Rate</label>
+                    <div style="display:flex; gap:4px; margin-top:4px;">
+                        <button class="sim-btn sim-btn-secondary" style="flex:1; padding:4px;">5%</button>
+                        <button class="sim-btn sim-btn-secondary" style="flex:1; padding:4px;">12%</button>
+                        <button class="sim-btn sim-btn-calc" style="flex:1; padding:4px;">18%</button>
+                        <button class="sim-btn sim-btn-secondary" style="flex:1; padding:4px;">28%</button>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:10px; font-size:12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span>Net Taxable Value:</span>
+                        <strong style="color:#0f172a;">₹ 41,000.00</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span>GST Amount (18%):</span>
+                        <strong style="color:#c0392b;">₹ 7,380.00</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:11px; color:#555; border-top:1px dashed #ccc; padding-top:4px;">
+                        <span>CGST + SGST Split:</span>
+                        <span>₹ 3,690.00 + ₹ 3,690.00</span>
+                    </div>
+                </div>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Calculator Utilities:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Reverse MRP Calculation:</strong> Determines net base cost and tax from inclusive retail prices (<code>Net = Total / (1 + Rate)</code>) [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Forward Calculation:</strong> Computes tax additions on raw trade values before adding them to line items [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Draggable Window:</strong> Operators can drag the calculator modal across the invoice canvas without obstructing input fields [cite: 43].</li>
+            </ul>
+        `
+    },
+    5: {
+        heading: "Step 5: Multi-Slab Tax Breakdown Matrix",
+        subheading: "Audit table breaking down taxable values and resulting tax amounts across distinct GST tax slabs.",
+        html: `
+            <table class="sim-table">
+                <tr>
+                    <td style="width:65%; vertical-align:top; padding:8px;">
+                        <div style="font-weight:bold; border-bottom:1px solid #000; padding-bottom:4px; margin-bottom:6px;">
+                            Tax Breakup Schedule (Statutory Matrix)
+                        </div>
+                        <table style="width:100%; border-collapse:collapse; font-size:11.5px; text-align:center;">
+                            <thead>
+                                <tr style="background:#f8fafc;">
+                                    <th style="border:1px solid #ccc; text-align:right;">Taxable Value</th>
+                                    <th style="border:1px solid #ccc;">CGST %</th>
+                                    <th style="border:1px solid #ccc; text-align:right;">CGST Amt</th>
+                                    <th style="border:1px solid #ccc;">SGST %</th>
+                                    <th style="border:1px solid #ccc; text-align:right;">SGST Amt</th>
+                                    <th style="border:1px solid #ccc; text-align:right;">Total Tax</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="border:1px solid #ccc; text-align:right;">₹ 41,000.00</td>
+                                    <td style="border:1px solid #ccc;">9%</td>
+                                    <td style="border:1px solid #ccc; text-align:right;">₹ 3,690.00</td>
+                                    <td style="border:1px solid #ccc;">9%</td>
+                                    <td style="border:1px solid #ccc; text-align:right;">₹ 3,690.00</td>
+                                    <td style="border:1px solid #ccc; text-align:right; font-weight:bold;">₹ 7,380.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                    <td style="width:35%; padding:6px; line-height:1.7;">
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                            <tr>
+                                <td>Taxable Value</td>
+                                <td style="text-align:right; font-weight:bold;">41,000.00</td>
+                            </tr>
+                            <tr>
+                                <td>CGST (9%)</td>
+                                <td style="text-align:right;">3,690.00</td>
+                            </tr>
+                            <tr>
+                                <td>SGST (9%)</td>
+                                <td style="text-align:right;">3,690.00</td>
+                            </tr>
+                            <tr>
+                                <td>IGST</td>
+                                <td style="text-align:right;">0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Round Off</td>
+                                <td style="text-align:right;">0.00</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Tax Schedule Details:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Automated Rate Segregation:</strong> <code>renderTaxBreakdown()</code> groups line items by their GST percentage into distinct tax slabs [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Audit Readiness:</strong> Displays total taxes under clear CGST, SGST, and IGST headers for verification [cite: 43].</li>
+            </ul>
+        `
+    },
+    6: {
+        heading: "Step 6: Freight Overheads, Round-Off & Final Landed Totals",
+        subheading: "Adding logistics expenses, calculating mathematical round-off adjustments, and generating amounts in words.",
+        html: `
+            <table class="sim-table">
+                <tr>
+                    <td style="width:65%; vertical-align:top; padding:8px;">
+                        <strong>Amount Chargeable (in words)</strong><br>
+                        <div style="font-weight:bold; color:#0f172a; margin-top:6px; font-size:13px; line-height:1.4;">
+                            Forty-Eight Thousand Three Hundred Eighty Rupees Only
+                        </div>
+                    </td>
+                    <td style="width:35%; padding:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <strong style="font-size:14px;">Grand Total:</strong>
+                            <strong style="font-size:18px; color:#28a745;">₹ 48,380.00</strong>
+                        </div>
+                        <div style="font-size:11.5px; color:#666; margin-top:4px; text-align:right;">
+                            Paid: ₹ 0.00 | <span style="color:#c0392b; font-weight:bold;">Due: ₹ 48,380.00</span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="display:flex; justify-content:center; gap:10px; margin-top:14px;">
+                <button class="sim-btn sim-btn-save">Save Invoice</button>
+                <button class="sim-btn sim-btn-print">Print Invoice</button>
+                <button class="sim-btn sim-btn-calc">🧮 GST Calc</button>
+            </div>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Landed Valuation Calculations:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Indian Currency Formatter:</strong> <code>convertNumberToWords()</code> translates numerical grand totals into formal Indian Rupee and Paise words [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Decimal Round-Off:</strong> Calculates small rounding differences to ensure grand totals land on whole integer figures [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Custom Logistics Fields:</strong> Optional toggles accommodate Freight (Before/After GST), Packing, and Loading charges [cite: 43].</li>
+            </ul>
+        `
+    },
+    7: {
+        heading: "Step 7: Editable Terms, Bank Credentials & Sign-Off Block",
+        subheading: "Locking legal declarations, formatting bank deposit details, and preparing the document for print or PDF export.",
+        html: `
+            <table class="sim-table">
+                <tr>
+                    <td style="width:50%; vertical-align:top; padding:8px;">
+                        <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:4px;">
+                            <span>Terms and Conditions</span>
+                            <span style="font-size:12px; color:#007bff; cursor:pointer;">🔒 Locked</span>
+                        </div>
+                        <div style="font-size:11px; color:#555; line-height:1.5;">
+                            1. Goods once sold will not be taken back.<br>
+                            2. Interest @ 18% p.a. will be charged if payment is not made within due date.<br>
+                            3. Subject to local jurisdiction.
+                        </div>
+                    </td>
+                    <td style="width:50%; vertical-align:top; padding:8px;">
+                        <div style="display:flex; justify-content:space-between; font-weight:bold; margin-bottom:4px;">
+                            <span>Bank Details</span>
+                            <span style="font-size:12px; color:#007bff; cursor:pointer;">🔒 Locked</span>
+                        </div>
+                        <div style="font-size:11px; color:#555; line-height:1.5;">
+                            Bank Name: <strong>State Bank of India</strong><br>
+                            A/c No: <strong>39882010992</strong><br>
+                            IFSC Code: <strong>SBIN0001234</strong><br>
+                            Branch: <strong>Memari Station Road Branch</strong>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="vertical-align:top; padding:8px;">
+                        <div style="font-weight:bold; margin-bottom:4px;">Declaration</div>
+                        <div style="font-size:10.5px; color:#555; line-height:1.4;">
+                            We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+                        </div>
+                    </td>
+                    <td style="text-align:center; padding:20px 8px 8px 8px;">
+                        <div style="font-size:11px;">for <strong>Apex Industrial Spares &amp; Logistics Ltd.</strong></div>
+                        <div style="font-family:'Brush Script MT', cursive; font-size:22px; color:#0f172a; margin:10px 0 2px 0;">Milan Gupta</div>
+                        <div style="border-top:1px solid #333; width:140px; margin:0 auto; padding-top:2px; font-weight:bold; font-size:11px;">
+                            Authorised Signatory
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        `,
+        explanation: `
+            <h3><i class="fas fa-info-circle"></i> Verification & Archival Safeguards:</h3>
+            <ul>
+                <li><i class="fas fa-check"></i> <strong>Lockable Terms & Bank Details:</strong> Click-to-lock icons prevent accidental modification of bank credentials or legal terms [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Clean Print Stylesheet:</strong> Removes interface buttons, borders, and interactive inputs for professional paper printouts [cite: 43].</li>
+                <li><i class="fas fa-check"></i> <strong>Centralized Database Sync:</strong> Saving the invoice writes records to local storage and syncs with cloud endpoints in the background [cite: 43].</li>
+            </ul>
+        `
+    }
+};
+
+function switchStep(stepNum) {
+    document.querySelectorAll('.step-item').forEach((el, idx) => {
+        if (idx + 1 === stepNum) el.classList.add('active');
+        else el.classList.remove('active');
+    });
+
+    const data = stepData[stepNum];
+    document.getElementById('stepHeading').innerText = data.heading;
+    document.getElementById('stepSubheading').innerText = data.subheading;
+    document.getElementById('simulatedScreen').innerHTML = data.html;
+    document.getElementById('stepExplainer').innerHTML = data.explanation;
+}
+
+// Initialize Step 1
+switchStep(1);
+</script>
+<script src="../intro-demo-navigation.js"></script>
+</body>
+</html>
+1
