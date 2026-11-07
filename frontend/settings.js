@@ -426,6 +426,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_whatsapp_sender', label: 'WhatsApp Sender' },
     { id: 'perm_finance_and_tools', label: 'Finance & Tools' },
     { id: 'perm_intro_rtr', label: 'System Intro' },
+    { id: 'perm_godown_live', label: 'Godown Live' },
+    { id: 'perm_godown_terminal', label: 'Godown Terminal' },
     { id: 'perm_business360', label: 'Business 360' }
 ];
 

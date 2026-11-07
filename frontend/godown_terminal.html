@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godown Operations Terminal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="apiClient.js"></script>
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
+    <style>
+        body {
+            background-color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .terminal-card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+        }
+
+        .mode-tab {
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .mode-tab:hover {
+            border-color: #94a3b8;
+        }
+
+        .mode-tab.active-receive {
+            border-color: #0284c7;
+            background: #f0f9ff;
+            color: #0369a1;
+        }
+
+        .mode-tab.active-counter {
+            border-color: #eab308;
+            background: #fefce8;
+            color: #854d0e;
+        }
+
+        .mode-tab.active-customer {
+            border-color: #10b981;
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .table-input th {
+            background: #f8fafc;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .integration-pill {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-decoration: none;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        /* Full-screen PIN Security Overlay */
+        #securityLockOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #printableChallan,
+            #printableChallan * {
+                visibility: visible;
+            }
+
+            #printableChallan {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        .challan-box {
+            border: 2px solid #1e293b;
+            padding: 24px;
+            background: #fff;
+        }
+    </style>
+</head>
+
+<body class="p-3 p-md-4">
+
+    <!-- SECURITY PIN ACCESS MODAL OVERLAY -->
+    <div id="securityLockOverlay">
+        <div class="card p-4 shadow-lg text-center bg-white" style="max-width: 420px; width: 90%; border-radius: 14px;">
+            <div class="mb-3">
+                <span class="p-3 bg-light rounded-circle d-inline-block text-primary fs-3">
+                    <i class="fa fa-lock"></i>
+                </span>
+            </div>
+            <h5 class="fw-bold mb-1" id="pinModalHeading">Enter Godown Access PIN</h5>
+            <p class="text-muted small mb-3" id="pinModalSub">Please enter the 4-digit workstation PIN allotted by Admin
+                to open your Godown terminal.</p>
+
+            <div class="mb-3">
+                <input type="password" id="inputTerminalPin"
+                    class="form-control text-center fs-4 fw-bold letter-spacing" placeholder="••••" maxlength="6"
+                    autofocus onkeydown="if(event.key==='Enter') verifyTerminalPin()">
+                <div id="pinErrorMsg" class="text-danger small mt-2 d-none">
+                    <i class="fa fa-exclamation-circle me-1"></i>Invalid Godown PIN. Access Denied.
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-primary w-100 fw-bold py-2" onclick="verifyTerminalPin()">
+                <i class="fa fa-key me-1"></i> Unlock Godown Terminal
+            </button>
+        </div>
+    </div>
+
+    <div class="container no-print" style="max-width: 950px;">
+
+        <!-- Top Header -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h4 class="fw-bold mb-0 text-dark">
+                    <i class="fa fa-warehouse text-primary me-2"></i><span id="godownTerminalTitle">Godown Release &
+                        Receipt Terminal</span>
+                </h4>
+                <small class="text-muted" id="godownTerminalSub">Assigned Godown Unit</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-dark text-white px-3 py-2" id="godownIdBadge"><i
+                        class="fa fa-map-marker-alt me-1 text-warning"></i>GDN-01</span>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="lockTerminal()"
+                    title="Lock Terminal Workstation"><i class="fa fa-lock"></i></button>
+            </div>
+        </div>
+
+        <!-- 3-Way Mode Tabs -->
+        <div class="row g-2 mb-3">
+            <div class="col-4">
+                <div id="tabReceive" class="mode-tab active-receive" onclick="switchMode('RECEIVE')">
+                    <i class="fa fa-arrow-circle-down d-block fs-4 mb-1"></i>
+                    1. Receive to Godown
+                </div>
+            </div>
+            <div class="col-4">
+                <div id="tabCounter" class="mode-tab" onclick="switchMode('COUNTER')">
+                    <i class="fa fa-store d-block fs-4 mb-1"></i>
+                    2. Dispatch to Counter
+                </div>
+            </div>
+            <div class="col-4">
+                <div id="tabCustomer" class="mode-tab" onclick="switchMode('CUSTOMER')">
+                    <i class="fa fa-truck-moving d-block fs-4 mb-1"></i>
+                    3. Dispatch to Customer
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Entry Form -->
+        <div class="card terminal-card p-4 bg-white mb-4">
+
+            <!-- Context Banner -->
+            <div id="modeBanner" class="p-3 mb-3 rounded border-start border-4 border-info bg-light">
+                <h6 class="fw-bold mb-0 text-dark" id="bannerTitle">Inward Goods Receipt Note (GRN)</h6>
+                <small class="text-muted" id="bannerDesc">Log goods unloaded into physical Godown storage from
+                    suppliers.</small>
+            </div>
+
+            <form id="godownForm">
+                <!-- Logistics Specs -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold">Date *</label>
+                        <input type="date" id="txDate" class="form-control form-control-sm" required>
+                    </div>
+
+                    <!-- FIXED / LOCKED OPERATOR SELECTION -->
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-dark">Assigned Operator * <i
+                                class="fa fa-lock text-muted" title="Defined by Admin"></i></label>
+                        <select id="txOperatorSelect" class="form-select form-select-sm" required>
+                            <!-- Populated exclusively from Admin's fixed operators list -->
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold">Vehicle / Delivery Agent *</label>
+                        <input type="text" id="txVehicle" class="form-control form-control-sm"
+                            placeholder="e.g. Van WB-19-4402" required>
+                    </div>
+                    <div class="col-md-3" id="docNoCol">
+                        <label class="form-label small fw-bold" id="docNoLabel">Bill / Gate Pass Ref *</label>
+                        <input type="text" id="txDocNo" class="form-control form-control-sm" placeholder="e.g. CH-1002"
+                            required>
+                    </div>
+                </div>
+
+                <!-- Mode Specific Context Area -->
+                <div id="counterDestAlert" class="alert alert-warning py-2 small d-none">
+                    <i class="fa fa-info-circle me-1"></i> <strong>Internal Transfer:</strong> Dispatched items will
+                    remain in <strong>In-Transit</strong> state until acknowledged by Admin at the Outlet Counter.
+                </div>
+
+                <!-- Customer & Invoice Link Section -->
+                <div id="customerPickerArea" class="p-3 border rounded bg-light mb-3 d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-bold text-success"><i class="fa fa-link me-1"></i>Reference Customer Sales
+                            Invoice (Optional Auto-Fill)</span>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <!-- Search Invoice Details (with Amount Badge) -->
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark mb-1">Search Invoice details,
+                            </label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white"><i
+                                        class="fa fa-file-invoice text-primary"></i></span>
+                                <input type="text" id="searchInvoiceNo" class="form-control" list="reportInvoiceList"
+                                    placeholder="Type or select Invoice No..." autocomplete="off"
+                                    oninput="onInvoiceNoSearched(this)">
+                                <span class="input-group-text bg-success text-white fw-bold d-none"
+                                    id="invAmountBadge">₹0.00</span>
+                                <datalist id="reportInvoiceList"></datalist>
+                                <button type="button" class="btn btn-outline-secondary"
+                                    onclick="clearInvoiceSelection()" title="Clear"><i class="fa fa-times"></i></button>
+                            </div>
+                            <input type="hidden" id="selectedInvoiceId">
+                        </div>
+
+                        <!-- Search Customer Details -->
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark mb-1">Search Customer details,</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white"><i class="fa fa-user text-success"></i></span>
+                                <input type="text" id="txCustomerName" class="form-control" list="masterCustomerList"
+                                    placeholder="Search customer name or phone..." autocomplete="off"
+                                    oninput="onCustomerSearched(this)">
+                                <datalist id="masterCustomerList"></datalist>
+                                <button type="button" class="btn btn-outline-secondary"
+                                    onclick="clearCustomerSelection()" title="Clear"><i
+                                        class="fa fa-times"></i></button>
+                            </div>
+                            <input type="hidden" id="selectedCustomerId">
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-8">
+                            <input type="text" id="txCustomerAddress" class="form-control form-control-sm"
+                                placeholder="Delivery Destination / Address (Auto-filled or manual)">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" id="txCustomerPhone" class="form-control form-control-sm"
+                                placeholder="Contact Mobile (Auto-filled)">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="supplierNameArea" class="mb-3">
+                    <label class="form-label small fw-bold">Supplier / Vendor Name *</label>
+                    <input type="text" id="txSupplierName" class="form-control form-control-sm"
+                        placeholder="e.g. ABC Manufacturing / Supreme Plastics" value="Primary Vendor">
+                </div>
+
+                <!-- Material Items Table -->
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h6 class="fw-bold mb-0 small text-uppercase">Material Lines</h6>
+                    <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none fw-bold"
+                        onclick="addMaterialRow()">+ Add Line</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-input align-middle mb-2">
+                        <thead>
+                            <tr>
+                                <th style="width: 55%;">Item Name</th>
+                                <th style="width: 25%;">Quantity</th>
+                                <th style="width: 12%;">UOM</th>
+                                <th style="width: 8%; text-align: center;">X</th>
+                            </tr>
+                        </thead>
+                        <tbody id="materialBody"></tbody>
+                    </table>
+                </div>
+                <datalist id="inventoryDatalist"></datalist>
+
+                <!-- Remarks -->
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Remarks / Inspection Notes</label>
+                    <input type="text" id="txRemarks" class="form-control form-control-sm"
+                        placeholder="e.g. Packaging intact, loaded safely">
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-flex justify-content-end border-top pt-3">
+                    <button type="button" id="submitActionBtn" class="btn btn-primary px-4 fw-bold"
+                        onclick="handleGodownTransaction()">
+                        <i class="fa fa-save me-1"></i> Log Movement
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Short Table View: Dispatch to Counter Live Status -->
+        <div id="counterTrackerSection" class="card terminal-card p-3 bg-white d-none">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                <div>
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fa fa-history text-warning me-2"></i>Recent Counter
+                        Dispatches & Delivery Status</h6>
+                    <small class="text-muted">Track when Counter Admin accepts delivery.</small>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" onclick="renderCounterTrackerTable()"><i
+                        class="fa fa-sync-alt"></i></button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Gate Pass No</th>
+                            <th>Vehicle / Runner</th>
+                            <th>Materials Sent</th>
+                            <th>Status at Counter</th>
+                            <th class="text-end">Print</th>
+                        </tr>
+                    </thead>
+                    <tbody id="counterTrackerBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Printable Challan Container -->
+    <div id="printableChallan" class="d-none d-print-block">
+        <div class="challan-box">
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
+                <div>
+                    <h3 class="fw-bold mb-0" id="printChallanHeading">INTERNAL GATE PASS / STOCK TRANSFER CHALLAN[cite:
+                    </h3>
+                    <small class="text-muted" id="printChallanSubheading">Movement of Goods Memo (Internal Transfer
+                        Only)</small>
+                </div>
+                <div id="challanQr"></div>
+            </div>
+            <div class="row g-2 mb-3 small">
+                <div class="col-6">
+                    <div class="border p-2 rounded">
+                        <strong>FROM (SOURCE):</strong>
+                        <div id="printSource" class="fw-bold">-</div>
+                        <div>Issuer: <span id="printOperator">-</span></div>
+                        <div>Dispatch Timestamp: <span id="printTime">-</span></div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="border p-2 rounded">
+                        <strong>TO (DESTINATION):</strong>
+                        <div id="printDest" class="fw-bold">-</div>
+                        <div>Vehicle / Transport: <span id="printVehicle" class="fw-bold">-</span></div>
+                        <div>Document Ref: <span id="printDocRef" class="fw-bold text-primary">-</span></div>
+                    </div>
+                </div>
+            </div>
+            <table class="table table-bordered table-sm small mb-4">
+                <thead>
+                    <tr class="table-light">
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 55%;">Description of Goods</th>
+                        <th style="width: 20%; text-align: center;">Dispatched Qty</th>
+                        <th style="width: 20%; text-align: center;">Received Qty</th>
+                    </tr>
+                </thead>
+                <tbody id="printItemsBody"></tbody>
+            </table>
+            <div class="row mt-5 pt-3 text-center small">
+                <div class="col-4">
+                    <hr class="mb-1">Godown In-Charge
+                </div>
+                <div class="col-4">
+                    <hr class="mb-1">Transporter / Carrier
+                </div>
+                <div class="col-4">
+                    <hr class="mb-1">Recipient Signature
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="apiClient.js"></script>
+    <script>
+        let currentMode = 'RECEIVE';
+        let inventoryItems = [];
+        let reportInvoices = [];
+        let masterCustomers = [];
+
+        // CONFIG & DYNAMIC PIN RESOLUTION
+        const CONFIG_KEY = 'godown_profiles';
+        const SESSION_AUTH_KEY = 'ACTIVE_AUTH_GODOWN';
+
+        let activeGodownId = '';
+        let activeGodownName = '';
+        let activeOperators = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+            checkSessionAndResolve();
+            loadInventoryItems();
+            loadReportInvoices();
+            loadMasterCustomers();
+            addMaterialRow();
+            switchMode('RECEIVE');
+        });
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'godown_movements') {
+                renderCounterTrackerTable();
+            }
+            if (e.key === CONFIG_KEY) {
+                checkSessionAndResolve();
+            }
+        });
+
+        // ==========================================
+        // DYNAMIC PIN-BASED GODOWN RESOLUTION
+        // ==========================================
+        function getSavedProfiles() {
+            return JSON.parse(localStorage.getItem(CONFIG_KEY)) || [
+                { id: "GDN-01", name: "Central Godown (Main)", operators: ["Abc Kumar", "Def Ghosh"], pin: "1001" },
+                { id: "GDN-02", name: "North Depot (Branch 2)", operators: ["Mno Das", "Pqr Roy"], pin: "2002" }
+            ];
+        }
+
+        function checkSessionAndResolve() {
+            const savedConfigs = getSavedProfiles();
+            const urlParams = new URLSearchParams(window.location.search);
+            const forcedParam = urlParams.get('godown');
+
+            // 1. If an active session already exists in this tab
+            const cachedGodownId = sessionStorage.getItem(SESSION_AUTH_KEY);
+
+            if (forcedParam) {
+                // If explicit URL parameter is passed, target that godown
+                const matched = savedConfigs.find(c => c.id.toLowerCase() === forcedParam.toLowerCase());
+                if (matched) {
+                    if (cachedGodownId === matched.id) {
+                        applyGodownSession(matched);
+                        return;
+                    } else {
+                        // Prompt PIN for this specific godown
+                        promptPinForTarget(matched);
+                        return;
+                    }
+                }
+            }
+
+            if (cachedGodownId) {
+                const matched = savedConfigs.find(c => c.id === cachedGodownId);
+                if (matched) {
+                    applyGodownSession(matched);
+                    return;
+                }
+            }
+
+            // 2. Default: Open PIN Prompt to let PIN identify the Godown
+            promptUniversalPin();
+        }
+
+        function promptUniversalPin() {
+            document.getElementById('pinModalHeading').textContent = "Workstation PIN Login";
+            document.getElementById('pinModalSub').textContent = "Enter your 4-digit Godown Access PIN. Your allotted godown will open automatically.";
+            document.getElementById('inputTerminalPin').value = '';
+            document.getElementById('pinErrorMsg').classList.add('d-none');
+            document.getElementById('securityLockOverlay').classList.remove('d-none');
+            setTimeout(() => document.getElementById('inputTerminalPin').focus(), 150);
+        }
+
+        function promptPinForTarget(targetConfig) {
+            document.getElementById('pinModalHeading').textContent = `Unlock ${targetConfig.name}`;
+            document.getElementById('pinModalSub').textContent = `Enter the 4-digit PIN allotted to ${targetConfig.id}:`;
+            document.getElementById('inputTerminalPin').value = '';
+            document.getElementById('pinErrorMsg').classList.add('d-none');
+            document.getElementById('securityLockOverlay').classList.remove('d-none');
+            setTimeout(() => document.getElementById('inputTerminalPin').focus(), 150);
+        }
+
+        function verifyTerminalPin() {
+            const enteredPin = document.getElementById('inputTerminalPin').value.trim();
+            const errorMsg = document.getElementById('pinErrorMsg');
+            const savedConfigs = getSavedProfiles();
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const forcedParam = urlParams.get('godown');
+
+            let matched = null;
+
+            if (forcedParam) {
+                // Strict validation against specified godown parameter
+                const target = savedConfigs.find(c => c.id.toLowerCase() === forcedParam.toLowerCase());
+                if (target && String(target.pin || '1001') === enteredPin) {
+                    matched = target;
+                }
+            } else {
+                // Pure PIN-based identification across all configured godowns
+                matched = savedConfigs.find(c => String(c.pin || '') === enteredPin);
+            }
+
+            if (matched) {
+                sessionStorage.setItem(SESSION_AUTH_KEY, matched.id);
+                errorMsg.classList.add('d-none');
+                applyGodownSession(matched);
+            } else {
+                errorMsg.classList.remove('d-none');
+                document.getElementById('inputTerminalPin').value = '';
+                document.getElementById('inputTerminalPin').focus();
+            }
+        }
+
+        function applyGodownSession(config) {
+            activeGodownId = config.id;
+            activeGodownName = config.name;
+            activeOperators = config.operators && config.operators.length > 0 ? config.operators : ["Operator (Staff)"];
+
+            // Hide Security Lock Overlay
+            document.getElementById('securityLockOverlay').classList.add('d-none');
+
+            // Set UI Identity
+            document.getElementById('godownTerminalTitle').textContent = `Godown Terminal: ${activeGodownName}`;
+            document.getElementById('godownTerminalSub').textContent = `Allotted Facility: ${activeGodownName} [${activeGodownId}]`;
+            document.getElementById('godownIdBadge').innerHTML = `<i class="fa fa-map-marker-alt me-1 text-warning"></i>${activeGodownId}`;
+
+            // Populate locked operator list
+            const opSelect = document.getElementById('txOperatorSelect');
+            opSelect.innerHTML = '';
+            activeOperators.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                opSelect.appendChild(opt);
+            });
+            opSelect.disabled = activeOperators.length <= 1;
+
+            if (currentMode === 'COUNTER') {
+                renderCounterTrackerTable();
+            }
+        }
+
+        function lockTerminal() {
+            sessionStorage.removeItem(SESSION_AUTH_KEY);
+            checkSessionAndResolve();
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            const tabReceive = document.getElementById('tabReceive');
+            const tabCounter = document.getElementById('tabCounter');
+            const tabCustomer = document.getElementById('tabCustomer');
+            const banner = document.getElementById('modeBanner');
+            const bannerTitle = document.getElementById('bannerTitle');
+            const bannerDesc = document.getElementById('bannerDesc');
+            const counterAlert = document.getElementById('counterDestAlert');
+            const customerPicker = document.getElementById('customerPickerArea');
+            const supplierArea = document.getElementById('supplierNameArea');
+            const docLabel = document.getElementById('docNoLabel');
+            const submitBtn = document.getElementById('submitActionBtn');
+            const counterTracker = document.getElementById('counterTrackerSection');
+
+            tabReceive.className = "mode-tab";
+            tabCounter.className = "mode-tab";
+            tabCustomer.className = "mode-tab";
+            counterAlert.classList.add('d-none');
+            customerPicker.classList.add('d-none');
+            supplierArea.classList.add('d-none');
+            counterTracker.classList.add('d-none');
+
+            const gdnLabel = activeGodownName || 'Godown';
+
+            if (mode === 'RECEIVE') {
+                tabReceive.className = "mode-tab active-receive";
+                banner.className = "p-3 mb-3 rounded border-start border-4 border-info bg-light";
+                bannerTitle.textContent = "1. Inward Goods Receipt Note (GRN)";
+                bannerDesc.textContent = `Unload and log incoming materials into storage at ${gdnLabel}.`;
+                supplierArea.classList.remove('d-none');
+                docLabel.textContent = "Supplier Bill / Inward Ref *";
+                document.getElementById('txDocNo').value = "GRN-" + Date.now().toString().slice(-4);
+                submitBtn.className = "btn btn-primary px-4 fw-bold";
+                submitBtn.innerHTML = '<i class="fa fa-download me-1"></i> Log Inward Receipt';
+            }
+            else if (mode === 'COUNTER') {
+                tabCounter.className = "mode-tab active-counter";
+                banner.className = "p-3 mb-3 rounded border-start border-4 border-warning bg-light";
+                bannerTitle.textContent = `2. Dispatch Goods to Outlet Counter (from ${gdnLabel})`;
+                bannerDesc.textContent = "Release materials to Outlet Counter. Status will show In-Transit until Counter Admin confirms receipt.";
+                counterAlert.classList.remove('d-none');
+                counterTracker.classList.remove('d-none');
+                docLabel.textContent = "Gate Pass Number *";
+                document.getElementById('txDocNo').value = "GP-" + Date.now().toString().slice(-4);
+                submitBtn.className = "btn btn-warning text-dark px-4 fw-bold";
+                submitBtn.innerHTML = '<i class="fa fa-truck me-1"></i> Release to Counter';
+                renderCounterTrackerTable();
+            }
+            else if (mode === 'CUSTOMER') {
+                tabCustomer.className = "mode-tab active-customer";
+                banner.className = "p-3 mb-3 rounded border-start border-4 border-success bg-light";
+                bannerTitle.textContent = `3. Dispatch Goods to Customer (from ${gdnLabel})`;
+                bannerDesc.textContent = "Deliver customer-ordered goods directly from godown.";
+                customerPicker.classList.remove('d-none');
+                docLabel.textContent = "Delivery Challan No *";
+                document.getElementById('txDocNo').value = "DC-CUST-" + Date.now().toString().slice(-4);
+                submitBtn.className = "btn btn-success px-4 fw-bold";
+                submitBtn.innerHTML = '<i class="fa fa-check-circle me-1"></i> Release Customer Shipment';
+            }
+        }
+
+        function renderCounterTrackerTable() {
+            const tbody = document.getElementById('counterTrackerBody');
+            tbody.innerHTML = '';
+
+            const movements = JSON.parse(localStorage.getItem('godown_movements')) || [];
+            const counterDispatches = movements.filter(m =>
+                m.type === 'DISPATCH' &&
+                m.flow && m.flow.includes('Outlet Counter') &&
+                (m.godownId === activeGodownId || !m.godownId)
+            );
+
+            if (counterDispatches.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No counter dispatches found from ${activeGodownName || 'this godown'}.</td></tr>`;
+                return;
+            }
+
+            counterDispatches.slice(0, 10).forEach(d => {
+                let statusBadge = '';
+                if (d.status === 'IN_TRANSIT') {
+                    statusBadge = '<span class="badge bg-warning text-dark status-badge"><i class="fa fa-truck fa-spin me-1"></i>In-Transit</span>';
+                } else if (d.status === 'RECEIVED_AT_OUTLET') {
+                    statusBadge = `<span class="badge bg-success status-badge"><i class="fa fa-check-circle me-1"></i>Received (${d.receivedTime || 'Accepted'})</span>`;
+                } else {
+                    statusBadge = `<span class="badge bg-secondary status-badge">${d.status}</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td><span class="text-muted">${d.time}</span><br><span style="font-size:11px;">${d.date || ''}</span></td>
+                  <td><strong class="text-dark">${d.id}</strong></td>
+                  <td><i class="fa fa-truck text-muted me-1"></i>${d.transport || '-'}</td>
+                  <td><span class="fw-medium">${d.itemsSummary || '-'}</span></td>
+                  <td>${statusBadge}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="printChallan('${d.id}')" title="Print Gate Pass">
+                      <i class="fa fa-print"></i>
+                    </button>
+                  </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function loadInventoryItems() {
+            try {
+                inventoryItems = JSON.parse(localStorage.getItem('items')) || [];
+                const dl = document.getElementById('inventoryDatalist');
+                dl.innerHTML = '';
+                inventoryItems.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = `${item.name} ${item.itemCode ? '[' + item.itemCode + ']' : ''}`;
+                    opt.dataset.id = item.id;
+                    opt.dataset.name = item.name;
+                    opt.dataset.uom = item.uom || 'Pcs';
+                    dl.appendChild(opt);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function getInvoiceAmount(inv) {
+            let raw = inv.invoice_total;
+            if (raw === undefined || raw === null || raw === '') raw = inv.total;
+            if (raw === undefined || raw === null || raw === '') raw = inv.grandTotal;
+            if (raw === undefined || raw === null || raw === '') raw = inv.total_amount;
+            if (raw === undefined || raw === null || raw === '') {
+                if (inv.items && Array.isArray(inv.items) && inv.items.length > 0) {
+                    raw = inv.items.reduce((sum, itm) => sum + (parseFloat(itm.total || (itm.qty * (itm.price || itm.rate || 0)) || 0) || 0), 0);
+                } else {
+                    raw = 0;
+                }
+            }
+            const num = typeof raw === 'string' ? parseFloat(raw.replace(/,/g, '')) : parseFloat(raw);
+            return isNaN(num) ? '0.00' : num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        async function loadReportInvoices() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getInvoices) {
+                    reportInvoices = await apiClient.getInvoices();
+                }
+            } catch (err) { }
+
+            if (!reportInvoices || reportInvoices.length === 0) {
+                reportInvoices = JSON.parse(localStorage.getItem('invoices')) || [];
+            }
+
+            renderInvoiceDatalist(reportInvoices);
+        }
+
+        function renderInvoiceDatalist(invoicesList) {
+            const dl = document.getElementById('reportInvoiceList');
+            dl.innerHTML = '';
+            (invoicesList || []).slice(-50).reverse().forEach(inv => {
+                const cName = (inv.customer && inv.customer.name) || inv.customerName || inv.customer_name || 'Customer';
+                const invNo = inv.invoice_no || inv.id;
+                const dateStr = inv.invoice_date || inv.date || '';
+                const amtStr = getInvoiceAmount(inv);
+
+                const opt = document.createElement('option');
+                opt.value = `${invNo} | ₹${amtStr} (${cName})`;
+                opt.label = `₹${amtStr} | ${cName} (${dateStr})`;
+                opt.dataset.id = inv.id;
+                opt.dataset.invNo = invNo;
+                opt.dataset.amount = amtStr;
+                opt.dataset.cust = cName;
+                opt.dataset.custAddress = (inv.customer && inv.customer.address) || inv.customer_address || inv.address || '';
+                opt.dataset.custPhone = (inv.customer && (inv.customer.contact || inv.customer.mobile)) || inv.customer_phone || inv.customer_contact || inv.contact || '';
+                opt.dataset.items = JSON.stringify(inv.items || []);
+                dl.appendChild(opt);
+            });
+        }
+
+        async function loadMasterCustomers() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomers) {
+                    masterCustomers = await apiClient.getCustomers();
+                }
+            } catch (err) { }
+
+            if (!masterCustomers || masterCustomers.length === 0) {
+                masterCustomers = JSON.parse(localStorage.getItem('customers')) || [];
+            }
+
+            const dl = document.getElementById('masterCustomerList');
+            dl.innerHTML = '';
+            (masterCustomers || []).forEach(cust => {
+                const name = cust.name || cust.customer_name || '';
+                const phone = cust.contact || cust.mobile || cust.phone || '';
+                const address = [cust.address, cust.district, cust.state].filter(Boolean).join(', ');
+
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.label = `${phone ? 'Ph: ' + phone + ' | ' : ''}${address}`;
+                opt.dataset.id = cust.id || cust._id || '';
+                opt.dataset.name = name;
+                opt.dataset.phone = phone;
+                opt.dataset.address = address;
+                dl.appendChild(opt);
+            });
+        }
+
+        function onInvoiceNoSearched(inputEl) {
+            const rawVal = inputEl.value.trim();
+            const badge = document.getElementById('invAmountBadge');
+            if (!rawVal) {
+                document.getElementById('selectedInvoiceId').value = '';
+                if (badge) badge.classList.add('d-none');
+                return;
+            }
+
+            const val = rawVal.toLowerCase();
+            const cleanInvNo = rawVal.split('|')[0].trim().toLowerCase();
+
+            const opts = document.getElementById('reportInvoiceList').options;
+            let matchedOption = null;
+
+            for (let i = 0; i < opts.length; i++) {
+                const optVal = opts[i].value.toLowerCase();
+                const optInvNo = (opts[i].dataset.invNo || '').toLowerCase();
+                const optId = (opts[i].dataset.id || '').toLowerCase();
+
+                if (optVal === val || optInvNo === cleanInvNo || optId === cleanInvNo || optInvNo === val || optId === val) {
+                    matchedOption = opts[i];
+                    break;
+                }
+            }
+
+            if (matchedOption) {
+                document.getElementById('selectedInvoiceId').value = matchedOption.dataset.id;
+                document.getElementById('txCustomerName').value = matchedOption.dataset.cust || '';
+
+                if (badge && matchedOption.dataset.amount) {
+                    badge.textContent = `₹${matchedOption.dataset.amount}`;
+                    badge.classList.remove('d-none');
+                }
+
+                if (matchedOption.dataset.custAddress) {
+                    document.getElementById('txCustomerAddress').value = matchedOption.dataset.custAddress;
+                } else {
+                    lookupCustomerAddress(matchedOption.dataset.cust);
+                }
+
+                if (matchedOption.dataset.custPhone) {
+                    document.getElementById('txCustomerPhone').value = matchedOption.dataset.custPhone;
+                }
+
+                try {
+                    const items = JSON.parse(matchedOption.dataset.items);
+                    if (items && items.length > 0) {
+                        document.getElementById('materialBody').innerHTML = '';
+                        items.forEach(itm => {
+                            appendItemRow(itm.itemId || '', itm.itemName || itm.item, itm.qty || 1, itm.uom || 'Pcs');
+                        });
+                    }
+                } catch (e) {
+                    console.error("Could not parse invoice items:", e);
+                }
+            }
+        }
+
+        function onCustomerSearched(inputEl) {
+            const val = inputEl.value.trim().toLowerCase();
+            if (!val) return;
+
+            const opts = document.getElementById('masterCustomerList').options;
+            let matchedCustomer = null;
+
+            for (let i = 0; i < opts.length; i++) {
+                if (opts[i].value.toLowerCase() === val || (opts[i].dataset.phone && opts[i].dataset.phone.includes(val))) {
+                    matchedCustomer = opts[i];
+                    break;
+                }
+            }
+
+            if (matchedCustomer) {
+                inputEl.value = matchedCustomer.dataset.name;
+                document.getElementById('selectedCustomerId').value = matchedCustomer.dataset.id;
+                document.getElementById('txCustomerAddress').value = matchedCustomer.dataset.address || '';
+                document.getElementById('txCustomerPhone').value = matchedCustomer.dataset.phone || '';
+
+                const custInvoices = reportInvoices.filter(inv => {
+                    const cName = (inv.customer && inv.customer.name) || inv.customerName || inv.customer_name || '';
+                    return cName.toLowerCase() === matchedCustomer.dataset.name.toLowerCase();
+                });
+
+                if (custInvoices.length > 0) {
+                    renderInvoiceDatalist(custInvoices);
+                    const latest = custInvoices[custInvoices.length - 1];
+                    const latestAmt = getInvoiceAmount(latest);
+                    document.getElementById('searchInvoiceNo').placeholder = `Recent Inv: ${latest.invoice_no || latest.id} (₹${latestAmt})`;
+                }
+            }
+        }
+
+        function lookupCustomerAddress(customerName) {
+            if (!customerName) return;
+            const found = masterCustomers.find(c => {
+                const n = c.name || c.customer_name || '';
+                return n.toLowerCase() === customerName.toLowerCase();
+            });
+            if (found) {
+                const fullAddr = [found.address, found.district, found.state].filter(Boolean).join(', ');
+                document.getElementById('txCustomerAddress').value = fullAddr;
+                if (found.contact || found.mobile || found.phone) {
+                    document.getElementById('txCustomerPhone').value = found.contact || found.mobile || found.phone;
+                }
+            }
+        }
+
+        function clearInvoiceSelection() {
+            document.getElementById('searchInvoiceNo').value = '';
+            document.getElementById('selectedInvoiceId').value = '';
+            const badge = document.getElementById('invAmountBadge');
+            if (badge) badge.classList.add('d-none');
+            renderInvoiceDatalist(reportInvoices);
+        }
+
+        function clearCustomerSelection() {
+            document.getElementById('txCustomerName').value = '';
+            document.getElementById('selectedCustomerId').value = '';
+            document.getElementById('txCustomerAddress').value = '';
+            document.getElementById('txCustomerPhone').value = '';
+            renderInvoiceDatalist(reportInvoices);
+        }
+
+        function addMaterialRow() {
+            appendItemRow('', '', '', 'Pcs');
+        }
+
+        function appendItemRow(id, name, qty, uom) {
+            const tbody = document.getElementById('materialBody');
+            const tr = document.createElement('tr');
+            tr.className = 'item-row';
+            tr.innerHTML = `
+                <td>
+                  <input type="text" class="form-control form-control-sm item-input" list="inventoryDatalist" value="${name}" placeholder="Type item name..." required onchange="onItemPicked(this)">
+                  <input type="hidden" class="item-id" value="${id}">
+                  <input type="hidden" class="item-name" value="${name}">
+                </td>
+                <td>
+                  <input type="number" class="form-control form-control-sm item-qty" value="${qty}" placeholder="Quantity" min="0.01" step="0.01" required>
+                </td>
+                <td>
+                  <input type="text" class="form-control form-control-sm item-uom" value="${uom}" readonly>
+                </td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteRow(this)">&times;</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function deleteRow(btn) {
+            if (document.querySelectorAll('.item-row').length > 1) {
+                btn.closest('tr').remove();
+            } else {
+                alert("Must contain at least 1 item line.");
+            }
+        }
+
+        function onItemPicked(input) {
+            const tr = input.closest('tr');
+            const val = input.value;
+            const opts = document.getElementById('inventoryDatalist').options;
+            let match = null;
+            for (let i = 0; i < opts.length; i++) {
+                if (opts[i].value === val) {
+                    match = opts[i];
+                    break;
+                }
+            }
+            if (match) {
+                tr.querySelector('.item-id').value = match.dataset.id;
+                tr.querySelector('.item-name').value = match.dataset.name;
+                tr.querySelector('.item-uom').value = match.dataset.uom || 'Pcs';
+            }
+        }
+
+        // MAIN SUBMIT ACTION
+        async function handleGodownTransaction() {
+            const date = document.getElementById('txDate').value;
+            const operator = document.getElementById('txOperatorSelect').value.trim();
+            const vehicle = document.getElementById('txVehicle').value.trim();
+            const docNo = document.getElementById('txDocNo').value.trim();
+            const remarks = document.getElementById('txRemarks').value.trim();
+
+            if (!operator || !vehicle || !docNo) {
+                alert("Please ensure Operator, Vehicle, and Document Ref are filled.");
+                return;
+            }
+
+            const rows = document.querySelectorAll('.item-row');
+            const lineItems = [];
+            rows.forEach(r => {
+                const id = r.querySelector('.item-id').value;
+                const name = r.querySelector('.item-name').value || r.querySelector('.item-input').value.trim();
+                const qty = parseFloat(r.querySelector('.item-qty').value) || 0;
+                const uom = r.querySelector('.item-uom').value || 'Pcs';
+                if (name && qty > 0) {
+                    lineItems.push({ id, name, qty, uom });
+                }
+            });
+
+            if (lineItems.length === 0) {
+                alert("Please add at least one item line with valid quantity.");
+                return;
+            }
+
+            const now = new Date();
+            let movements = JSON.parse(localStorage.getItem('godown_movements')) || [];
+
+            // 1. INWARD RECEIVE
+            if (currentMode === 'RECEIVE') {
+                const supplier = document.getElementById('txSupplierName').value.trim() || 'Vendor Inward';
+                movements.unshift({
+                    id: docNo,
+                    godownId: activeGodownId,
+                    godownName: activeGodownName,
+                    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    date: date,
+                    type: "INWARD",
+                    flow: `${supplier} ➔ ${activeGodownName}`,
+                    operator: operator,
+                    transport: vehicle,
+                    itemsSummary: lineItems.map(i => `${i.name} x ${i.qty} ${i.uom}`).join(', '),
+                    itemsRaw: lineItems,
+                    status: "GODOWN_STOCKED"
+                });
+                alert(`Inward Goods Receipt Note ${docNo} logged at ${activeGodownName}.`);
+            }
+
+            // 2. COUNTER DISPATCH (INTERNAL TRANSFER)
+            else if (currentMode === 'COUNTER') {
+                movements.unshift({
+                    id: docNo,
+                    godownId: activeGodownId,
+                    godownName: activeGodownName,
+                    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    date: date,
+                    type: "DISPATCH",
+                    flow: `${activeGodownName} ➔ Outlet Counter`,
+                    operator: operator,
+                    transport: vehicle,
+                    itemsSummary: lineItems.map(i => `${i.name} x ${i.qty} ${i.uom}`).join(', '),
+                    itemsRaw: lineItems,
+                    status: "IN_TRANSIT"
+                });
+                alert(`Gate Pass ${docNo} dispatched from ${activeGodownName}! Status: In-Transit.`);
+            }
+
+            // 3. CUSTOMER DISPATCH
+            else if (currentMode === 'CUSTOMER') {
+                const custName = document.getElementById('txCustomerName').value.trim() || 'Direct Customer';
+                const custAddr = document.getElementById('txCustomerAddress').value.trim();
+                const custPhone = document.getElementById('txCustomerPhone').value.trim();
+                const rawInvoiceVal = document.getElementById('searchInvoiceNo').value.trim();
+                const linkedInv = rawInvoiceVal ? rawInvoiceVal.split('|')[0].trim() : '';
+
+                const partyFull = `${custName}${custPhone ? ' (' + custPhone + ')' : ''}${custAddr ? ' - ' + custAddr : ''}`;
+                movements.unshift({
+                    id: docNo,
+                    godownId: activeGodownId,
+                    godownName: activeGodownName,
+                    invoiceNo: linkedInv,
+                    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    date: date,
+                    type: "DISPATCH",
+                    flow: `${activeGodownName} ➔ ${partyFull}`,
+                    operator: operator,
+                    transport: vehicle,
+                    itemsSummary: lineItems.map(i => `${i.name} x ${i.qty} ${i.uom}`).join(', '),
+                    itemsRaw: lineItems,
+                    remarks: `${linkedInv ? 'Linked Invoice: ' + linkedInv + ' | ' : ''}${remarks}`,
+                    status: "DELIVERED_TO_CUSTOMER"
+                });
+                alert(`Customer Delivery Challan ${docNo} dispatched from ${activeGodownName}.`);
+            }
+
+            localStorage.setItem('godown_movements', JSON.stringify(movements));
+
+            document.getElementById('materialBody').innerHTML = '';
+            addMaterialRow();
+            clearInvoiceSelection();
+            clearCustomerSelection();
+            switchMode(currentMode);
+            if (currentMode === 'COUNTER') {
+                renderCounterTrackerTable();
+            }
+        }
+
+        function printChallan(id) {
+            const movements = JSON.parse(localStorage.getItem('godown_movements')) || [];
+            const target = movements.find(m => m.id === id);
+            if (!target) return;
+
+            document.getElementById('printDocRef').innerText = target.id;
+            document.getElementById('printSource').innerText = target.godownName || activeGodownName;
+            document.getElementById('printOperator').innerText = target.operator;
+            document.getElementById('printVehicle').innerText = target.transport;
+            document.getElementById('printTime').innerText = `${target.date} ${target.time}`;
+            document.getElementById('printDest').innerText = target.flow;
+
+            const tbody = document.getElementById('printItemsBody');
+            tbody.innerHTML = '';
+            (target.itemsRaw || []).forEach((itm, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${idx + 1}</td>
+                    <td class="fw-bold">${itm.name}</td>
+                    <td class="text-center">${itm.qty} ${itm.uom || 'Pcs'}</td>
+                    <td class="text-center">${target.status === 'RECEIVED_AT_OUTLET' ? itm.qty + ' ' + (itm.uom || 'Pcs') : '___________'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const qrEl = document.getElementById('challanQr');
+            qrEl.innerHTML = '';
+            new QRCode(qrEl, {
+                text: JSON.stringify({
+                    ref: target.id,
+                    godown: target.godownId || activeGodownId,
+                    flow: target.flow,
+                    vehicle: target.transport,
+                    itemsCount: (target.itemsRaw || []).length
+                }),
+                width: 70,
+                height: 70
+            });
+
+            window.print();
+        }
+    </script>
+</body>
+
+</html>

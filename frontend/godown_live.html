@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Live Godown Movement Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="apiClient.js"></script>
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
+
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .pulse-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #28a745;
+            box-shadow: 0 0 0 rgba(40, 167, 69, 0.4);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+            }
+        }
+
+        .kpi-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .integration-pill {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-decoration: none;
+        }
+
+        .inv-pill {
+            font-size: 11px;
+            font-weight: 600;
+            text-decoration: none;
+            padding: 3px 6px;
+            border-radius: 6px;
+        }
+
+        .gdn-badge {
+            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #printableChallan,
+            #printableChallan * {
+                visibility: visible;
+            }
+
+            #printableChallan {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        .challan-box {
+            border: 2px solid #1e293b;
+            padding: 24px;
+            background: #fff;
+        }
+    </style>
+</head>
+
+<body class="p-3 p-md-4">
+    <div class="container-fluid no-print">
+
+        <!-- Top Bar -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
+            <div>
+                <h4 class="mb-1 text-dark fw-bold">Godown-to-Counter Real-Time Tracker</h4>
+                <small class="text-muted"><span class="pulse-indicator me-1"></span> Live Monitor | Multi-Godown
+                    Controller</small>
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <button class="btn btn-outline-primary btn-sm" onclick="refreshData()"><i
+                        class="fa fa-sync-alt me-1"></i>Refresh</button>
+                <button class="btn btn-outline-dark btn-sm" onclick="openGodownConfigModal()"><i
+                        class="fa fa-cogs me-1"></i>Manage Godowns & Operators</button>
+                <a href="report.html" target="_blank" class="btn btn-outline-secondary btn-sm integration-pill"><i
+                        class="fa fa-file-invoice text-primary me-1"></i>Invoices Report</a>
+                <a href="customer.html" target="_blank" class="btn btn-outline-secondary btn-sm integration-pill"><i
+                        class="fa fa-users text-success me-1"></i>Customer Master</a>
+            </div>
+        </div>
+
+        <!-- Real-time KPI Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card kpi-card p-3 border-start border-warning border-4">
+                    <span class="text-muted small text-uppercase fw-semibold">Dispatched (In-Transit)</span>
+                    <h3 class="fw-bold my-1 text-warning" id="kpiInTransit">0 Deliveries</h3>
+                    <small class="text-muted">En route from Godown to Counter</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card p-3 border-start border-success border-4">
+                    <span class="text-muted small text-uppercase fw-semibold">Received at Counter</span>
+                    <h3 class="fw-bold my-1 text-success" id="kpiReceived">0 Units</h3>
+                    <small class="text-muted">Physical delivery confirmed</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card p-3 border-start border-info border-4">
+                    <span class="text-muted small text-uppercase fw-semibold">Godown Inward (GRN)</span>
+                    <h3 class="fw-bold my-1 text-info" id="kpiGodownInward">0 Units</h3>
+                    <small class="text-muted">Supplier arrivals logged</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card kpi-card p-3 border-start border-primary border-4">
+                    <span class="text-muted small text-uppercase fw-semibold">Delivered to Customers</span>
+                    <h3 class="fw-bold my-1 text-primary" id="kpiCustomerDelivered">0 Shipments</h3>
+                    <small class="text-muted">Direct sales shipments completed</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Movement Table -->
+        <div class="card border-0 shadow-sm rounded-3">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <h6 class="mb-0 fw-bold"><i class="fa fa-dolly me-2 text-primary"></i>Live Cargo & Movement Feed
+                    </h6>
+                    <!-- Multi-Godown Filter -->
+                    <select id="godownFilterSelect" class="form-select form-select-sm" onchange="filterTable()"
+                        style="width: 200px;">
+                        <option value="ALL">All Godowns</option>
+                    </select>
+                </div>
+                <div class="d-flex gap-2">
+                    <input type="text" id="searchInput" class="form-control form-control-sm"
+                        placeholder="Search invoice, doc, godown, item..." style="width: 280px;"
+                        onkeyup="filterTable()">
+                    <select class="form-select form-select-sm" id="typeFilter" onchange="filterTable()"
+                        style="width: 180px;">
+                        <option value="ALL">All Movements</option>
+                        <option value="IN_TRANSIT">In-Transit (Counter Transfer)</option>
+                        <option value="RECEIVED_AT_OUTLET">Received at Counter</option>
+                        <option value="DELIVERED_TO_CUSTOMER">Customer Deliveries</option>
+                        <option value="GODOWN_STOCKED">Godown Inward (GRN)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="movementTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Time & Date</th>
+                            <th>Godown Source</th>
+                            <th>Document Ref</th>
+                            <th>Invoice No</th>
+                            <th>Movement Flow</th>
+                            <th>Operator</th>
+                            <th>Vehicle / Carrier</th>
+                            <th>Items & Qty</th>
+                            <th>Status</th>
+                            <th class="text-end">Admin Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="movementBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ADMIN MULTI-GODOWN & OPERATOR CONFIGURATION MODAL -->
+    <div class="modal fade" id="godownConfigModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fa fa-cogs me-2 text-primary"></i>Manage Godown Terminals
+                        & Fixed Operators</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        Define each godown's display name, authorized operators, and 4-digit terminal access PIN.
+                        Operators must enter this PIN to open and bind their terminal workstation.
+                    </p>
+
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered table-sm align-middle" id="configTable">
+                            <thead class="table-light small">
+                                <tr>
+                                    <th style="width: 14%;">Godown ID</th>
+                                    <th style="width: 28%;">Godown Display Name</th>
+                                    <th style="width: 28%;">Fixed Operators</th>
+                                    <th style="width: 14%;">Terminal Access PIN</th>
+                                    <th style="width: 11%; text-align: center;">Terminal Link</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="configTableBody"></tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addGodownConfigRow()">+ Add
+                        New Godown</button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveGodownConfigs()"><i
+                            class="fa fa-save me-1"></i>Save Configuration</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div class="modal fade" id="movementDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="modalDocTitle"><i
+                            class="fa fa-info-circle me-2 text-primary"></i>Movement Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 mb-3 small" id="modalMetaContent"></div>
+                    <h6 class="fw-bold border-bottom pb-1 mb-2">Item Line Items</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Item Name / Code</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-center">UOM</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modalItemsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                    <button type="button" id="modalPrintBtn" class="btn btn-primary btn-sm"><i
+                            class="fa fa-print me-1"></i>Print Challan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Printable Delivery Challan -->
+    <div id="printableChallan" class="d-none d-print-block">
+        <div class="challan-box">
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
+                <div>
+                    <h3 class="fw-bold mb-0" id="printChallanHeading">DELIVERY CHALLAN / GOODS PASS</h3>
+                    <small class="text-muted" id="printChallanSubheading">Issued under Rule 55 of Indian GST Rules for
+                        Movement of Goods</small>
+                </div>
+                <div id="challanQr"></div>
+            </div>
+            <div class="row g-2 mb-3 small">
+                <div class="col-6">
+                    <div class="border p-2 rounded">
+                        <strong>FROM (SOURCE GODOWN):</strong>
+                        <div id="printSource" class="fw-bold">-</div>
+                        <div>Issuer: <span id="printOperator">-</span></div>
+                        <div>Dispatch Timestamp: <span id="printTime">-</span></div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="border p-2 rounded">
+                        <strong>TO (DESTINATION):</strong>
+                        <div id="printDest" class="fw-bold">-</div>
+                        <div>Vehicle / Transport: <span id="printVehicle" class="fw-bold">-</span></div>
+                        <div>Document Ref: <span id="printDocRef" class="fw-bold text-primary">-</span></div>
+                        <div id="printInvoiceRow" class="d-none">Linked Invoice: <span id="printInvoiceNo"
+                                class="fw-bold text-dark">-</span></div>
+                    </div>
+                </div>
+            </div>
+            <table class="table table-bordered table-sm small mb-4">
+                <thead>
+                    <tr class="table-light">
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 55%;">Description of Goods</th>
+                        <th style="width: 20%; text-align: center;">Dispatched Qty</th>
+                        <th style="width: 20%; text-align: center;">Received Qty</th>
+                    </tr>
+                </thead>
+                <tbody id="printItemsBody"></tbody>
+            </table>
+            <div class="row mt-5 pt-3 text-center small">
+                <div class="col-4">
+                    <hr class="mb-1">Godown In-Charge
+                </div>
+                <div class="col-4">
+                    <hr class="mb-1">Transporter / Carrier
+                </div>
+                <div class="col-4">
+                    <hr class="mb-1">Recipient Sign & Seal
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const STORAGE_KEY = 'godown_movements';
+        const CONFIG_KEY = 'godown_profiles';
+
+        // Default godown configuration with access PINs
+        const DEFAULT_CONFIGS = [
+            { id: "GDN-01", name: "Central Godown (Main)", operators: ["Abc Kumar", "Def Ghosh"], pin: "1001" },
+            { id: "GDN-02", name: "North Depot (Branch 2)", operators: ["Mno Das", "Pqr Roy"], pin: "2002" }
+        ];
+
+        let movements = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        let godownConfigs = JSON.parse(localStorage.getItem(CONFIG_KEY)) || DEFAULT_CONFIGS;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            populateGodownDropdownFilter();
+            renderTable(movements);
+            updateKPIs();
+        });
+
+        window.addEventListener('storage', (e) => {
+            if (e.key === STORAGE_KEY || e.key === CONFIG_KEY) {
+                refreshData();
+            }
+        });
+
+        function refreshData() {
+            movements = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            godownConfigs = JSON.parse(localStorage.getItem(CONFIG_KEY)) || DEFAULT_CONFIGS;
+            populateGodownDropdownFilter();
+            renderTable(movements);
+            updateKPIs();
+        }
+
+        function populateGodownDropdownFilter() {
+            const select = document.getElementById('godownFilterSelect');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="ALL">All Godowns</option>';
+            godownConfigs.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.id;
+                opt.textContent = g.name;
+                select.appendChild(opt);
+            });
+            select.value = currentVal || 'ALL';
+        }
+
+        function resolveInvoiceNo(row) {
+            if (row.invoiceNo && row.invoiceNo.trim()) return row.invoiceNo.trim();
+            if (row.remarks && row.remarks.includes('Linked Invoice:')) {
+                const parts = row.remarks.split('Linked Invoice:');
+                if (parts.length > 1) {
+                    const invPart = parts[1].split('|')[0].trim();
+                    if (invPart) return invPart;
+                }
+            }
+            return '-';
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById("movementBody");
+            tbody.innerHTML = "";
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No godown movements recorded yet.</td></tr>`;
+                return;
+            }
+
+            data.forEach(row => {
+                let statusBadge = "";
+                let actionBtn = "";
+                const invNo = resolveInvoiceNo(row);
+
+                let invBadge = `<span class="text-muted small">-</span>`;
+                if (invNo !== '-') {
+                    invBadge = `
+            <a href="report.html" target="_blank" class="badge bg-light text-primary border inv-pill" title="Click to view invoice in Report">
+              <i class="fa fa-file-invoice text-primary me-1"></i>${invNo}
+            </a>
+          `;
+                }
+
+                if (row.status === "IN_TRANSIT") {
+                    statusBadge = '<span class="badge bg-warning text-dark status-badge"><i class="fa fa-truck me-1"></i>In-Transit</span>';
+                    actionBtn = `
+            <button class="btn btn-sm btn-outline-info me-1" onclick="viewMovementDetails('${row.id}')" title="Inspect Items"><i class="fa fa-eye"></i></button>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="printChallan('${row.id}')" title="Print Challan"><i class="fa fa-print"></i></button>
+            <button class="btn btn-sm btn-success" onclick="acceptAtCounter('${row.id}')"><i class="fa fa-check me-1"></i>Confirm Arrival</button>
+          `;
+                }
+                else if (row.status === "RECEIVED_AT_OUTLET") {
+                    statusBadge = '<span class="badge bg-success status-badge"><i class="fa fa-check-circle me-1"></i>Received at Counter</span>';
+                    actionBtn = `
+            <button class="btn btn-sm btn-outline-info me-1" onclick="viewMovementDetails('${row.id}')" title="Inspect Items"><i class="fa fa-eye"></i></button>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="printChallan('${row.id}')"><i class="fa fa-print"></i></button>
+            <span class="text-muted small">Confirmed</span>
+          `;
+                }
+                else if (row.status === "DELIVERED_TO_CUSTOMER") {
+                    statusBadge = '<span class="badge bg-primary status-badge"><i class="fa fa-user-check me-1"></i>Customer Shipped</span>';
+                    actionBtn = `
+            <button class="btn btn-sm btn-outline-info me-1" onclick="viewMovementDetails('${row.id}')" title="Inspect Items"><i class="fa fa-eye"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="printChallan('${row.id}')" title="Print Delivery Challan"><i class="fa fa-print"></i></button>
+          `;
+                }
+                else {
+                    statusBadge = '<span class="badge bg-info text-dark status-badge"><i class="fa fa-boxes me-1"></i>Godown Stocked (GRN)</span>';
+                    actionBtn = `
+            <button class="btn btn-sm btn-outline-info me-1" onclick="viewMovementDetails('${row.id}')" title="Inspect Items"><i class="fa fa-eye"></i></button>
+            <span class="text-muted small">Inward OK</span>
+          `;
+                }
+
+                const gdnName = row.godownName || (row.godownId ? `Godown (${row.godownId})` : 'Central Godown');
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+          <td class="text-muted small">${row.time}<br><span style="font-size:11px;">${row.date || ''}</span></td>
+          <td><span class="badge bg-light text-dark border gdn-badge"><i class="fa fa-warehouse text-secondary me-1"></i>${gdnName}</span></td>
+          <td><strong class="text-dark">${row.id}</strong></td>
+          <td>${invBadge}</td>
+          <td><span class="small fw-semibold text-secondary">${row.flow}</span></td>
+          <td><i class="fa fa-user-circle me-1 text-muted"></i>${row.operator}</td>
+          <td><span class="small">${row.transport}</span></td>
+          <td><span class="fw-medium small">${row.itemsSummary}</span></td>
+          <td>${statusBadge}</td>
+          <td class="text-end text-nowrap">${actionBtn}</td>
+        `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function acceptAtCounter(id) {
+            const target = movements.find(m => m.id === id);
+            if (!target || target.status !== 'IN_TRANSIT') return;
+
+            const ok = confirm(`Confirm physical arrival of Gate Pass ${id} at Outlet Counter?`);
+            if (!ok) return;
+
+            const now = new Date();
+            target.status = "RECEIVED_AT_OUTLET";
+            target.receivedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(movements));
+
+            refreshData();
+            alert(`Gate Pass ${id} marked as Received at Counter!`);
+        }
+
+        function viewMovementDetails(id) {
+            const target = movements.find(m => m.id === id);
+            if (!target) return;
+
+            const invNo = resolveInvoiceNo(target);
+            const gdnName = target.godownName || 'Central Godown';
+
+            document.getElementById('modalDocTitle').innerHTML = `<i class="fa fa-dolly me-2 text-primary"></i>Movement: ${target.id}`;
+            document.getElementById('modalMetaContent').innerHTML = `
+        <div class="col-6"><strong>Godown Source:</strong> ${gdnName}</div>
+        <div class="col-6"><strong>Movement Flow:</strong> ${target.flow}</div>
+        <div class="col-6"><strong>Status:</strong> ${target.status}</div>
+        <div class="col-6"><strong>Linked Invoice No:</strong> <span class="fw-bold text-primary">${invNo}</span></div>
+        <div class="col-6"><strong>Date & Time:</strong> ${target.date} ${target.time}</div>
+        <div class="col-6"><strong>Operator / Handler:</strong> ${target.operator}</div>
+        <div class="col-6"><strong>Vehicle:</strong> ${target.transport}</div>
+      `;
+
+            const tbody = document.getElementById('modalItemsBody');
+            tbody.innerHTML = '';
+            (target.itemsRaw || []).forEach((itm, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td><strong>${itm.name}</strong></td>
+          <td class="text-center">${itm.qty}</td>
+          <td class="text-center">${itm.uom || 'Pcs'}</td>
+        `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('modalPrintBtn').onclick = () => {
+                bootstrap.Modal.getInstance(document.getElementById('movementDetailsModal')).hide();
+                printChallan(target.id);
+            };
+
+            const modal = new bootstrap.Modal(document.getElementById('movementDetailsModal'));
+            modal.show();
+        }
+
+        function updateKPIs() {
+            const inTransit = movements.filter(m => m.status === 'IN_TRANSIT').length;
+            const receivedUnits = movements.filter(m => m.status === 'RECEIVED_AT_OUTLET').reduce((sum, m) => {
+                return sum + (m.itemsRaw || []).reduce((acc, i) => acc + (parseFloat(i.qty) || 0), 0);
+            }, 0);
+            const inwardUnits = movements.filter(m => m.status === 'GODOWN_STOCKED').reduce((sum, m) => {
+                return sum + (m.itemsRaw || []).reduce((acc, i) => acc + (parseFloat(i.qty) || 0), 0);
+            }, 0);
+            const customerShipments = movements.filter(m => m.status === 'DELIVERED_TO_CUSTOMER').length;
+
+            document.getElementById('kpiInTransit').innerText = `${inTransit} Deliveries`;
+            document.getElementById('kpiReceived').innerText = `${receivedUnits} Units`;
+            document.getElementById('kpiGodownInward').innerText = `${inwardUnits} Units`;
+            document.getElementById('kpiCustomerDelivered').innerText = `${customerShipments} Delivered`;
+        }
+
+        function filterTable() {
+            const query = document.getElementById("searchInput").value.toLowerCase();
+            const type = document.getElementById("typeFilter").value;
+            const gdn = document.getElementById("godownFilterSelect").value;
+
+            const filtered = movements.filter(m => {
+                const invNo = resolveInvoiceNo(m).toLowerCase();
+                const gdnName = (m.godownName || '').toLowerCase();
+                const gdnId = (m.godownId || '').toLowerCase();
+
+                const matchesQuery = (m.id && m.id.toLowerCase().includes(query)) ||
+                    invNo.includes(query) ||
+                    gdnName.includes(query) ||
+                    (m.itemsSummary && m.itemsSummary.toLowerCase().includes(query)) ||
+                    (m.operator && m.operator.toLowerCase().includes(query)) ||
+                    (m.flow && m.flow.toLowerCase().includes(query)) ||
+                    (m.transport && m.transport.toLowerCase().includes(query));
+
+                const matchesType = (type === "ALL" || m.status === type);
+                const matchesGodown = (gdn === "ALL" || m.godownId === gdn);
+
+                return matchesQuery && matchesType && matchesGodown;
+            });
+            renderTable(filtered);
+        }
+
+        // ====================================================
+        // GODOWN CONFIGURATION MODAL CONTROLS (WITH PIN FIX)
+        // ====================================================
+        function openGodownConfigModal() {
+            renderConfigTable();
+            const modal = new bootstrap.Modal(document.getElementById('godownConfigModal'));
+            modal.show();
+        }
+
+        function renderConfigTable() {
+            const tbody = document.getElementById('configTableBody');
+            tbody.innerHTML = '';
+            godownConfigs.forEach((cfg) => {
+                const tr = document.createElement('tr');
+                tr.className = 'config-row';
+                tr.innerHTML = `
+          <td><input type="text" class="form-control form-control-sm cfg-id" value="${cfg.id}" placeholder="GDN-01" required></td>
+          <td><input type="text" class="form-control form-control-sm cfg-name" value="${cfg.name}" placeholder="Godown Name" required></td>
+          <td><input type="text" class="form-control form-control-sm cfg-operators" value="${(cfg.operators || []).join(', ')}" placeholder="e.g. ABC Name, XYXZ Name"></td>
+          <td><input type="text" class="form-control form-control-sm cfg-pin" value="${cfg.pin || '1001'}" placeholder="4-digit PIN" maxlength="6" required></td>
+          <td class="text-center">
+            <a href="godown_terminal.html?godown=${encodeURIComponent(cfg.id)}" target="_blank" class="badge bg-primary text-decoration-none" title="Open terminal for this godown">
+              <i class="fa fa-external-link-alt me-1"></i>Open
+            </a>
+          </td>
+          <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">&times;</button>
+          </td>
+        `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addGodownConfigRow() {
+            const nextIdx = document.querySelectorAll('.config-row').length + 1;
+            const tbody = document.getElementById('configTableBody');
+            const tr = document.createElement('tr');
+            tr.className = 'config-row';
+            tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm cfg-id" value="GDN-0${nextIdx}" placeholder="GDN-0${nextIdx}" required></td>
+        <td><input type="text" class="form-control form-control-sm cfg-name" value="Godown Depot ${nextIdx}" placeholder="Godown Name" required></td>
+        <td><input type="text" class="form-control form-control-sm cfg-operators" value="" placeholder="e.g. Operator A, Operator B"></td>
+        <td><input type="password" class="form-control form-control-sm cfg-pin" value="${1000 + nextIdx}" placeholder="4-digit PIN" maxlength="6" required></td>
+        <td class="text-center text-muted small">Save first</td>
+        <td class="text-center">
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">&times;</button>
+        </td>
+      `;
+            tbody.appendChild(tr);
+        }
+
+        function saveGodownConfigs() {
+            const rows = document.querySelectorAll('.config-row');
+            const updated = [];
+
+            rows.forEach(r => {
+                const id = r.querySelector('.cfg-id').value.trim();
+                const name = r.querySelector('.cfg-name').value.trim();
+                const opsRaw = r.querySelector('.cfg-operators').value.trim();
+                const pin = r.querySelector('.cfg-pin').value.trim();
+                const operators = opsRaw ? opsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+                if (id && name) {
+                    updated.push({ id, name, operators, pin: pin || "1001" });
+                }
+            });
+
+            if (updated.length === 0) {
+                alert("Please define at least one valid godown.");
+                return;
+            }
+
+            godownConfigs = updated;
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(godownConfigs));
+            populateGodownDropdownFilter();
+            bootstrap.Modal.getInstance(document.getElementById('godownConfigModal')).hide();
+            alert("Godown profiles, access PINs, and operator lists saved successfully!");
+        }
+
+        function printChallan(id) {
+            const target = movements.find(m => m.id === id);
+            if (!target) return;
+
+            const isCustomer = target.status === 'DELIVERED_TO_CUSTOMER' || target.flow.includes('Customer');
+            document.getElementById('printChallanHeading').innerText = isCustomer
+                ? "CUSTOMER DELIVERY CHALLAN"
+                : "INTERNAL GATE PASS / STOCK TRANSFER CHALLAN";
+            document.getElementById('printChallanSubheading').innerText = isCustomer
+                ? "Accompaniment to Tax Invoice under Rule 55 of GST Rules"
+                : "Stock Transfer from Godown to Retail Counter (Not for Direct Sale)";
+
+            document.getElementById('printDocRef').innerText = target.id;
+            document.getElementById('printSource').innerText = target.godownName || "Central Godown Depot";
+            document.getElementById('printOperator').innerText = target.operator;
+            document.getElementById('printVehicle').innerText = target.transport;
+            document.getElementById('printTime').innerText = `${target.date} ${target.time}`;
+            document.getElementById('printDest').innerText = target.flow;
+
+            const invNo = resolveInvoiceNo(target);
+            const printInvRow = document.getElementById('printInvoiceRow');
+            if (invNo !== '-') {
+                document.getElementById('printInvoiceNo').innerText = invNo;
+                printInvRow.classList.remove('d-none');
+            } else {
+                printInvRow.classList.add('d-none');
+            }
+
+            const tbody = document.getElementById('printItemsBody');
+            tbody.innerHTML = '';
+            (target.itemsRaw || []).forEach((itm, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td class="fw-bold">${itm.name}</td>
+          <td class="text-center">${itm.qty} ${itm.uom || 'Pcs'}</td>
+          <td class="text-center">${target.status === 'RECEIVED_AT_OUTLET' || isCustomer ? itm.qty + ' ' + (itm.uom || 'Pcs') : '___________'}</td>
+        `;
+                tbody.appendChild(tr);
+            });
+
+            const qrEl = document.getElementById('challanQr');
+            qrEl.innerHTML = '';
+            new QRCode(qrEl, {
+                text: JSON.stringify({
+                    ref: target.id,
+                    godown: target.godownId,
+                    inv: invNo !== '-' ? invNo : undefined,
+                    flow: target.flow,
+                    vehicle: target.transport,
+                    itemsCount: (target.itemsRaw || []).length
+                }),
+                width: 70,
+                height: 70
+            });
+
+            window.print();
+        }
+    </script>
+</body>
+
+</html>
