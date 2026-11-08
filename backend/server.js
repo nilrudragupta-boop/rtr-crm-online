@@ -87,6 +87,7 @@ app.use('/api', async (req, res, next) => {
     const bodyActor = req.body && !Array.isArray(req.body) ? req.body.createdBy : '';
     const actorUsername = String(req.query.user || bodyActor || '').trim();
     if (!actorUsername) return next();
+    req.actorUsername = actorUsername;
 
     try {
         const users = await getConfiguredAdminUsers();
@@ -211,6 +212,28 @@ app.post('/api/godown/movements', async (req, res) => {
         res.json({ success: true, data: movement });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/godown/movements/:id', async (req, res) => {
+    try {
+        const actorUsername = String(req.actorUsername || req.query.user || '').trim();
+        const users = await getConfiguredAdminUsers();
+        const actor = users.find(account => String(account.username || '').trim().toLowerCase() === actorUsername.toLowerCase());
+        if (!actor || String(actor.role || '').trim().toLowerCase() !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Admin permission is required to delete godown movements.' });
+        }
+
+        const owner = String(req.query.user || 'System');
+        const deleted = await GodownMovement.findOneAndUpdate(
+            { createdBy: owner, id: String(req.params.id), deletedAt: null },
+            { $set: { deletedAt: new Date(), deletedBy: actorUsername } },
+            { new: true, strict: false }
+        ).lean();
+        if (!deleted) return res.status(404).json({ success: false, message: 'Movement not found.' });
+        res.json({ success: true, data: deleted });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
