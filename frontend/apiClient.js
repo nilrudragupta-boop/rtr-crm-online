@@ -315,6 +315,7 @@ const apiClient = {
     // --- Godown Operations ---
     getGodownMovements: () => apiClient._getCollection('godown/movements'),
     saveGodownMovement: (movement) => apiClient._saveCollection('godown/movements', movement),
+    deleteGodownMovement: (id) => apiClient._deleteCollection('godown/movements', id),
     getGodownProfiles: () => apiClient._getCollection('godown/profiles'),
     saveGodownProfiles: async (profiles) => {
         try {

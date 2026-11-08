@@ -357,31 +357,113 @@
             </form>
         </div>
 
-        <!-- Short Table View: Dispatch to Counter Live Status -->
-        <div id="counterTrackerSection" class="card terminal-card p-3 bg-white d-none">
-            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+        <!-- Recent Godown Movements -->
+        <div id="counterTrackerSection" class="card terminal-card p-3 bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
                 <div>
-                    <h6 class="fw-bold mb-0 text-dark"><i class="fa fa-history text-warning me-2"></i>Recent Counter
-                        Dispatches & Delivery Status</h6>
-                    <small class="text-muted">Track when Counter Admin accepts delivery.</small>
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fa fa-history text-warning me-2"></i>Recent Godown
+                        Movements</h6>
+                    <small class="text-muted">Search and review receipts, counter transfers, and customer
+                        dispatches.</small>
                 </div>
-                <button class="btn btn-sm btn-outline-secondary" onclick="renderCounterTrackerTable()"><i
-                        class="fa fa-sync-alt"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="refreshRecentMovements()"
+                    title="Refresh movements"><i class="fa fa-sync-alt"></i></button>
+            </div>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label small fw-bold mb-1" for="recentMovementSearch">Global search</label>
+                    <input type="search" id="recentMovementSearch" class="form-control form-control-sm"
+                        placeholder="Search ref, flow, operator, vehicle, item, remarks..."
+                        oninput="filterRecentMovements()">
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label small fw-bold mb-1" for="recentMovementType">Movement</label>
+                    <select id="recentMovementType" class="form-select form-select-sm"
+                        onchange="filterRecentMovements()">
+                        <option value="ALL">All movements</option>
+                        <option value="RECEIVE">Receive to Godown</option>
+                        <option value="COUNTER">Dispatch to Counter</option>
+                        <option value="CUSTOMER">Dispatch to Customer</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label small fw-bold mb-1" for="recentMovementDateFrom">Date from</label>
+                    <input type="date" id="recentMovementDateFrom" class="form-control form-control-sm"
+                        onchange="filterRecentMovements()">
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label small fw-bold mb-1" for="recentMovementDateTo">Date to</label>
+                    <input type="date" id="recentMovementDateTo" class="form-control form-control-sm"
+                        onchange="filterRecentMovements()">
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
                     <thead class="table-light">
                         <tr>
                             <th>Date/Time</th>
-                            <th>Gate Pass No</th>
-                            <th>Vehicle / Runner</th>
-                            <th>Materials Sent</th>
-                            <th>Status at Counter</th>
-                            <th class="text-end">Print</th>
+                            <th id="recentMovementRefHeader">Supplier Bill / Inward Ref</th>
+                            <th id="recentMovementPartyHeader">Supplier / Source</th>
+                            <th id="recentMovementTransportHeader">Vehicle / Delivery Agent</th>
+                            <th>Items & Qty</th>
+                            <th>Status</th>
+                            <th class="text-end">Inspect / Print</th>
                         </tr>
                     </thead>
                     <tbody id="counterTrackerBody"></tbody>
                 </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small text-muted" id="recentMovementSummary"></span>
+                    <label for="recentMovementPageSize" class="small text-muted mb-0">Rows</label>
+                    <select id="recentMovementPageSize" class="form-select form-select-sm" style="width: auto;"
+                        onchange="changeRecentMovementPageSize(this.value)">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="recentMovementPrevious"
+                        onclick="changeRecentMovementPage(-1)">Previous</button>
+                    <span class="small text-muted" id="recentMovementPageInfo"></span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="recentMovementNext"
+                        onclick="changeRecentMovementPage(1)">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="recentMovementDetailsModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="recentMovementDetailsTitle">Movement Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-2 mb-3 small" id="recentMovementDetailsMeta"></div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Item Name / Code</th>
+                                        <th class="text-center">Quantity</th>
+                                        <th class="text-center">UOM</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentMovementDetailsItems"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="recentMovementDetailsPrint"><i
+                                class="fa fa-print me-1"></i>Print Challan</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -456,9 +538,13 @@
         let activeGodownId = '';
         let activeGodownName = '';
         let activeOperators = [];
+        let filteredRecentMovements = [];
+        let recentMovementPage = 1;
+        let recentMovementPageSize = 25;
 
         document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+            setDefaultRecentMovementDateRange();
             await syncGodownRemoteData();
             checkSessionAndResolve();
             loadInventoryItems();
@@ -488,7 +574,7 @@
                 if (activeProfile) applyGodownSession(activeProfile);
                 else checkSessionAndResolve();
             }
-            if (currentMode === 'COUNTER') renderCounterTrackerTable();
+            renderCounterTrackerTable();
         }, 10000);
 
         // ==========================================
@@ -499,6 +585,20 @@
                 { id: "GDN-01", name: "Central Godown (Main)", operators: ["Abc Kumar", "Def Ghosh"], pin: "1001" },
                 { id: "GDN-02", name: "North Depot (Branch 2)", operators: ["Mno Das", "Pqr Roy"], pin: "2002" }
             ];
+        }
+
+        function setDefaultRecentMovementDateRange() {
+            const today = new Date();
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const toInputDate = date => [
+                date.getFullYear(),
+                String(date.getMonth() + 1).padStart(2, '0'),
+                String(date.getDate()).padStart(2, '0')
+            ].join('-');
+
+            document.getElementById('recentMovementDateFrom').value = toInputDate(monthStart);
+            document.getElementById('recentMovementDateTo').value = toInputDate(monthEnd);
         }
 
         async function syncGodownRemoteData() {
@@ -525,9 +625,15 @@
             if (Array.isArray(remoteMovements)) {
                 const cachedMovements = JSON.parse(localStorage.getItem('godown_movements')) || [];
                 const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
-                const remoteIds = new Set(remoteMovements.map(movement => movement.id));
-                const mergedMovements = [...remoteMovements];
+                const deletedIds = new Set(remoteMovements.filter(movement => movement.deletedAt).map(movement => movement.id));
+                const activeRemoteMovements = remoteMovements.filter(movement => !movement.deletedAt);
+                const remoteIds = new Set(activeRemoteMovements.map(movement => movement.id));
+                const mergedMovements = [...activeRemoteMovements];
                 for (const movement of cachedMovements) {
+                    if (deletedIds.has(movement.id)) {
+                        pendingIds.delete(movement.id);
+                        continue;
+                    }
                     if (!remoteIds.has(movement.id) || pendingIds.has(movement.id)) {
                         const result = await apiClient.saveGodownMovement(movement);
                         if (result && result.success) {
@@ -650,9 +756,7 @@
             });
             opSelect.disabled = activeOperators.length <= 1;
 
-            if (currentMode === 'COUNTER') {
-                renderCounterTrackerTable();
-            }
+            renderCounterTrackerTable();
         }
 
         function lockTerminal() {
@@ -681,7 +785,7 @@
             counterAlert.classList.add('d-none');
             customerPicker.classList.add('d-none');
             supplierArea.classList.add('d-none');
-            counterTracker.classList.add('d-none');
+            counterTracker.classList.remove('d-none');
 
             const gdnLabel = activeGodownName || 'Godown';
 
@@ -707,7 +811,6 @@
                 document.getElementById('txDocNo').value = "GP-" + Date.now().toString().slice(-4);
                 submitBtn.className = "btn btn-warning text-dark px-4 fw-bold";
                 submitBtn.innerHTML = '<i class="fa fa-truck me-1"></i> Release to Counter';
-                renderCounterTrackerTable();
             }
             else if (mode === 'CUSTOMER') {
                 tabCustomer.className = "mode-tab active-customer";
@@ -720,6 +823,22 @@
                 submitBtn.className = "btn btn-success px-4 fw-bold";
                 submitBtn.innerHTML = '<i class="fa fa-check-circle me-1"></i> Release Customer Shipment';
             }
+
+            document.getElementById('recentMovementType').value = mode;
+            recentMovementPage = 1;
+            renderCounterTrackerTable();
+        }
+
+        function updateRecentMovementHeaders(mode) {
+            const headers = {
+                RECEIVE: { reference: 'Supplier Bill / Inward Ref', party: 'Supplier / Source' },
+                COUNTER: { reference: 'Gate Pass Number', party: 'Counter Destination' },
+                CUSTOMER: { reference: 'Delivery Challan No', party: 'Customer / Destination' }
+            };
+            const labels = headers[mode] || { reference: 'Document Ref', party: 'Party / Destination' };
+            document.getElementById('recentMovementRefHeader').textContent = labels.reference;
+            document.getElementById('recentMovementPartyHeader').textContent = labels.party;
+            document.getElementById('recentMovementTransportHeader').textContent = 'Vehicle / Delivery Agent';
         }
 
         function renderCounterTrackerTable() {
@@ -727,42 +846,159 @@
             tbody.innerHTML = '';
 
             const movements = JSON.parse(localStorage.getItem('godown_movements')) || [];
-            const counterDispatches = movements.filter(m =>
-                m.type === 'DISPATCH' &&
-                m.flow && m.flow.includes('Outlet Counter') &&
-                (m.godownId === activeGodownId || !m.godownId)
-            );
+            const query = document.getElementById('recentMovementSearch').value.trim().toLowerCase();
+            const selectedType = document.getElementById('recentMovementType').value;
+            const displayMode = selectedType === 'ALL' ? currentMode : selectedType;
+            updateRecentMovementHeaders(displayMode);
+            const dateFrom = document.getElementById('recentMovementDateFrom').value;
+            const dateTo = document.getElementById('recentMovementDateTo').value;
 
-            if (counterDispatches.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No counter dispatches found from ${activeGodownName || 'this godown'}.</td></tr>`;
+            const getMovementType = movement => {
+                if (movement.status === 'GODOWN_STOCKED' || movement.type === 'INWARD') return 'RECEIVE';
+                if (movement.status === 'DELIVERED_TO_CUSTOMER') return 'CUSTOMER';
+                if (movement.type === 'DISPATCH' && movement.flow && movement.flow.includes('Outlet Counter')) return 'COUNTER';
+                return '';
+            };
+
+            filteredRecentMovements = movements.filter(movement => {
+                const movementType = getMovementType(movement);
+                const movementDate = typeof movement.date === 'string' ? movement.date : '';
+                const searchableText = [
+                    movement.id, movement.invoiceNo, movement.godownId, movement.godownName,
+                    movement.date, movement.time, movement.flow, movement.operator,
+                    movement.transport, movement.itemsSummary, movement.remarks, movement.status
+                ].filter(Boolean).join(' ').toLowerCase();
+
+                return (movement.godownId === activeGodownId || !movement.godownId) &&
+                    (!selectedType || selectedType === 'ALL' || movementType === selectedType) &&
+                    (!query || searchableText.includes(query)) &&
+                    (!dateFrom || (movementDate && movementDate >= dateFrom)) &&
+                    (!dateTo || (movementDate && movementDate <= dateTo));
+            });
+
+            const totalPages = Math.max(1, Math.ceil(filteredRecentMovements.length / recentMovementPageSize));
+            recentMovementPage = Math.min(recentMovementPage, totalPages);
+            const startIndex = (recentMovementPage - 1) * recentMovementPageSize;
+            const pageMovements = filteredRecentMovements.slice(startIndex, startIndex + recentMovementPageSize);
+
+            if (filteredRecentMovements.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">No movements match the selected search and filters.</td></tr>`;
+                updateRecentMovementPagination(0, totalPages);
                 return;
             }
 
-            counterDispatches.slice(0, 10).forEach(d => {
+            pageMovements.forEach(movement => {
                 let statusBadge = '';
-                if (d.status === 'IN_TRANSIT') {
+                if (movement.status === 'IN_TRANSIT') {
                     statusBadge = '<span class="badge bg-warning text-dark status-badge"><i class="fa fa-truck fa-spin me-1"></i>In-Transit</span>';
-                } else if (d.status === 'RECEIVED_AT_OUTLET') {
-                    statusBadge = `<span class="badge bg-success status-badge"><i class="fa fa-check-circle me-1"></i>Received (${d.receivedTime || 'Accepted'})</span>`;
+                } else if (movement.status === 'RECEIVED_AT_OUTLET') {
+                    statusBadge = `<span class="badge bg-success status-badge"><i class="fa fa-check-circle me-1"></i>Received (${movement.receivedTime || 'Accepted'})</span>`;
+                } else if (movement.status === 'GODOWN_STOCKED') {
+                    statusBadge = '<span class="badge bg-info text-dark status-badge"><i class="fa fa-boxes me-1"></i>Received at Godown</span>';
+                } else if (movement.status === 'DELIVERED_TO_CUSTOMER') {
+                    statusBadge = '<span class="badge bg-primary status-badge"><i class="fa fa-user-check me-1"></i>Delivered to Customer</span>';
                 } else {
-                    statusBadge = `<span class="badge bg-secondary status-badge">${d.status}</span>`;
+                    statusBadge = `<span class="badge bg-secondary status-badge">${movement.status || '-'}</span>`;
                 }
+
+                const movementType = getMovementType(movement);
+                const flowParts = String(movement.flow || '').split('➔');
+                const party = movementType === 'RECEIVE'
+                    ? (flowParts[0] || movement.flow || '-')
+                    : movementType === 'COUNTER'
+                        ? (flowParts[1] || 'Outlet Counter').trim()
+                        : (flowParts[1] || movement.flow || '-').trim();
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                  <td><span class="text-muted">${d.time}</span><br><span style="font-size:11px;">${d.date || ''}</span></td>
-                  <td><strong class="text-dark">${d.id}</strong></td>
-                  <td><i class="fa fa-truck text-muted me-1"></i>${d.transport || '-'}</td>
-                  <td><span class="fw-medium">${d.itemsSummary || '-'}</span></td>
+                  <td><span class="text-muted">${movement.time || '-'}</span><br><span style="font-size:11px;">${movement.date || ''}</span></td>
+                  <td><strong class="text-dark">${movement.id || '-'}</strong></td>
+                  <td><span class="small">${party}</span></td>
+                  <td><i class="fa fa-truck text-muted me-1"></i>${movement.transport || '-'}</td>
+                  <td><span class="fw-medium">${movement.itemsSummary || '-'}</span></td>
                   <td>${statusBadge}</td>
                   <td class="text-end">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="printChallan('${d.id}')" title="Print Gate Pass">
+                                        <button type="button" class="btn btn-outline-info btn-sm me-1" onclick="inspectRecentMovement('${movement.id}')" title="Inspect Items">
+                                            <i class="fa fa-eye"></i>
+                                        </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="printChallan('${movement.id}')" title="Print Movement Challan">
                       <i class="fa fa-print"></i>
                     </button>
                   </td>
                 `;
                 tbody.appendChild(tr);
             });
+            updateRecentMovementPagination(filteredRecentMovements.length, totalPages);
+        }
+
+        function inspectRecentMovement(id) {
+            const movement = (JSON.parse(localStorage.getItem('godown_movements')) || []).find(item => item.id === id);
+            if (!movement) return;
+
+            document.getElementById('recentMovementDetailsTitle').textContent = `Movement Details: ${movement.id}`;
+            const meta = document.getElementById('recentMovementDetailsMeta');
+            meta.replaceChildren();
+            [
+                ['Flow', movement.flow], ['Status', movement.status], ['Date & Time', `${movement.date || ''} ${movement.time || ''}`],
+                ['Operator', movement.operator], ['Vehicle / Carrier', movement.transport], ['Remarks', movement.remarks]
+            ].forEach(([label, value]) => {
+                const cell = document.createElement('div');
+                cell.className = 'col-md-6';
+                const strong = document.createElement('strong');
+                strong.textContent = `${label}: `;
+                cell.append(strong, document.createTextNode(value || '-'));
+                meta.appendChild(cell);
+            });
+
+            const itemsBody = document.getElementById('recentMovementDetailsItems');
+            itemsBody.replaceChildren();
+            (movement.itemsRaw || []).forEach((item, index) => {
+                const row = document.createElement('tr');
+                [index + 1, item.name || '-', item.qty ?? '-', item.uom || 'Pcs'].forEach((value, cellIndex) => {
+                    const cell = document.createElement('td');
+                    cell.textContent = value;
+                    if (cellIndex > 1) cell.className = 'text-center';
+                    row.appendChild(cell);
+                });
+                itemsBody.appendChild(row);
+            });
+            document.getElementById('recentMovementDetailsPrint').onclick = () => {
+                bootstrap.Modal.getInstance(document.getElementById('recentMovementDetailsModal')).hide();
+                printChallan(id);
+            };
+            new bootstrap.Modal(document.getElementById('recentMovementDetailsModal')).show();
+        }
+
+        function filterRecentMovements() {
+            recentMovementPage = 1;
+            renderCounterTrackerTable();
+        }
+
+        function changeRecentMovementPage(direction) {
+            const totalPages = Math.max(1, Math.ceil(filteredRecentMovements.length / recentMovementPageSize));
+            recentMovementPage = Math.max(1, Math.min(recentMovementPage + direction, totalPages));
+            renderCounterTrackerTable();
+        }
+
+        function changeRecentMovementPageSize(value) {
+            recentMovementPageSize = Number(value) || 25;
+            recentMovementPage = 1;
+            renderCounterTrackerTable();
+        }
+
+        function updateRecentMovementPagination(totalRows, totalPages) {
+            const firstRow = totalRows ? (recentMovementPage - 1) * recentMovementPageSize + 1 : 0;
+            const lastRow = Math.min(recentMovementPage * recentMovementPageSize, totalRows);
+            document.getElementById('recentMovementSummary').textContent = `Showing ${firstRow}-${lastRow} of ${totalRows}`;
+            document.getElementById('recentMovementPageInfo').textContent =
+                `Page ${totalRows ? recentMovementPage : 0} of ${totalRows ? totalPages : 0}`;
+            document.getElementById('recentMovementPrevious').disabled = recentMovementPage <= 1 || totalRows === 0;
+            document.getElementById('recentMovementNext').disabled = recentMovementPage >= totalPages || totalRows === 0;
+        }
+
+        async function refreshRecentMovements() {
+            await syncGodownRemoteData();
+            renderCounterTrackerTable();
         }
 
         function loadInventoryItems() {

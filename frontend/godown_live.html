@@ -388,6 +388,18 @@
         let currentPage = 1;
         let pageSize = 25;
 
+        function isAdminUser() {
+            const currentUser = (localStorage.getItem('currentUser') || '').trim().toLowerCase();
+            if (!currentUser) return false;
+            let adminUsers = [];
+            try {
+                adminUsers = JSON.parse(localStorage.getItem('ADMIN_USERS')) || [];
+            } catch (error) { }
+            if (!adminUsers.length && typeof APP_SETTINGS !== 'undefined') adminUsers = APP_SETTINGS.ADMIN_USERS || [];
+            const user = adminUsers.find(account => String(account.username || '').trim().toLowerCase() === currentUser);
+            return Boolean(user && String(user.role || '').trim().toLowerCase() === 'admin');
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             setDefaultDateRange();
             await refreshData();
@@ -425,10 +437,16 @@
             if (Array.isArray(remoteMovements)) {
                 const cachedMovements = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
                 const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
-                const remoteIds = new Set(remoteMovements.map(movement => movement.id));
-                const mergedMovements = [...remoteMovements];
+                const deletedIds = new Set(remoteMovements.filter(movement => movement.deletedAt).map(movement => movement.id));
+                const activeRemoteMovements = remoteMovements.filter(movement => !movement.deletedAt);
+                const remoteIds = new Set(activeRemoteMovements.map(movement => movement.id));
+                const mergedMovements = [...activeRemoteMovements];
 
                 for (const movement of cachedMovements) {
+                    if (deletedIds.has(movement.id)) {
+                        pendingIds.delete(movement.id);
+                        continue;
+                    }
                     if (!remoteIds.has(movement.id) || pendingIds.has(movement.id)) {
                         const result = await apiClient.saveGodownMovement(movement);
                         if (result && result.success) {
@@ -555,6 +573,14 @@
           `;
                 }
 
+                if (isAdminUser()) {
+                    actionBtn += `
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteMovement('${row.id}')" title="Delete incorrect movement">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    `;
+                }
+
                 const gdnName = row.godownName || (row.godownId ? `Godown (${row.godownId})` : 'Central Godown');
                 const remarks = typeof row.remarks === 'string' ? row.remarks.trim() : '';
                 const inspectionNotes = remarks.replace(/^Linked Invoice:\s*[^|]*\|\s*/, '').trim();
@@ -624,6 +650,25 @@
             alert(syncResult && syncResult.success
                 ? `Gate Pass ${id} marked as Received at Counter!`
                 : `Gate Pass ${id} was updated on this device, but backend sync failed. It will retry when the connection is available.`);
+        }
+
+        async function deleteMovement(id) {
+            if (!isAdminUser()) {
+                alert('Admin permission is required to delete godown movements.');
+                return;
+            }
+            if (!confirm(`Delete movement ${id}? It will be removed from both godown movement tables.`)) return;
+
+            const result = await apiClient.deleteGodownMovement(id);
+            if (!result || !result.success) {
+                alert(result && result.message ? result.message : 'Movement could not be deleted. Check the connection and try again.');
+                return;
+            }
+
+            const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
+            pendingIds.delete(id);
+            localStorage.setItem('godown_pending_sync', JSON.stringify([...pendingIds]));
+            await refreshData();
         }
 
         function viewMovementDetails(id) {
