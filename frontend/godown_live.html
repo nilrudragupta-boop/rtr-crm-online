@@ -107,6 +107,10 @@
             padding: 24px;
             background: #fff;
         }
+
+        #appModeSection {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -341,7 +345,7 @@
                         <div id="printDest" class="fw-bold">-</div>
                         <div>Vehicle / Transport: <span id="printVehicle" class="fw-bold">-</span></div>
                         <div>Document Ref: <span id="printDocRef" class="fw-bold text-primary">-</span></div>
-                        <div id="printInvoiceRow" class="d-none">Linked Invoice: <span id="printInvoiceNo"
+                        <div id="printInvoiceRow"><strong>Linked Invoice No:</strong> <span id="printInvoiceNo"
                                 class="fw-bold text-dark">-</span></div>
                     </div>
                 </div>
@@ -703,8 +707,9 @@
             });
 
             document.getElementById('modalPrintBtn').onclick = () => {
-                bootstrap.Modal.getInstance(document.getElementById('movementDetailsModal')).hide();
-                printChallan(target.id);
+                const modalElement = document.getElementById('movementDetailsModal');
+                modalElement.addEventListener('hidden.bs.modal', () => printChallan(target.id), { once: true });
+                bootstrap.Modal.getOrCreateInstance(modalElement).hide();
             };
 
             const modal = new bootstrap.Modal(document.getElementById('movementDetailsModal'));
@@ -865,12 +870,8 @@
 
             const invNo = resolveInvoiceNo(target);
             const printInvRow = document.getElementById('printInvoiceRow');
-            if (invNo !== '-') {
-                document.getElementById('printInvoiceNo').innerText = invNo;
-                printInvRow.classList.remove('d-none');
-            } else {
-                printInvRow.classList.add('d-none');
-            }
+            document.getElementById('printInvoiceNo').innerText = invNo;
+            printInvRow.classList.remove('d-none');
 
             const tbody = document.getElementById('printItemsBody');
             tbody.innerHTML = '';
@@ -887,18 +888,24 @@
 
             const qrEl = document.getElementById('challanQr');
             qrEl.innerHTML = '';
-            new QRCode(qrEl, {
-                text: JSON.stringify({
-                    ref: target.id,
-                    godown: target.godownId,
-                    inv: invNo !== '-' ? invNo : undefined,
-                    flow: target.flow,
-                    vehicle: target.transport,
-                    itemsCount: (target.itemsRaw || []).length
-                }),
-                width: 70,
-                height: 70
-            });
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrEl, {
+                        text: JSON.stringify({
+                            ref: target.id,
+                            godown: target.godownId,
+                            inv: invNo !== '-' ? invNo : undefined,
+                            flow: target.flow,
+                            vehicle: target.transport,
+                            itemsCount: (target.itemsRaw || []).length
+                        }),
+                        width: 70,
+                        height: 70
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not generate the challan QR code:', error);
+            }
 
             window.print();
         }

@@ -121,6 +121,10 @@
             padding: 24px;
             background: #fff;
         }
+
+        #appModeSection {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -495,6 +499,8 @@
                         <div id="printDest" class="fw-bold">-</div>
                         <div>Vehicle / Transport: <span id="printVehicle" class="fw-bold">-</span></div>
                         <div>Document Ref: <span id="printDocRef" class="fw-bold text-primary">-</span></div>
+                        <div id="printInvoiceRow"><strong>Linked Invoice No:</strong> <span id="printInvoiceNo"
+                                class="fw-bold text-dark">-</span></div>
                     </div>
                 </div>
             </div>
@@ -524,6 +530,7 @@
     </div>
 
     <script src="apiClient.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentMode = 'RECEIVE';
         let inventoryItems = [];
@@ -940,7 +947,8 @@
             meta.replaceChildren();
             [
                 ['Flow', movement.flow], ['Status', movement.status], ['Date & Time', `${movement.date || ''} ${movement.time || ''}`],
-                ['Operator', movement.operator], ['Vehicle / Carrier', movement.transport], ['Remarks', movement.remarks]
+                ['Linked Invoice No', resolveMovementInvoiceNo(movement)], ['Operator', movement.operator],
+                ['Vehicle / Carrier', movement.transport], ['Remarks', movement.remarks]
             ].forEach(([label, value]) => {
                 const cell = document.createElement('div');
                 cell.className = 'col-md-6';
@@ -963,10 +971,20 @@
                 itemsBody.appendChild(row);
             });
             document.getElementById('recentMovementDetailsPrint').onclick = () => {
-                bootstrap.Modal.getInstance(document.getElementById('recentMovementDetailsModal')).hide();
-                printChallan(id);
+                const modalElement = document.getElementById('recentMovementDetailsModal');
+                modalElement.addEventListener('hidden.bs.modal', () => printChallan(id), { once: true });
+                bootstrap.Modal.getOrCreateInstance(modalElement).hide();
             };
             new bootstrap.Modal(document.getElementById('recentMovementDetailsModal')).show();
+        }
+
+        function resolveMovementInvoiceNo(movement) {
+            const invoiceNo = String(movement.invoiceNo || '').trim();
+            if (invoiceNo) return invoiceNo;
+
+            const remarks = String(movement.remarks || '');
+            const match = remarks.match(/Linked Invoice:\s*([^|]*)/i);
+            return match && match[1].trim() ? match[1].trim() : '-';
         }
 
         function filterRecentMovements() {
@@ -1497,6 +1515,7 @@
             document.getElementById('printVehicle').innerText = target.transport;
             document.getElementById('printTime').innerText = `${target.date} ${target.time}`;
             document.getElementById('printDest').innerText = target.flow;
+            document.getElementById('printInvoiceNo').innerText = resolveMovementInvoiceNo(target);
 
             const tbody = document.getElementById('printItemsBody');
             tbody.innerHTML = '';
@@ -1513,17 +1532,23 @@
 
             const qrEl = document.getElementById('challanQr');
             qrEl.innerHTML = '';
-            new QRCode(qrEl, {
-                text: JSON.stringify({
-                    ref: target.id,
-                    godown: target.godownId || activeGodownId,
-                    flow: target.flow,
-                    vehicle: target.transport,
-                    itemsCount: (target.itemsRaw || []).length
-                }),
-                width: 70,
-                height: 70
-            });
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrEl, {
+                        text: JSON.stringify({
+                            ref: target.id,
+                            godown: target.godownId || activeGodownId,
+                            flow: target.flow,
+                            vehicle: target.transport,
+                            itemsCount: (target.itemsRaw || []).length
+                        }),
+                        width: 70,
+                        height: 70
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not generate the challan QR code:', error);
+            }
 
             window.print();
         }
