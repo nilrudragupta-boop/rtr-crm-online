@@ -173,6 +173,74 @@ const medPurchaseInvoiceSchema = new mongoose.Schema({ id: { type: String, requi
 const MedPurchaseInvoice = mongoose.model('MedPurchaseInvoice', medPurchaseInvoiceSchema);
 
 // --- API Routes ---
+const godownMovementSchema = new mongoose.Schema({
+    id: { type: String, required: true },
+    createdBy: { type: String, default: 'System', index: true }
+}, { strict: false, timestamps: true });
+godownMovementSchema.index({ createdBy: 1, id: 1 }, { unique: true });
+const GodownMovement = mongoose.model('GodownMovement', godownMovementSchema);
+
+const godownProfileSchema = new mongoose.Schema({
+    id: { type: String, required: true },
+    createdBy: { type: String, default: 'System', index: true },
+    profiles: { type: Array, default: [] }
+}, { timestamps: true });
+godownProfileSchema.index({ createdBy: 1, id: 1 }, { unique: true });
+const GodownProfile = mongoose.model('GodownProfile', godownProfileSchema);
+
+app.get('/api/godown/movements', async (req, res) => {
+    try {
+        const owner = String(req.query.user || 'System');
+        const movements = await GodownMovement.find({ createdBy: owner }).sort({ date: -1, time: -1, createdAt: -1 }).lean();
+        res.json({ success: true, data: movements });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/godown/movements', async (req, res) => {
+    try {
+        const owner = String(req.query.user || 'System');
+        const payload = { ...req.body, createdBy: owner };
+        if (!payload.id) return res.status(400).json({ success: false, message: 'Movement id is required.' });
+        const movement = await GodownMovement.findOneAndUpdate(
+            { createdBy: owner, id: String(payload.id) },
+            payload,
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        ).lean();
+        res.json({ success: true, data: movement });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/godown/profiles', async (req, res) => {
+    try {
+        const owner = String(req.query.user || 'System');
+        const record = await GodownProfile.findOne({ createdBy: owner, id: 'profiles' }).lean();
+        res.json({ success: true, data: record && Array.isArray(record.profiles) ? record.profiles : [] });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/godown/profiles', async (req, res) => {
+    try {
+        const owner = String(req.query.user || 'System');
+        if (!Array.isArray(req.body.profiles)) {
+            return res.status(400).json({ success: false, message: 'Profiles must be an array.' });
+        }
+        const record = await GodownProfile.findOneAndUpdate(
+            { createdBy: owner, id: 'profiles' },
+            { createdBy: owner, id: 'profiles', profiles: req.body.profiles },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        ).lean();
+        res.json({ success: true, data: record.profiles });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
 app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });
 });
