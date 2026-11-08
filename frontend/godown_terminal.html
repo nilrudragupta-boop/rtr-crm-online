@@ -239,7 +239,7 @@
                     remain in <strong>In-Transit</strong> state until acknowledged by Admin at the Outlet Counter.
                 </div>
 
-                <!-- Customer & Invoice Link Section -->
+                <!-- Customer & Invoice Link Section (Mode 3) -->
                 <div id="customerPickerArea" class="p-3 border rounded bg-light mb-3 d-none">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="small fw-bold text-success"><i class="fa fa-link me-1"></i>Reference Customer Sales
@@ -249,7 +249,7 @@
                     <div class="row g-2 mb-2">
                         <!-- Search Invoice Details (with Amount Badge) -->
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-dark mb-1">Search Invoice details,
+                            <label class="form-label small fw-bold text-dark mb-1">Search Invoice details
                             </label>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text bg-white"><i
@@ -268,7 +268,8 @@
 
                         <!-- Search Customer Details -->
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-dark mb-1">Search Customer details,</label>
+                            <label class="form-label small fw-bold text-dark mb-1">Search Customer details
+                            </label>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text bg-white"><i class="fa fa-user text-success"></i></span>
                                 <input type="text" id="txCustomerName" class="form-control" list="masterCustomerList"
@@ -295,10 +296,26 @@
                     </div>
                 </div>
 
+                <!-- INTEGRATED SUPPLIER / VENDOR SECTION (Integrated with supplier.html) -->
                 <div id="supplierNameArea" class="mb-3">
-                    <label class="form-label small fw-bold">Supplier / Vendor Name *</label>
-                    <input type="text" id="txSupplierName" class="form-control form-control-sm"
-                        placeholder="e.g. ABC Manufacturing / Supreme Plastics" value="Primary Vendor">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-bold text-dark mb-0">Supplier / Vendor Name *</label>
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white"><i class="fa fa-truck text-primary"></i></span>
+                        <input type="text" id="txSupplierName" class="form-control" list="masterSupplierList"
+                            placeholder="Type or search Supplier from supplier.html master..." autocomplete="off"
+                            oninput="onSupplierSearched(this)" required>
+                        <datalist id="masterSupplierList"></datalist>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearSupplierSelection()"
+                            title="Clear">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    <input type="hidden" id="selectedSupplierId">
+                    <div id="supplierDetailsHint" class="small text-muted mt-1 d-none" style="font-size: 11.5px;">
+                        <i class="fa fa-info-circle me-1 text-primary"></i><span id="supplierDetailsText"></span>
+                    </div>
                 </div>
 
                 <!-- Material Items Table -->
@@ -375,8 +392,7 @@
         <div class="challan-box">
             <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
                 <div>
-                    <h3 class="fw-bold mb-0" id="printChallanHeading">INTERNAL GATE PASS / STOCK TRANSFER CHALLAN[cite:
-                    </h3>
+                    <h3 class="fw-bold mb-0" id="printChallanHeading">INTERNAL GATE PASS / STOCK TRANSFER CHALLAN</h3>
                     <small class="text-muted" id="printChallanSubheading">Movement of Goods Memo (Internal Transfer
                         Only)</small>
                 </div>
@@ -431,6 +447,7 @@
         let inventoryItems = [];
         let reportInvoices = [];
         let masterCustomers = [];
+        let masterSuppliers = [];
 
         // CONFIG & DYNAMIC PIN RESOLUTION
         const CONFIG_KEY = 'godown_profiles';
@@ -446,6 +463,7 @@
             loadInventoryItems();
             loadReportInvoices();
             loadMasterCustomers();
+            loadMasterSuppliers();
             addMaterialRow();
             switchMode('RECEIVE');
         });
@@ -456,6 +474,9 @@
             }
             if (e.key === CONFIG_KEY) {
                 checkSessionAndResolve();
+            }
+            if (e.key === 'suppliers') {
+                loadMasterSuppliers();
             }
         });
 
@@ -474,18 +495,15 @@
             const urlParams = new URLSearchParams(window.location.search);
             const forcedParam = urlParams.get('godown');
 
-            // 1. If an active session already exists in this tab
             const cachedGodownId = sessionStorage.getItem(SESSION_AUTH_KEY);
 
             if (forcedParam) {
-                // If explicit URL parameter is passed, target that godown
                 const matched = savedConfigs.find(c => c.id.toLowerCase() === forcedParam.toLowerCase());
                 if (matched) {
                     if (cachedGodownId === matched.id) {
                         applyGodownSession(matched);
                         return;
                     } else {
-                        // Prompt PIN for this specific godown
                         promptPinForTarget(matched);
                         return;
                     }
@@ -500,7 +518,6 @@
                 }
             }
 
-            // 2. Default: Open PIN Prompt to let PIN identify the Godown
             promptUniversalPin();
         }
 
@@ -533,13 +550,11 @@
             let matched = null;
 
             if (forcedParam) {
-                // Strict validation against specified godown parameter
                 const target = savedConfigs.find(c => c.id.toLowerCase() === forcedParam.toLowerCase());
                 if (target && String(target.pin || '1001') === enteredPin) {
                     matched = target;
                 }
             } else {
-                // Pure PIN-based identification across all configured godowns
                 matched = savedConfigs.find(c => String(c.pin || '') === enteredPin);
             }
 
@@ -559,15 +574,12 @@
             activeGodownName = config.name;
             activeOperators = config.operators && config.operators.length > 0 ? config.operators : ["Operator (Staff)"];
 
-            // Hide Security Lock Overlay
             document.getElementById('securityLockOverlay').classList.add('d-none');
 
-            // Set UI Identity
             document.getElementById('godownTerminalTitle').textContent = `Godown Terminal: ${activeGodownName}`;
             document.getElementById('godownTerminalSub').textContent = `Allotted Facility: ${activeGodownName} [${activeGodownId}]`;
             document.getElementById('godownIdBadge').innerHTML = `<i class="fa fa-map-marker-alt me-1 text-warning"></i>${activeGodownId}`;
 
-            // Populate locked operator list
             const opSelect = document.getElementById('txOperatorSelect');
             opSelect.innerHTML = '';
             activeOperators.forEach(name => {
@@ -793,6 +805,88 @@
             });
         }
 
+        // ==========================================
+        // INTEGRATED SUPPLIERS LOADER (from supplier.html master)
+        // ==========================================
+        async function loadMasterSuppliers() {
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getSuppliers) {
+                    masterSuppliers = await apiClient.getSuppliers();
+                }
+            } catch (err) { }
+
+            if (!masterSuppliers || masterSuppliers.length === 0) {
+                masterSuppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            }
+
+            const dl = document.getElementById('masterSupplierList');
+            dl.innerHTML = '';
+            (masterSuppliers || []).forEach(sup => {
+                const name = sup.name || sup.supplierName || '';
+                const phone = sup.contact || sup.phone || sup.mobile || '';
+                const address = [sup.address, sup.district, sup.state].filter(Boolean).join(', ');
+                const type = sup.supplierType ? ` [${sup.supplierType}]` : '';
+
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.label = `${phone ? 'Ph: ' + phone + ' | ' : ''}${address}${type}`;
+                opt.dataset.id = sup.id || sup._id || '';
+                opt.dataset.name = name;
+                opt.dataset.phone = phone;
+                opt.dataset.address = address;
+                opt.dataset.gstin = sup.gstin || '';
+                dl.appendChild(opt);
+            });
+        }
+
+        function onSupplierSearched(inputEl) {
+            const val = inputEl.value.trim().toLowerCase();
+            const hintBox = document.getElementById('supplierDetailsHint');
+            const hintText = document.getElementById('supplierDetailsText');
+
+            if (!val) {
+                document.getElementById('selectedSupplierId').value = '';
+                hintBox.classList.add('d-none');
+                return;
+            }
+
+            const opts = document.getElementById('masterSupplierList').options;
+            let matchedSupplier = null;
+
+            for (let i = 0; i < opts.length; i++) {
+                if (opts[i].value.toLowerCase() === val || (opts[i].dataset.phone && opts[i].dataset.phone.includes(val))) {
+                    matchedSupplier = opts[i];
+                    break;
+                }
+            }
+
+            if (matchedSupplier) {
+                inputEl.value = matchedSupplier.dataset.name;
+                document.getElementById('selectedSupplierId').value = matchedSupplier.dataset.id;
+
+                const metaParts = [];
+                if (matchedSupplier.dataset.phone) metaParts.push(`Ph: ${matchedSupplier.dataset.phone}`);
+                if (matchedSupplier.dataset.address) metaParts.push(matchedSupplier.dataset.address);
+                if (matchedSupplier.dataset.gstin) metaParts.push(`GST: ${matchedSupplier.dataset.gstin}`);
+
+                if (metaParts.length > 0) {
+                    hintText.textContent = `Verified Supplier: ${metaParts.join(' | ')}`;
+                    hintBox.classList.remove('d-none');
+                } else {
+                    hintBox.classList.add('d-none');
+                }
+            } else {
+                document.getElementById('selectedSupplierId').value = '';
+                hintBox.classList.add('d-none');
+            }
+        }
+
+        function clearSupplierSelection() {
+            document.getElementById('txSupplierName').value = '';
+            document.getElementById('selectedSupplierId').value = '';
+            document.getElementById('supplierDetailsHint').classList.add('d-none');
+        }
+
         function onInvoiceNoSearched(inputEl) {
             const rawVal = inputEl.value.trim();
             const badge = document.getElementById('invAmountBadge');
@@ -970,7 +1064,7 @@
             }
         }
 
-        // MAIN SUBMIT ACTION
+        // MAIN SUBMIT ACTION (ISOLATED TO GODOWN_MOVEMENTS)
         async function handleGodownTransaction() {
             const date = document.getElementById('txDate').value;
             const operator = document.getElementById('txOperatorSelect').value.trim();
@@ -1005,7 +1099,7 @@
 
             // 1. INWARD RECEIVE
             if (currentMode === 'RECEIVE') {
-                const supplier = document.getElementById('txSupplierName').value.trim() || 'Vendor Inward';
+                const supplier = document.getElementById('txSupplierName').value.trim() || 'Primary Vendor';
                 movements.unshift({
                     id: docNo,
                     godownId: activeGodownId,
@@ -1018,6 +1112,7 @@
                     transport: vehicle,
                     itemsSummary: lineItems.map(i => `${i.name} x ${i.qty} ${i.uom}`).join(', '),
                     itemsRaw: lineItems,
+                    remarks: remarks,
                     status: "GODOWN_STOCKED"
                 });
                 alert(`Inward Goods Receipt Note ${docNo} logged at ${activeGodownName}.`);
@@ -1037,6 +1132,7 @@
                     transport: vehicle,
                     itemsSummary: lineItems.map(i => `${i.name} x ${i.qty} ${i.uom}`).join(', '),
                     itemsRaw: lineItems,
+                    remarks: remarks,
                     status: "IN_TRANSIT"
                 });
                 alert(`Gate Pass ${docNo} dispatched from ${activeGodownName}! Status: In-Transit.`);
@@ -1076,6 +1172,7 @@
             addMaterialRow();
             clearInvoiceSelection();
             clearCustomerSelection();
+            clearSupplierSelection();
             switchMode(currentMode);
             if (currentMode === 'COUNTER') {
                 renderCounterTrackerTable();
