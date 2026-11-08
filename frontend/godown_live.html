@@ -125,10 +125,6 @@
                         class="fa fa-sync-alt me-1"></i>Refresh</button>
                 <button class="btn btn-outline-dark btn-sm" onclick="openGodownConfigModal()"><i
                         class="fa fa-cogs me-1"></i>Manage Godowns & Operators</button>
-                <a href="report.html" target="_blank" class="btn btn-outline-secondary btn-sm integration-pill"><i
-                        class="fa fa-file-invoice text-primary me-1"></i>Invoices Report</a>
-                <a href="customer.html" target="_blank" class="btn btn-outline-secondary btn-sm integration-pill"><i
-                        class="fa fa-users text-success me-1"></i>Customer Master</a>
             </div>
         </div>
 
@@ -189,6 +185,14 @@
                         <option value="GODOWN_STOCKED">Godown Inward (GRN)</option>
                     </select>
                 </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <label class="small text-muted mb-0" for="dateFromFilter">Date from</label>
+                    <input type="date" id="dateFromFilter" class="form-control form-control-sm"
+                        aria-label="Movement date from" onchange="filterTable()">
+                    <label class="small text-muted mb-0" for="dateToFilter">to</label>
+                    <input type="date" id="dateToFilter" class="form-control form-control-sm"
+                        aria-label="Movement date to" onchange="filterTable()">
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0" id="movementTable">
@@ -202,12 +206,33 @@
                             <th>Operator</th>
                             <th>Vehicle / Carrier</th>
                             <th>Items & Qty</th>
+                            <th>Remarks / Inspection Notes</th>
                             <th>Status</th>
                             <th class="text-end">Admin Action</th>
                         </tr>
                     </thead>
                     <tbody id="movementBody"></tbody>
                 </table>
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small text-muted" id="movementResultsSummary"></span>
+                    <label for="movementPageSize" class="small text-muted mb-0">Rows</label>
+                    <select id="movementPageSize" class="form-select form-select-sm" style="width: auto;"
+                        onchange="changePageSize(this.value)">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="movementPreviousPage"
+                        onclick="changePage(-1)">Previous</button>
+                    <span class="small text-muted" id="movementPageInfo"></span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="movementNextPage"
+                        onclick="changePage(1)">Next</button>
+                </div>
             </div>
         </div>
 
@@ -359,11 +384,13 @@
 
         let movements = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         let godownConfigs = JSON.parse(localStorage.getItem(CONFIG_KEY)) || DEFAULT_CONFIGS;
+        let filteredMovements = [];
+        let currentPage = 1;
+        let pageSize = 25;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            populateGodownDropdownFilter();
-            renderTable(movements);
-            updateKPIs();
+        document.addEventListener('DOMContentLoaded', async () => {
+            setDefaultDateRange();
+            await refreshData();
         });
 
         window.addEventListener('storage', (e) => {
@@ -372,12 +399,76 @@
             }
         });
 
-        function refreshData() {
-            movements = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-            godownConfigs = JSON.parse(localStorage.getItem(CONFIG_KEY)) || DEFAULT_CONFIGS;
+        setInterval(refreshData, 10000);
+
+        async function refreshData() {
+            const [remoteMovements, remoteProfiles] = await Promise.all([
+                apiClient.getGodownMovements(),
+                apiClient.getGodownProfiles()
+            ]);
+
+            if (Array.isArray(remoteProfiles)) {
+                const cachedProfiles = JSON.parse(localStorage.getItem(CONFIG_KEY)) || [];
+                const profilesPending = localStorage.getItem('godown_profiles_pending_sync') === '1';
+                godownConfigs = remoteProfiles.length ? remoteProfiles : (cachedProfiles.length ? cachedProfiles : DEFAULT_CONFIGS);
+                if (profilesPending) {
+                    const result = await apiClient.saveGodownProfiles(cachedProfiles);
+                    godownConfigs = cachedProfiles;
+                    if (result && result.success) localStorage.removeItem('godown_profiles_pending_sync');
+                }
+                localStorage.setItem(CONFIG_KEY, JSON.stringify(godownConfigs));
+                if (remoteProfiles.length === 0 && !profilesPending) await apiClient.saveGodownProfiles(godownConfigs);
+            } else {
+                godownConfigs = JSON.parse(localStorage.getItem(CONFIG_KEY)) || DEFAULT_CONFIGS;
+            }
+
+            if (Array.isArray(remoteMovements)) {
+                const cachedMovements = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+                const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
+                const remoteIds = new Set(remoteMovements.map(movement => movement.id));
+                const mergedMovements = [...remoteMovements];
+
+                for (const movement of cachedMovements) {
+                    if (!remoteIds.has(movement.id) || pendingIds.has(movement.id)) {
+                        const result = await apiClient.saveGodownMovement(movement);
+                        if (result && result.success) {
+                            const existingIndex = mergedMovements.findIndex(item => item.id === movement.id);
+                            if (existingIndex >= 0) mergedMovements[existingIndex] = result.data || movement;
+                            else mergedMovements.push(result.data || movement);
+                            remoteIds.add(movement.id);
+                            pendingIds.delete(movement.id);
+                        } else {
+                            const existingIndex = mergedMovements.findIndex(item => item.id === movement.id);
+                            if (existingIndex >= 0) mergedMovements[existingIndex] = movement;
+                            else mergedMovements.push(movement);
+                        }
+                    }
+                }
+
+                movements = mergedMovements;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(movements));
+                localStorage.setItem('godown_pending_sync', JSON.stringify([...pendingIds]));
+            } else {
+                movements = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            }
+
             populateGodownDropdownFilter();
-            renderTable(movements);
+            filterTable();
             updateKPIs();
+        }
+
+        function setDefaultDateRange() {
+            const today = new Date();
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const toInputDate = date => [
+                date.getFullYear(),
+                String(date.getMonth() + 1).padStart(2, '0'),
+                String(date.getDate()).padStart(2, '0')
+            ].join('-');
+
+            document.getElementById('dateFromFilter').value = toInputDate(monthStart);
+            document.getElementById('dateToFilter').value = toInputDate(monthEnd);
         }
 
         function populateGodownDropdownFilter() {
@@ -408,13 +499,18 @@
         function renderTable(data) {
             const tbody = document.getElementById("movementBody");
             tbody.innerHTML = "";
+            const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+            currentPage = Math.min(currentPage, totalPages);
+            const startIndex = (currentPage - 1) * pageSize;
+            const pageData = data.slice(startIndex, startIndex + pageSize);
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-4">No godown movements recorded yet.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-4">No movements match the selected filters.</td></tr>`;
+                updatePagination(0, totalPages);
                 return;
             }
 
-            data.forEach(row => {
+            pageData.forEach(row => {
                 let statusBadge = "";
                 let actionBtn = "";
                 const invNo = resolveInvoiceNo(row);
@@ -460,6 +556,8 @@
                 }
 
                 const gdnName = row.godownName || (row.godownId ? `Godown (${row.godownId})` : 'Central Godown');
+                const remarks = typeof row.remarks === 'string' ? row.remarks.trim() : '';
+                const inspectionNotes = remarks.replace(/^Linked Invoice:\s*[^|]*\|\s*/, '').trim();
 
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
@@ -471,14 +569,40 @@
           <td><i class="fa fa-user-circle me-1 text-muted"></i>${row.operator}</td>
           <td><span class="small">${row.transport}</span></td>
           <td><span class="fw-medium small">${row.itemsSummary}</span></td>
+            <td class="small text-break"></td>
           <td>${statusBadge}</td>
           <td class="text-end text-nowrap">${actionBtn}</td>
         `;
+                tr.children[8].textContent = inspectionNotes || '-';
                 tbody.appendChild(tr);
             });
+            updatePagination(data.length, totalPages);
         }
 
-        function acceptAtCounter(id) {
+        function updatePagination(totalRows, totalPages) {
+            const firstRow = totalRows ? (currentPage - 1) * pageSize + 1 : 0;
+            const lastRow = Math.min(currentPage * pageSize, totalRows);
+            document.getElementById('movementResultsSummary').textContent =
+                `Showing ${firstRow}-${lastRow} of ${totalRows}`;
+            document.getElementById('movementPageInfo').textContent =
+                `Page ${totalRows ? currentPage : 0} of ${totalRows ? totalPages : 0}`;
+            document.getElementById('movementPreviousPage').disabled = currentPage <= 1 || totalRows === 0;
+            document.getElementById('movementNextPage').disabled = currentPage >= totalPages || totalRows === 0;
+        }
+
+        function changePage(direction) {
+            const totalPages = Math.max(1, Math.ceil(filteredMovements.length / pageSize));
+            currentPage = Math.max(1, Math.min(currentPage + direction, totalPages));
+            renderTable(filteredMovements);
+        }
+
+        function changePageSize(value) {
+            pageSize = Number(value) || 25;
+            currentPage = 1;
+            renderTable(filteredMovements);
+        }
+
+        async function acceptAtCounter(id) {
             const target = movements.find(m => m.id === id);
             if (!target || target.status !== 'IN_TRANSIT') return;
 
@@ -489,9 +613,17 @@
             target.status = "RECEIVED_AT_OUTLET";
             target.receivedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(movements));
+            const syncResult = await apiClient.saveGodownMovement(target);
+            if (!syncResult || !syncResult.success) {
+                const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
+                pendingIds.add(id);
+                localStorage.setItem('godown_pending_sync', JSON.stringify([...pendingIds]));
+            }
 
             refreshData();
-            alert(`Gate Pass ${id} marked as Received at Counter!`);
+            alert(syncResult && syncResult.success
+                ? `Gate Pass ${id} marked as Received at Counter!`
+                : `Gate Pass ${id} was updated on this device, but backend sync failed. It will retry when the connection is available.`);
         }
 
         function viewMovementDetails(id) {
@@ -554,6 +686,8 @@
             const query = document.getElementById("searchInput").value.toLowerCase();
             const type = document.getElementById("typeFilter").value;
             const gdn = document.getElementById("godownFilterSelect").value;
+            const dateFrom = document.getElementById('dateFromFilter').value;
+            const dateTo = document.getElementById('dateToFilter').value;
 
             const filtered = movements.filter(m => {
                 const invNo = resolveInvoiceNo(m).toLowerCase();
@@ -570,10 +704,15 @@
 
                 const matchesType = (type === "ALL" || m.status === type);
                 const matchesGodown = (gdn === "ALL" || m.godownId === gdn);
+                const movementDate = typeof m.date === 'string' ? m.date : '';
+                const matchesDate = (!dateFrom || (movementDate && movementDate >= dateFrom)) &&
+                    (!dateTo || (movementDate && movementDate <= dateTo));
 
-                return matchesQuery && matchesType && matchesGodown;
+                return matchesQuery && matchesType && matchesGodown && matchesDate;
             });
-            renderTable(filtered);
+            filteredMovements = filtered;
+            currentPage = 1;
+            renderTable(filteredMovements);
         }
 
         // ====================================================
@@ -627,7 +766,7 @@
             tbody.appendChild(tr);
         }
 
-        function saveGodownConfigs() {
+        async function saveGodownConfigs() {
             const rows = document.querySelectorAll('.config-row');
             const updated = [];
 
@@ -650,9 +789,14 @@
 
             godownConfigs = updated;
             localStorage.setItem(CONFIG_KEY, JSON.stringify(godownConfigs));
+            const syncResult = await apiClient.saveGodownProfiles(godownConfigs);
+            if (syncResult && syncResult.success) localStorage.removeItem('godown_profiles_pending_sync');
+            else localStorage.setItem('godown_profiles_pending_sync', '1');
             populateGodownDropdownFilter();
             bootstrap.Modal.getInstance(document.getElementById('godownConfigModal')).hide();
-            alert("Godown profiles, access PINs, and operator lists saved successfully!");
+            alert(syncResult && syncResult.success
+                ? "Godown profiles, access PINs, and operator lists saved successfully!"
+                : "Profiles were saved on this device, but backend sync failed. They will retry when the connection is available.");
         }
 
         function printChallan(id) {

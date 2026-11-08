@@ -457,8 +457,9 @@
         let activeGodownName = '';
         let activeOperators = [];
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+            await syncGodownRemoteData();
             checkSessionAndResolve();
             loadInventoryItems();
             loadReportInvoices();
@@ -480,6 +481,16 @@
             }
         });
 
+        setInterval(async () => {
+            const profilesChanged = await syncGodownRemoteData();
+            if (profilesChanged && activeGodownId) {
+                const activeProfile = getSavedProfiles().find(profile => profile.id === activeGodownId);
+                if (activeProfile) applyGodownSession(activeProfile);
+                else checkSessionAndResolve();
+            }
+            if (currentMode === 'COUNTER') renderCounterTrackerTable();
+        }, 10000);
+
         // ==========================================
         // DYNAMIC PIN-BASED GODOWN RESOLUTION
         // ==========================================
@@ -488,6 +499,55 @@
                 { id: "GDN-01", name: "Central Godown (Main)", operators: ["Abc Kumar", "Def Ghosh"], pin: "1001" },
                 { id: "GDN-02", name: "North Depot (Branch 2)", operators: ["Mno Das", "Pqr Roy"], pin: "2002" }
             ];
+        }
+
+        async function syncGodownRemoteData() {
+            const [remoteProfiles, remoteMovements] = await Promise.all([
+                apiClient.getGodownProfiles(),
+                apiClient.getGodownMovements()
+            ]);
+            let profilesChanged = false;
+
+            if (Array.isArray(remoteProfiles)) {
+                const cachedProfiles = JSON.parse(localStorage.getItem(CONFIG_KEY)) || [];
+                const profilesPending = localStorage.getItem('godown_profiles_pending_sync') === '1';
+                let profiles = remoteProfiles.length ? remoteProfiles : (cachedProfiles.length ? cachedProfiles : getSavedProfiles());
+                if (profilesPending) {
+                    const result = await apiClient.saveGodownProfiles(cachedProfiles);
+                    profiles = cachedProfiles;
+                    if (result && result.success) localStorage.removeItem('godown_profiles_pending_sync');
+                }
+                profilesChanged = JSON.stringify(cachedProfiles) !== JSON.stringify(profiles);
+                localStorage.setItem(CONFIG_KEY, JSON.stringify(profiles));
+                if (remoteProfiles.length === 0 && !profilesPending) await apiClient.saveGodownProfiles(profiles);
+            }
+
+            if (Array.isArray(remoteMovements)) {
+                const cachedMovements = JSON.parse(localStorage.getItem('godown_movements')) || [];
+                const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
+                const remoteIds = new Set(remoteMovements.map(movement => movement.id));
+                const mergedMovements = [...remoteMovements];
+                for (const movement of cachedMovements) {
+                    if (!remoteIds.has(movement.id) || pendingIds.has(movement.id)) {
+                        const result = await apiClient.saveGodownMovement(movement);
+                        if (result && result.success) {
+                            const existingIndex = mergedMovements.findIndex(item => item.id === movement.id);
+                            if (existingIndex >= 0) mergedMovements[existingIndex] = result.data || movement;
+                            else mergedMovements.push(result.data || movement);
+                            remoteIds.add(movement.id);
+                            pendingIds.delete(movement.id);
+                        } else {
+                            const existingIndex = mergedMovements.findIndex(item => item.id === movement.id);
+                            if (existingIndex >= 0) mergedMovements[existingIndex] = movement;
+                            else mergedMovements.push(movement);
+                        }
+                    }
+                }
+                localStorage.setItem('godown_movements', JSON.stringify(mergedMovements));
+                localStorage.setItem('godown_pending_sync', JSON.stringify([...pendingIds]));
+            }
+
+            return profilesChanged;
         }
 
         function checkSessionAndResolve() {
@@ -1167,6 +1227,17 @@
             }
 
             localStorage.setItem('godown_movements', JSON.stringify(movements));
+            const syncResult = await apiClient.saveGodownMovement(movements[0]);
+            if (!syncResult || !syncResult.success) {
+                const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
+                pendingIds.add(movements[0].id);
+                localStorage.setItem('godown_pending_sync', JSON.stringify([...pendingIds]));
+                alert('The movement is saved on this device, but could not reach the backend. It will retry when the connection is available.');
+            } else {
+                const pendingIds = new Set(JSON.parse(localStorage.getItem('godown_pending_sync')) || []);
+                pendingIds.delete(movements[0].id);
+                localStorage.setItem('godown_pending_sync', JSON.stringify([...pendingIds]));
+            }
 
             document.getElementById('materialBody').innerHTML = '';
             addMaterialRow();

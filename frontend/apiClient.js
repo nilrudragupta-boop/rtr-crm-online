@@ -194,7 +194,7 @@ const apiClient = {
         } catch (error) { return { success: false, message: error.message }; }
     },
 
-    
+
     // --- Invoices ---
     getInvoices: async () => {
         try {
@@ -311,6 +311,25 @@ const apiClient = {
     getCreditDebitNotes: () => apiClient._getCollection('credit-debit-notes'),
     saveCreditDebitNote: async (data) => apiClient._saveCollection('credit-debit-notes', data),
     deleteCreditDebitNote: async (id) => apiClient._deleteCollection('credit-debit-notes', id),
+
+    // --- Godown Operations ---
+    getGodownMovements: () => apiClient._getCollection('godown/movements'),
+    saveGodownMovement: (movement) => apiClient._saveCollection('godown/movements', movement),
+    getGodownProfiles: () => apiClient._getCollection('godown/profiles'),
+    saveGodownProfiles: async (profiles) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/godown/profiles${apiClient._getAuthQuery()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profiles })
+            });
+            const result = await response.json();
+            return response.ok ? result : { success: false, message: result.message || `HTTP ${response.status}` };
+        } catch (error) {
+            console.error('Error saving godown profiles:', error);
+            return { success: false, message: error.message };
+        }
+    },
 
     // --- Generic Fetch / Save for other collections ---
     _getCollection: async (collectionName) => {
