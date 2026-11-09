@@ -1,6 +1,6 @@
 class NancyVoiceAssistant {
     constructor() {
-        this.history = [];
+        this.interactionId = null;
         this.isListening = false;
         this.questionCategories = {
             Sales: ["Unpaid invoices", "Total sales this month", "Recent invoices"],
@@ -331,7 +331,7 @@ class NancyVoiceAssistant {
                 signal: requestController.signal,
                 body: JSON.stringify({
                     message: query,
-                    conversationHistory: this.history
+                    previousInteractionId: this.interactionId
                 })
             });
 
@@ -340,7 +340,7 @@ class NancyVoiceAssistant {
 
             if (response.ok && data.reply) {
                 if (targetMsg) targetMsg.innerText = data.reply;
-                this.history = data.updatedHistory || this.history;
+                this.interactionId = data.interactionId || this.interactionId;
                 this.speak(data.reply);
             } else {
                 if (targetMsg) targetMsg.innerText = data.error || 'No records found.';
