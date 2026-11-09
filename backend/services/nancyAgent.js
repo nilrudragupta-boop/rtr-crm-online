@@ -160,7 +160,7 @@ async function lookupGeminiApiKey(userId) {
         }
         if (!result.ok || typeof result.apiKey !== 'string' || !result.apiKey.trim()) {
             console.error('Nancy key lookup rejected the request or found no active key.');
-            const error = new Error('No active Gemini API key is configured for this user.');
+            const error = new Error('Nancy not activated. Please contact your administrator.');
             error.code = 'NANCY_KEY_UNAVAILABLE';
             throw error;
         }
@@ -229,6 +229,7 @@ Keep answers concise, direct, and conversational so they are pleasant to listen 
             input: interactionInput,
             tools: nancyToolDeclarations.map(tool => ({ type: 'function', ...tool })),
             system_instruction: systemInstruction,
+            generation_config: { thinking_level: 'low' },
             store: true,
             ...(previousInteractionId ? { previous_interaction_id: previousInteractionId } : {})
         }), remaining, 'Gemini Interactions API');
