@@ -322,19 +322,10 @@ class NancyVoiceAssistant {
         this.messageList.scrollTop = this.messageList.scrollHeight;
 
         try {
-            const currentUser = localStorage.getItem('currentUser');
-            if (!currentUser) {
-                const targetMsg = document.getElementById(loadingId);
-                if (targetMsg) targetMsg.innerText = 'Please sign in before using Nancy.';
-                return;
-            }
-
             const response = await fetch('/api/nancy/chat', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-user-id': currentUser
-                },
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: query,
                     conversationHistory: this.history
