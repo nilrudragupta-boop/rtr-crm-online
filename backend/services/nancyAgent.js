@@ -153,11 +153,13 @@ async function lookupGeminiApiKey(userId) {
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
+            console.error('Nancy key lookup returned HTTP status:', response.status);
             const error = new Error('Nancy could not contact the key lookup service.');
             error.code = 'NANCY_LOOKUP_UNAVAILABLE';
             throw error;
         }
         if (!result.ok || typeof result.apiKey !== 'string' || !result.apiKey.trim()) {
+            console.error('Nancy key lookup rejected the request or found no active key.');
             const error = new Error('No active Gemini API key is configured for this user.');
             error.code = 'NANCY_KEY_UNAVAILABLE';
             throw error;
@@ -165,6 +167,10 @@ async function lookupGeminiApiKey(userId) {
         return result.apiKey.trim();
     } catch (cause) {
         if (cause.code) throw cause;
+        console.error('Nancy key lookup network error:', {
+            name: cause.name,
+            code: cause.cause && cause.cause.code
+        });
         const error = new Error('Nancy could not contact the key lookup service.');
         error.code = 'NANCY_LOOKUP_UNAVAILABLE';
         throw error;
