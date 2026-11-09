@@ -179,6 +179,18 @@ async function lookupGeminiApiKey(userId) {
     }
 }
 
+function withTimeout(promise, timeoutMs) {
+    let timer;
+    const timeoutPromise = new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+            const error = new Error('Nancy request timed out while waiting for an upstream service.');
+            error.code = 'NANCY_UPSTREAM_TIMEOUT';
+            reject(error);
+        }, timeoutMs);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
 async function runNancyAgent({ userId, prompt, conversationHistory = [], dataStore }) {
     if (!dataStore) throw new Error('Nancy data services are unavailable.');
     const apiKey = await lookupGeminiApiKey(userId);
@@ -214,12 +226,23 @@ Keep answers concise, direct, and conversational so they are pleasant to listen 
         history: Array.isArray(conversationHistory) ? conversationHistory.slice(-20) : []
     });
 
-    let response = await chat.sendMessage({ message: prompt });
+    const deadline = Date.now() + 45000;
+    const sendMessage = message => {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) {
+            const error = new Error('Nancy request timed out while waiting for Gemini.');
+            error.code = 'NANCY_UPSTREAM_TIMEOUT';
+            throw error;
+        }
+        return withTimeout(chat.sendMessage(message), remaining);
+    };
+
+    let response = await sendMessage({ message: prompt });
 
     let toolRounds = 0;
     while (response.functionCalls && response.functionCalls.length > 0 && toolRounds < 8) {
         toolRounds += 1;
-        const functionResponses = await Promise.all(response.functionCalls.map(async call => {
+        const functionResponses = await withTimeout(Promise.all(response.functionCalls.map(async call => {
             const toolHandler = tools[call.name];
             let result;
             if (!toolHandler) {
@@ -232,8 +255,8 @@ Keep answers concise, direct, and conversational so they are pleasant to listen 
                 }
             }
             return { functionResponse: { name: call.name, response: { result } } };
-        }));
-        response = await chat.sendMessage({ message: functionResponses });
+        })), Math.max(1, deadline - Date.now()));
+        response = await sendMessage({ message: functionResponses });
     }
 
     if (response.functionCalls && response.functionCalls.length > 0) {
