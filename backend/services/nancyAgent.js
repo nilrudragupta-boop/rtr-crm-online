@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const Type = { OBJECT: 'OBJECT', STRING: 'STRING' };
+const Type = { OBJECT: 'object', STRING: 'string' };
 
 
 // 1. Nancy's tools (Every tool explicitly requires userId from the authenticated session)
@@ -179,11 +179,11 @@ async function lookupGeminiApiKey(userId) {
     }
 }
 
-function withTimeout(promise, timeoutMs) {
+function withTimeout(promise, timeoutMs, stage = 'upstream service') {
     let timer;
     const timeoutPromise = new Promise((resolve, reject) => {
         timer = setTimeout(() => {
-            const error = new Error('Nancy request timed out while waiting for an upstream service.');
+            const error = new Error(`Nancy request timed out while waiting for ${stage}.`);
             error.code = 'NANCY_UPSTREAM_TIMEOUT';
             reject(error);
         }, timeoutMs);
@@ -191,7 +191,7 @@ function withTimeout(promise, timeoutMs) {
     return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }
 
-async function runNancyAgent({ userId, prompt, conversationHistory = [], dataStore }) {
+async function runNancyAgent({ userId, prompt, previousInteractionId, dataStore }) {
     if (!dataStore) throw new Error('Nancy data services are unavailable.');
     const apiKey = await lookupGeminiApiKey(userId);
 
@@ -216,56 +216,68 @@ Never guess or fabricate records. If an item or invoice is not found via your to
 Keep answers concise, direct, and conversational so they are pleasant to listen to when read aloud.
 `;
 
-    // Start chat with Nancy's function declarations
-    const chat = ai.chats.create({
-        model: 'gemini-3.8-flash',
-        config: {
-            systemInstruction,
-            tools: [{ functionDeclarations: nancyToolDeclarations }]
-        },
-        history: Array.isArray(conversationHistory) ? conversationHistory.slice(-20) : []
-    });
-
-    const deadline = Date.now() + 45000;
-    const sendMessage = message => {
+    const deadline = Date.now() + 35000;
+    const createInteraction = ({ input: interactionInput, previousInteractionId }) => {
         const remaining = deadline - Date.now();
         if (remaining <= 0) {
             const error = new Error('Nancy request timed out while waiting for Gemini.');
             error.code = 'NANCY_UPSTREAM_TIMEOUT';
             throw error;
         }
-        return withTimeout(chat.sendMessage(message), remaining);
+        return withTimeout(ai.interactions.create({
+            model: 'gemini-3.8-flash',
+            input: interactionInput,
+            tools: nancyToolDeclarations.map(tool => ({ type: 'function', ...tool })),
+            system_instruction: systemInstruction,
+            store: true,
+            ...(previousInteractionId ? { previous_interaction_id: previousInteractionId } : {})
+        }), remaining, 'Gemini Interactions API');
     };
 
-    let response = await sendMessage({ message: prompt });
+    let interaction = await createInteraction({
+        input: prompt,
+        previousInteractionId: previousInteractionId || ''
+    });
 
     let toolRounds = 0;
-    while (response.functionCalls && response.functionCalls.length > 0 && toolRounds < 8) {
+    while (toolRounds < 8) {
+        const functionCalls = (interaction.steps || []).filter(step => step.type === 'function_call');
+        if (functionCalls.length === 0) break;
         toolRounds += 1;
-        const functionResponses = await withTimeout(Promise.all(response.functionCalls.map(async call => {
+        const functionResults = await withTimeout(Promise.all(functionCalls.map(async call => {
             const toolHandler = tools[call.name];
             let result;
             if (!toolHandler) {
                 result = { error: `Tool ${call.name} is not available.` };
             } else {
                 try {
-                    result = await toolHandler(call.args || {});
+                    result = await toolHandler(typeof call.arguments === 'string'
+                        ? JSON.parse(call.arguments)
+                        : call.arguments || {});
                 } catch (error) {
                     result = { error: `Could not complete ${call.name}.` };
                 }
             }
-            return { functionResponse: { name: call.name, response: { result } } };
-        })), Math.max(1, deadline - Date.now()));
-        response = await sendMessage({ message: functionResponses });
+            return {
+                type: 'function_result',
+                name: call.name,
+                call_id: call.id,
+                result: [{ type: 'text', text: JSON.stringify(result) }]
+            };
+        })), Math.max(1, deadline - Date.now()), 'Nancy data tools');
+        interaction = await createInteraction({
+            input: functionResults,
+            previousInteractionId: interaction.id
+        });
     }
 
-    if (response.functionCalls && response.functionCalls.length > 0) {
+    if ((interaction.steps || []).some(step => step.type === 'function_call')) {
         throw new Error('Nancy could not complete the request. Please try a more specific question.');
     }
 
     return {
-        reply: response.text || 'I could not find an answer to that question.',
-        updatedHistory: await chat.getHistory()
+        reply: interaction.output_text || 'I could not find an answer to that question.',
+        interactionId: interaction.id
     };
 }
 

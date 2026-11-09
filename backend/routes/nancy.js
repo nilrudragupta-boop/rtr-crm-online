@@ -119,14 +119,15 @@ module.exports = function registerNancyRoutes(app, models) {
             const result = await runNancyAgent({
                 userId,
                 prompt,
-                conversationHistory: req.body.conversationHistory,
+                previousInteractionId: req.body.previousInteractionId,
                 dataStore
             });
             res.json(result);
         } catch (error) {
             console.error('Nancy request failed:', error.message);
-            const status = error.code === 'NANCY_KEY_UNAVAILABLE' ? 403 :
-                ['NANCY_NOT_CONFIGURED', 'NANCY_LOOKUP_UNAVAILABLE'].includes(error.code) ? 503 : 500;
+            const status = error.code === 'NANCY_UPSTREAM_TIMEOUT' ? 504 :
+                error.code === 'NANCY_KEY_UNAVAILABLE' ? 403 :
+                    ['NANCY_NOT_CONFIGURED', 'NANCY_LOOKUP_UNAVAILABLE'].includes(error.code) ? 503 : 500;
             res.status(status).json({ error: error.message || 'Nancy is temporarily unavailable.' });
         }
     });
