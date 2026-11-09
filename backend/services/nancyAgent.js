@@ -206,7 +206,7 @@ Keep answers concise, direct, and conversational so they are pleasant to listen 
 
     // Start chat with Nancy's function declarations
     const chat = ai.chats.create({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         config: {
             systemInstruction,
             tools: [{ functionDeclarations: nancyToolDeclarations }]
