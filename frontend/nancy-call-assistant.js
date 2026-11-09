@@ -340,7 +340,7 @@ class NancyVoiceAssistant {
 
             if (response.ok && data.reply) {
                 if (targetMsg) targetMsg.innerText = data.reply;
-                this.interactionId = data.interactionId || this.interactionId;
+                if ('interactionId' in data) this.interactionId = data.interactionId;
                 this.speak(data.reply);
             } else {
                 if (targetMsg) targetMsg.innerText = data.error || 'No records found.';
