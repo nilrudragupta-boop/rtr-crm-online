@@ -24,6 +24,8 @@
     <script src="brandLoader.js"></script>
     <script src="apiClient.js"></script>
     <script src="global_urgent_notice.js"></script>
+    <!-- Nancy AI Voice Agent -->
+    <script src="nancy-call-assistant.js"></script>
 
     <style>
         /* Fixed / Aligned Topbar Search Trigger */
@@ -9045,6 +9047,162 @@
             if (overflowContainer && !overflowContainer.contains(e.target)) {
                 closeTopTabOverflowMenu();
             }
+        });
+
+
+
+
+        class NancyVoiceAssistant {
+            constructor() {
+                this.history = [];
+                this.isListening = false;
+                this.initUI();
+                this.initSpeech();
+            }
+
+            initUI() {
+                const widget = document.createElement('div');
+                widget.id = 'nancy-voice-widget';
+                widget.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    `;
+
+                widget.innerHTML = `
+      <div id="nancy-speech-bubble" style="
+        display: none;
+        background: #1e293b;
+        color: #f8fafc;
+        padding: 8px 14px;
+        border-radius: 18px;
+        font-size: 13px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+        max-width: 260px;
+      ">Nancy listening...</div>
+      <button id="nancy-call-btn" style="
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        border: none;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        transition: transform 0.2s, background 0.2s;
+      ">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+      </button>
+    `;
+                document.body.appendChild(widget);
+
+                this.callBtn = document.getElementById('nancy-call-btn');
+                this.bubble = document.getElementById('nancy-speech-bubble');
+
+                this.callBtn.addEventListener('click', () => this.toggleListening());
+            }
+
+            initSpeech() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    console.warn('Speech recognition not supported in this browser.');
+                    return;
+                }
+
+                this.recognition = new SpeechRecognition();
+                this.recognition.continuous = false;
+                this.recognition.lang = 'en-IN'; // Works well for Indian English and regional contexts
+
+                this.recognition.onstart = () => {
+                    this.isListening = true;
+                    this.callBtn.style.background = '#dc2626'; // Red active listening state
+                    this.bubble.innerText = 'Nancy is listening...';
+                    this.bubble.style.display = 'block';
+                };
+
+                this.recognition.onresult = async (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    this.bubble.innerText = `"${transcript}"`;
+                    await this.askNancy(transcript);
+                };
+
+                this.recognition.onend = () => {
+                    this.isListening = false;
+                    this.callBtn.style.background = '#2563eb';
+                };
+            }
+
+            toggleListening() {
+                if (!this.recognition) {
+                    const manual = prompt('Type your query for Nancy:');
+                    if (manual) this.askNancy(manual);
+                    return;
+                }
+
+                if (this.isListening) {
+                    this.recognition.stop();
+                } else {
+                    this.recognition.start();
+                }
+            }
+
+            async askNancy(text) {
+                this.bubble.innerText = 'Nancy searching your records...';
+                try {
+                    // Retrieve the current user's session identifier
+                    const userId = localStorage.getItem('rtr_user_id') || 'CURRENT_USER';
+
+                    const response = await fetch('/api/nancy/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-user-id': userId
+                        },
+                        body: JSON.stringify({
+                            message: text,
+                            conversationHistory: this.history
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.reply) {
+                        this.bubble.innerText = data.reply;
+                        this.history = data.updatedHistory || this.history;
+                        this.speak(data.reply);
+                    } else {
+                        this.bubble.innerText = 'No records found.';
+                    }
+                } catch (err) {
+                    this.bubble.innerText = 'Unable to reach Nancy right now.';
+                }
+            }
+
+            speak(text) {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+        }
+
+        // Automatically mount when DOM loads
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.Nancy) window.Nancy = new NancyVoiceAssistant();
         });
     </script>
 </body>
