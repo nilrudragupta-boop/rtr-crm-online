@@ -191,8 +191,80 @@ function withTimeout(promise, timeoutMs, stage = 'upstream service') {
     return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }
 
+function formatCurrency(value) {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 2
+    }).format(Number(value) || 0);
+}
+
+async function getDirectAnswer(prompt, tools) {
+    const query = String(prompt || '').trim();
+    const normalized = query.toLowerCase().replace(/[?.!]+$/g, '').trim();
+
+    if (/^(unpaid invoices|unpaid bills|unpaid invoice summary|unpaid bills summary)$/.test(normalized)) {
+        const invoices = await withTimeout(tools.getUnpaidInvoices({}), 8000, 'MongoDB unpaid-invoice query');
+        if (!invoices.length) return 'No unpaid invoices found.';
+        const rows = invoices.slice(0, 8).map(invoice =>
+            `${invoice.invoiceNo || 'Invoice'} - ${invoice.customerName || 'Unknown customer'}: ${formatCurrency(invoice.outstanding)}`);
+        return `Found ${invoices.length} unpaid invoices.\n${rows.join('\n')}`;
+    }
+
+    if (/^(total sales this month|sales this month|monthly sales)$/.test(normalized)) {
+        const summary = await withTimeout(tools.getSalesSummary({ period: 'month' }), 8000, 'MongoDB monthly-sales query');
+        return `This month: ${formatCurrency(summary.totalSales)} across ${summary.invoiceCount} invoices.`;
+    }
+
+    if (/^(total sales today|today'?s sales|sales today)$/.test(normalized)) {
+        const summary = await withTimeout(tools.getSalesSummary({ period: 'today' }), 8000, 'MongoDB daily-sales query');
+        return `Today: ${formatCurrency(summary.totalSales)} across ${summary.invoiceCount} invoices.`;
+    }
+
+    if (/^(recent invoices|search recent invoices|latest invoices)$/.test(normalized)) {
+        const invoices = await withTimeout(tools.searchInvoices({}), 8000, 'MongoDB recent-invoice query');
+        if (!invoices.length) return 'No recent invoices found.';
+        const rows = invoices.slice(0, 8).map(invoice =>
+            `${invoice.invoiceNo || invoice.invoice_no || 'Invoice'} - ${invoice.customerName || 'Unknown customer'}: ${formatCurrency(invoice.invoiceTotal)} (${invoice.status || 'status unknown'})`);
+        return `Here are ${Math.min(invoices.length, 8)} recent invoices:\n${rows.join('\n')}`;
+    }
+
+    const stockMatch = query.match(/^(?:check|show|get|find)\s+(?:the\s+)?(?:item\s+)?stock(?:\s+(?:for|of)\s+(.+))?$/i);
+    if (stockMatch) {
+        if (!stockMatch[1]) return 'Which item’s stock would you like me to check?';
+        const items = await withTimeout(tools.checkItemStock({ itemName: stockMatch[1].trim() }), 8000, 'MongoDB item-stock query');
+        if (!items.length) return `I couldn’t find an item matching “${stockMatch[1].trim()}”.`;
+        return items.slice(0, 8).map(item =>
+            `${item.name || item.itemCode || 'Item'}: ${Number(item.currentStock) || 0} ${item.unit || 'units'}`).join('\n');
+    }
+
+    const customerMatch = query.match(/^(?:customer\s+)?balance(?:\s+(?:for|of))?\s*(.*)$/i);
+    if (customerMatch) {
+        const party = customerMatch[1].trim();
+        if (!party) return 'Which customer’s balance would you like me to check?';
+        const balance = await withTimeout(tools.getLedgerSummary({ partyName: party }), 8000, 'MongoDB customer-ledger query');
+        if (!balance) return `I couldn’t find a ledger for “${party}”.`;
+        return `${balance.party}: outstanding ${formatCurrency(balance.outstanding)}.`;
+    }
+
+    const supplierMatch = query.match(/^(?:supplier\s+)?dues(?:\s+(?:for|of))?\s*(.*)$/i);
+    if (supplierMatch) {
+        const party = supplierMatch[1].trim();
+        if (!party) return 'Which supplier’s dues would you like me to check?';
+        const balance = await withTimeout(tools.getLedgerSummary({ partyName: party }), 8000, 'MongoDB supplier-ledger query');
+        if (!balance) return `I couldn’t find a ledger for “${party}”.`;
+        return `${balance.party}: outstanding ${formatCurrency(balance.outstanding)}.`;
+    }
+
+    return null;
+}
+
 async function runNancyAgent({ userId, prompt, previousInteractionId, dataStore }) {
     if (!dataStore) throw new Error('Nancy data services are unavailable.');
+    const tools = createNancyTools(userId, dataStore);
+    const directAnswer = await getDirectAnswer(prompt, tools);
+    if (directAnswer) return { reply: directAnswer, interactionId: null };
+
     const apiKey = await lookupGeminiApiKey(userId);
 
     let GoogleGenAI;
@@ -206,7 +278,6 @@ async function runNancyAgent({ userId, prompt, previousInteractionId, dataStore 
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const tools = createNancyTools(userId, dataStore);
 
     const systemInstruction = `
 You are Nancy, the voice and intelligence assistant for RISE Tech Revolution (RTR).
@@ -220,7 +291,7 @@ Keep answers concise, direct, and conversational so they are pleasant to listen 
     const createInteraction = ({ input: interactionInput, previousInteractionId }) => {
         const remaining = deadline - Date.now();
         if (remaining <= 0) {
-            const error = new Error('Nancy request timed out while waiting for Gemini.');
+            const error = new Error('Nancy request timed out while waiting for search results.');
             error.code = 'NANCY_UPSTREAM_TIMEOUT';
             throw error;
         }
@@ -232,7 +303,7 @@ Keep answers concise, direct, and conversational so they are pleasant to listen 
             generation_config: { thinking_level: 'low' },
             store: true,
             ...(previousInteractionId ? { previous_interaction_id: previousInteractionId } : {})
-        }), remaining, 'Gemini Interactions API');
+        }), remaining, 'Your search results ');
     };
 
     let interaction = await createInteraction({
