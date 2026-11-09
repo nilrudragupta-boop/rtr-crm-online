@@ -321,11 +321,14 @@ class NancyVoiceAssistant {
         this.messageList.appendChild(loadingMsg);
         this.messageList.scrollTop = this.messageList.scrollHeight;
 
+        const requestController = new AbortController();
+        const requestTimeout = setTimeout(() => requestController.abort(), 50000);
         try {
             const response = await fetch('/api/nancy/chat', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
+                signal: requestController.signal,
                 body: JSON.stringify({
                     message: query,
                     conversationHistory: this.history
@@ -344,7 +347,13 @@ class NancyVoiceAssistant {
             }
         } catch (err) {
             const targetMsg = document.getElementById(loadingId);
-            if (targetMsg) targetMsg.innerText = 'Unable to reach Nancy right now.';
+            if (targetMsg) {
+                targetMsg.innerText = err.name === 'AbortError'
+                    ? 'Nancy is taking longer than expected. Please try again.'
+                    : 'Unable to reach Nancy right now.';
+            }
+        } finally {
+            clearTimeout(requestTimeout);
         }
         this.messageList.scrollTop = this.messageList.scrollHeight;
     }
