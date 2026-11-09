@@ -9,6 +9,7 @@ const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
 const registerCrmV2 = require('./routes/crm_v2');
 const registerNancyRoutes = require('./routes/nancy');
+const { COOKIE_NAME, SESSION_SECONDS, createNancySession, verifyTotp } = require('./services/nancyAuth');
 
 
 const app = express();
@@ -1771,6 +1772,57 @@ app.post('/api/auth/login', (req, res) => {
     // Log to console or future DB collection
     console.log(`[AUTH] User '${username}' logged in from IP: ${clientIp}`);
     res.json({ success: true, message: "Login tracked" });
+});
+
+app.post('/api/auth/nancy-session', async (req, res) => {
+    const username = String(req.body && req.body.username || '').trim();
+    const password = String(req.body && req.body.password || '');
+    const otp = String(req.body && req.body.otp || '');
+    const authSecret = process.env.NANCY_AUTH_SECRET;
+
+    if (!authSecret || authSecret.length < 32) {
+        return res.status(503).json({ error: 'Nancy authentication is not configured on the server.' });
+    }
+    if (!username || !password || username.length > 200) {
+        return res.status(401).json({ error: 'Nancy sign-in could not be verified.' });
+    }
+
+    try {
+        const creds = await AdminCreds.findOne({ id: 'global_creds' }).select('adminUsers adminPass').lean();
+        const users = creds && Array.isArray(creds.adminUsers) ? creds.adminUsers : [];
+        const account = users.find(user => String(user.username || '').trim() === username);
+        if (!account || account.active === false || account.isActive === false) {
+            return res.status(401).json({ error: 'Nancy sign-in could not be verified.' });
+        }
+
+        const expectedPassword = String(account.password || creds.adminPass || '');
+        if (!expectedPassword || password !== expectedPassword) {
+            return res.status(401).json({ error: 'Nancy sign-in could not be verified.' });
+        }
+
+        const totpSecret = String(account.totpSecret || '').trim();
+        const requiresTotp = !!(totpSecret || account.authenticatorEnabled || account.twoFactorEnabled || account.is2FA);
+        if (requiresTotp && !totpSecret) {
+            return res.status(503).json({ error: 'Save this user’s 2FA setup on the server before using Nancy.' });
+        }
+        if (totpSecret && !verifyTotp(totpSecret, otp)) {
+            return res.status(401).json({ error: 'Nancy sign-in could not be verified.' });
+        }
+
+        const token = createNancySession(username, authSecret);
+        const secureFlag = req.secure ? '; Secure' : '';
+        res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Path=/api/nancy; Max-Age=${SESSION_SECONDS}${secureFlag}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Nancy session issuance failed:', error.message);
+        res.status(503).json({ error: 'Nancy sign-in is temporarily unavailable.' });
+    }
+});
+
+app.post('/api/auth/nancy-logout', (req, res) => {
+    const secureFlag = req.secure ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/api/nancy; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${secureFlag}`);
+    res.json({ success: true });
 });
 
 // --- Secure OTP Nodemailer Transporter ---

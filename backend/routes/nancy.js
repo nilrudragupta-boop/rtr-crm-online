@@ -1,4 +1,5 @@
 const { runNancyAgent } = require('../services/nancyAgent');
+const { getNancySession } = require('../services/nancyAuth');
 
 const escapeRegex = value => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -108,9 +109,9 @@ module.exports = function registerNancyRoutes(app, models) {
     const dataStore = createNancyDataStore(models);
 
     app.post('/api/nancy/chat', async (req, res) => {
-        const userId = String(req.get('x-user-id') || req.query.user || '').trim();
+        const userId = getNancySession(req, process.env.NANCY_AUTH_SECRET);
         const prompt = String(req.body && req.body.message || '').trim();
-        if (!userId) return res.status(401).json({ error: 'Please sign in before using Nancy.' });
+        if (!userId) return res.status(401).json({ error: 'Please sign in again before using Nancy.' });
         if (!prompt) return res.status(400).json({ error: 'Enter a question for Nancy.' });
         if (prompt.length > 2000) return res.status(400).json({ error: 'Nancy questions must be 2,000 characters or fewer.' });
 
@@ -124,7 +125,8 @@ module.exports = function registerNancyRoutes(app, models) {
             res.json(result);
         } catch (error) {
             console.error('Nancy request failed:', error.message);
-            const status = error.code === 'NANCY_NOT_CONFIGURED' ? 503 : 500;
+            const status = error.code === 'NANCY_KEY_UNAVAILABLE' ? 403 :
+                ['NANCY_NOT_CONFIGURED', 'NANCY_LOOKUP_UNAVAILABLE'].includes(error.code) ? 503 : 500;
             res.status(status).json({ error: error.message || 'Nancy is temporarily unavailable.' });
         }
     });

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const Type = { OBJECT: 'OBJECT', STRING: 'STRING' };
 
 
@@ -113,13 +114,68 @@ const nancyToolDeclarations = [
 ];
 
 // 3. Nancy Chat Handler
-async function runNancyAgent({ userId, prompt, conversationHistory = [], dataStore }) {
-    if (!process.env.GEMINI_API_KEY) {
-        const error = new Error('Nancy is not configured. Set GEMINI_API_KEY on the server.');
+async function lookupGeminiApiKey(userId) {
+    const lookupUrl = process.env.NANCY_KEY_LOOKUP_URL;
+    const sharedSecret = process.env.NANCY_KEY_LOOKUP_SECRET;
+    if (!lookupUrl || !sharedSecret || sharedSecret.length < 32) {
+        const error = new Error('Nancy key lookup is not configured on the server.');
         error.code = 'NANCY_NOT_CONFIGURED';
         throw error;
     }
+
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(lookupUrl);
+    } catch (cause) {
+        const error = new Error('Nancy key lookup URL is invalid.');
+        error.code = 'NANCY_NOT_CONFIGURED';
+        throw error;
+    }
+    if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== 'script.google.com') {
+        const error = new Error('Nancy key lookup must use the HTTPS Apps Script deployment URL.');
+        error.code = 'NANCY_NOT_CONFIGURED';
+        throw error;
+    }
+
+    const timestamp = String(Date.now());
+    const nonce = crypto.randomBytes(24).toString('base64url');
+    const canonical = `${userId}\n${timestamp}\n${nonce}`;
+    const signature = crypto.createHmac('sha256', sharedSecret).update(canonical).digest('hex');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+        const response = await fetch(parsedUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, timestamp, nonce, signature }),
+            signal: controller.signal
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const error = new Error('Nancy could not contact the key lookup service.');
+            error.code = 'NANCY_LOOKUP_UNAVAILABLE';
+            throw error;
+        }
+        if (!result.ok || typeof result.apiKey !== 'string' || !result.apiKey.trim()) {
+            const error = new Error('No active Gemini API key is configured for this user.');
+            error.code = 'NANCY_KEY_UNAVAILABLE';
+            throw error;
+        }
+        return result.apiKey.trim();
+    } catch (cause) {
+        if (cause.code) throw cause;
+        const error = new Error('Nancy could not contact the key lookup service.');
+        error.code = 'NANCY_LOOKUP_UNAVAILABLE';
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function runNancyAgent({ userId, prompt, conversationHistory = [], dataStore }) {
     if (!dataStore) throw new Error('Nancy data services are unavailable.');
+    const apiKey = await lookupGeminiApiKey(userId);
 
     let GoogleGenAI;
     try {
@@ -131,7 +187,7 @@ async function runNancyAgent({ userId, prompt, conversationHistory = [], dataSto
         throw error;
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     const tools = createNancyTools(userId, dataStore);
 
     const systemInstruction = `
