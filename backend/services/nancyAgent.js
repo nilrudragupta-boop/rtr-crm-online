@@ -22,6 +22,10 @@ function createNancyTools(userId, dataStore) {
             });
         },
 
+        getCustomerDetails: async ({ customerName }) => dataStore.getRecordDetails({ userId, type: 'customer', name: customerName }),
+        getSupplierDetails: async ({ supplierName }) => dataStore.getRecordDetails({ userId, type: 'supplier', name: supplierName }),
+        getItemDetails: async ({ itemName }) => dataStore.getRecordDetails({ userId, type: 'item', name: itemName }),
+
         checkItemStock: async ({ itemName }) => {
             return await dataStore.findStock({
                 userId,
@@ -68,6 +72,33 @@ const nancyToolDeclarations = [
                 customerName: { type: Type.STRING, description: 'Name or partial name of the customer' },
                 phone: { type: Type.STRING, description: 'Mobile/WhatsApp number' }
             }
+        }
+    },
+    {
+        name: 'getCustomerDetails',
+        description: "Find detailed information about a customer by full or partial name, limited to the caller's business.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: { customerName: { type: Type.STRING, description: 'Full or partial customer name' } },
+            required: ['customerName']
+        }
+    },
+    {
+        name: 'getSupplierDetails',
+        description: "Find detailed information about a supplier by full or partial name, limited to the caller's business.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: { supplierName: { type: Type.STRING, description: 'Full or partial supplier name' } },
+            required: ['supplierName']
+        }
+    },
+    {
+        name: 'getItemDetails',
+        description: "Find detailed information about an inventory item by name, code, or description, limited to the caller's business.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: { itemName: { type: Type.STRING, description: 'Item name, code, or description' } },
+            required: ['itemName']
         }
     },
     {
@@ -229,6 +260,39 @@ async function getDirectAnswer(prompt, tools) {
         return `Here are ${Math.min(invoices.length, 8)} recent invoices:\n${rows.join('\n')}`;
     }
 
+    const detailMatch = query.match(/^(?:(?:show|get|tell me|give me)\s+)?(?:the\s+)?(customer|supplier|item)\s+(?:details|information|info)(?:\s+(?:for|of|about))?\s+(.+)$/i)
+        || query.match(/^(?:show|get|tell me|give me)\s+(?:the\s+)?(customer|supplier|item)\s+(.+?)\s+(?:details|information|info)$/i)
+        || query.match(/^(?:details|information|info)\s+(?:of|for|about)\s+(customer|supplier|item)\s+(.+)$/i)
+        || query.match(/^(?:tell me about|what do you know about)\s+(?:the\s+)?(customer|supplier|item)\s+(.+)$/i);
+    if (detailMatch) {
+        const type = detailMatch[1].toLowerCase();
+        const name = detailMatch[2].trim();
+        const records = await withTimeout(tools[`get${type[0].toUpperCase()}${type.slice(1)}Details`]({
+            [type === 'customer' ? 'customerName' : type === 'supplier' ? 'supplierName' : 'itemName']: name
+        }), 8000, `MongoDB ${type}-details query`);
+        if (!records.length) return `I couldn't find a ${type} matching “${name}”.`;
+
+        const rows = records.slice(0, 5).map(record => {
+            const fields = (type === 'customer' ? [
+                ['Contact', record.contact || record.phone], ['Email', record.email],
+                ['Address', [record.address, record.district, record.state, record.pin].filter(Boolean).join(', ')],
+                ['GSTIN', record.gstin], ['Opening balance', formatCurrency(record.openingBalance)]
+            ] : type === 'supplier' ? [
+                ['Contact', record.contact || record.phone], ['Email', record.email],
+                ['Address', [record.address, record.district, record.state, record.pin].filter(Boolean).join(', ')],
+                ['GSTIN', record.gstin], ['Opening balance', formatCurrency(record.openingBalance)]
+            ] : [
+                ['Item code', record.itemCode], ['Description', record.description], ['Category', record.category],
+                ['Stock', record.currentStock === undefined ? '' : `${record.currentStock} ${record.unit || ''}`.trim()],
+                ['Unit', record.unit], ['Selling price', record.sellingPrice === undefined ? '' : formatCurrency(record.sellingPrice)],
+                ['Purchase price', record.purchasePrice === undefined ? '' : formatCurrency(record.purchasePrice)],
+                ['GST', record.gstRate === undefined ? '' : `${record.gstRate}%`], ['HSN', record.hsnCode]
+            ]).filter(([, value]) => value !== undefined && value !== null && value !== '');
+            return `${record.name || record.itemCode || name}: ${fields.map(([label, value]) => `${label}: ${value}`).join('; ')}`;
+        });
+        return rows.join('\n');
+    }
+
     const stockMatch = query.match(/^(?:check|show|get|find)\s+(?:the\s+)?(?:item\s+)?stock(?:\s+(?:for|of)\s+(.+))?$/i);
     if (stockMatch) {
         if (!stockMatch[1]) return 'Which item’s stock would you like me to check?';
@@ -284,6 +348,7 @@ You are Nancy, the voice and intelligence assistant for RISE Tech Revolution (RT
 You assist individual users over voice/call while they work in their enterprise software.
 CRITICAL SECURITY RULE: You only have access to records belonging strictly to the caller's account (User ID: ${userId}). 
 Never guess or fabricate records. If an item or invoice is not found via your tools, politely state so.
+For requests for customer, supplier, or item details, use the matching detail tool and summarize the fields it returns. Never invent missing contact, address, price, or stock values.
 Keep answers concise, direct, and conversational so they are pleasant to listen to when read aloud.
 `;
 

@@ -42,6 +42,47 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
             return Item.find(query).sort({ name: 1 }).limit(10).lean();
         },
 
+        async findSuggestions({ userId, type, query }) {
+            const match = matchingText(query);
+            if (type === 'customer') {
+                const records = await Customer.find({ ...ownerQuery(userId), name: match }).sort({ name: 1 }).limit(8).lean();
+                return records.map(record => ({ label: record.name, detail: record.contact || record.phone || '' }));
+            }
+            if (type === 'supplier') {
+                const records = await Supplier.find({ ...ownerQuery(userId), name: match }).sort({ name: 1 }).limit(8).lean();
+                return records.map(record => ({ label: record.name, detail: record.contact || record.phone || '' }));
+            }
+            if (type === 'item') {
+                const records = await Item.find({
+                    ...ownerQuery(userId),
+                    $or: [{ name: match }, { itemCode: match }, { description: match }]
+                }).sort({ name: 1 }).limit(8).lean();
+                return records.map(record => ({
+                    label: record.name || record.itemCode || record.description,
+                    detail: [record.itemCode, record.currentStock !== undefined ? `Stock: ${record.currentStock} ${record.unit || ''}` : ''].filter(Boolean).join(' · ')
+                }));
+            }
+            return [];
+        },
+
+        async getRecordDetails({ userId, type, name }) {
+            const query = matchingText(name);
+            const owner = ownerQuery(userId);
+            if (type === 'customer') {
+                return Customer.find({ ...owner, name: query }).sort({ name: 1 }).limit(5).lean();
+            }
+            if (type === 'supplier') {
+                return Supplier.find({ ...owner, name: query }).sort({ name: 1 }).limit(5).lean();
+            }
+            if (type === 'item') {
+                return Item.find({
+                    ...owner,
+                    $or: [{ name: query }, { itemCode: query }, { description: query }]
+                }).sort({ name: 1 }).limit(5).lean();
+            }
+            return [];
+        },
+
         async getLedgerBalance({ userId, party }) {
             const match = matchingText(party);
             const [customers, suppliers] = await Promise.all([
@@ -109,6 +150,22 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
 
 module.exports = function registerNancyRoutes(app, models) {
     const dataStore = createNancyDataStore(models);
+
+    app.get('/api/nancy/suggestions', async (req, res) => {
+        const userId = getNancySession(req, process.env.NANCY_AUTH_SECRET);
+        if (!userId) return res.status(401).json({ error: 'Please sign in again before using Nancy.' });
+        const type = String(req.query.type || '').toLowerCase();
+        const query = String(req.query.q || '').trim();
+        if (!['customer', 'supplier', 'item'].includes(type)) return res.status(400).json({ error: 'Choose customer, supplier, or item suggestions.' });
+        if (query.length < 1 || query.length > 100) return res.json({ suggestions: [] });
+        try {
+            const suggestions = await dataStore.findSuggestions({ userId, type, query });
+            res.json({ suggestions });
+        } catch (error) {
+            console.error('Nancy suggestions failed:', error.message);
+            res.status(500).json({ error: 'Could not load suggestions right now.' });
+        }
+    });
 
     app.post('/api/nancy/chat', async (req, res) => {
         const userId = getNancySession(req, process.env.NANCY_AUTH_SECRET);
