@@ -279,7 +279,7 @@ async function getDirectAnswer(prompt, tools) {
         const invoices = await withTimeout(tools.searchInvoices({}), 8000, 'MongoDB recent-invoice query');
         if (!invoices.length) return 'No recent invoices found.';
         const rows = invoices.slice(0, 8).map(invoice =>
-            `${invoice.invoiceNo || invoice.invoice_no || 'Invoice'} - ${invoice.customerName || invoice.customer_name || 'Unknown customer'}: ${formatCurrency(invoice.invoiceTotal ?? invoice.invoice_total ?? invoice.grandTotal ?? invoice.total)} (${invoice.status || 'status unknown'})`);
+            `${invoice.invoiceNo || invoice.invoice_no || 'Invoice'} - ${invoice.customerName || invoice.customer_name || 'Unknown customer'}: ${formatCurrency(Number(invoice.invoice_total) || Number(invoice.invoiceTotal) || Number(invoice.grandTotal) || Number(invoice.total))} (${invoice.status || 'status unknown'})`);
         return `Here are ${Math.min(invoices.length, 8)} recent invoices:\n${rows.join('\n')}`;
     }
 
@@ -317,7 +317,7 @@ async function getDirectAnswer(prompt, tools) {
             const fields = (type === 'customer' ? [
                 ['Contact', record.contact || record.phone || record.mobile || record.customerPhone], ['Email', record.email],
                 ['Address', [record.address || record.customerAddress, record.district, record.state, record.pin || record.pinCode].filter(Boolean).join(', ')],
-                ['GSTIN', record.gstin || record.gst_no || record.gstNo || record.customerGST],
+                ['GSTIN', record.gst || record.gstin || record.gst_no || record.gstNo || record.customerGST],
                 ['Opening balance', `${formatCurrency(Math.abs(balance?.openingBalance ?? record.openingBalance ?? 0))} (${openingType})`],
                 ['Closing balance', `${formatCurrency(Math.abs(balance?.closingBalance ?? balance?.outstanding ?? record.openingBalance ?? 0))} (${closingType})`]
             ] : type === 'supplier' ? [

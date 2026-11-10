@@ -4,7 +4,7 @@ const { getNancySession } = require('../services/nancyAuth');
 const escapeRegex = value => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, JournalVoucher }) {
+function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote }) {
     const ownerQuery = userId => ({ createdBy: userId, deletedAt: null });
     const matchingText = value => new RegExp(escapeRegex(value), 'i');
 
@@ -29,7 +29,7 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             const terms = [];
             if (name) {
                 const match = matchingText(name);
-                terms.push({ name: match }, { email: match }, { address: match }, { gstin: match }, { gst_no: match }, { gstNo: match });
+                terms.push({ name: match }, { email: match }, { address: match }, { gst: match }, { gstin: match }, { gst_no: match }, { gstNo: match });
             }
             if (phone) {
                 const match = matchingText(phone);
@@ -57,14 +57,14 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             if (type === 'customer') {
                 const records = await Customer.find({ ...ownerQuery(userId), $or: [
                     { name: match }, { contact: match }, { phone: match }, { mobile: match }, { email: match },
-                    { address: match }, { gstin: match }, { gst_no: match }, { gstNo: match }
+                    { address: match }, { gst: match }, { gstin: match }, { gst_no: match }, { gstNo: match }
                 ] }).sort({ name: 1 }).limit(8).lean();
-                return records.map(record => ({ label: record.name, detail: [record.contact || record.phone || record.mobile, record.email, record.gstin || record.gst_no || record.gstNo].filter(Boolean).join(' · ') }));
+                return records.map(record => ({ label: record.name, detail: [record.contact || record.phone || record.mobile, record.email, record.gst || record.gstin || record.gst_no || record.gstNo].filter(Boolean).join(' · ') }));
             }
             if (type === 'supplier') {
                 const records = await Supplier.find({ ...ownerQuery(userId), $or: [
                     { name: match }, { contact: match }, { phone: match }, { mobile: match }, { email: match },
-                    { address: match }, { gstin: match }, { gst_no: match }, { gstNo: match }
+                    { address: match }, { gst: match }, { gstin: match }, { gst_no: match }, { gstNo: match }
                 ] }).sort({ name: 1 }).limit(8).lean();
                 return records.map(record => ({ label: record.name, detail: [record.contact || record.phone || record.mobile, record.email, record.gstin || record.gst_no || record.gstNo].filter(Boolean).join(' · ') }));
             }
@@ -94,13 +94,13 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             if (type === 'customer') {
                 return Customer.find({ ...owner, $or: [
                     { name: query }, { contact: query }, { phone: query }, { mobile: query }, { email: query },
-                    { address: query }, { gstin: query }, { gst_no: query }, { gstNo: query }
+                    { address: query }, { gst: query }, { gstin: query }, { gst_no: query }, { gstNo: query }
                 ] }).sort({ name: 1 }).limit(5).lean();
             }
             if (type === 'supplier') {
                 return Supplier.find({ ...owner, $or: [
                     { name: query }, { contact: query }, { phone: query }, { mobile: query }, { email: query },
-                    { address: query }, { gstin: query }, { gst_no: query }, { gstNo: query }
+                    { address: query }, { gst: query }, { gstin: query }, { gst_no: query }, { gstNo: query }
                 ] }).sort({ name: 1 }).limit(5).lean();
             }
             if (type === 'item') {
@@ -126,41 +126,34 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 const customer = customers[0];
                 const customerIdentity = [
                     { customerName: matchingText(customer.name) },
-                    { customer_name: matchingText(customer.name) }
+                    { customer_name: matchingText(customer.name) },
+                    { 'customer.name': matchingText(customer.name) }
                 ];
                 if (customer.id) customerIdentity.unshift({ customerId: customer.id });
                 const invoices = await Invoice.find({
                     ...ownerQuery(userId),
-                    $or: customerIdentity,
-                    status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
+                    $or: customerIdentity
                 }).lean();
                 const invoiceBalance = invoices.reduce((sum, invoice) =>
-                    sum + (String(invoice.status || '').toUpperCase() === 'PAID' ? 0 :
-                        number(invoice.invoiceTotal ?? invoice.grandTotal ?? invoice.invoice_total ?? invoice.total) -
-                        number(invoice.amountPaid ?? invoice.total_paid ?? invoice.paid_amount ?? invoice.paid)), 0);
-                const outstanding = Math.max(0, invoiceBalance);
+                    sum + ((number(invoice.invoice_total) || number(invoice.invoiceTotal) || number(invoice.grandTotal) || number(invoice.total)) -
+                        (number(invoice.total_paid) || number(invoice.amountPaid) || number(invoice.paid_amount) || number(invoice.paid))), 0);
                 const adjustments = CreditDebitNote ? await CreditDebitNote.find({
                     ...ownerQuery(userId),
-                    customerName: matchingText(customer.name),
+                    $or: [
+                        { customerName: matchingText(customer.name) },
+                        { customer_name: matchingText(customer.name) }
+                    ],
                     status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
                 }).lean() : [];
                 const noteBalance = adjustments.reduce((sum, note) => sum +
-                    (String(note.type || '').toUpperCase() === 'DEBIT' ? 1 : -1) * number(note.totalAmount ?? note.total_amount), 0);
-                const vouchers = JournalVoucher ? await JournalVoucher.find(ownerQuery(userId)).lean() : [];
-                const voucherBalance = vouchers.reduce((sum, voucher) => {
-                    if (['MEMORANDUM', 'PURCHASE ORDER', 'SALES ORDER', 'DELIVERY NOTE', 'RECEIPT NOTE'].includes(String(voucher.voucherType || voucher.voucher_type || '').toUpperCase())) return sum;
-                    return sum + (voucher.entries || []).reduce((entrySum, entry) => {
-                        if (String(entry.account || '').toLowerCase() !== String(customer.name || '').toLowerCase()) return entrySum;
-                        const amount = number(entry.debit || entry.credit);
-                        return entrySum + (String(entry.type || '').toUpperCase() === 'DR' ? amount : -amount);
-                    }, 0);
-                }, 0);
+                    (String(note.type || '').toUpperCase() === 'DEBIT' ? 1 : -1) * (number(note.total_amount) || number(note.totalAmount)), 0);
                 const opening = number(customer.openingBalance);
                 const openingSigned = customer.openingBalanceType === 'Cr' ? -opening : opening;
-                const closing = openingSigned + invoiceBalance + noteBalance + voucherBalance;
+                const customerPageBalance = openingSigned + invoiceBalance + noteBalance;
+                const closing = customerPageBalance;
                 return {
                     party: customer.name, type: 'customer', openingBalance: opening,
-                    openingBalanceType: customer.openingBalanceType || 'Dr', outstanding,
+                    openingBalanceType: customer.openingBalanceType || 'Dr', outstanding: customerPageBalance,
                     closingBalance: closing,
                     closingBalanceType: closing < 0 ? 'Cr' : 'Dr'
                 };
@@ -178,40 +171,30 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 }).lean();
                 const purchaseBalance = purchases.reduce((sum, purchase) =>
                     sum + (() => {
-                        const savedTotal = number(purchase.totalAmount ?? purchase.total_amount ?? purchase.grandTotal ?? purchase.total);
                         const base = number(purchase.qty) * number(purchase.price);
-                        const storedDiscount = purchase.discountAmt ?? purchase.discountAmount;
-                        const discountValue = number(storedDiscount ?? purchase.discount);
-                        const discount = storedDiscount !== undefined && storedDiscount !== null
-                            ? discountValue
-                            : purchase.discType === 'flat' || purchase.discountType === 'flat'
-                                ? discountValue : base * discountValue / 100;
+                        const discountValue = number(purchase.discount);
+                        const discount = (purchase.discType || '%') === 'flat'
+                            ? discountValue : base * discountValue / 100;
                         const charges = number(purchase.freightCharges) + number(purchase.packingCharges) + number(purchase.loadingCharges);
-                        const taxable = Math.max(0, base - discount + charges);
+                        const taxable = base - discount + charges;
                         const computedTotal = taxable + taxable * number(purchase.gst) / 100 + number(purchase.roundOff);
-                        const total = savedTotal || computedTotal;
-                        return total - number(purchase.amountPaid ?? purchase.total_paid ?? purchase.paid_amount ?? purchase.paid);
+                        const paid = number(purchase.paid) || number(purchase.total_paid) || number(purchase.paid_amount) || number(purchase.amountPaid);
+                        return computedTotal - paid;
                     })(), 0);
                 const outstanding = Math.max(0, purchaseBalance);
                 const adjustments = CreditDebitNote ? await CreditDebitNote.find({
                     ...ownerQuery(userId),
-                    customerName: matchingText(supplier.name),
+                    $or: [
+                        { customerName: matchingText(supplier.name) },
+                        { customer_name: matchingText(supplier.name) }
+                    ],
                     status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
                 }).lean() : [];
                 const noteBalance = adjustments.reduce((sum, note) => sum +
-                    (String(note.type || '').toUpperCase() === 'CREDIT' ? 1 : -1) * number(note.totalAmount ?? note.total_amount), 0);
-                const vouchers = JournalVoucher ? await JournalVoucher.find(ownerQuery(userId)).lean() : [];
-                const voucherBalance = vouchers.reduce((sum, voucher) => {
-                    if (['MEMORANDUM', 'PURCHASE ORDER', 'SALES ORDER', 'DELIVERY NOTE', 'RECEIPT NOTE'].includes(String(voucher.voucherType || voucher.voucher_type || '').toUpperCase())) return sum;
-                    return sum + (voucher.entries || []).reduce((entrySum, entry) => {
-                        if (String(entry.account || '').toLowerCase() !== String(supplier.name || '').toLowerCase()) return entrySum;
-                        const amount = number(entry.debit || entry.credit);
-                        return entrySum + (String(entry.type || '').toUpperCase() === 'CR' ? amount : -amount);
-                    }, 0);
-                }, 0);
+                    (String(note.type || '').toUpperCase() === 'CREDIT' ? 1 : -1) * (number(note.total_amount) || number(note.totalAmount)), 0);
                 const opening = number(supplier.openingBalance);
                 const openingSigned = supplier.openingBalanceType === 'Dr' ? -opening : opening;
-                const closing = openingSigned + purchaseBalance + noteBalance + voucherBalance;
+                const closing = openingSigned + purchaseBalance + noteBalance;
                 return {
                     party: supplier.name, type: 'supplier', openingBalance: opening,
                     openingBalanceType: supplier.openingBalanceType || 'Cr', outstanding,
@@ -235,18 +218,19 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             return {
                 period: period === 'today' ? 'today' : 'this month',
                 invoiceCount: invoices.length,
-                totalSales: invoices.reduce((sum, invoice) => sum + number(invoice.invoiceTotal ?? invoice.invoice_total ?? invoice.grandTotal ?? invoice.total), 0)
+                totalSales: invoices.reduce((sum, invoice) => sum + (number(invoice.invoice_total) || number(invoice.invoiceTotal) || number(invoice.grandTotal) || number(invoice.total)), 0)
             };
         },
 
         async getUnpaidInvoices({ userId }) {
-            const invoices = await Invoice.find({
-                ...ownerQuery(userId),
-                status: { $nin: ['PAID', 'CANCELLED'] }
-            }).sort({ date: -1 }).lean();
+            const invoices = await Invoice.find(ownerQuery(userId)).sort({ date: -1 }).lean();
             // Match report.html's Summary bar definition of Unpaid: nothing paid,
             // with a positive invoice total. Partial invoices are excluded.
-            return invoices.map(invoice => ({ invoice, total: number(invoice.invoiceTotal ?? invoice.invoice_total ?? invoice.grandTotal ?? invoice.total), paid: number(invoice.amountPaid ?? invoice.total_paid ?? invoice.paid_amount ?? invoice.paid) }))
+            return invoices.map(invoice => ({
+                invoice,
+                total: number(invoice.invoice_total) || number(invoice.invoiceTotal) || number(invoice.grandTotal) || number(invoice.total),
+                paid: number(invoice.total_paid) || number(invoice.amountPaid) || number(invoice.paid_amount) || number(invoice.paid)
+            }))
                 .filter(({ total, paid }) => paid === 0 && total > 0).map(({ invoice, total, paid }) => ({
                 invoiceNo: invoice.invoiceNo || invoice.invoice_no,
                 customerName: invoice.customerName || invoice.customer_name,

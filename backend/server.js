@@ -1287,7 +1287,7 @@ crmRoutes(app, CrmEnquiry, '/api/crm-enquiries');
 crmRoutes(app, CrmTechnicalReview, '/api/crm-technical-reviews');
 crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
 registerCrmV2(app, { Customer, Supplier, CrmContact, CrmPlant, CrmEnquiry, Invoice, Purchase, FollowUp, Quotation });
-registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, JournalVoucher });
+registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote });
 
 app.get('/api/crm/customer/:id/360', async (req, res) => {
     try {
