@@ -2913,7 +2913,7 @@
 
             <div style="margin-bottom: 20px; margin-top: 15px;">
                 <label style="display:block; margin-bottom:8px; font-weight:bold;">Navigation Menu Placement:</label>
-                <select id="menuPlacementSelect" onchange="saveMenuPlacement(this.value)"
+                <select id="menuPlacementSelect" onchange="setDashboardMenuPlacement(this.value)"
                     style="width:100%; padding:10px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-color); color:var(--text-color); font-size: 14px;">
                     <option value="vertical">Vertical Sidebar (Default)</option>
                     <option value="horizontal">Horizontal Top Menu (Grouped)</option>
@@ -8549,7 +8549,7 @@
             const modal = document.getElementById('dashboardSettingsModal');
             if (modal) {
                 const currentUser = localStorage.getItem('currentUser') || 'default';
-                const currentLayout = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
+                const currentLayout = localStorage.getItem(`menuPlacement_${currentUser}`) || localStorage.getItem('menuPlacement') || 'vertical';
                 const select = document.getElementById('menuPlacementSelect');
                 if (select) select.value = currentLayout;
                 modal.style.display = 'flex';
@@ -8566,8 +8566,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Restore Saved Navigation Layout & Tab Ordering
             const currentUser = localStorage.getItem('currentUser') || 'default';
-            const savedPlacement = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
-            applyMenuPlacement(savedPlacement);
+            const savedPlacement = localStorage.getItem(`menuPlacement_${currentUser}`) || localStorage.getItem('menuPlacement') || 'vertical';
+            applyDashboardMenuPlacement(savedPlacement);
 
             const lastSync = localStorage.getItem('lastAutoSync');
 
@@ -8953,10 +8953,10 @@
         });
 
         // Mode Placement Master Controller (Persists across logins & app reloads)
-        function applyMenuPlacement() {
+        function applyMenuPlacement(requestedPlacement) {
             const currentUser = localStorage.getItem('currentUser') || 'default';
             // Check user-specific key first, then fallback to global key
-            const placement = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
+            const placement = requestedPlacement || localStorage.getItem(`menuPlacement_${currentUser}`) || localStorage.getItem('menuPlacement') || 'vertical';
 
             const select = document.getElementById('menuPlacementSelect');
             if (select) select.value = placement;
@@ -9033,17 +9033,80 @@
 
         function saveMenuPlacement(mode) {
             const currentUser = localStorage.getItem('currentUser') || 'default';
-            // Keep each user's menu layout independent so one login cannot move another user's menu.
+            // Persist both the shared setting and this user's override, matching dashboardB2 behavior.
+            localStorage.setItem('menuPlacement', mode);
             localStorage.setItem(`menuPlacement_${currentUser}`, mode);
-            applyMenuPlacement();
+            applyDashboardMenuPlacement(mode);
+        }
+
+        function setDashboardMenuPlacement(mode) {
+            const currentUser = localStorage.getItem('currentUser') || 'default';
+            localStorage.setItem('menuPlacement', mode);
+            localStorage.setItem(`menuPlacement_${currentUser}`, mode);
+            applyDashboardMenuPlacement(mode);
+        }
+
+        function applyDashboardMenuPlacement(requestedPlacement) {
+            const currentUser = localStorage.getItem('currentUser') || 'default';
+            const savedPlacement = localStorage.getItem(`menuPlacement_${currentUser}`)
+                || localStorage.getItem('menuPlacement') || 'vertical';
+            const placement = ['vertical', 'horizontal', 'top-tab-unfolded'].includes(requestedPlacement)
+                ? requestedPlacement : savedPlacement;
+            const sidebar = document.getElementById('sidebar');
+            const overflowBox = document.getElementById('topTabOverflowContainer');
+            const overflowMenu = document.getElementById('topTabOverflowMenu');
+            const select = document.getElementById('menuPlacementSelect');
+
+            if (select) select.value = placement;
+            document.body.classList.remove('horizontal-menu', 'top-tab-unfolded');
+
+            // Return tabs held by the Top Tab overflow menu to their original groups.
+            if (overflowMenu) {
+                Array.from(overflowMenu.querySelectorAll('.nav-item')).forEach(item => {
+                    const home = item.dataset.tabHome && document.getElementById(item.dataset.tabHome);
+                    if (home) home.appendChild(item);
+                    else document.querySelector('.sidebar-scrollable')?.appendChild(item);
+                });
+            }
+
+            if (placement === 'top-tab-unfolded') {
+                document.body.classList.add('top-tab-unfolded');
+                if (sidebar) sidebar.classList.remove('collapsed');
+                ['operationsWrapper', 'reportsWrapper', 'toolsSecurityWrapper'].forEach(id => {
+                    const wrapper = document.getElementById(id);
+                    if (wrapper) {
+                        wrapper.style.display = '';
+                        wrapper.style.maxHeight = '';
+                    }
+                });
+                initTopTabDragAndDrop();
+                restoreTopTabOrder();
+                requestAnimationFrame(() => {
+                    if (typeof applyUIPermissions === 'function') applyUIPermissions();
+                    updateTopTabOverflow();
+                });
+            } else if (placement === 'horizontal') {
+                document.body.classList.add('horizontal-menu');
+                if (sidebar) sidebar.classList.remove('collapsed');
+                if (overflowBox) overflowBox.style.display = 'none';
+                getTopTabOrderButtons().forEach(tab => tab.style.removeProperty('order'));
+                closeHorizontalMenuDropdowns();
+                if (typeof applyUIPermissions === 'function') applyUIPermissions();
+            } else {
+                if (overflowBox) overflowBox.style.display = 'none';
+                getTopTabOrderButtons().forEach(tab => tab.style.removeProperty('order'));
+                closeHorizontalMenuDropdowns();
+                restoreSectionStates();
+                if (typeof applyUIPermissions === 'function') applyUIPermissions();
+            }
         }
 
         // Initialize layout preference immediately on document load
         document.addEventListener('DOMContentLoaded', () => {
             // 1. Restore navigation layout and button sequence
             const currentUser = localStorage.getItem('currentUser') || 'default';
-            const savedPlacement = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
-            applyMenuPlacement(savedPlacement);
+            const savedPlacement = localStorage.getItem(`menuPlacement_${currentUser}`) || localStorage.getItem('menuPlacement') || 'vertical';
+            applyDashboardMenuPlacement(savedPlacement);
         });
 
 
