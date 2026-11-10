@@ -3,6 +3,9 @@ class NancyVoiceAssistant {
         this.interactionId = null;
         this.isListening = false;
         this.awaitingCustomerBalanceName = false;
+        this.awaitingEntityType = null;
+        this.suggestionTimer = null;
+        this.suggestionRequestId = 0;
         this.questionCategories = {
             Sales: ["Unpaid invoices", "Total sales this month", "Recent invoices"],
             Stock: ["Check item stock", "Low stock items", "Godown stock count"],
@@ -141,6 +144,35 @@ class NancyVoiceAssistant {
         background: #fafafa;
         gap: 6px;
       }
+      #nancy-suggestions {
+        display: none;
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 58px;
+        max-height: 190px;
+        overflow-y: auto;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        box-shadow: 0 5px 18px rgba(0, 0, 0, .16);
+        z-index: 2;
+      }
+      body.dark-mode #nancy-suggestions { background: #242424; border-color: #444; }
+      .nancy-suggestion {
+        display: block;
+        width: 100%;
+        padding: 9px 11px;
+        border: 0;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      body.dark-mode .nancy-suggestion { border-bottom-color: #444; }
+      .nancy-suggestion:hover { background: rgba(11, 87, 208, .1); }
+      .nancy-suggestion small { display: block; opacity: .7; margin-top: 2px; }
       body.dark-mode .nancy-input-area {
         background: #181818;
         border-color: #333333;
@@ -195,6 +227,7 @@ class NancyVoiceAssistant {
             <div class="nancy-chips-container" id="nancy-chips-wrapper"></div>
           </div>
         </div>
+        <div id="nancy-suggestions" role="listbox" aria-label="Matching records"></div>
         <div class="nancy-input-area">
           <button id="nancy-mic-toggle-btn" class="nancy-icon-btn" type="button" title="Speak">
             <i class="fas fa-microphone"></i>
@@ -217,6 +250,7 @@ class NancyVoiceAssistant {
         this.micBtn = document.getElementById('nancy-mic-toggle-btn');
         this.sendBtn = document.getElementById('nancy-send-btn');
         this.callBtn = document.getElementById('nancy-call-btn');
+        this.suggestionsBox = document.getElementById('nancy-suggestions');
 
         this.renderCategoryChips();
 
@@ -226,6 +260,7 @@ class NancyVoiceAssistant {
         this.textInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') this.handleTextSubmit();
         });
+        this.textInput.addEventListener('input', () => this.scheduleSuggestions());
     }
 
     renderCategoryChips() {
@@ -239,12 +274,75 @@ class NancyVoiceAssistant {
                 chip.className = 'nancy-chip';
                 chip.innerText = `[${category}] ${question}`;
                 chip.addEventListener('click', () => {
+                    const normalized = question.toLowerCase();
+                    const entityType = normalized === 'customer balance' ? 'customer'
+                        : normalized === 'supplier dues' ? 'supplier'
+                            : normalized === 'check item stock' ? 'item' : null;
+                    if (entityType) {
+                        this.awaitingEntityType = entityType;
+                        this.textInput.value = '';
+                        this.textInput.placeholder = `Type a ${entityType === 'item' ? 'item' : entityType} name...`;
+                        this.clearSuggestions();
+                        this.appendMessage(`Enter a ${entityType === 'item' ? 'item' : entityType} name to see matches.`, 'agent');
+                        this.textInput.focus();
+                        return;
+                    }
                     this.textInput.value = question;
                     this.handleTextSubmit();
                 });
                 wrapper.appendChild(chip);
             });
         });
+    }
+
+    clearSuggestions() {
+        if (!this.suggestionsBox) return;
+        this.suggestionsBox.replaceChildren();
+        this.suggestionsBox.style.display = 'none';
+    }
+
+    scheduleSuggestions() {
+        clearTimeout(this.suggestionTimer);
+        const type = this.awaitingEntityType;
+        const query = this.textInput.value.trim();
+        if (!type || !query) {
+            this.clearSuggestions();
+            return;
+        }
+        this.suggestionTimer = setTimeout(() => this.loadSuggestions(type, query), 180);
+    }
+
+    async loadSuggestions(type, query) {
+        const requestId = ++this.suggestionRequestId;
+        try {
+            const url = `/api/nancy/suggestions?type=${encodeURIComponent(type)}&q=${encodeURIComponent(query)}`;
+            const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+            if (!response.ok) return this.clearSuggestions();
+            const data = await response.json();
+            if (requestId !== this.suggestionRequestId || query !== this.textInput.value.trim() || type !== this.awaitingEntityType) return;
+            this.suggestionsBox.replaceChildren();
+            (data.suggestions || []).forEach(suggestion => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'nancy-suggestion';
+                button.setAttribute('role', 'option');
+                button.textContent = suggestion.label || '';
+                if (suggestion.detail) {
+                    const detail = document.createElement('small');
+                    detail.textContent = suggestion.detail;
+                    button.appendChild(detail);
+                }
+                button.addEventListener('click', () => {
+                    this.textInput.value = suggestion.label || '';
+                    this.clearSuggestions();
+                    this.handleTextSubmit();
+                });
+                this.suggestionsBox.appendChild(button);
+            });
+            this.suggestionsBox.style.display = this.suggestionsBox.childElementCount ? 'block' : 'none';
+        } catch (_) {
+            this.clearSuggestions();
+        }
     }
 
     toggleChatWindow() {
@@ -326,11 +424,18 @@ class NancyVoiceAssistant {
         const query = this.textInput.value.trim();
         if (!query) return;
 
-        const requestMessage = this.awaitingCustomerBalanceName &&
-            !/^(?:customer\s+)?balance\s+(?:for|of)\s+/i.test(query)
-            ? `Customer balance for ${query}`
-            : query;
+        const activeType = this.awaitingEntityType || (this.awaitingCustomerBalanceName ? 'customer' : null);
+        let requestMessage = query;
+        if (activeType && !/^(?:customer\s+balance|supplier\s+dues|check\s+(?:item\s+)?stock)\s+(?:for|of)\s+/i.test(query)) {
+            if (activeType === 'customer') requestMessage = `Customer balance for ${query}`;
+            else if (activeType === 'supplier') requestMessage = `Supplier dues for ${query}`;
+            else if (activeType === 'item') requestMessage = `Check item stock for ${query}`;
+        }
         this.awaitingCustomerBalanceName = false;
+        this.awaitingEntityType = null;
+        this.textInput.placeholder = 'Ask Nancy or pick a question...';
+        this.clearSuggestions();
+        const requestType = activeType || this.entityTypeForPrompt(requestMessage);
 
         this.appendMessage(query, 'user');
         this.textInput.value = '';
@@ -366,12 +471,22 @@ class NancyVoiceAssistant {
                     this.renderMessageText(targetMsg, data.reply);
                 }
                 if ('interactionId' in data) this.interactionId = data.interactionId;
-                this.awaitingCustomerBalanceName = /which customer.*balance|customer name.*balance/i.test(data.reply);
+                if (/which customer|customer name.*balance/i.test(data.reply)) this.awaitingEntityType = 'customer';
+                else if (/which supplier|supplier name.*due/i.test(data.reply)) this.awaitingEntityType = 'supplier';
+                else if (/which item|item name.*stock/i.test(data.reply)) this.awaitingEntityType = 'item';
+                if (this.awaitingEntityType) {
+                    const name = this.awaitingEntityType === 'item' ? 'item' : this.awaitingEntityType;
+                    this.textInput.placeholder = `Type a ${name} name...`;
+                }
                 this.speak(data.reply);
             } else {
                 if (targetMsg) targetMsg.innerText = data.error || 'No records found.';
             }
         } catch (err) {
+            if (activeType) {
+                this.awaitingEntityType = activeType;
+                this.textInput.placeholder = `Type a ${activeType === 'item' ? 'item' : activeType} name...`;
+            }
             const targetMsg = document.getElementById(loadingId);
             if (targetMsg) {
                 targetMsg.innerText = err.name === 'AbortError'
@@ -384,13 +499,31 @@ class NancyVoiceAssistant {
         this.messageList.scrollTop = this.messageList.scrollHeight;
     }
 
+    entityTypeForPrompt(prompt) {
+        const value = String(prompt || '').toLowerCase();
+        if (/supplier.*due|\bdues\b/.test(value)) return 'supplier';
+        if (/item.*stock|\bstock\b/.test(value)) return 'item';
+        if (/customer.*balance|\bbalance\b/.test(value)) return 'customer';
+        return null;
+    }
+
     speak(text) {
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 1.0;
+            const voices = window.speechSynthesis.getVoices();
+            const femaleVoiceName = /female|heera|priya|veena|raveena|lekha|zira|samantha|karen|susan|hazel|aria|jenny|sonia|neerja/i;
+            const voice = voices.find(item => /^en-IN$/i.test(item.lang) && femaleVoiceName.test(item.name))
+                || voices.find(item => femaleVoiceName.test(item.name) && /^en/i.test(item.lang))
+                || voices.find(item => /^en-IN$/i.test(item.lang));
+            if (voice) {
+                utterance.voice = voice;
+                utterance.lang = voice.lang;
+            } else {
+                utterance.lang = 'en-IN';
+            }
+            utterance.rate = 0.96;
             utterance.pitch = 1.0;
-            utterance.lang = 'en-IN';
             window.speechSynthesis.speak(utterance);
         }
     }

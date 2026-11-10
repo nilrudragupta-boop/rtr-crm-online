@@ -9198,7 +9198,18 @@
                 if ('speechSynthesis' in window) {
                     window.speechSynthesis.cancel();
                     const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.rate = 1.0;
+                    const voices = window.speechSynthesis.getVoices();
+                    const femaleVoiceName = /female|heera|priya|veena|raveena|lekha|zira|samantha|karen|susan|hazel|aria|jenny|sonia|neerja/i;
+                    const voice = voices.find(item => /^en-IN$/i.test(item.lang) && femaleVoiceName.test(item.name))
+                        || voices.find(item => femaleVoiceName.test(item.name) && /^en/i.test(item.lang))
+                        || voices.find(item => /^en-IN$/i.test(item.lang));
+                    if (voice) {
+                        utterance.voice = voice;
+                        utterance.lang = voice.lang;
+                    } else {
+                        utterance.lang = 'en-IN';
+                    }
+                    utterance.rate = 0.96;
                     utterance.pitch = 1.0;
                     window.speechSynthesis.speak(utterance);
                 }
