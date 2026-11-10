@@ -36,6 +36,8 @@ function createNancyTools(userId, dataStore) {
             });
         },
 
+        getLowStockItems: async () => dataStore.findLowStockItems({ userId }),
+
         getLedgerSummary: async ({ partyName, partyType }) => {
             return await dataStore.getLedgerBalance({
                 userId,
@@ -281,6 +283,33 @@ async function getDirectAnswer(prompt, tools) {
         const rows = invoices.slice(0, 8).map(invoice =>
             `${invoice.invoiceNo || invoice.invoice_no || 'Invoice'} - ${invoice.customerName || invoice.customer_name || 'Unknown customer'}: ${formatCurrency(Number(invoice.invoice_total) || Number(invoice.invoiceTotal) || Number(invoice.grandTotal) || Number(invoice.total))} (${invoice.status || 'status unknown'})`);
         return `Here are ${Math.min(invoices.length, 8)} recent invoices:\n${rows.join('\n')}`;
+    }
+
+    if (/^(?:(?:please\s+)?(?:show|list|check|tell me|find|what are)\s+)?(?:the\s+)?(?:low|short)\s+stock(?:\s+items?)?(?:\s+(?:list|report))?$/.test(normalized)
+        || /^(?:(?:please\s+)?(?:show|list|find|tell me)\s+)?(?:items?|products?)\s+(?:that are\s+)?(?:low|short)\s+(?:on\s+)?stock$/i.test(query)
+        || /^(?:(?:please\s+)?(?:show|list|find|tell me)\s+)?(?:items?|products?)\s+(?:that\s+)?need(?:s)?\s+restocking$/i.test(query)) {
+        const items = await withTimeout(tools.getLowStockItems(), 8000, 'MongoDB low-stock query');
+        const low = items.filter(item => item.stockStatus === 'Low Stock');
+        const unavailable = items.filter(item => item.stockStatus === 'Out of Stock' || item.stockStatus === 'Negative Stock');
+        const formatItem = item => {
+            const name = item.name || item.itemName || item.item_name || item.itemCode || 'Unnamed item';
+            const code = item.itemCode || item.item_code || item.code;
+            const quantity = Number(item.currentStock) || 0;
+            const unit = item.uom || item.unit || 'units';
+            const codeText = code ? ` [${code}]` : '';
+            const statusText = item.stockStatus === 'Low Stock'
+                ? `low: ${quantity} ${unit} (below ${item.reorderThreshold} ${unit})`
+                : `${item.stockStatus.toLowerCase()}: ${quantity} ${unit}`;
+            return `• ${name}${codeText} — ${statusText}`;
+        };
+        if (!low.length && !unavailable.length) return 'No low-stock or out-of-stock items found. All listed items are above the stock report’s low-stock threshold.';
+        const sections = ['Stock status (same thresholds as the Stock Availability Report):'];
+        if (low.length) sections.push(`Low stock (${low.length}):\n${low.slice(0, 15).map(formatItem).join('\n')}`);
+        if (unavailable.length) sections.push(`Out of stock or negative stock (${unavailable.length}; needs attention first):\n${unavailable.slice(0, 15).map(formatItem).join('\n')}`);
+        const total = low.length + unavailable.length;
+        if (total > 15) sections.push(`Showing up to 15 items per section (${total} matching items total).`);
+        sections.push('Low stock means below 5 units, or below 500 for gm/ml items; zero and negative quantities are listed separately.');
+        return sections.join('\n\n');
     }
 
     const fieldMatch = query.match(/^(?:please\s+)?(?:(?:show(?:\s+me)?|get|find(?:\s+me)?|tell me|give me|what is|what's|whats)\s+)?(?:the\s+)?(?:contact(?:\s+(?:details|number))?|phone|mobile|email|address|gstin|gst\s*(?:number|no)?|opening balance|closing balance)\s+(?:of|for)\s+(customer|supplier)\s+(.+)$/i)

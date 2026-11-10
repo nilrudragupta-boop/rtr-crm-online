@@ -78,7 +78,8 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             const currentStock = matchingRows.length
                 ? matchingRows.reduce((sum, row) => sum + row.purchased - row.sold - row.consumed, 0)
                 : number(item.currentStock ?? item.stock ?? item.openingStock ?? item.quantity);
-            return { ...item, currentStock };
+            const purchasedQuantity = matchingRows.reduce((sum, row) => sum + row.purchased, 0);
+            return { ...item, currentStock, purchasedQuantity };
         });
     }
 
@@ -121,6 +122,23 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             }
             const items = await Item.find(query).sort({ name: 1 }).limit(10).lean();
             return attachStock(userId, items);
+        },
+
+        async findLowStockItems({ userId }) {
+            const items = await Item.find(ownerQuery(userId)).sort({ name: 1 }).lean();
+            const stockItems = await attachStock(userId, items);
+            return stockItems.map(item => {
+                const stock = number(item.currentStock);
+                const unit = String(item.uom || item.unit || '').toLowerCase().trim();
+                const threshold = ['gm', 'ml', 'gram', 'grams'].includes(unit) ? 500 : 5;
+                let status;
+                if (stock < 0) status = 'Negative Stock';
+                else if (stock === 0) status = 'Out of Stock';
+                else if (number(item.purchasedQuantity) > 0 && stock >= number(item.purchasedQuantity)) status = 'In Stock';
+                else if (stock < threshold) status = 'Low Stock';
+                else status = 'In Stock';
+                return { ...item, stockStatus: status, reorderThreshold: threshold };
+            }).filter(item => item.stockStatus === 'Low Stock' || item.stockStatus === 'Out of Stock' || item.stockStatus === 'Negative Stock');
         },
 
         async findSuggestions({ userId, type, query }) {
