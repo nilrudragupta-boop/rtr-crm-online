@@ -2,6 +2,7 @@ class NancyVoiceAssistant {
     constructor() {
         this.interactionId = null;
         this.isListening = false;
+        this.awaitingCustomerBalanceName = false;
         this.questionCategories = {
             Sales: ["Unpaid invoices", "Total sales this month", "Recent invoices"],
             Stock: ["Check item stock", "Low stock items", "Godown stock count"],
@@ -325,6 +326,12 @@ class NancyVoiceAssistant {
         const query = this.textInput.value.trim();
         if (!query) return;
 
+        const requestMessage = this.awaitingCustomerBalanceName &&
+            !/^(?:customer\s+)?balance\s+(?:for|of)\s+/i.test(query)
+            ? `Customer balance for ${query}`
+            : query;
+        this.awaitingCustomerBalanceName = false;
+
         this.appendMessage(query, 'user');
         this.textInput.value = '';
 
@@ -345,7 +352,7 @@ class NancyVoiceAssistant {
                 headers: { 'Content-Type': 'application/json' },
                 signal: requestController.signal,
                 body: JSON.stringify({
-                    message: query,
+                    message: requestMessage,
                     previousInteractionId: this.interactionId
                 })
             });
@@ -359,6 +366,7 @@ class NancyVoiceAssistant {
                     this.renderMessageText(targetMsg, data.reply);
                 }
                 if ('interactionId' in data) this.interactionId = data.interactionId;
+                this.awaitingCustomerBalanceName = /which customer.*balance|customer name.*balance/i.test(data.reply);
                 this.speak(data.reply);
             } else {
                 if (targetMsg) targetMsg.innerText = data.error || 'No records found.';
