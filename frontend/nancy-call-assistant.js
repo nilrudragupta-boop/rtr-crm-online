@@ -28,9 +28,10 @@ class NancyVoiceAssistant {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
       #nancy-call-btn {
-        width: 56px;
+        min-width: 56px;
         height: 56px;
-        border-radius: 50%;
+        padding: 0 18px;
+        border-radius: 28px;
         border: none;
         background: #0b57d0;
         color: white;
@@ -38,6 +39,7 @@ class NancyVoiceAssistant {
         display: flex;
         align-items: center;
         justify-content: center;
+        gap: 9px;
         box-shadow: 0 4px 14px rgba(11, 87, 208, 0.4);
         transition: transform 0.2s, background 0.2s;
         outline: none;
@@ -218,7 +220,7 @@ class NancyVoiceAssistant {
         container.innerHTML = `
       <div id="nancy-chat-window">
         <div class="nancy-header">
-          <span><i class="fas fa-robot" style="margin-right: 6px;"></i> Nancy [Your Data Assistant]</span>
+          <span><i class="fas fa-robot" style="margin-right: 6px;"></i> Nancy [Search Assistant]</span>
           <span style="cursor: pointer; font-size: 16px;" onclick="window.Nancy.toggleChatWindow()">&times;</span>
         </div>
         <div class="nancy-messages" id="nancy-message-list">
@@ -240,6 +242,7 @@ class NancyVoiceAssistant {
       </div>
       <button id="nancy-call-btn" type="button" title="Open Nancy">
         <i class="fas fa-headset" style="font-size: 22px;"></i>
+        <span>Open Nancy</span>
       </button>
     `;
         document.body.appendChild(container);
@@ -347,7 +350,11 @@ class NancyVoiceAssistant {
 
     toggleChatWindow() {
         const isVisible = this.chatWindow.style.display === 'flex';
-        this.chatWindow.style.display = isVisible ? 'none' : 'flex';
+        const willBeVisible = !isVisible;
+        this.chatWindow.style.display = willBeVisible ? 'flex' : 'none';
+        this.callBtn.title = willBeVisible ? 'Close Nancy' : 'Open Nancy';
+        this.callBtn.setAttribute('aria-expanded', String(willBeVisible));
+        this.callBtn.querySelector('span').textContent = willBeVisible ? 'Close Nancy' : 'Open Nancy';
         if (!isVisible) {
             this.textInput.focus();
         }
