@@ -352,9 +352,9 @@ class NancyVoiceAssistant {
         const isVisible = this.chatWindow.style.display === 'flex';
         const willBeVisible = !isVisible;
         this.chatWindow.style.display = willBeVisible ? 'flex' : 'none';
-        this.callBtn.title = willBeVisible ? 'Close Nancy' : 'Ask Nancy';
+        this.callBtn.title = willBeVisible ? 'Close' : 'Ask Nancy';
         this.callBtn.setAttribute('aria-expanded', String(willBeVisible));
-        this.callBtn.querySelector('span').textContent = willBeVisible ? 'Close Nancy' : 'Ask Nancy';
+        this.callBtn.querySelector('span').textContent = willBeVisible ? 'Close' : 'Ask Nancy';
         if (!isVisible) {
             this.textInput.focus();
         }
