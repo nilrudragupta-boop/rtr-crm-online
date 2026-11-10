@@ -8,7 +8,7 @@ class NancyVoiceAssistant {
         this.suggestionRequestId = 0;
         this.questionCategories = {
             Sales: ["Unpaid invoices", "Total sales this month", "Recent invoices"],
-            Stock: ["Check item stock", "Low stock items", "Godown stock count"],
+            Stock: ["Check item stock", "Low stock items"],
             Accounts: ["Customer balance", "Supplier dues", "Today's Day Book"]
         };
         this.initUI();
