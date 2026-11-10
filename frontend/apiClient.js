@@ -213,7 +213,7 @@ const apiClient = {
     getSales: async () => {
         try {
             const invoices = await apiClient.getInvoices();
-            if (!Array.isArray(invoices)) return [];
+            if (!Array.isArray(invoices)) return null;
             return invoices.map(invoice => {
                 const customer = invoice.customer || {};
                 const customerName = invoice.customerName || invoice.customer_name || customer.name || 'Walk-in Customer';
@@ -375,7 +375,11 @@ const apiClient = {
                 method: 'DELETE',
                 keepalive: true
             });
-            return await response.json();
+            const result = await response.json();
+            if (!response.ok || result?.success === false) {
+                return { success: false, message: result?.message || `HTTP ${response.status}` };
+            }
+            return result;
         } catch (error) {
             console.error(`Error deleting from ${collectionName}:`, error);
             return { success: false, message: error.message };

@@ -290,13 +290,8 @@
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getSales) {
                     const remoteSales = await apiClient.getSales();
-                    if (Array.isArray(remoteSales) && remoteSales.length > 0) {
-                        const mergedSales = new Map();
-                        [...localSales, ...remoteSales.map(normalizeSaleRecord)].forEach(sale => {
-                            const key = sale.invoiceNo || sale.id;
-                            if (key) mergedSales.set(String(key), sale);
-                        });
-                        rawSales = Array.from(mergedSales.values());
+                    if (Array.isArray(remoteSales)) {
+                        rawSales = remoteSales.map(normalizeSaleRecord);
                         localStorage.setItem('sales_records', JSON.stringify(rawSales));
                         return;
                     }
@@ -560,15 +555,20 @@
             if (!confirm(`Are you sure you want to delete invoice ${invoiceNo}? This cannot be undone.`)) {
                 return;
             }
-            rawSales = rawSales.filter(s => s.invoiceNo !== invoiceNo);
-            localStorage.setItem('sales_records', JSON.stringify(rawSales));
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.deleteSale) {
-                    await apiClient.deleteSale(invoiceNo);
+                    const result = await apiClient.deleteSale(invoiceNo);
+                    if (!result?.success) throw new Error(result?.message || `Could not delete invoice ${invoiceNo}.`);
+                } else {
+                    throw new Error('Sales deletion service is unavailable.');
                 }
             } catch (error) {
-                console.warn('Failed to delete remote sale:', error);
+                console.error('Failed to delete remote sale:', error);
+                alert(error.message || 'Could not delete this invoice. Please try again.');
+                return;
             }
+            rawSales = rawSales.filter(s => s.invoiceNo !== invoiceNo);
+            localStorage.setItem('sales_records', JSON.stringify(rawSales));
             renderReport();
         }
 

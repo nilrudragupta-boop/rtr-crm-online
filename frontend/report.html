@@ -1857,20 +1857,8 @@
             }
             try {
                 const remoteData = await apiClient.getInvoices();
-                if (remoteData && remoteData.length > 0) {
-                    const localInvoiceMap = new Map();
-                    localInvoices.forEach((inv, index) => {
-                        localInvoiceMap.set(inv.invoice_no, index);
-                    });
-                    remoteData.forEach(remoteInv => {
-                        if (localInvoiceMap.has(remoteInv.invoice_no)) {
-                            const localIdx = localInvoiceMap.get(remoteInv.invoice_no);
-                            localInvoices[localIdx] = { ...localInvoices[localIdx], ...remoteInv };
-                        } else {
-                            localInvoices.push(remoteInv);
-                            localInvoiceMap.set(remoteInv.invoice_no, localInvoices.length - 1);
-                        }
-                    });
+                if (Array.isArray(remoteData)) {
+                    localInvoices = remoteData;
                     localStorage.setItem("invoices", JSON.stringify(localInvoices));
                 }
             } catch (e) { console.warn("Failed to fetch remote invoices, using local data."); }
@@ -5136,6 +5124,19 @@
         document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
             const idsToDelete = new Set(pendingDeleteIds);
+            try {
+                if (typeof apiClient === 'undefined' || !apiClient.deleteInvoice) throw new Error('Invoice deletion service is unavailable.');
+                for (const id of pendingDeleteIds) {
+                    const result = await apiClient.deleteInvoice(id);
+                    if (!result?.success) throw new Error(result?.message || `Could not delete invoice ${id}.`);
+                }
+            } catch (error) {
+                console.error('Invoice deletion failed:', error);
+                showToast(error.message || 'Could not delete invoice(s). Please try again.', '#ff4d4f');
+                closeDeleteModal();
+                return;
+            }
+
             const recycleBin = JSON.parse(localStorage.getItem('recycleBin_invoices') || '[]');
             invoices.filter(invoice => idsToDelete.has(getInvoiceRecycleId(invoice))).forEach(invoice => {
                 recycleBin.unshift({ ...invoice, deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' });
@@ -5143,12 +5144,6 @@
             localStorage.setItem('recycleBin_invoices', JSON.stringify(recycleBin.filter((record, index, records) =>
                 index === records.findIndex(item => getInvoiceRecycleId(item) === getInvoiceRecycleId(record))
             )));
-
-            for (let id of pendingDeleteIds) {
-                if (typeof apiClient !== 'undefined' && apiClient.deleteInvoice) {
-                    await apiClient.deleteInvoice(id).catch(console.warn);
-                }
-            }
 
             invoices = invoices.filter(x => !idsToDelete.has(getInvoiceRecycleId(x)));
             localStorage.setItem("invoices", JSON.stringify(invoices));
