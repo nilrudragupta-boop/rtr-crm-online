@@ -230,6 +230,18 @@ const invoiceSchema = new mongoose.Schema({
     remarks: String
 }, { timestamps: true, strict: false });
 
+// Direct counter sales are stored separately from formal invoices.
+const salesRecordSchema = new mongoose.Schema({
+    id: { type: String, index: true },
+    invoiceNo: { type: String, index: true },
+    invoice_no: String,
+    date: String,
+    customerName: String,
+    grandTotal: { type: Number, default: 0 },
+    items: { type: Array, default: [] },
+    createdBy: { type: String, default: 'System', index: true }
+}, { timestamps: true, strict: false });
+
 // --- 5. Purchase Schema ---
 const purchaseSchema = new mongoose.Schema({
     id: String,
@@ -377,6 +389,7 @@ module.exports = {
     Supplier: mongoose.model('Supplier', supplierSchema),
     Item: mongoose.model('Item', itemSchema),
     Invoice: mongoose.model('Invoice', invoiceSchema),
+    SalesRecord: mongoose.model('SalesRecord', salesRecordSchema),
     Purchase: mongoose.model('Purchase', purchaseSchema),
     JournalVoucher: mongoose.model('JournalVoucher', journalVoucherSchema),
     CreditDebitNote: mongoose.model('CreditDebitNote', creditDebitNoteSchema),

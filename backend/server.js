@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, SalesRecord, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -531,6 +531,52 @@ app.delete('/api/quotations/:id', async (req, res) => {
 });
 
 // --- Invoice Routes ---
+// Direct sales use their own collection so they never mix with formal invoices.
+app.get('/api/sales-records', async (req, res) => {
+    try {
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const sales = await SalesRecord.find(query).sort({ date: -1, createdAt: -1 });
+        res.json({ success: true, data: sales });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/sales-records', async (req, res) => {
+    try {
+        const payload = { ...req.body };
+        const user = req.query.user || payload.createdBy || 'System';
+        payload.createdBy = user;
+        const invoiceNo = payload.invoiceNo || payload.invoice_no;
+        if (!invoiceNo) return res.status(400).json({ success: false, message: 'Sales invoice number is required.' });
+        payload.invoiceNo = invoiceNo;
+        payload.invoice_no = payload.invoice_no || invoiceNo;
+        payload.id = payload.id || invoiceNo;
+        const sale = await SalesRecord.findOneAndUpdate(
+            { createdBy: user, invoiceNo },
+            { $set: payload },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        res.json({ success: true, data: sale });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+app.delete('/api/sales-records/:id', async (req, res) => {
+    try {
+        const id = decodeURIComponent(req.params.id);
+        const query = { deletedAt: null, $or: [{ id }, { invoiceNo: id }, { invoice_no: id }] };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await SalesRecord.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
+        if (!deleted) return res.status(404).json({ success: false, message: 'Sales record not found.' });
+        res.json({ success: true, data: deleted });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Fetch all invoices
 app.get('/api/invoices', async (req, res) => {
     try {
