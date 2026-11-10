@@ -206,8 +206,8 @@ async function getDirectAnswer(prompt, tools) {
     if (/^(unpaid invoices|unpaid bills|unpaid invoice summary|unpaid bills summary)$/.test(normalized)) {
         const invoices = await withTimeout(tools.getUnpaidInvoices({}), 8000, 'MongoDB unpaid-invoice query');
         if (!invoices.length) return 'No unpaid invoices found.';
-        const rows = invoices.slice(0, 8).map(invoice =>
-            `**Invoice No: ${invoice.invoiceNo || 'Invoice'}** - ${invoice.customerName || 'Unknown customer'}: **Dues: ${formatCurrency(invoice.outstanding)}**`);
+        const rows = invoices.slice(0, 8).map((invoice, index) =>
+            `**Sl No: ${index + 1}** | **Invoice No: ${invoice.invoiceNo || 'Invoice'}** - ${invoice.customerName || 'Unknown customer'}: **Dues: ${formatCurrency(invoice.outstanding)}**`);
         return `Found ${invoices.length} unpaid invoices.\n${rows.join('\n')}`;
     }
 
