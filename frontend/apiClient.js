@@ -264,7 +264,11 @@ const apiClient = {
                 keepalive: true,
                 body: JSON.stringify(invoiceData)
             });
-            return await response.json();
+            const result = await response.json();
+            if (!response.ok || result?.success === false) {
+                throw new Error(result?.message || `Invoice save failed (HTTP ${response.status}).`);
+            }
+            return result;
         } catch (error) {
             console.error('Error saving invoice:', error);
             return { success: false, message: error.message };
