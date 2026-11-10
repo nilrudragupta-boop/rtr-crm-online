@@ -4,7 +4,7 @@ const { getNancySession } = require('../services/nancyAuth');
 const escapeRegex = value => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
+function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, JournalVoucher }) {
     const ownerQuery = userId => ({ createdBy: userId, deletedAt: null });
     const matchingText = value => new RegExp(escapeRegex(value), 'i');
 
@@ -27,8 +27,14 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
         async findCustomers({ userId, name, phone }) {
             const query = ownerQuery(userId);
             const terms = [];
-            if (name) terms.push({ name: matchingText(name) });
-            if (phone) terms.push({ contact: matchingText(phone) }, { phone: matchingText(phone) });
+            if (name) {
+                const match = matchingText(name);
+                terms.push({ name: match }, { email: match }, { address: match }, { gstin: match }, { gst_no: match }, { gstNo: match });
+            }
+            if (phone) {
+                const match = matchingText(phone);
+                terms.push({ contact: match }, { phone: match }, { mobile: match });
+            }
             if (terms.length) query.$or = terms;
             return Customer.find(query).sort({ name: 1 }).limit(10).lean();
         },
@@ -37,7 +43,11 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
             const query = ownerQuery(userId);
             if (item) {
                 const match = matchingText(item);
-                query.$or = [{ name: match }, { itemCode: match }, { description: match }];
+                query.$or = [
+                    { name: match }, { itemName: match }, { item_name: match },
+                    { itemCode: match }, { item_code: match }, { code: match },
+                    { description: match }, { indexNo: match }
+                ];
             }
             return Item.find(query).sort({ name: 1 }).limit(10).lean();
         },
@@ -45,21 +55,34 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
         async findSuggestions({ userId, type, query }) {
             const match = matchingText(query);
             if (type === 'customer') {
-                const records = await Customer.find({ ...ownerQuery(userId), name: match }).sort({ name: 1 }).limit(8).lean();
-                return records.map(record => ({ label: record.name, detail: record.contact || record.phone || '' }));
+                const records = await Customer.find({ ...ownerQuery(userId), $or: [
+                    { name: match }, { contact: match }, { phone: match }, { mobile: match }, { email: match },
+                    { address: match }, { gstin: match }, { gst_no: match }, { gstNo: match }
+                ] }).sort({ name: 1 }).limit(8).lean();
+                return records.map(record => ({ label: record.name, detail: [record.contact || record.phone || record.mobile, record.email, record.gstin || record.gst_no || record.gstNo].filter(Boolean).join(' · ') }));
             }
             if (type === 'supplier') {
-                const records = await Supplier.find({ ...ownerQuery(userId), name: match }).sort({ name: 1 }).limit(8).lean();
-                return records.map(record => ({ label: record.name, detail: record.contact || record.phone || '' }));
+                const records = await Supplier.find({ ...ownerQuery(userId), $or: [
+                    { name: match }, { contact: match }, { phone: match }, { mobile: match }, { email: match },
+                    { address: match }, { gstin: match }, { gst_no: match }, { gstNo: match }
+                ] }).sort({ name: 1 }).limit(8).lean();
+                return records.map(record => ({ label: record.name, detail: [record.contact || record.phone || record.mobile, record.email, record.gstin || record.gst_no || record.gstNo].filter(Boolean).join(' · ') }));
             }
             if (type === 'item') {
                 const records = await Item.find({
                     ...ownerQuery(userId),
-                    $or: [{ name: match }, { itemCode: match }, { description: match }]
+                    $or: [
+                        { name: match }, { itemName: match }, { item_name: match },
+                        { itemCode: match }, { item_code: match }, { code: match },
+                        { description: match }, { indexNo: match }
+                    ]
                 }).sort({ name: 1 }).limit(8).lean();
                 return records.map(record => ({
-                    label: record.name || record.itemCode || record.description,
-                    detail: [record.itemCode, record.currentStock !== undefined ? `Stock: ${record.currentStock} ${record.unit || ''}` : ''].filter(Boolean).join(' · ')
+                    label: record.name || record.itemName || record.item_name || record.itemCode || record.item_code || record.code || record.description,
+                    detail: [record.itemCode || record.item_code || record.code,
+                        (record.currentStock ?? record.stock ?? record.quantity) !== undefined
+                            ? `Stock: ${record.currentStock ?? record.stock ?? record.quantity} ${record.uom || record.unit || ''}` : '']
+                        .filter(Boolean).join(' · ')
                 }));
             }
             return [];
@@ -69,46 +92,132 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
             const query = matchingText(name);
             const owner = ownerQuery(userId);
             if (type === 'customer') {
-                return Customer.find({ ...owner, name: query }).sort({ name: 1 }).limit(5).lean();
+                return Customer.find({ ...owner, $or: [
+                    { name: query }, { contact: query }, { phone: query }, { mobile: query }, { email: query },
+                    { address: query }, { gstin: query }, { gst_no: query }, { gstNo: query }
+                ] }).sort({ name: 1 }).limit(5).lean();
             }
             if (type === 'supplier') {
-                return Supplier.find({ ...owner, name: query }).sort({ name: 1 }).limit(5).lean();
+                return Supplier.find({ ...owner, $or: [
+                    { name: query }, { contact: query }, { phone: query }, { mobile: query }, { email: query },
+                    { address: query }, { gstin: query }, { gst_no: query }, { gstNo: query }
+                ] }).sort({ name: 1 }).limit(5).lean();
             }
             if (type === 'item') {
                 return Item.find({
                     ...owner,
-                    $or: [{ name: query }, { itemCode: query }, { description: query }]
+                    $or: [
+                        { name: query }, { itemName: query }, { item_name: query },
+                        { itemCode: query }, { item_code: query }, { code: query },
+                        { description: query }, { indexNo: query }
+                    ]
                 }).sort({ name: 1 }).limit(5).lean();
             }
             return [];
         },
 
-        async getLedgerBalance({ userId, party }) {
+        async getLedgerBalance({ userId, party, partyType }) {
             const match = matchingText(party);
             const [customers, suppliers] = await Promise.all([
-                Customer.find({ ...ownerQuery(userId), name: match }).limit(1).lean(),
-                Supplier.find({ ...ownerQuery(userId), name: match }).limit(1).lean()
+                partyType === 'supplier' ? Promise.resolve([]) : Customer.find({ ...ownerQuery(userId), name: match }).limit(1).lean(),
+                partyType === 'customer' ? Promise.resolve([]) : Supplier.find({ ...ownerQuery(userId), name: match }).limit(1).lean()
             ]);
             if (customers.length) {
                 const customer = customers[0];
+                const customerIdentity = [
+                    { customerName: matchingText(customer.name) },
+                    { customer_name: matchingText(customer.name) }
+                ];
+                if (customer.id) customerIdentity.unshift({ customerId: customer.id });
                 const invoices = await Invoice.find({
                     ...ownerQuery(userId),
-                    customerName: matchingText(customer.name),
-                    status: { $nin: ['PAID', 'CANCELLED'] }
+                    $or: customerIdentity,
+                    status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
                 }).lean();
-                const outstanding = invoices.reduce((sum, invoice) =>
-                    sum + Math.max(0, number(invoice.invoiceTotal) - number(invoice.amountPaid)), 0);
-                return { party: customer.name, type: 'customer', openingBalance: number(customer.openingBalance), outstanding };
+                const invoiceBalance = invoices.reduce((sum, invoice) =>
+                    sum + (String(invoice.status || '').toUpperCase() === 'PAID' ? 0 :
+                        number(invoice.invoiceTotal ?? invoice.grandTotal ?? invoice.invoice_total ?? invoice.total) -
+                        number(invoice.amountPaid ?? invoice.total_paid ?? invoice.paid_amount ?? invoice.paid)), 0);
+                const outstanding = Math.max(0, invoiceBalance);
+                const adjustments = CreditDebitNote ? await CreditDebitNote.find({
+                    ...ownerQuery(userId),
+                    customerName: matchingText(customer.name),
+                    status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
+                }).lean() : [];
+                const noteBalance = adjustments.reduce((sum, note) => sum +
+                    (String(note.type || '').toUpperCase() === 'DEBIT' ? 1 : -1) * number(note.totalAmount ?? note.total_amount), 0);
+                const vouchers = JournalVoucher ? await JournalVoucher.find(ownerQuery(userId)).lean() : [];
+                const voucherBalance = vouchers.reduce((sum, voucher) => {
+                    if (['MEMORANDUM', 'PURCHASE ORDER', 'SALES ORDER', 'DELIVERY NOTE', 'RECEIPT NOTE'].includes(String(voucher.voucherType || voucher.voucher_type || '').toUpperCase())) return sum;
+                    return sum + (voucher.entries || []).reduce((entrySum, entry) => {
+                        if (String(entry.account || '').toLowerCase() !== String(customer.name || '').toLowerCase()) return entrySum;
+                        const amount = number(entry.debit || entry.credit);
+                        return entrySum + (String(entry.type || '').toUpperCase() === 'DR' ? amount : -amount);
+                    }, 0);
+                }, 0);
+                const opening = number(customer.openingBalance);
+                const openingSigned = customer.openingBalanceType === 'Cr' ? -opening : opening;
+                const closing = openingSigned + invoiceBalance + noteBalance + voucherBalance;
+                return {
+                    party: customer.name, type: 'customer', openingBalance: opening,
+                    openingBalanceType: customer.openingBalanceType || 'Dr', outstanding,
+                    closingBalance: closing,
+                    closingBalanceType: closing < 0 ? 'Cr' : 'Dr'
+                };
             }
             if (suppliers.length) {
                 const supplier = suppliers[0];
+                const supplierIdentity = [
+                    { supplierName: matchingText(supplier.name) },
+                    { supplier_name: matchingText(supplier.name) }
+                ];
+                if (supplier._id) supplierIdentity.unshift({ supplierId: supplier._id });
                 const purchases = await Purchase.find({
                     ...ownerQuery(userId),
-                    supplierName: matchingText(supplier.name)
+                    $or: supplierIdentity
                 }).lean();
-                const outstanding = purchases.reduce((sum, purchase) =>
-                    sum + Math.max(0, number(purchase.totalAmount) - number(purchase.amountPaid)), 0);
-                return { party: supplier.name, type: 'supplier', openingBalance: number(supplier.openingBalance), outstanding };
+                const purchaseBalance = purchases.reduce((sum, purchase) =>
+                    sum + (() => {
+                        const savedTotal = number(purchase.totalAmount ?? purchase.total_amount ?? purchase.grandTotal ?? purchase.total);
+                        const base = number(purchase.qty) * number(purchase.price);
+                        const storedDiscount = purchase.discountAmt ?? purchase.discountAmount;
+                        const discountValue = number(storedDiscount ?? purchase.discount);
+                        const discount = storedDiscount !== undefined && storedDiscount !== null
+                            ? discountValue
+                            : purchase.discType === 'flat' || purchase.discountType === 'flat'
+                                ? discountValue : base * discountValue / 100;
+                        const charges = number(purchase.freightCharges) + number(purchase.packingCharges) + number(purchase.loadingCharges);
+                        const taxable = Math.max(0, base - discount + charges);
+                        const computedTotal = taxable + taxable * number(purchase.gst) / 100 + number(purchase.roundOff);
+                        const total = savedTotal || computedTotal;
+                        return total - number(purchase.amountPaid ?? purchase.total_paid ?? purchase.paid_amount ?? purchase.paid);
+                    })(), 0);
+                const outstanding = Math.max(0, purchaseBalance);
+                const adjustments = CreditDebitNote ? await CreditDebitNote.find({
+                    ...ownerQuery(userId),
+                    customerName: matchingText(supplier.name),
+                    status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
+                }).lean() : [];
+                const noteBalance = adjustments.reduce((sum, note) => sum +
+                    (String(note.type || '').toUpperCase() === 'CREDIT' ? 1 : -1) * number(note.totalAmount ?? note.total_amount), 0);
+                const vouchers = JournalVoucher ? await JournalVoucher.find(ownerQuery(userId)).lean() : [];
+                const voucherBalance = vouchers.reduce((sum, voucher) => {
+                    if (['MEMORANDUM', 'PURCHASE ORDER', 'SALES ORDER', 'DELIVERY NOTE', 'RECEIPT NOTE'].includes(String(voucher.voucherType || voucher.voucher_type || '').toUpperCase())) return sum;
+                    return sum + (voucher.entries || []).reduce((entrySum, entry) => {
+                        if (String(entry.account || '').toLowerCase() !== String(supplier.name || '').toLowerCase()) return entrySum;
+                        const amount = number(entry.debit || entry.credit);
+                        return entrySum + (String(entry.type || '').toUpperCase() === 'CR' ? amount : -amount);
+                    }, 0);
+                }, 0);
+                const opening = number(supplier.openingBalance);
+                const openingSigned = supplier.openingBalanceType === 'Dr' ? -opening : opening;
+                const closing = openingSigned + purchaseBalance + noteBalance + voucherBalance;
+                return {
+                    party: supplier.name, type: 'supplier', openingBalance: opening,
+                    openingBalanceType: supplier.openingBalanceType || 'Cr', outstanding,
+                    closingBalance: closing,
+                    closingBalanceType: closing < 0 ? 'Dr' : 'Cr'
+                };
             }
             return null;
         },
@@ -126,7 +235,7 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
             return {
                 period: period === 'today' ? 'today' : 'this month',
                 invoiceCount: invoices.length,
-                totalSales: invoices.reduce((sum, invoice) => sum + number(invoice.invoiceTotal), 0)
+                totalSales: invoices.reduce((sum, invoice) => sum + number(invoice.invoiceTotal ?? invoice.invoice_total ?? invoice.grandTotal ?? invoice.total), 0)
             };
         },
 
@@ -137,12 +246,13 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
             }).sort({ date: -1 }).lean();
             // Match report.html's Summary bar definition of Unpaid: nothing paid,
             // with a positive invoice total. Partial invoices are excluded.
-            return invoices.filter(invoice => number(invoice.amountPaid) === 0 && number(invoice.invoiceTotal) > 0).map(invoice => ({
+            return invoices.map(invoice => ({ invoice, total: number(invoice.invoiceTotal ?? invoice.invoice_total ?? invoice.grandTotal ?? invoice.total), paid: number(invoice.amountPaid ?? invoice.total_paid ?? invoice.paid_amount ?? invoice.paid) }))
+                .filter(({ total, paid }) => paid === 0 && total > 0).map(({ invoice, total, paid }) => ({
                 invoiceNo: invoice.invoiceNo || invoice.invoice_no,
-                customerName: invoice.customerName,
+                customerName: invoice.customerName || invoice.customer_name,
                 date: invoice.date,
                 status: invoice.status,
-                outstanding: Math.max(0, number(invoice.invoiceTotal) - number(invoice.amountPaid))
+                outstanding: Math.max(0, total - paid)
             }));
         }
     };

@@ -22,6 +22,9 @@ function createNancyTools(userId, dataStore) {
             });
         },
 
+        searchSuppliers: async ({ supplierName }) => dataStore.getRecordDetails({ userId, type: 'supplier', name: supplierName }),
+        searchItems: async ({ itemName }) => dataStore.getRecordDetails({ userId, type: 'item', name: itemName }),
+
         getCustomerDetails: async ({ customerName }) => dataStore.getRecordDetails({ userId, type: 'customer', name: customerName }),
         getSupplierDetails: async ({ supplierName }) => dataStore.getRecordDetails({ userId, type: 'supplier', name: supplierName }),
         getItemDetails: async ({ itemName }) => dataStore.getRecordDetails({ userId, type: 'item', name: itemName }),
@@ -33,10 +36,11 @@ function createNancyTools(userId, dataStore) {
             });
         },
 
-        getLedgerSummary: async ({ partyName }) => {
+        getLedgerSummary: async ({ partyName, partyType }) => {
             return await dataStore.getLedgerBalance({
                 userId,
-                party: partyName
+                party: partyName,
+                partyType
             });
         },
 
@@ -65,13 +69,31 @@ const nancyToolDeclarations = [
     },
     {
         name: 'searchCustomers',
-        description: "Find customer details, contact numbers, and balances for this user.",
+        description: "Search this user's customers by name or phone and return their matching records.",
         parameters: {
             type: Type.OBJECT,
             properties: {
                 customerName: { type: Type.STRING, description: 'Name or partial name of the customer' },
                 phone: { type: Type.STRING, description: 'Mobile/WhatsApp number' }
             }
+        }
+    },
+    {
+        name: 'searchSuppliers',
+        description: "Search this user's suppliers by name, phone, email, address, or GSTIN and return matching records.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: { supplierName: { type: Type.STRING, description: 'Supplier name or search text' } },
+            required: ['supplierName']
+        }
+    },
+    {
+        name: 'searchItems',
+        description: "Search this user's inventory by item name, item code, description, or index number and return matching records.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: { itemName: { type: Type.STRING, description: 'Item name, code, description, or index number' } },
+            required: ['itemName']
         }
     },
     {
@@ -118,7 +140,8 @@ const nancyToolDeclarations = [
         parameters: {
             type: Type.OBJECT,
             properties: {
-                partyName: { type: Type.STRING, description: 'Customer or supplier ledger account name' }
+                partyName: { type: Type.STRING, description: 'Customer or supplier ledger account name' },
+                partyType: { type: Type.STRING, enum: ['customer', 'supplier'], description: 'Specify the party type when known' }
             },
             required: ['partyName']
         }
@@ -256,14 +279,22 @@ async function getDirectAnswer(prompt, tools) {
         const invoices = await withTimeout(tools.searchInvoices({}), 8000, 'MongoDB recent-invoice query');
         if (!invoices.length) return 'No recent invoices found.';
         const rows = invoices.slice(0, 8).map(invoice =>
-            `${invoice.invoiceNo || invoice.invoice_no || 'Invoice'} - ${invoice.customerName || 'Unknown customer'}: ${formatCurrency(invoice.invoiceTotal)} (${invoice.status || 'status unknown'})`);
+            `${invoice.invoiceNo || invoice.invoice_no || 'Invoice'} - ${invoice.customerName || invoice.customer_name || 'Unknown customer'}: ${formatCurrency(invoice.invoiceTotal ?? invoice.invoice_total ?? invoice.grandTotal ?? invoice.total)} (${invoice.status || 'status unknown'})`);
         return `Here are ${Math.min(invoices.length, 8)} recent invoices:\n${rows.join('\n')}`;
     }
 
-    const detailMatch = query.match(/^(?:(?:show|get|tell me|give me)\s+)?(?:the\s+)?(customer|supplier|item)\s+(?:details|information|info)(?:\s+(?:for|of|about))?\s+(.+)$/i)
-        || query.match(/^(?:show|get|tell me|give me)\s+(?:the\s+)?(customer|supplier|item)\s+(.+?)\s+(?:details|information|info)$/i)
+    const fieldMatch = query.match(/^(?:please\s+)?(?:(?:show(?:\s+me)?|get|find(?:\s+me)?|tell me|give me|what is|what's|whats)\s+)?(?:the\s+)?(?:contact(?:\s+(?:details|number))?|phone|mobile|email|address|gstin|gst\s*(?:number|no)?|opening balance|closing balance)\s+(?:of|for)\s+(customer|supplier)\s+(.+)$/i)
+        || query.match(/^(?:please\s+)?(?:(?:show(?:\s+me)?|get|find(?:\s+me)?|tell me|give me|what is|what's|whats)\s+)?(?:the\s+)?(customer|supplier)\s+(.+?)\s+(contact(?:\s+(?:details|number))?|phone|mobile|email|address|gstin|gst\s*(?:number|no)?|opening balance|closing balance)$/i);
+    const lookupMatch = query.match(/^(?:search|find|look up)\s+(customer|supplier)\s+by\s+(?:contact|phone|mobile|email|address|gstin|gst number)\s+(.+)$/i)
+        || query.match(/^(?:search|find|look up)\s+(item)\s+by\s+(?:code|name|description)\s+(.+)$/i);
+    const detailMatch = lookupMatch || (fieldMatch
+        ? [fieldMatch[0], fieldMatch[1], fieldMatch[2]]
+        : query.match(/^(?:(?:show(?:\s+me)?|get|tell me|give me)\s+)?(?:the\s+)?(customer|supplier|item)\s+(?:details|information|info)(?:\s+(?:for|of|about))?\s+(.+)$/i)
+        || query.match(/^(?:show(?:\s+me)?|get|tell me|give me)\s+(?:the\s+)?(customer|supplier|item)\s+(.+?)\s+(?:details|information|info)$/i)
         || query.match(/^(?:details|information|info)\s+(?:of|for|about)\s+(customer|supplier|item)\s+(.+)$/i)
-        || query.match(/^(?:tell me about|what do you know about)\s+(?:the\s+)?(customer|supplier|item)\s+(.+)$/i);
+        || query.match(/^(?:tell me about|what do you know about)\s+(?:the\s+)?(customer|supplier|item)\s+(.+)$/i)
+        || query.match(/^(?:search|find|look up)\s+(customer|supplier)\s+(.+)$/i)
+        || query.match(/^(?:search|find|look up)\s+(item)\s+(?!stock\b)(.+)$/i));
     if (detailMatch) {
         const type = detailMatch[1].toLowerCase();
         const name = detailMatch[2].trim();
@@ -272,52 +303,73 @@ async function getDirectAnswer(prompt, tools) {
         }), 8000, `MongoDB ${type}-details query`);
         if (!records.length) return `I couldn't find a ${type} matching “${name}”.`;
 
-        const rows = records.slice(0, 5).map(record => {
+        const requestedField = fieldMatch
+            ? (query.match(/contact(?:\s+(?:details|number))?|phone|mobile|email|address|gstin|gst\s*(?:number|no)?|opening balance|closing balance/i)?.[0] || '')
+                .toLowerCase().replace(/\s+number$/, '').replace(/^phone$|^mobile$/, 'contact').replace(/^gst(?:\s*(?:number|no)?)$/, 'gstin')
+            : '';
+        const rows = await Promise.all(records.slice(0, 5).map(async record => {
+            const balance = type === 'item' ? null : await withTimeout(tools.getLedgerSummary({
+                partyName: record.name,
+                partyType: type
+            }), 8000, `MongoDB ${type}-balance query`);
+            const openingType = balance?.openingBalanceType || (type === 'customer' ? 'Dr' : 'Cr');
+            const closingType = balance?.closingBalanceType || openingType;
             const fields = (type === 'customer' ? [
-                ['Contact', record.contact || record.phone], ['Email', record.email],
-                ['Address', [record.address, record.district, record.state, record.pin].filter(Boolean).join(', ')],
-                ['GSTIN', record.gstin], ['Opening balance', formatCurrency(record.openingBalance)]
+                ['Contact', record.contact || record.phone || record.mobile || record.customerPhone], ['Email', record.email],
+                ['Address', [record.address || record.customerAddress, record.district, record.state, record.pin || record.pinCode].filter(Boolean).join(', ')],
+                ['GSTIN', record.gstin || record.gst_no || record.gstNo || record.customerGST],
+                ['Opening balance', `${formatCurrency(Math.abs(balance?.openingBalance ?? record.openingBalance ?? 0))} (${openingType})`],
+                ['Closing balance', `${formatCurrency(Math.abs(balance?.closingBalance ?? balance?.outstanding ?? record.openingBalance ?? 0))} (${closingType})`]
             ] : type === 'supplier' ? [
-                ['Contact', record.contact || record.phone], ['Email', record.email],
-                ['Address', [record.address, record.district, record.state, record.pin].filter(Boolean).join(', ')],
-                ['GSTIN', record.gstin], ['Opening balance', formatCurrency(record.openingBalance)]
+                ['Contact', record.contact || record.phone || record.mobile], ['Email', record.email],
+                ['Address', [record.address, record.district, record.state, record.pin || record.pinCode].filter(Boolean).join(', ')],
+                ['GSTIN', record.gstin || record.gst_no || record.gstNo || record.supplierGST],
+                ['Opening balance', `${formatCurrency(Math.abs(balance?.openingBalance ?? record.openingBalance ?? 0))} (${openingType})`],
+                ['Closing balance', `${formatCurrency(Math.abs(balance?.closingBalance ?? balance?.outstanding ?? record.openingBalance ?? 0))} (${closingType})`]
             ] : [
-                ['Item code', record.itemCode], ['Description', record.description], ['Category', record.category],
-                ['Stock', record.currentStock === undefined ? '' : `${record.currentStock} ${record.unit || ''}`.trim()],
-                ['Unit', record.unit], ['Selling price', record.sellingPrice === undefined ? '' : formatCurrency(record.sellingPrice)],
-                ['Purchase price', record.purchasePrice === undefined ? '' : formatCurrency(record.purchasePrice)],
-                ['GST', record.gstRate === undefined ? '' : `${record.gstRate}%`], ['HSN', record.hsnCode]
+                ['Item code', record.itemCode || record.item_code || record.code], ['Description', record.description], ['Category', record.category],
+                ['Stock', (record.currentStock ?? record.stock ?? record.quantity) === undefined ? '' : `${record.currentStock ?? record.stock ?? record.quantity} ${record.uom || record.unit || ''}`.trim()],
+                ['Unit', record.uom || record.unit], ['Selling price', (record.sellingPrice ?? record.salePrice) === undefined ? '' : formatCurrency(record.sellingPrice ?? record.salePrice)],
+                ['Purchase price', (record.purchasePrice ?? record.averagePurchasePrice) === undefined ? '' : formatCurrency(record.purchasePrice ?? record.averagePurchasePrice)],
+                ['GST', (record.gstRate ?? record.gst) === undefined ? '' : `${record.gstRate ?? record.gst}%`], ['HSN', record.hsnCode || record.hsn]
             ]).filter(([, value]) => value !== undefined && value !== null && value !== '');
+            if (requestedField) {
+                const selected = requestedField === 'contact details'
+                    ? fields.filter(([label]) => ['contact', 'email'].includes(label.toLowerCase()))
+                    : fields.filter(([label]) => label.toLowerCase().includes(requestedField));
+                if (selected.length) return `${record.name || name}: ${selected.map(([label, value]) => `${label}: ${value}`).join('; ')}`;
+            }
             return `${record.name || record.itemCode || name}: ${fields.map(([label, value]) => `${label}: ${value}`).join('; ')}`;
-        });
+        }));
         return rows.join('\n');
     }
 
-    const stockMatch = query.match(/^(?:check|show|get|find)\s+(?:the\s+)?(?:item\s+)?stock(?:\s+(?:for|of)\s+(.+))?$/i);
-    if (stockMatch) {
-        if (!stockMatch[1]) return 'Which item’s stock would you like me to check?';
-        const items = await withTimeout(tools.checkItemStock({ itemName: stockMatch[1].trim() }), 8000, 'MongoDB item-stock query');
-        if (!items.length) return `I couldn’t find an item matching “${stockMatch[1].trim()}”.`;
+    const flexibleStockMatch = query.match(/^(?:(?:please\s+)?(?:check|show(?:\s+me)?|get|find|search|tell me|what(?:'s| is)?|how much)\s+)?(?:(?:the\s+)?(?:current\s+)?(?:item\s+)?stock(?:\s+(?:(?:for|of|in)\s+)?(.+))?|item\s+(.+?)\s+(?:stock|quantity)|(?:quantity|stock)\s+(?:of|for)\s+(?:item\s+)?(.+))$/i);
+    if (flexibleStockMatch) {
+        const itemName = (flexibleStockMatch[1] || flexibleStockMatch[2] || flexibleStockMatch[3] || '').trim().replace(/^item\s+/i, '');
+        if (!itemName) return 'Which item stock would you like me to check?';
+        const items = await withTimeout(tools.checkItemStock({ itemName }), 8000, 'MongoDB item-stock query');
+        if (!items.length) return `I couldn't find an item matching "${itemName}".`;
         return items.slice(0, 8).map(item =>
-            `${item.name || item.itemCode || 'Item'}: ${Number(item.currentStock) || 0} ${item.unit || 'units'}`).join('\n');
+            `${item.name || item.itemName || item.item_name || item.itemCode || item.item_code || 'Item'}: ${Number(item.currentStock ?? item.stock ?? item.quantity) || 0} ${item.uom || item.unit || 'units'}`).join('\n');
     }
 
-    const customerMatch = query.match(/^(?:customer\s+)?balance(?:\s+(?:for|of))?\s*(.*)$/i);
+    const customerMatch = query.match(/^(?:(?:please\s+)?(?:show(?:\s+me)?|tell me|get|check)\s+(?:the\s+)?)?(?:customer\s+)?balance(?:\s+(?:for|of))?\s*(.*)$/i);
     if (customerMatch) {
         const party = customerMatch[1].trim();
         if (!party) return 'Which customer’s balance would you like me to check?';
-        const balance = await withTimeout(tools.getLedgerSummary({ partyName: party }), 8000, 'MongoDB customer-ledger query');
+        const balance = await withTimeout(tools.getLedgerSummary({ partyName: party, partyType: 'customer' }), 8000, 'MongoDB customer-ledger query');
         if (!balance) return `I couldn’t find a ledger for “${party}”.`;
-        return `${balance.party}: outstanding ${formatCurrency(balance.outstanding)}.`;
+        return `${balance.party}: opening balance ${formatCurrency(Math.abs(balance.openingBalance))} (${balance.openingBalanceType}); outstanding ${formatCurrency(balance.outstanding)}; closing balance ${formatCurrency(Math.abs(balance.closingBalance))} (${balance.closingBalanceType}).`;
     }
 
-    const supplierMatch = query.match(/^(?:supplier\s+)?dues(?:\s+(?:for|of))?\s*(.*)$/i);
+    const supplierMatch = query.match(/^(?:(?:please\s+)?(?:show(?:\s+me)?|tell me|get|check)\s+(?:the\s+)?)?(?:supplier\s+)?dues(?:\s+(?:for|of))?\s*(.*)$/i);
     if (supplierMatch) {
         const party = supplierMatch[1].trim();
         if (!party) return 'Which supplier’s dues would you like me to check?';
-        const balance = await withTimeout(tools.getLedgerSummary({ partyName: party }), 8000, 'MongoDB supplier-ledger query');
+        const balance = await withTimeout(tools.getLedgerSummary({ partyName: party, partyType: 'supplier' }), 8000, 'MongoDB supplier-ledger query');
         if (!balance) return `I couldn’t find a ledger for “${party}”.`;
-        return `${balance.party}: outstanding ${formatCurrency(balance.outstanding)}.`;
+        return `${balance.party}: opening balance ${formatCurrency(Math.abs(balance.openingBalance))} (${balance.openingBalanceType}); outstanding dues ${formatCurrency(balance.outstanding)}; closing balance ${formatCurrency(Math.abs(balance.closingBalance))} (${balance.closingBalanceType}).`;
     }
 
     return null;
@@ -349,6 +401,7 @@ You assist individual users over voice/call while they work in their enterprise 
 CRITICAL SECURITY RULE: You only have access to records belonging strictly to the caller's account (User ID: ${userId}). 
 Never guess or fabricate records. If an item or invoice is not found via your tools, politely state so.
 For requests for customer, supplier, or item details, use the matching detail tool and summarize the fields it returns. Never invent missing contact, address, price, or stock values.
+Interpret typed requests by the named record and requested information. For example, use item search for product names/codes, customer or supplier search for party names/contact fields, and the ledger tool for opening, outstanding, or closing balances. If the record type or name is missing, ask a short clarifying question.
 Keep answers concise, direct, and conversational so they are pleasant to listen to when read aloud.
 `;
 

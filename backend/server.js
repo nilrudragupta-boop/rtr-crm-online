@@ -546,12 +546,21 @@ app.get('/api/invoices', async (req, res) => {
 // Create a new invoice
 app.post('/api/invoices', async (req, res) => {
     try {
-        const payload = req.body;
-        if (payload.invoice_no || payload.invoiceNo) {
-            // Update existing invoice
-            const updated = await Invoice.findOneAndUpdate({ invoiceNo: payload.invoice_no || payload.invoiceNo }, payload, { new: true, upsert: true });
+        const payload = { ...req.body };
+        const invoiceNumber = payload.invoiceNo || payload.invoice_no;
+        if (invoiceNumber) {
+            const owner = req.query.user || payload.createdBy || 'System';
+            payload.createdBy = owner;
+            const identity = [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }];
+            if (payload.id) identity.push({ id: payload.id });
+            const updated = await Invoice.findOneAndUpdate({
+                createdBy: owner,
+                deletedAt: null,
+                $or: identity
+            }, { $set: payload }, { new: true, upsert: true, setDefaultsOnInsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
+            if (!payload.createdBy) payload.createdBy = req.query.user || 'System';
             const newInvoice = new Invoice(payload);
             await newInvoice.save();
             res.status(201).json({ success: true, data: newInvoice });
@@ -1278,7 +1287,7 @@ crmRoutes(app, CrmEnquiry, '/api/crm-enquiries');
 crmRoutes(app, CrmTechnicalReview, '/api/crm-technical-reviews');
 crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
 registerCrmV2(app, { Customer, Supplier, CrmContact, CrmPlant, CrmEnquiry, Invoice, Purchase, FollowUp, Quotation });
-registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase });
+registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, JournalVoucher });
 
 app.get('/api/crm/customer/:id/360', async (req, res) => {
     try {
