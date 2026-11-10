@@ -93,8 +93,10 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase }) {
             const invoices = await Invoice.find({
                 ...ownerQuery(userId),
                 status: { $nin: ['PAID', 'CANCELLED'] }
-            }).sort({ date: -1 }).limit(20).lean();
-            return invoices.map(invoice => ({
+            }).sort({ date: -1 }).lean();
+            // Match report.html's Summary bar definition of Unpaid: nothing paid,
+            // with a positive invoice total. Partial invoices are excluded.
+            return invoices.filter(invoice => number(invoice.amountPaid) === 0 && number(invoice.invoiceTotal) > 0).map(invoice => ({
                 invoiceNo: invoice.invoiceNo || invoice.invoice_no,
                 customerName: invoice.customerName,
                 date: invoice.date,
