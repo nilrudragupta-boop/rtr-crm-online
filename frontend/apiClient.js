@@ -212,9 +212,12 @@ const apiClient = {
 
     getSales: async () => {
         try {
-            const invoices = await apiClient.getInvoices();
-            if (!Array.isArray(invoices)) return null;
-            return invoices.map(invoice => {
+            const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            if (!response.ok) return null;
+            const result = await response.json();
+            const sales = Array.isArray(result) ? result : result?.data;
+            if (!Array.isArray(sales)) return null;
+            return sales.map(invoice => {
                 const customer = invoice.customer || {};
                 const customerName = invoice.customerName || invoice.customer_name || customer.name || 'Walk-in Customer';
                 const customerPhone = invoice.customerPhone || invoice.customer_phone || invoice.contact || customer.phone || customer.contact || customer.mobile || '';
@@ -300,7 +303,14 @@ const apiClient = {
                 remarks: saleData.remarks || saleData.note || '',
                 items: Array.isArray(saleData.items) ? saleData.items : []
             };
-            return await apiClient.saveInvoice(normalized);
+            normalized.createdBy = normalized.createdBy || localStorage.getItem('currentUser') || 'System';
+            const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+                body: JSON.stringify(normalized)
+            });
+            const result = await response.json();
+            if (!response.ok || result?.success === false) throw new Error(result?.message || `Sales record save failed (HTTP ${response.status}).`);
+            return result;
         } catch (error) {
             console.error('Error saving sale:', error);
             return { success: false, message: error.message };
@@ -309,7 +319,12 @@ const apiClient = {
     deleteInvoice: (id) => apiClient._deleteCollection('invoices', id),
     getDeletedInvoices: () => apiClient._getDeletedCollection('invoices'),
     restoreInvoice: (id) => apiClient._restoreCollection('invoices', id),
-    deleteSale: async (id) => apiClient.deleteInvoice(id),
+    deleteSale: async (id) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/sales-records/${encodeURIComponent(id)}${apiClient._getAuthQuery()}`, { method: 'DELETE' });
+            return await response.json();
+        } catch (error) { return { success: false, message: error.message }; }
+    },
 
     // --- Credit/Debit Notes ---
     getCreditDebitNotes: () => apiClient._getCollection('credit-debit-notes'),
