@@ -301,9 +301,24 @@ class NancyVoiceAssistant {
     appendMessage(text, sender) {
         const msg = document.createElement('div');
         msg.className = `nancy-msg ${sender}`;
-        msg.innerText = text;
+        this.renderMessageText(msg, text);
         this.messageList.appendChild(msg);
         this.messageList.scrollTop = this.messageList.scrollHeight;
+    }
+
+    renderMessageText(element, text) {
+        // Render only the small bold Markdown convention used by Nancy's invoice list.
+        // All other content is inserted as text, never interpreted as HTML.
+        const parts = String(text).split(/(\*\*[^*]+\*\*)/g);
+        parts.forEach(part => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                const strong = document.createElement('strong');
+                strong.textContent = part.slice(2, -2);
+                element.appendChild(strong);
+            } else {
+                element.appendChild(document.createTextNode(part));
+            }
+        });
     }
 
     async handleTextSubmit() {
@@ -339,7 +354,10 @@ class NancyVoiceAssistant {
             const targetMsg = document.getElementById(loadingId);
 
             if (response.ok && data.reply) {
-                if (targetMsg) targetMsg.innerText = data.reply;
+                if (targetMsg) {
+                    targetMsg.textContent = '';
+                    this.renderMessageText(targetMsg, data.reply);
+                }
                 if ('interactionId' in data) this.interactionId = data.interactionId;
                 this.speak(data.reply);
             } else {
