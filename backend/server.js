@@ -534,7 +534,8 @@ app.delete('/api/quotations/:id', async (req, res) => {
 // Fetch all invoices
 app.get('/api/invoices', async (req, res) => {
     try {
-        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
         const invoices = await Invoice.find(query).sort({ date: -1 }); // Newest date first
         res.json({ success: true, data: invoices });
     } catch (err) {
@@ -563,17 +564,50 @@ app.post('/api/invoices', async (req, res) => {
 app.delete('/api/invoices/:id', async (req, res) => {
     try {
         const invoiceId = decodeURIComponent(req.params.id);
-        const deleted = await Invoice.findOneAndDelete({
+        const query = {
+            deletedAt: null,
             $or: [
                 { id: invoiceId },
                 { invoiceNo: invoiceId },
                 { invoice_no: invoiceId }
             ]
-        });
+        };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await Invoice.findOneAndUpdate(query, {
+            $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' }
+        }, { new: true, strict: false });
         if (!deleted) {
             return res.status(404).json({ success: false, message: 'Invoice not found.' });
         }
         res.json({ success: true, data: deleted });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/invoices/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        res.json({ success: true, data: await Invoice.find(query).sort({ deletedAt: -1 }) });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/invoices/:id/restore', async (req, res) => {
+    try {
+        const invoiceId = decodeURIComponent(req.params.id);
+        const query = {
+            deletedAt: { $ne: null },
+            $or: [{ id: invoiceId }, { invoiceNo: invoiceId }, { invoice_no: invoiceId }]
+        };
+        if (req.query.user) query.createdBy = req.query.user;
+        const restored = await Invoice.findOneAndUpdate(query, {
+            $set: { deletedAt: null, deletedBy: null, updatedAt: new Date() }
+        }, { new: true, strict: false });
+        if (!restored) return res.status(404).json({ success: false, message: 'Deleted invoice not found.' });
+        res.json({ success: true, data: restored });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
