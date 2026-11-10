@@ -207,7 +207,7 @@ async function getDirectAnswer(prompt, tools) {
         const invoices = await withTimeout(tools.getUnpaidInvoices({}), 8000, 'MongoDB unpaid-invoice query');
         if (!invoices.length) return 'No unpaid invoices found.';
         const rows = invoices.slice(0, 8).map(invoice =>
-            `${invoice.invoiceNo || 'Invoice'} - ${invoice.customerName || 'Unknown customer'}: ${formatCurrency(invoice.outstanding)}`);
+            `**Invoice No: ${invoice.invoiceNo || 'Invoice'}** - ${invoice.customerName || 'Unknown customer'}: **Dues: ${formatCurrency(invoice.outstanding)}**`);
         return `Found ${invoices.length} unpaid invoices.\n${rows.join('\n')}`;
     }
 
