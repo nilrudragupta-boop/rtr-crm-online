@@ -4,9 +4,83 @@ const { getNancySession } = require('../services/nancyAuth');
 const escapeRegex = value => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
 
-function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote }) {
+function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production }) {
     const ownerQuery = userId => ({ createdBy: userId, deletedAt: null });
     const matchingText = value => new RegExp(escapeRegex(value), 'i');
+
+    const itemSearchFields = match => [
+        { name: match }, { itemName: match }, { item_name: match },
+        { itemCode: match }, { item_code: match }, { code: match },
+        { description: match }, { indexNo: match }, { hsn: match }, { hsnCode: match }
+    ];
+
+    async function attachStock(userId, items) {
+        if (!items.length) return items;
+        const [allItems, purchases, invoices, scraps, productions] = await Promise.all([
+            Item.find(ownerQuery(userId)).lean(),
+            Purchase.find(ownerQuery(userId)).lean(),
+            Invoice.find(ownerQuery(userId)).lean(),
+            Scrap ? Scrap.find(ownerQuery(userId)).lean() : [],
+            Production ? Production.find(ownerQuery(userId)).lean() : []
+        ]);
+        const keyOf = (name, code = '', uom = '-') => `${String(name || '').trim().toLowerCase()}|${String(code || '').trim().toLowerCase()}|${String(uom || '-').trim().toLowerCase()}`;
+        const stockMap = new Map();
+        const ensure = (name, code = '', uom = '-') => {
+            if (!name) return null;
+            const key = keyOf(name, code, uom);
+            if (!stockMap.has(key)) {
+                const master = allItems.find(i => String(i.name || '').toLowerCase() === String(name).toLowerCase() && (!code || String(i.itemCode || '').toLowerCase() === String(code).toLowerCase()))
+                    || allItems.find(i => String(i.name || '').toLowerCase() === String(name).toLowerCase()) || {};
+                stockMap.set(key, { name, itemCode: code || master.itemCode || '', uom: uom || '-', purchased: 0, sold: 0, consumed: 0 });
+            }
+            return stockMap.get(key);
+        };
+        const findKey = (name, code = '', uom = '') => {
+            const exact = keyOf(name, code, uom || '-');
+            if (stockMap.has(exact)) return stockMap.get(exact);
+            const lowerName = String(name || '').trim().toLowerCase();
+            const lowerCode = String(code || '').trim().toLowerCase();
+            const lowerUom = String(uom || '').trim().toLowerCase();
+            for (const row of stockMap.values()) {
+                if (row.name.toLowerCase() === lowerName && (!lowerCode || row.itemCode.toLowerCase() === lowerCode) && (!lowerUom || row.uom.toLowerCase() === lowerUom)) return row;
+            }
+            return null;
+        };
+        allItems.forEach(i => ensure(i.name || i.itemName || i.item_name, i.itemCode || i.item_code || i.code, '-'));
+        purchases.forEach(p => {
+            // Purchase records are stored as one row per item by purchase.html.
+            const row = ensure(p.itemName || p.item_name || p.name, p.itemCode || p.item_code || p.code, p.uom || p.unit || '-');
+            if (row) row.purchased += number(p.totalQty) || number(p.qty);
+        });
+        invoices.forEach(inv => (Array.isArray(inv.items) ? inv.items : []).forEach(line => {
+            const row = ensure(line.item || line.itemName || line.item_name || line.name, line.itemCode || line.item_code || line.code, line.uom || line.unit || '-');
+            if (row) row.sold += number(line.qty);
+        }));
+        if (Scrap) scraps.forEach(s => {
+            const row = findKey(s.itemName || s.item_name || s.name, s.itemCode || s.item_code || s.code, s.uom || s.unit);
+            if (row) row.purchased -= number(s.qty);
+        });
+        if (Production) productions.forEach(prod => {
+            if ((prod.stage || 'Completed') === 'Planned') return;
+            const consumed = Array.isArray(prod.materialsConsumed) ? prod.materialsConsumed : [];
+            consumed.forEach(line => {
+                const row = findKey(line.item || line.itemName || line.name, line.code || line.itemCode, line.uom || line.unit);
+                if (row) row.consumed += number(line.qty);
+            });
+        });
+        return items.map(item => {
+            const name = item.name || item.itemName || item.item_name;
+            const code = item.itemCode || item.item_code || item.code;
+            const unit = item.uom || item.unit;
+            const matchingRows = [...stockMap.values()].filter(row => row.name.toLowerCase() === String(name || '').toLowerCase()
+                && (!code || row.itemCode.toLowerCase() === String(code).toLowerCase())
+                && (!unit || row.uom.toLowerCase() === String(unit).toLowerCase()));
+            const currentStock = matchingRows.length
+                ? matchingRows.reduce((sum, row) => sum + row.purchased - row.sold - row.consumed, 0)
+                : number(item.currentStock ?? item.stock ?? item.openingStock ?? item.quantity);
+            return { ...item, currentStock };
+        });
+    }
 
     return {
         async findInvoices({ userId, search, status }) {
@@ -43,13 +117,10 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             const query = ownerQuery(userId);
             if (item) {
                 const match = matchingText(item);
-                query.$or = [
-                    { name: match }, { itemName: match }, { item_name: match },
-                    { itemCode: match }, { item_code: match }, { code: match },
-                    { description: match }, { indexNo: match }
-                ];
+                query.$or = itemSearchFields(match);
             }
-            return Item.find(query).sort({ name: 1 }).limit(10).lean();
+            const items = await Item.find(query).sort({ name: 1 }).limit(10).lean();
+            return attachStock(userId, items);
         },
 
         async findSuggestions({ userId, type, query }) {
@@ -71,17 +142,12 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             if (type === 'item') {
                 const records = await Item.find({
                     ...ownerQuery(userId),
-                    $or: [
-                        { name: match }, { itemName: match }, { item_name: match },
-                        { itemCode: match }, { item_code: match }, { code: match },
-                        { description: match }, { indexNo: match }
-                    ]
+                    $or: itemSearchFields(match)
                 }).sort({ name: 1 }).limit(8).lean();
                 return records.map(record => ({
                     label: record.name || record.itemName || record.item_name || record.itemCode || record.item_code || record.code || record.description,
                     detail: [record.itemCode || record.item_code || record.code,
-                        (record.currentStock ?? record.stock ?? record.quantity) !== undefined
-                            ? `Stock: ${record.currentStock ?? record.stock ?? record.quantity} ${record.uom || record.unit || ''}` : '']
+                        `Stock: ${record.currentStock ?? record.stock ?? record.quantity ?? 0} ${record.uom || record.unit || ''}`]
                         .filter(Boolean).join(' · ')
                 }));
             }
@@ -104,14 +170,11 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 ] }).sort({ name: 1 }).limit(5).lean();
             }
             if (type === 'item') {
-                return Item.find({
+                const records = await Item.find({
                     ...owner,
-                    $or: [
-                        { name: query }, { itemName: query }, { item_name: query },
-                        { itemCode: query }, { item_code: query }, { code: query },
-                        { description: query }, { indexNo: query }
-                    ]
+                    $or: itemSearchFields(query)
                 }).sort({ name: 1 }).limit(5).lean();
+                return attachStock(userId, records);
             }
             return [];
         },

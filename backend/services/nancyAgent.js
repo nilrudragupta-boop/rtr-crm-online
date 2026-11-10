@@ -327,8 +327,8 @@ async function getDirectAnswer(prompt, tools) {
                 ['Opening balance', `${formatCurrency(Math.abs(balance?.openingBalance ?? record.openingBalance ?? 0))} (${openingType})`],
                 ['Closing balance', `${formatCurrency(Math.abs(balance?.closingBalance ?? balance?.outstanding ?? record.openingBalance ?? 0))} (${closingType})`]
             ] : [
-                ['Item code', record.itemCode || record.item_code || record.code], ['Description', record.description], ['Category', record.category],
-                ['Stock', (record.currentStock ?? record.stock ?? record.quantity) === undefined ? '' : `${record.currentStock ?? record.stock ?? record.quantity} ${record.uom || record.unit || ''}`.trim()],
+                ['Item code', record.itemCode || record.item_code || record.code], ['Index no', record.indexNo], ['Description', record.description], ['Category', record.category],
+                ['Stock', `${record.currentStock ?? record.stock ?? record.quantity ?? 0} ${record.uom || record.unit || ''}`.trim()],
                 ['Unit', record.uom || record.unit], ['Selling price', (record.sellingPrice ?? record.salePrice) === undefined ? '' : formatCurrency(record.sellingPrice ?? record.salePrice)],
                 ['Purchase price', (record.purchasePrice ?? record.averagePurchasePrice) === undefined ? '' : formatCurrency(record.purchasePrice ?? record.averagePurchasePrice)],
                 ['GST', (record.gstRate ?? record.gst) === undefined ? '' : `${record.gstRate ?? record.gst}%`], ['HSN', record.hsnCode || record.hsn]
@@ -344,9 +344,9 @@ async function getDirectAnswer(prompt, tools) {
         return rows.join('\n');
     }
 
-    const flexibleStockMatch = query.match(/^(?:(?:please\s+)?(?:check|show(?:\s+me)?|get|find|search|tell me|what(?:'s| is)?|how much)\s+)?(?:(?:the\s+)?(?:current\s+)?(?:item\s+)?stock(?:\s+(?:(?:for|of|in)\s+)?(.+))?|item\s+(.+?)\s+(?:stock|quantity)|(?:quantity|stock)\s+(?:of|for)\s+(?:item\s+)?(.+))$/i);
+    const flexibleStockMatch = query.match(/^(?:(?:please\s+)?(?:check|show(?:\s+me)?|get|find|search|tell me|what(?:'s| is)?|how much|how many)\s+)?(?:(?:the\s+)?(?:current\s+)?(?:item\s+)?stock(?:\s+(?:(?:for|of|in)\s+)?(.+))?|item\s+(.+?)\s+(?:stock|quantity)|(?:quantity|stock)\s+(?:of|for)\s+(?:item\s+)?(.+)|(?:how many)\s+(.+?)\s+(?:do we have|are available|in stock))$/i);
     if (flexibleStockMatch) {
-        const itemName = (flexibleStockMatch[1] || flexibleStockMatch[2] || flexibleStockMatch[3] || '').trim().replace(/^item\s+/i, '');
+        const itemName = (flexibleStockMatch[1] || flexibleStockMatch[2] || flexibleStockMatch[3] || flexibleStockMatch[4] || '').trim().replace(/^item\s+/i, '');
         if (!itemName) return 'Which item stock would you like me to check?';
         const items = await withTimeout(tools.checkItemStock({ itemName }), 8000, 'MongoDB item-stock query');
         if (!items.length) return `I couldn't find an item matching "${itemName}".`;
