@@ -9,7 +9,7 @@ class NancyVoiceAssistant {
         this.questionCategories = {
             Sales: ["Unpaid invoices", "Total sales this month", "Recent invoices"],
             Stock: ["Check item stock", "Low stock items"],
-            Accounts: ["Customer balance", "Supplier dues", "Today's Day Book"]
+            Accounts: ["Customer balance", "Supplier dues"]
         };
         this.initUI();
         this.initSpeech();
