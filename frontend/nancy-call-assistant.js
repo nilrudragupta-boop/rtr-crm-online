@@ -242,7 +242,7 @@ class NancyVoiceAssistant {
       </div>
       <button id="nancy-call-btn" type="button" title="Open Nancy">
         <i class="fas fa-headset" style="font-size: 22px;"></i>
-        <span>Open Nancy</span>
+        <span>Ask Nancy</span>
       </button>
     `;
         document.body.appendChild(container);
@@ -352,9 +352,9 @@ class NancyVoiceAssistant {
         const isVisible = this.chatWindow.style.display === 'flex';
         const willBeVisible = !isVisible;
         this.chatWindow.style.display = willBeVisible ? 'flex' : 'none';
-        this.callBtn.title = willBeVisible ? 'Close Nancy' : 'Open Nancy';
+        this.callBtn.title = willBeVisible ? 'Close Nancy' : 'Ask Nancy';
         this.callBtn.setAttribute('aria-expanded', String(willBeVisible));
-        this.callBtn.querySelector('span').textContent = willBeVisible ? 'Close Nancy' : 'Open Nancy';
+        this.callBtn.querySelector('span').textContent = willBeVisible ? 'Close Nancy' : 'Ask Nancy';
         if (!isVisible) {
             this.textInput.focus();
         }
