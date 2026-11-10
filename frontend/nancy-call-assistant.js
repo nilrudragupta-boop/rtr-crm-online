@@ -458,6 +458,10 @@ class NancyVoiceAssistant {
                 signal: requestController.signal,
                 body: JSON.stringify({
                     message: requestMessage,
+                    localDate: (() => {
+                        const now = new Date();
+                        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                    })(),
                     previousInteractionId: this.interactionId
                 })
             });
@@ -510,7 +514,13 @@ class NancyVoiceAssistant {
     speak(text) {
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
+            const spokenText = String(text || '')
+                .replace(/\*{1,3}/g, '')
+                .replace(/^\s*[-•]\s+/gm, '')
+                .replace(/[ \t]{2,}/g, ' ')
+                .trim();
+            if (!spokenText) return;
+            const utterance = new SpeechSynthesisUtterance(spokenText);
             const voices = window.speechSynthesis.getVoices();
             const femaleVoiceName = /female|heera|priya|veena|raveena|lekha|zira|samantha|karen|susan|hazel|aria|jenny|sonia|neerja/i;
             const voice = voices.find(item => /^en-IN$/i.test(item.lang) && femaleVoiceName.test(item.name))

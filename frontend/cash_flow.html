@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- DevTools & F12 Blocker -->
     <script src="anti-debug.js"></script>
+    <script src="apiClient.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -456,7 +457,35 @@
         let chartInstance = null;
 
         // --- Initialization ---
-        document.addEventListener("DOMContentLoaded", () => {
+        async function loadReportDataFromBackend() {
+            if (!window.apiClient) return;
+            const sources = [
+                ['invoices', 'getInvoices', r => r.id || r.invoiceNo || r.invoice_no],
+                ['purchases', 'getPurchases', r => r.id || r.purchaseNo || r.supplierInv],
+                ['expenses', 'getExpenses', r => r.id || r.expense_id],
+                ['bank_transactions', 'getBankTransactions', r => r.id],
+                ['bank_accounts', 'getBankAccounts', r => r.id],
+                ['journal_vouchers', 'getJournalVouchers', r => r.id || r.voucherNo || r.voucher_no],
+                ['credit_debit_notes', 'getCreditDebitNotes', r => r.id || r.noteNo || r.note_no]
+            ];
+            await Promise.allSettled(sources.map(async ([storageKey, method, getId]) => {
+                if (typeof apiClient[method] !== 'function') return;
+                const remoteRows = await apiClient[method]();
+                if (!Array.isArray(remoteRows)) return;
+                let localRows = [];
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                    if (Array.isArray(parsed)) localRows = parsed;
+                } catch (_) { }
+                const merged = new Map();
+                localRows.forEach((row, index) => merged.set(getId(row) || `local-${index}`, row));
+                remoteRows.forEach((row, index) => merged.set(getId(row) || `remote-${index}`, row));
+                localStorage.setItem(storageKey, JSON.stringify(Array.from(merged.values())));
+            }));
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            await loadReportDataFromBackend();
             // Set default dates (This Year)
             const today = new Date();
             const firstDay = new Date(today.getFullYear(), 0, 1);
