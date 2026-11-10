@@ -2469,6 +2469,7 @@
         async function loadPurchases() {
             let localPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
             if (!Array.isArray(localPurchases)) localPurchases = [];
+            let localPurchasesToSync = [];
 
             const tbody = document.getElementById("purchaseTableBody");
             if (tbody && localPurchases.length === 0) {
@@ -2482,7 +2483,9 @@
             }
             try {
                 let remoteData = await apiClient.getPurchases();
-                if (remoteData && remoteData.length > 0) {
+                if (Array.isArray(remoteData)) {
+                    const remoteIds = new Set(remoteData.map(record => String(record.id)));
+                    localPurchasesToSync = localPurchases.filter(record => record && record.id && !remoteIds.has(String(record.id)));
                     const localPurchaseMap = new Map();
                     localPurchases.forEach((p, index) => localPurchaseMap.set(p.id, index));
                     remoteData.forEach(remoteP => {
@@ -2495,6 +2498,14 @@
                         }
                     });
                     localStorage.setItem("purchases", JSON.stringify(localPurchases));
+                    if (localPurchasesToSync.length && typeof apiClient.savePurchase === 'function') {
+                        const currentUser = localStorage.getItem('currentUser') || 'System';
+                        const syncablePurchases = localPurchasesToSync
+                            .filter(record => !record.createdBy || record.createdBy === 'System' || record.createdBy === currentUser)
+                            .map(record => ({ ...record, createdBy: !record.createdBy || record.createdBy === 'System' ? currentUser : record.createdBy }));
+                        apiClient._syncRecordsInBatches(syncablePurchases, record => apiClient.savePurchase(record))
+                            .catch(error => console.warn('Purchase records remain local until sync succeeds.', error));
+                    }
                 }
             } catch (e) {
                 console.warn("API sync failed, using local data", e);

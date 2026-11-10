@@ -1050,6 +1050,14 @@
                 localStorage.setItem("suppliers", JSON.stringify(suppliers));
             } else {
                 suppliers = localSuppliers;
+                if (Array.isArray(remoteData) && remoteData.length === 0 && typeof apiClient.saveSupplier === 'function') {
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const syncableSuppliers = localSuppliers
+                        .filter(record => !record.createdBy || record.createdBy === 'System' || record.createdBy === currentUser)
+                        .map(record => ({ ...record, createdBy: !record.createdBy || record.createdBy === 'System' ? currentUser : record.createdBy }));
+                    apiClient._syncRecordsInBatches(syncableSuppliers, record => apiClient.saveSupplier(record))
+                        .catch(error => console.warn('Supplier records remain local until sync succeeds.', error));
+                }
             }
             if (!suppliers.some(s => s.name === "ANONYMOUS")) {
                 const anon = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), name: "ANONYMOUS", contact: "0000000000", gstin: "", address: "N/A", pin: "", district: "", state: "West Bengal", stateCode: "19", supplierType: "Retailer", createdAt: new Date().toISOString() };

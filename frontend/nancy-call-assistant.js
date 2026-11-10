@@ -218,12 +218,12 @@ class NancyVoiceAssistant {
         container.innerHTML = `
       <div id="nancy-chat-window">
         <div class="nancy-header">
-          <span><i class="fas fa-robot" style="margin-right: 6px;"></i> Nancy Assistant</span>
+          <span><i class="fas fa-robot" style="margin-right: 6px;"></i> Nancy [Your Data Assistant]</span>
           <span style="cursor: pointer; font-size: 16px;" onclick="window.Nancy.toggleChatWindow()">&times;</span>
         </div>
         <div class="nancy-messages" id="nancy-message-list">
           <div class="nancy-msg agent">
-            Hello! Ask me anything across your invoices, accounts, and stock.
+            Hello! Ask me anything across your saved records.
             <div class="nancy-chips-container" id="nancy-chips-wrapper"></div>
           </div>
         </div>

@@ -362,7 +362,11 @@ const apiClient = {
 
             const contentType = response.headers.get("content-type");
             if (contentType && contentType.includes("application/json")) {
-                return await response.json();
+                const result = await response.json();
+                if (!response.ok || result?.success === false) {
+                    throw new Error(result?.message || `Save to ${collectionName} failed (HTTP ${response.status}).`);
+                }
+                return result;
             } else {
                 if (response.status === 413) throw new Error("Payload Too Large: The file exceeds network size limits.");
                 if (response.status === 404) throw new Error(`404 Not Found: The API endpoint '/api/${collectionName}' does not exist on the server.`);
@@ -372,6 +376,23 @@ const apiClient = {
             console.error(`Error saving ${collectionName}:`, error);
             return { success: false, message: error.message };
         }
+    },
+    _syncRecordsInBatches: async (records, saveRecord, batchSize = 20) => {
+        const failures = [];
+        let synced = 0;
+        for (let offset = 0; offset < records.length; offset += batchSize) {
+            const batch = records.slice(offset, offset + batchSize);
+            const results = await Promise.allSettled(batch.map(saveRecord));
+            results.forEach((result, index) => {
+                if (result.status === 'rejected' || result.value?.success === false) {
+                    failures.push(batch[index].id || 'unknown record');
+                } else {
+                    synced++;
+                }
+            });
+        }
+        if (failures.length) throw new Error(`Could not sync ${failures.length} record(s): ${failures.slice(0, 5).join(', ')}.`);
+        return { success: true, synced };
     },
     _deleteCollection: async (collectionName, id) => {
         try {

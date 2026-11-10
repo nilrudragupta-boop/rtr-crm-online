@@ -1485,18 +1485,23 @@
                     let remoteCustomers = Array.isArray(res) ? res : (res.data || res || []);
 
                     const fetchedMap = new Map(remoteCustomers.map(r => [String(r.id), r]));
+                    const localRecordsToSync = [];
 
                     localCustomers.forEach(localRecord => {
                         if (localRecord && localRecord.id) {
                             if (!fetchedMap.has(String(localRecord.id))) {
                                 remoteCustomers.push(localRecord);
+                                localRecordsToSync.push(localRecord);
                             } else {
                                 const apiRecord = fetchedMap.get(String(localRecord.id));
                                 const localTime = new Date(localRecord.updatedAt || 0).getTime();
                                 const apiTime = new Date(apiRecord.updatedAt || 0).getTime();
                                 if (localTime > apiTime) {
                                     const idx = remoteCustomers.findIndex(r => String(r.id) === String(localRecord.id));
-                                    if (idx > -1) remoteCustomers[idx] = localRecord;
+                                    if (idx > -1) {
+                                        remoteCustomers[idx] = localRecord;
+                                        localRecordsToSync.push(localRecord);
+                                    }
                                 }
                             }
                         }
@@ -1519,12 +1524,37 @@
 
                     customers = remoteCustomers;
                     localStorage.setItem("customers", JSON.stringify(customers));
+                    if (localRecordsToSync.length && typeof apiClient.saveCustomer === 'function') {
+                        const currentUser = localStorage.getItem('currentUser') || 'System';
+                        const syncableRecords = localRecordsToSync
+                            .filter(record => !record.createdBy || record.createdBy === currentUser)
+                            .map(record => ({ ...record, createdBy: record.createdBy || currentUser }));
+                        apiClient._syncRecordsInBatches(syncableRecords, record => apiClient.saveCustomer(record))
+                            .catch(error => console.warn('Customer records remain local until sync succeeds.', error));
+                    }
                 } else {
                     customers = localCustomers;
                 }
             } catch (e) {
                 console.warn(e);
                 customers = localCustomers;
+            }
+
+            try {
+                const [remoteInvoices, remoteCreditNotes] = await Promise.all([
+                    apiClient.getInvoices(),
+                    apiClient.getCreditDebitNotes()
+                ]);
+                if (Array.isArray(remoteInvoices)) {
+                    invoices = remoteInvoices;
+                    localStorage.setItem('invoices', JSON.stringify(invoices));
+                }
+                if (Array.isArray(remoteCreditNotes)) {
+                    creditNotes = remoteCreditNotes;
+                    localStorage.setItem('credit_debit_notes', JSON.stringify(creditNotes));
+                }
+            } catch (e) {
+                console.warn('Could not refresh customer balances from the server.', e);
             }
 
             if (!customers.some(c => c.name === "ANONYMOUS")) {
