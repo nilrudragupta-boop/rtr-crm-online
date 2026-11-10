@@ -3859,7 +3859,6 @@
            MENU PLACEMENT & OVERFLOW LOGIC
            ======================================================= */
         function saveMenuPlacement(mode) {
-            localStorage.setItem('menuPlacement', mode);
             applyMenuPlacement(mode);
         }
 
@@ -8549,7 +8548,8 @@
         function openDashboardSettingsModal() {
             const modal = document.getElementById('dashboardSettingsModal');
             if (modal) {
-                const currentLayout = localStorage.getItem(MENU_PLACEMENT_KEY) || 'vertical';
+                const currentUser = localStorage.getItem('currentUser') || 'default';
+                const currentLayout = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
                 const select = document.getElementById('menuPlacementSelect');
                 if (select) select.value = currentLayout;
                 modal.style.display = 'flex';
@@ -8558,13 +8558,15 @@
 
         // Save choice to localStorage and apply change immediately
         function saveMenuPlacement(layout) {
-            localStorage.setItem(MENU_PLACEMENT_KEY, layout);
+            const currentUser = localStorage.getItem('currentUser') || 'default';
+            localStorage.setItem(`menuPlacement_${currentUser}`, layout);
             applyMenuPlacement(layout);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             // Restore Saved Navigation Layout & Tab Ordering
-            const savedPlacement = localStorage.getItem('menuPlacement') || 'vertical';
+            const currentUser = localStorage.getItem('currentUser') || 'default';
+            const savedPlacement = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
             applyMenuPlacement(savedPlacement);
 
             const lastSync = localStorage.getItem('lastAutoSync');
@@ -8950,7 +8952,7 @@
         function applyMenuPlacement() {
             const currentUser = localStorage.getItem('currentUser') || 'default';
             // Check user-specific key first, then fallback to global key
-            const placement = localStorage.getItem(`menuPlacement_${currentUser}`) || localStorage.getItem('menuPlacement') || 'vertical';
+            const placement = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
 
             const select = document.getElementById('menuPlacementSelect');
             if (select) select.value = placement;
@@ -9022,8 +9024,7 @@
 
         function saveMenuPlacement(mode) {
             const currentUser = localStorage.getItem('currentUser') || 'default';
-            // Save both globally and per-user so next login/reboot permanently preserves this choice
-            localStorage.setItem('menuPlacement', mode);
+            // Keep each user's menu layout independent so one login cannot move another user's menu.
             localStorage.setItem(`menuPlacement_${currentUser}`, mode);
             applyMenuPlacement();
         }
@@ -9031,7 +9032,8 @@
         // Initialize layout preference immediately on document load
         document.addEventListener('DOMContentLoaded', () => {
             // 1. Restore navigation layout and button sequence
-            const savedPlacement = localStorage.getItem('menuPlacement') || 'vertical';
+            const currentUser = localStorage.getItem('currentUser') || 'default';
+            const savedPlacement = localStorage.getItem(`menuPlacement_${currentUser}`) || 'vertical';
             applyMenuPlacement(savedPlacement);
         });
 
