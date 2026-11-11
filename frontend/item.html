@@ -662,7 +662,10 @@
                         <th>Avg. Purchase Price (₹)</th>
                         <th style="cursor:pointer;" onclick="handleHeaderClick('gst')">GST % <span
                                 id="sort-icon-gst"></span></th>
+                        <th style="cursor:pointer;" onclick="handleHeaderClick('currentStock')">Current Stock <span
+                                id="sort-icon-currentStock"></span></th>
                         <th style="width: 140px;">Actions</th>
+
                     </tr>
                 </thead>
                 <tbody id="itemTable"></tbody>
@@ -990,9 +993,9 @@
 
         // Dynamic Fields Config
         let dynamicFieldsList = [];
-        let baseFixedCols = 18; // Including Checkbox and Sl No and Actions
+        let baseFixedCols = 19; // Including Checkbox and Sl No and Actions
 
-        let defaultVisibility = new Array(18).fill(true);
+        let defaultVisibility = new Array(19).fill(true);
         [5, 8, 9, 10, 11, 15].forEach(i => defaultVisibility[i] = false);
         const savedColumnVisibility = JSON.parse(localStorage.getItem("itemColumnVisibility"));
         let columnVisibility = Array.isArray(savedColumnVisibility) ? savedColumnVisibility : defaultVisibility.slice();
@@ -1000,7 +1003,7 @@
             columnVisibility.splice(15, 0, false);
             localStorage.setItem("itemAvgPriceColumnVersion", "1");
         }
-        if (columnVisibility.length < 18) {
+        if (columnVisibility.length < 19) {
             const newVis = defaultVisibility.slice();
             for (let i = 0; i < columnVisibility.length; i++) newVis[i] = columnVisibility[i];
             columnVisibility = newVis;
@@ -1850,7 +1853,11 @@
                     <td>
                         <span id="view-gst-${item.id}">${item.gst || 0}%</span>
                         <input type="number" id="gst-${item.id}" value="${item.gst || 0}" style="display:none; width: 60px;" class="form-control" min="0" max="100">
-                    </td>` + dynamicFieldsList.map(f => {
+                    </td>
+                    <td class="stock-col-cell text-end" id="stock-${item.id}">
+                        <span class="stock-value fw-bold text-muted">-</span>
+                    </td>
+                    ` + dynamicFieldsList.map(f => {
                     let val = item[f.fieldName];
                     let dispVal = val;
                     if (f.fieldType === 'boolean') dispVal = val ? 'Yes' : 'No';
@@ -3312,59 +3319,35 @@
                         // Continue with DOM map
                     }
 
-                    // 3. Inject into item.html table
-                    const itemTable = document.querySelector('table');
+                    // 3. Populate existing cells in item.html table
+                    const itemTable = document.getElementById('mainItemTable');
                     if (!itemTable) return;
 
-                    // Ensure header exists if not manually added in HTML
-                    const headerRow = itemTable.querySelector('thead tr');
-                    if (headerRow && !headerRow.querySelector('.stock-col-header')) {
-                        const stockTh = document.createElement('th');
-                        stockTh.className = 'stock-col-header';
-                        stockTh.textContent = 'Current Stock';
-                        stockTh.style.cssText = 'text-align: right; font-weight: 600;';
-                        // Insert before Action column if available, else append
-                        headerRow.insertBefore(stockTh, headerRow.lastElementChild);
-                    }
-
-                    // Update rows
                     const itemRows = itemTable.querySelectorAll('tbody tr');
                     itemRows.forEach(row => {
-                        // Avoid modifying headers or empty placeholder rows
                         if (row.querySelector('th') || row.classList.contains('no-data')) return;
 
-                        // Skip if cell already injected
-                        if (row.querySelector('.stock-col-cell')) return;
+                        // Select the name/code input or view elements
+                        const nameInput = row.querySelector('textarea[id^="name-"]');
+                        const codeInput = row.querySelector('input[id^="code-"]');
+                        const stockCell = row.querySelector('.stock-col-cell');
 
-                        const cells = row.querySelectorAll('td');
-                        if (!cells.length) return;
+                        if (!stockCell) return;
 
-                        // Extract identifier from the row (name or code)
-                        const nameText = cells[0]?.innerText?.trim().toLowerCase();
-                        const codeText = cells[1]?.innerText?.trim().toLowerCase();
+                        const nameText = nameInput ? nameInput.value.trim().toLowerCase() : '';
+                        const codeText = codeInput ? codeInput.value.trim().toLowerCase() : '';
 
                         const stock = stockMap.get(nameText) || stockMap.get(codeText) || '0';
                         const numStock = parseFloat(stock) || 0;
 
-                        // Create the stock cell
-                        const stockTd = document.createElement('td');
-                        stockTd.className = 'stock-col-cell';
-                        stockTd.style.cssText = `text-align: right; font-weight: bold; color: ${numStock <= 0 ? '#ef4444' : '#10b981'};`;
-                        stockTd.innerHTML = `<span>${stock}</span>`;
-
-                        // Insert before last column (Actions) or append to row
-                        if (cells.length > 1) {
-                            row.insertBefore(stockTd, cells[cells.length - 1]);
-                        } else {
-                            row.appendChild(stockTd);
-                        }
+                        stockCell.style.color = numStock <= 0 ? '#ef4444' : '#10b981';
+                        stockCell.innerHTML = `<span>${stock}</span>`;
                     });
 
-                } catch (err) {
-                    console.warn('[Stock View Integration] Could not populate stock column:', err);
-                }
-            }
-
+                } catch (error) {
+                    console.error("Error loading current stock column:", error);
+                }}
+                
             // Run on page ready and observe dynamic table updates (search/pagination/filters)
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', initObserver);
