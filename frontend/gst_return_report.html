@@ -13,6 +13,7 @@
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
+    <script src="apiClient.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -715,7 +716,7 @@
         }
 
         // --- Initialization ---
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
             // Populate Financial Year Dropdown
             const fySelect = document.getElementById('fySelect');
             const currYear = new Date().getFullYear();
@@ -740,7 +741,7 @@
             applyGreyButtons();
 
             // Populate dropdowns
-            populateDropdowns();
+            await populateDropdowns();
 
             // Initialize settings toggles
             initializeSettingsToggles();
@@ -757,18 +758,38 @@
             document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`).classList.add('active');
         }
 
-        function populateDropdowns() {
+        async function populateDropdowns() {
             const custSelect = document.getElementById('customerSearch');
             const suppSelect = document.getElementById('supplierSearch');
-            const customers = JSON.parse(localStorage.getItem('customers')) || [];
-            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            let customers = JSON.parse(localStorage.getItem('customers')) || [];
+            let suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
 
-            customers.sort((a, b) => a.name.localeCompare(b.name)).forEach(c => {
+            if (typeof apiClient !== 'undefined') {
+                const [remoteCustomers, remoteSuppliers] = await Promise.all([
+                    apiClient.getCustomers ? apiClient.getCustomers() : null,
+                    apiClient.getSuppliers ? apiClient.getSuppliers() : null
+                ]);
+                if (Array.isArray(remoteCustomers)) {
+                    customers = remoteCustomers;
+                    localStorage.setItem('customers', JSON.stringify(customers));
+                }
+                if (Array.isArray(remoteSuppliers)) {
+                    suppliers = remoteSuppliers;
+                    localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                }
+            }
+
+            if (!Array.isArray(customers)) customers = [];
+            if (!Array.isArray(suppliers)) suppliers = [];
+            if (custSelect) custSelect.innerHTML = '';
+            if (suppSelect) suppSelect.innerHTML = '';
+
+            customers.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).forEach(c => {
                 const opt = document.createElement('option'); opt.value = c.name; opt.text = c.name;
                 if (custSelect) custSelect.appendChild(opt);
             });
 
-            suppliers.sort((a, b) => a.name.localeCompare(b.name)).forEach(s => {
+            suppliers.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).forEach(s => {
                 const opt = document.createElement('option'); opt.value = s.name; opt.text = s.name;
                 if (suppSelect) suppSelect.appendChild(opt);
             });
@@ -833,12 +854,28 @@
             return sup ? sup.state : SELLER_STATE; // Default to local if not found
         }
 
-        function generateReport() {
+        async function generateReport() {
             const fromDate = document.getElementById('fromDate').value;
             const toDate = document.getElementById('toDate').value;
 
-            const invoices = JSON.parse(localStorage.getItem("invoices")) || [];
-            const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            let invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+            if (typeof apiClient !== 'undefined') {
+                const [remoteInvoices, remotePurchases] = await Promise.all([
+                    apiClient.getInvoices ? apiClient.getInvoices() : null,
+                    apiClient.getPurchases ? apiClient.getPurchases() : null
+                ]);
+                if (Array.isArray(remoteInvoices)) {
+                    invoices = remoteInvoices;
+                    localStorage.setItem('invoices', JSON.stringify(invoices));
+                }
+                if (Array.isArray(remotePurchases)) {
+                    purchases = remotePurchases;
+                    localStorage.setItem('purchases', JSON.stringify(purchases));
+                }
+            }
+            if (!Array.isArray(invoices)) invoices = [];
+            if (!Array.isArray(purchases)) purchases = [];
 
             // --- GSTR-1 Logic (Sales) ---
             gstr1Data = [];
@@ -940,9 +977,19 @@
                 const isInterState = (supplierState.toLowerCase() !== SELLER_STATE.toLowerCase());
                 const supplyType = isInterState ? "Inter-State" : "Intra-State";
 
+                // Match Purchase Entries' taxable value: (qty × price) less
+                // the configured discount, plus allocated freight/packing/loading.
                 const qty = parseFloat(p.qty) || 0;
                 const price = parseFloat(p.price) || 0;
-                const taxable = qty * price;
+                const base = qty * price;
+                const discount = parseFloat(p.discount) || 0;
+                const discountAmount = (p.discType || '%') === 'flat'
+                    ? discount
+                    : base * (discount / 100);
+                const extraCharges = (parseFloat(p.freightCharges) || 0)
+                    + (parseFloat(p.packingCharges) || 0)
+                    + (parseFloat(p.loadingCharges) || 0);
+                const taxable = base - discountAmount + extraCharges;
 
                 // Use stored GST rate or default to 18 if missing (legacy data)
                 const rate = (p.gst !== undefined && p.gst !== null) ? parseFloat(p.gst) : 18;
