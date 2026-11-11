@@ -781,18 +781,28 @@
 
             if (!Array.isArray(customers)) customers = [];
             if (!Array.isArray(suppliers)) suppliers = [];
-            if (custSelect) custSelect.innerHTML = '';
-            if (suppSelect) suppSelect.innerHTML = '';
+            if (custSelect) {
+                custSelect.innerHTML = '';
+                custSelect.add(new Option('All Customers', ''));
+            }
+            if (suppSelect) {
+                suppSelect.innerHTML = '';
+                suppSelect.add(new Option('All Suppliers', ''));
+            }
 
-            customers.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).forEach(c => {
-                const opt = document.createElement('option'); opt.value = c.name; opt.text = c.name;
-                if (custSelect) custSelect.appendChild(opt);
-            });
+            [...new Set(customers.map(c => String(c.name || '').trim()).filter(Boolean))]
+                .sort((a, b) => a.localeCompare(b))
+                .forEach(name => {
+                    const opt = document.createElement('option'); opt.value = name; opt.text = name;
+                    if (custSelect) custSelect.appendChild(opt);
+                });
 
-            suppliers.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))).forEach(s => {
-                const opt = document.createElement('option'); opt.value = s.name; opt.text = s.name;
-                if (suppSelect) suppSelect.appendChild(opt);
-            });
+            [...new Set(suppliers.map(s => String(s.name || '').trim()).filter(Boolean))]
+                .sort((a, b) => a.localeCompare(b))
+                .forEach(name => {
+                    const opt = document.createElement('option'); opt.value = name; opt.text = name;
+                    if (suppSelect) suppSelect.appendChild(opt);
+                });
         }
 
         function openGuideModal() { document.getElementById('guideModal').style.display = 'flex'; }
