@@ -3007,7 +3007,7 @@
         }
 
         function updateHeaderIcons() {
-            const cols = ['itemCode', 'indexNo', 'category', 'hsn', 'itemType', 'uom', 'name', 'description', 'salePrice', 'gst'];
+            const cols = ['itemCode', 'indexNo', 'category', 'hsn', 'itemType', 'uom', 'name', 'description', 'salePrice', 'gst', 'currentStock'];
             dynamicFieldsList.forEach(f => cols.push(f.fieldName));
             cols.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
@@ -3263,115 +3263,114 @@
 
     <script>
         (function () {
-            /**
-             * Fetches stock values from stock_report.html or its data source
-             * and maps them to items in item.html table.
-             */
+            let stockFramePromise;
+
+            function getStockReportFrame() {
+                if (stockFramePromise) return stockFramePromise;
+                stockFramePromise = new Promise(resolve => {
+                    let frame = document.getElementById('stockReportFrame');
+                    if (!frame) {
+                        frame = document.createElement('iframe');
+                        frame.id = 'stockReportFrame';
+                        frame.src = 'stock_report.html';
+                        frame.title = 'Current stock data';
+                        frame.setAttribute('aria-hidden', 'true');
+                        frame.tabIndex = -1;
+                        frame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
+                        document.body.appendChild(frame);
+                    }
+                    if (frame.contentDocument?.readyState === 'complete') resolve(frame);
+                    else frame.addEventListener('load', () => resolve(frame), { once: true });
+                });
+                return stockFramePromise;
+            }
+
             async function loadCurrentStockColumn() {
+                const itemTable = document.getElementById('mainItemTable');
+                if (!itemTable) return;
+
                 try {
-                    // 1. Fetch stock_report.html DOM to extract calculated stock
-                    const response = await fetch('stock_report.html');
-                    if (!response.ok) throw new Error('Failed to load stock_report.html');
+                    const frame = await getStockReportFrame();
+                    const reportDoc = frame.contentDocument;
+                    if (!reportDoc) return;
 
-                    const htmlText = await response.text();
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(htmlText, 'text/html');
-
-                    // 2. Build Item Name/Code -> Current Stock mapping
-                    const stockMap = new Map();
-
-                    // Case A: If stock_report table rows contain calculated stock
-                    // Typical stock report table columns: [Item Name, Inward, Outward, Closing/Current Stock]
-                    const reportRows = doc.querySelectorAll('table tbody tr');
-                    reportRows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        if (cells.length >= 2) {
-                            // Adjust indices based on your exact stock_report.html table schema
-                            // Usually col 0/1 is Item Name/Code and the last or closing col is Balance/Stock
-                            const itemName = cells[0]?.innerText?.trim().toLowerCase();
-                            const itemCode = cells[1]?.innerText?.trim().toLowerCase();
-
-                            // Locate closing stock or balance column
-                            let stockVal = cells[cells.length - 1]?.innerText?.trim() || '0';
-
-                            // Also check for explicit data attributes or class names if present
-                            const stockCell = row.querySelector('.closing-stock, .balance-qty, [data-stock]');
-                            if (stockCell) {
-                                stockVal = stockCell.getAttribute('data-stock') || stockCell.innerText.trim();
-                            }
-
-                            if (itemName) stockMap.set(itemName, stockVal);
-                            if (itemCode) stockMap.set(itemCode, stockVal);
+                    const pageSize = reportDoc.getElementById('rowsPerPageSelect');
+                    if (pageSize) {
+                        let allRowsOption = Array.from(pageSize.options).find(option => option.value === '1000000');
+                        if (!allRowsOption) {
+                            allRowsOption = document.createElement('option');
+                            allRowsOption.value = '1000000';
+                            allRowsOption.textContent = 'All rows';
+                            pageSize.appendChild(allRowsOption);
                         }
-                    });
-
-                    // Case B: Fallback to localStorage / indexed keys if stock_report caches inventory
-                    try {
-                        const localStock = JSON.parse(localStorage.getItem('rtr_stock_report_data') || 'null');
-                        if (localStock && Array.isArray(localStock)) {
-                            localStock.forEach(item => {
-                                const key = (item.name || item.itemName || item.item_code || '').trim().toLowerCase();
-                                const qty = item.current_stock ?? item.closingStock ?? item.qty ?? item.balance ?? '0';
-                                if (key) stockMap.set(key, qty);
-                            });
+                        if (pageSize.value !== allRowsOption.value) {
+                            pageSize.value = allRowsOption.value;
+                            pageSize.dispatchEvent(new Event('change', { bubbles: true }));
                         }
-                    } catch (e) {
-                        // Continue with DOM map
                     }
 
-                    // 3. Populate existing cells in item.html table
-                    const itemTable = document.getElementById('mainItemTable');
-                    if (!itemTable) return;
+                    // The report builds its stock rows asynchronously after loading inventory data.
+                    let reportRows = [];
+                    for (let attempt = 0; attempt < 40; attempt++) {
+                        await new Promise(resolve => setTimeout(resolve, 250));
+                        const headerCells = Array.from(reportDoc.querySelectorAll('#stockTable thead th'));
+                        const stockColumn = headerCells.findIndex(th => th.textContent.trim().toLowerCase().startsWith('current stock'));
+                        reportRows = Array.from(reportDoc.querySelectorAll('#stockTable tbody tr'));
+                        if (stockColumn >= 0 && reportRows.some(row => row.cells.length > stockColumn)) break;
+                    }
 
-                    const itemRows = itemTable.querySelectorAll('tbody tr');
-                    itemRows.forEach(row => {
-                        if (row.querySelector('th') || row.classList.contains('no-data')) return;
+                    const headerCells = Array.from(reportDoc.querySelectorAll('#stockTable thead th'));
+                    const headerLabel = th => th.textContent.trim().toLowerCase();
+                    const stockColumn = headerCells.findIndex(th => headerLabel(th).startsWith('current stock'));
+                    const codeColumn = headerCells.findIndex(th => headerLabel(th).startsWith('item code'));
+                    const nameColumn = headerCells.findIndex(th => headerLabel(th).startsWith('item name'));
+                    if (stockColumn < 0 || codeColumn < 0 || nameColumn < 0) return;
 
-                        // Select the name/code input or view elements
-                        const nameInput = row.querySelector('textarea[id^="name-"]');
-                        const codeInput = row.querySelector('input[id^="code-"]');
-                        const stockCell = row.querySelector('.stock-col-cell');
-
-                        if (!stockCell) return;
-
-                        const nameText = nameInput ? nameInput.value.trim().toLowerCase() : '';
-                        const codeText = codeInput ? codeInput.value.trim().toLowerCase() : '';
-
-                        const stock = stockMap.get(nameText) || stockMap.get(codeText) || '0';
-                        const numStock = parseFloat(stock) || 0;
-
-                        stockCell.style.color = numStock <= 0 ? '#ef4444' : '#10b981';
-                        stockCell.innerHTML = `<span>${stock}</span>`;
+                    const stockMap = new Map();
+                    reportRows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length <= Math.max(stockColumn, codeColumn, nameColumn)) return;
+                        const itemCode = (cells[codeColumn]?.textContent || '').trim().toLowerCase();
+                        const itemName = (cells[nameColumn]?.textContent || '').trim().toLowerCase();
+                        const stock = (cells[stockColumn]?.textContent || '').trim();
+                        if (itemName) stockMap.set(`name:${itemName}`, stock);
+                        if (itemCode) stockMap.set(`code:${itemCode}`, stock);
                     });
 
+                    itemTable.querySelectorAll('tbody tr').forEach(row => {
+                        if (row.querySelector('th') || row.classList.contains('no-data')) return;
+                        const name = (row.querySelector('textarea[id^="name-"]')?.value || '').trim().toLowerCase();
+                        const code = (row.querySelector('input[id^="code-"]')?.value || '').trim().toLowerCase();
+                        const stockCell = row.querySelector('.stock-col-cell');
+                        if (!stockCell) return;
+
+                        const stock = stockMap.get(`code:${code}`) ?? stockMap.get(`name:${name}`);
+                        if (stock === undefined || stockCell.textContent.trim() === stock) return;
+                        const numericStock = parseFloat(stock.replace(/,/g, '')) || 0;
+                        stockCell.style.color = numericStock <= 0 ? '#ef4444' : '#10b981';
+                        stockCell.innerHTML = `<span>${escapeHtml(stock)}</span>`;
+                    });
                 } catch (error) {
-                    console.error("Error loading current stock column:", error);
-                }}
-                
-            // Run on page ready and observe dynamic table updates (search/pagination/filters)
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initObserver);
-            } else {
-                initObserver();
+                    console.warn('Unable to load Current Stock from stock report:', error);
+                }
             }
 
             function initObserver() {
                 loadCurrentStockColumn();
+                const targetTable = document.getElementById('mainItemTable');
+                if (!targetTable) return;
+                let refreshTimer;
+                const observer = new MutationObserver(() => {
+                    clearTimeout(refreshTimer);
+                    refreshTimer = setTimeout(loadCurrentStockColumn, 50);
+                });
+                observer.observe(targetTable, { childList: true, subtree: true });
+            }
 
-                // Re-apply if table body is re-rendered dynamically (e.g. search, pagination)
-                const targetTable = document.querySelector('table tbody') || document.querySelector('table');
-                if (targetTable) {
-                    const observer = new MutationObserver((mutations) => {
-                        // Prevent infinite loop by checking if mutated nodes don't already have our cell
-                        const hasUnprocessedRow = Array.from(mutations).some(m =>
-                            Array.from(m.addedNodes).some(node => node.nodeType === 1 && !node.querySelector?.('.stock-col-cell'))
-                        );
-                        if (hasUnprocessedRow) {
-                            loadCurrentStockColumn();
-                        }
-                    });
-                    observer.observe(targetTable, { childList: true, subtree: true });
-                }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initObserver, { once: true });
+            } else {
+                initObserver();
             }
         })();
     </script>
