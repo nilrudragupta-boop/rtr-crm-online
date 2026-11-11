@@ -256,6 +256,16 @@ const purchaseSchema = new mongoose.Schema({
     remarks: String
 }, { timestamps: true, strict: false });
 
+// --- Stock Journal Schema ---
+const stockJournalSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true },
+    type: { type: String, enum: ['IN', 'OUT'], required: true },
+    itemId: { type: String, required: true },
+    date: { type: String, required: true },
+    qty: { type: Number, required: true },
+    createdBy: { type: String, default: 'System' }
+}, { timestamps: true, strict: false });
+
 // --- 6. Journal Voucher Schema ---
 const journalVoucherSchema = new mongoose.Schema({
     id: String,
@@ -391,6 +401,7 @@ module.exports = {
     Invoice: mongoose.model('Invoice', invoiceSchema),
     SalesRecord: mongoose.model('SalesRecord', salesRecordSchema),
     Purchase: mongoose.model('Purchase', purchaseSchema),
+    StockJournal: mongoose.model('StockJournal', stockJournalSchema),
     JournalVoucher: mongoose.model('JournalVoucher', journalVoucherSchema),
     CreditDebitNote: mongoose.model('CreditDebitNote', creditDebitNoteSchema),
     BankAccount: mongoose.model('BankAccount', bankAccountSchema),

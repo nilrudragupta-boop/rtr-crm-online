@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, SalesRecord, Item, Supplier, Purchase, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, SalesRecord, Item, Supplier, Purchase, StockJournal, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -909,6 +909,35 @@ app.delete('/api/purchases/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Stock Journal Routes (kept separate from purchase and invoice records) ---
+app.get('/api/stock-journal', async (req, res) => {
+    try {
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const records = await StockJournal.find(query).sort({ date: -1, createdAt: -1 });
+        res.json({ success: true, data: records });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/stock-journal', async (req, res) => {
+    try {
+        const payload = req.body;
+        if (!payload.id || !['IN', 'OUT'].includes(payload.type) || !payload.itemId || !payload.date || !(Number(payload.qty) > 0)) {
+            return res.status(400).json({ success: false, message: 'A valid id, type, item, date, and positive quantity are required.' });
+        }
+        const record = await StockJournal.findOneAndUpdate(
+            { id: payload.id, ...(req.query.user ? { createdBy: req.query.user } : {}) },
+            payload,
+            { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+        );
+        res.status(200).json({ success: true, data: record });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
     }
 });
 
