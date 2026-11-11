@@ -84,23 +84,26 @@ async function generateLedger() {
     let toDateMs = toDate.getTime();
 
     // Fetch data
-    let purchases = [];
-    let invoices = [];
-
-    if (typeof apiClient !== 'undefined') {
-        if (apiClient.getPurchases) purchases = await apiClient.getPurchases();
-        if (apiClient.getInvoices) invoices = await apiClient.getInvoices();
-    }
-
-    if (!purchases || purchases.length === 0) purchases = JSON.parse(localStorage.getItem('purchases')) || [];
-    if (!invoices || invoices.length === 0) invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+    let purchases = typeof apiClient !== 'undefined' && apiClient.getPurchases
+        ? await apiClient.getPurchases()
+        : null;
+    let invoices = typeof apiClient !== 'undefined' && apiClient.getInvoices
+        ? await apiClient.getInvoices()
+        : null;
+    let stockJournal = typeof apiClient !== 'undefined' && apiClient.getStockJournal
+        ? await apiClient.getStockJournal()
+        : null;
+    if (!Array.isArray(purchases)) purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
+    if (!Array.isArray(invoices)) invoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+    if (!Array.isArray(stockJournal)) stockJournal = JSON.parse(localStorage.getItem('stockJournal') || '[]');
 
     let ledgerEntries = [];
     let openingBalance = 0;
 
     // Process Purchases (IN)
     purchases.forEach(p => {
-        if (p.itemId === itemId) {
+        // Quick journal entries are stored separately from formal purchases.
+        if (String(p.itemId) === String(itemId) && p.category !== 'Quick Entry' && p.remarks !== 'Quick Stock Journal') {
             const pDateMs = new Date(p.date || p.createdAt).getTime();
             const qty = parseFloat(p.totalQty || p.qty) || 0;
 
@@ -126,36 +129,54 @@ async function generateLedger() {
         }
     });
 
-    // Process Invoices (OUT)
-    invoices.forEach(inv => {
-        if (inv.items && Array.isArray(inv.items)) {
-            inv.items.forEach(item => {
-                if (item.itemId === itemId || item.medId === itemId) {
-                    const invDateMs = new Date(inv.date || inv.invoice_date || inv.created_at).getTime();
-                    const qty = parseFloat(item.qty) || 0;
+    // Journal IN and OUT are kept in their own backend collection and both
+    // contribute to the ledger balance.
+    stockJournal.forEach(record => {
+        if (!['IN', 'OUT'].includes(record.type) || String(record.itemId) !== String(itemId)) return;
+        const recordDate = record.date || record.createdAt;
+        const recordDateMs = new Date(recordDate).getTime();
+        const qty = parseFloat(record.qty) || 0;
+        if (!qty || Number.isNaN(recordDateMs)) return;
 
-                    if (invDateMs < fromDate) {
-                        openingBalance -= qty;
-                    } else if (invDateMs >= fromDate && invDateMs <= toDateMs) {
-                        let refText = inv.invoice_no || '-';
-                        if (inv.invoiceType === 'Quick Exit' || inv.remarks === 'Quick Stock Journal') {
-                            refText = inv.remarks && inv.remarks !== 'Quick Stock Journal' ? inv.remarks : inv.invoice_no;
-                        } else if (inv.remarks) {
-                            refText = inv.invoice_no ? `${inv.invoice_no} - ${inv.remarks}` : inv.remarks;
-                        }
-
-                        ledgerEntries.push({
-                            date: inv.date || inv.invoice_date || inv.created_at.split('T')[0],
-                            timestamp: invDateMs,
-                            type: inv.invoiceType === 'Quick Exit' ? 'Quick Stock OUT' : 'Invoice / Exit',
-                            ref: refText,
-                            in: 0,
-                            out: qty
-                        });
-                    }
-                }
+        if (recordDateMs < fromDate) {
+            openingBalance += record.type === 'IN' ? qty : -qty;
+        } else if (recordDateMs <= toDateMs) {
+            ledgerEntries.push({
+                date: String(recordDate).split('T')[0],
+                timestamp: recordDateMs,
+                type: record.type === 'IN' ? 'Stock Journal IN' : 'Stock Journal OUT',
+                ref: record.remarks || '-',
+                in: record.type === 'IN' ? qty : 0,
+                out: record.type === 'OUT' ? qty : 0
             });
         }
+    });
+
+    // Formal invoices remain stock exits. Legacy quick exits are also kept
+    // visible for records created before journal entries had their own store.
+    invoices.forEach(inv => {
+        if (!Array.isArray(inv.items)) return;
+        inv.items.forEach(item => {
+            if (String(item.itemId || item.medId) !== String(itemId)) return;
+            const invoiceDate = inv.date || inv.invoice_date || inv.created_at;
+            const invoiceDateMs = new Date(invoiceDate).getTime();
+            const qty = parseFloat(item.qty) || 0;
+            if (!qty || Number.isNaN(invoiceDateMs)) return;
+
+            if (invoiceDateMs < fromDate) {
+                openingBalance -= qty;
+            } else if (invoiceDateMs <= toDateMs) {
+                const ref = inv.invoice_no || inv.invoiceNo || '-';
+                ledgerEntries.push({
+                    date: String(invoiceDate).split('T')[0],
+                    timestamp: invoiceDateMs,
+                    type: inv.invoiceType === 'Quick Exit' ? 'Quick Stock OUT' : 'Invoice / Exit',
+                    ref: inv.remarks ? `${ref} - ${inv.remarks}` : ref,
+                    in: 0,
+                    out: qty
+                });
+            }
+        });
     });
 
     // Sort entries chronologically

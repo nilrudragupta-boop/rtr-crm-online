@@ -90,9 +90,13 @@ let allItems = [];
 
 async function loadItems() {
     try {
-        // Fetch items directly from localStorage or API (matching your architecture)
-        const storedItems = localStorage.getItem('items');
-        allItems = storedItems ? JSON.parse(storedItems) : [];
+        let items = typeof apiClient !== 'undefined' && apiClient.getItems
+            ? await apiClient.getItems()
+            : null;
+        if (!Array.isArray(items)) items = JSON.parse(localStorage.getItem('items') || '[]');
+        allItems = items;
+
+        await syncPendingStockTransactions();
         
         const itemSelect = document.getElementById('sj-item-list');
         allItems.forEach(item => {
@@ -103,6 +107,23 @@ async function loadItems() {
         });
     } catch (error) {
         console.error("Error loading items:", error);
+    }
+}
+
+async function syncPendingStockTransactions() {
+    if (typeof apiClient === 'undefined' || !apiClient.getStockJournal || !apiClient.saveStockJournal) return;
+
+    const remoteRecords = await apiClient.getStockJournal();
+    if (!Array.isArray(remoteRecords)) return;
+
+    const remoteIds = new Set(remoteRecords.map(record => String(record.id)));
+    const localRecords = JSON.parse(localStorage.getItem('stockJournal') || '[]');
+    for (const record of localRecords) {
+        if (remoteIds.has(String(record.id))) continue;
+        const result = await apiClient.saveStockJournal(record);
+        if (!result || result.success === false) {
+            console.warn('A local stock journal record could not be synced:', record.id, result?.message);
+        }
     }
 }
 
@@ -126,71 +147,32 @@ async function saveStockTransaction() {
     const currentUser = localStorage.getItem('currentUser') || 'Admin';
     const transactionId = 'SJ-' + Date.now() + Math.random().toString(36).substr(2, 5);
 
-    if (type === 'IN') {
-        // 1. Process as a "Purchase" for Stock Entry
-        const purchaseRecord = {
-            id: transactionId,
-            date: date,
-            supplierName: 'Self (Stock Entry)',
-            supplierInv: 'ENTRY-' + Date.now(),
-            itemId: itemId,
-            itemName: itemName,
-            itemCode: itemCode,
-            indexNo: indexNo,
-            category: category || 'Quick Entry',
-            uom: uom,
-            qty: qty,
-            totalQty: qty,
-            freeQty: 0,
-            price: itemPrice,
-            amount: qty * itemPrice,
-            remarks: remarks,
-            createdBy: currentUser,
-            createdAt: new Date().toISOString()
-        };
+    const journalRecord = {
+        id: transactionId,
+        type,
+        date,
+        itemId,
+        itemName,
+        itemCode,
+        indexNo,
+        category,
+        uom,
+        qty,
+        price: itemPrice,
+        amount: qty * itemPrice,
+        remarks,
+        createdBy: currentUser,
+        createdAt: new Date().toISOString()
+    };
 
-        let purchases = JSON.parse(localStorage.getItem('purchases')) || [];
-        purchases.push(purchaseRecord);
-        localStorage.setItem('purchases', JSON.stringify(purchases));
+    const localRecords = JSON.parse(localStorage.getItem('stockJournal') || '[]');
+    localRecords.push(journalRecord);
+    localStorage.setItem('stockJournal', JSON.stringify(localRecords));
 
-        if (typeof apiClient !== 'undefined' && apiClient.savePurchase) {
-            await apiClient.savePurchase(purchaseRecord);
-        }
-
-    } else if (type === 'OUT') {
-        // 2. Process as an "Invoice" (or Consumption) for Stock Exit
-        const invoiceRecord = {
-            id: transactionId,
-            invoice_no: 'EXIT-' + Date.now(),
-            date: date,
-            invoice_date: date,
-            customer_name: 'Self (Stock Exit)',
-            invoiceType: 'Quick Exit',
-            remarks: remarks,
-            items: [{
-                itemId: itemId,
-                item: itemName,
-                itemName: itemName,
-                itemCode: itemCode,
-                indexNo: indexNo,
-                category: category,
-                uom: uom,
-                qty: qty,
-                price: itemPrice,
-                rate: itemPrice,
-                total: qty * itemPrice
-            }],
-            total: qty * itemPrice,
-            createdBy: currentUser,
-            created_at: new Date().toISOString()
-        };
-
-        let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
-        invoices.push(invoiceRecord);
-        localStorage.setItem('invoices', JSON.stringify(invoices));
-
-        if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) {
-            await apiClient.saveInvoice(invoiceRecord);
+    if (typeof apiClient !== 'undefined' && apiClient.saveStockJournal) {
+        const result = await apiClient.saveStockJournal(journalRecord);
+        if (!result || result.success === false) {
+            return alert(`Could not sync stock transaction to the backend: ${result?.message || 'Connection unavailable'}. The record is saved on this device and will need to be synced.`);
         }
     }
 
