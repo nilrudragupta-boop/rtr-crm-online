@@ -660,6 +660,8 @@
                         <th style="cursor:pointer;" onclick="handleHeaderClick('salePrice')">Sale Price <span
                                 id="sort-icon-salePrice"></span></th>
                         <th>Avg. Purchase Price (₹)</th>
+                        <th style="cursor:pointer;" onclick="handleHeaderClick('currentStock')">Current Stock <span
+                                id="sort-icon-currentStock"></span></th>
                         <th style="cursor:pointer;" onclick="handleHeaderClick('gst')">GST % <span
                                 id="sort-icon-gst"></span></th>
                         <th style="width: 140px;">Actions</th>
@@ -3252,6 +3254,145 @@
                 }
             });
         }
+    </script>
+
+    <script>
+        (function () {
+            /**
+             * Fetches stock values from stock_report.html or its data source
+             * and maps them to items in item.html table.
+             */
+            async function loadCurrentStockColumn() {
+                try {
+                    // 1. Fetch stock_report.html DOM to extract calculated stock
+                    const response = await fetch('stock_report.html');
+                    if (!response.ok) throw new Error('Failed to load stock_report.html');
+
+                    const htmlText = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlText, 'text/html');
+
+                    // 2. Build Item Name/Code -> Current Stock mapping
+                    const stockMap = new Map();
+
+                    // Case A: If stock_report table rows contain calculated stock
+                    // Typical stock report table columns: [Item Name, Inward, Outward, Closing/Current Stock]
+                    const reportRows = doc.querySelectorAll('table tbody tr');
+                    reportRows.forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length >= 2) {
+                            // Adjust indices based on your exact stock_report.html table schema
+                            // Usually col 0/1 is Item Name/Code and the last or closing col is Balance/Stock
+                            const itemName = cells[0]?.innerText?.trim().toLowerCase();
+                            const itemCode = cells[1]?.innerText?.trim().toLowerCase();
+
+                            // Locate closing stock or balance column
+                            let stockVal = cells[cells.length - 1]?.innerText?.trim() || '0';
+
+                            // Also check for explicit data attributes or class names if present
+                            const stockCell = row.querySelector('.closing-stock, .balance-qty, [data-stock]');
+                            if (stockCell) {
+                                stockVal = stockCell.getAttribute('data-stock') || stockCell.innerText.trim();
+                            }
+
+                            if (itemName) stockMap.set(itemName, stockVal);
+                            if (itemCode) stockMap.set(itemCode, stockVal);
+                        }
+                    });
+
+                    // Case B: Fallback to localStorage / indexed keys if stock_report caches inventory
+                    try {
+                        const localStock = JSON.parse(localStorage.getItem('rtr_stock_report_data') || 'null');
+                        if (localStock && Array.isArray(localStock)) {
+                            localStock.forEach(item => {
+                                const key = (item.name || item.itemName || item.item_code || '').trim().toLowerCase();
+                                const qty = item.current_stock ?? item.closingStock ?? item.qty ?? item.balance ?? '0';
+                                if (key) stockMap.set(key, qty);
+                            });
+                        }
+                    } catch (e) {
+                        // Continue with DOM map
+                    }
+
+                    // 3. Inject into item.html table
+                    const itemTable = document.querySelector('table');
+                    if (!itemTable) return;
+
+                    // Ensure header exists if not manually added in HTML
+                    const headerRow = itemTable.querySelector('thead tr');
+                    if (headerRow && !headerRow.querySelector('.stock-col-header')) {
+                        const stockTh = document.createElement('th');
+                        stockTh.className = 'stock-col-header';
+                        stockTh.textContent = 'Current Stock';
+                        stockTh.style.cssText = 'text-align: right; font-weight: 600;';
+                        // Insert before Action column if available, else append
+                        headerRow.insertBefore(stockTh, headerRow.lastElementChild);
+                    }
+
+                    // Update rows
+                    const itemRows = itemTable.querySelectorAll('tbody tr');
+                    itemRows.forEach(row => {
+                        // Avoid modifying headers or empty placeholder rows
+                        if (row.querySelector('th') || row.classList.contains('no-data')) return;
+
+                        // Skip if cell already injected
+                        if (row.querySelector('.stock-col-cell')) return;
+
+                        const cells = row.querySelectorAll('td');
+                        if (!cells.length) return;
+
+                        // Extract identifier from the row (name or code)
+                        const nameText = cells[0]?.innerText?.trim().toLowerCase();
+                        const codeText = cells[1]?.innerText?.trim().toLowerCase();
+
+                        const stock = stockMap.get(nameText) || stockMap.get(codeText) || '0';
+                        const numStock = parseFloat(stock) || 0;
+
+                        // Create the stock cell
+                        const stockTd = document.createElement('td');
+                        stockTd.className = 'stock-col-cell';
+                        stockTd.style.cssText = `text-align: right; font-weight: bold; color: ${numStock <= 0 ? '#ef4444' : '#10b981'};`;
+                        stockTd.innerHTML = `<span>${stock}</span>`;
+
+                        // Insert before last column (Actions) or append to row
+                        if (cells.length > 1) {
+                            row.insertBefore(stockTd, cells[cells.length - 1]);
+                        } else {
+                            row.appendChild(stockTd);
+                        }
+                    });
+
+                } catch (err) {
+                    console.warn('[Stock View Integration] Could not populate stock column:', err);
+                }
+            }
+
+            // Run on page ready and observe dynamic table updates (search/pagination/filters)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initObserver);
+            } else {
+                initObserver();
+            }
+
+            function initObserver() {
+                loadCurrentStockColumn();
+
+                // Re-apply if table body is re-rendered dynamically (e.g. search, pagination)
+                const targetTable = document.querySelector('table tbody') || document.querySelector('table');
+                if (targetTable) {
+                    const observer = new MutationObserver((mutations) => {
+                        // Prevent infinite loop by checking if mutated nodes don't already have our cell
+                        const hasUnprocessedRow = Array.from(mutations).some(m =>
+                            Array.from(m.addedNodes).some(node => node.nodeType === 1 && !node.querySelector?.('.stock-col-cell'))
+                        );
+                        if (hasUnprocessedRow) {
+                            loadCurrentStockColumn();
+                        }
+                    });
+                    observer.observe(targetTable, { childList: true, subtree: true });
+                }
+            }
+        })();
     </script>
 </body>
 
