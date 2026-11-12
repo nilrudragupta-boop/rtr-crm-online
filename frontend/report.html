@@ -1859,7 +1859,7 @@
                 const remoteData = await apiClient.getInvoices();
                 if (Array.isArray(remoteData)) {
                     const invoicesByNumber = new Map();
-                    remoteData.forEach(invoice => {
+                    [...localInvoices, ...remoteData].forEach(invoice => {
                         const invoiceNumber = String(invoice.invoice_no || invoice.invoiceNo || invoice.id || '').trim();
                         if (invoiceNumber) invoicesByNumber.set(invoiceNumber, invoice);
                     });
@@ -2495,11 +2495,6 @@
 
             invoices.unshift(newInvoice);
             localStorage.setItem("invoices", JSON.stringify(invoices));
-            if (typeof apiClient?.saveInvoice === 'function') {
-                apiClient.saveInvoice(newInvoice).then(result => {
-                    if (!result?.success) console.warn('Failed to sync duplicated invoice:', result?.message);
-                }).catch(error => console.warn('Failed to sync duplicated invoice:', error));
-            }
             showToast(`✅ Invoice duplicated: ${newInvoice.invoice_no}`, "#6f42c1");
             applySearch();
         }
@@ -5319,7 +5314,7 @@
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = async (e) => {
+            reader.onload = (e) => {
                 try {
                     const text = e.target.result;
                     const rows = parseCSV(text);
@@ -5411,9 +5406,6 @@
                     });
 
                     localStorage.setItem("invoices", JSON.stringify(invoices));
-                    if (typeof apiClient?.saveInvoice === 'function') {
-                        await Promise.allSettled(Array.from(invoiceMap.values()).map(invoice => apiClient.saveInvoice(invoice)));
-                    }
                     renderTable(invoices);
 
                     document.getElementById("importSuccessMsg").innerHTML = `Added: <b>${added}</b><br>Updated: <b>${updated}</b>`;
@@ -6152,7 +6144,8 @@
             window.addEventListener('storage', event => {
                 if (event.key === 'customers') refreshReportCustomerDetails();
             });
-            window.addEventListener('focus', loadInvoices);
+            window.addEventListener('focus', refreshReportCustomerDetails);
+            setInterval(refreshReportCustomerDetails, 30000);
 
 
             if (window.electronAPI && window.electronAPI.getAppSettings) {
