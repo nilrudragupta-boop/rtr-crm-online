@@ -413,6 +413,7 @@
                         <button type="button" class="btn btn-outline-primary btn-sm dropdown-toggle dropdown-toggle-split py-0 px-2" data-bs-toggle="dropdown" aria-expanded="false"></button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="#" onclick="openEditorForInvoice('${sale.invoiceNo}'); return false;">Edit</a></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteSaleRecord('${sale.invoiceNo}'); return false;">Delete</a></li>
                             <li><a class="dropdown-item" href="#" onclick="openShareForInvoice('${sale.invoiceNo}'); return false;">Export / Share</a></li>
                         </ul>
                     </div>
@@ -543,6 +544,24 @@
             detailModal.show();
             // store current invoice for print/share actions
             window.currentInvoice = sale;
+        }
+
+        async function deleteSaleRecord(invoiceNo) {
+            if (!confirm(`Are you sure you want to delete invoice ${invoiceNo}? This cannot be undone.`)) return;
+
+            try {
+                if (typeof apiClient === 'undefined' || !apiClient.deleteSale) {
+                    throw new Error('Sales deletion service is unavailable.');
+                }
+                const result = await apiClient.deleteSale(invoiceNo);
+                if (!result?.success) throw new Error(result?.message || `Could not delete invoice ${invoiceNo}.`);
+
+                rawSales = rawSales.filter(sale => sale.invoiceNo !== invoiceNo);
+                renderReport();
+            } catch (error) {
+                console.error('Failed to delete remote sale:', error);
+                alert(error.message || 'Could not delete this invoice. Please try again.');
+            }
         }
 
         function exportToCSV() {
