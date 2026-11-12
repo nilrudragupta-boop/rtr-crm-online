@@ -619,19 +619,13 @@ app.post('/api/invoices', async (req, res) => {
 app.delete('/api/invoices/:id', async (req, res) => {
     try {
         const invoiceId = decodeURIComponent(req.params.id);
-        const invoiceIdentity = [
-            { id: invoiceId },
-            { invoiceNo: invoiceId },
-            { invoice_no: invoiceId }
-        ];
-        // Only add _id when it is a valid ObjectId. Mongoose casts every $or
-        // branch, so an invoice number here would otherwise fail the whole query.
-        if (mongoose.Types.ObjectId.isValid(invoiceId) && String(new mongoose.Types.ObjectId(invoiceId)) === invoiceId) {
-            invoiceIdentity.push({ _id: invoiceId });
-        }
         const query = {
             deletedAt: null,
-            $or: invoiceIdentity
+            $or: [
+                { id: invoiceId },
+                { invoiceNo: invoiceId },
+                { invoice_no: invoiceId }
+            ]
         };
         if (req.query.user) query.createdBy = req.query.user;
         const deleted = await Invoice.findOneAndUpdate(query, {
@@ -659,17 +653,9 @@ app.get('/api/invoices/recycle-bin', async (req, res) => {
 app.post('/api/invoices/:id/restore', async (req, res) => {
     try {
         const invoiceId = decodeURIComponent(req.params.id);
-        const invoiceIdentity = [
-            { id: invoiceId },
-            { invoiceNo: invoiceId },
-            { invoice_no: invoiceId }
-        ];
-        if (mongoose.Types.ObjectId.isValid(invoiceId) && String(new mongoose.Types.ObjectId(invoiceId)) === invoiceId) {
-            invoiceIdentity.push({ _id: invoiceId });
-        }
         const query = {
             deletedAt: { $ne: null },
-            $or: invoiceIdentity
+            $or: [{ id: invoiceId }, { invoiceNo: invoiceId }, { invoice_no: invoiceId }]
         };
         if (req.query.user) query.createdBy = req.query.user;
         const restored = await Invoice.findOneAndUpdate(query, {
@@ -2163,6 +2149,6 @@ app.post('/api/emails/mark-read', async (req, res) => {
 
 // --- RISE AI Endpoint ---
 // --- Start Server ---
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
