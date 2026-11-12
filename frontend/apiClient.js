@@ -472,6 +472,7 @@ const apiClient = {
     deletePurchase: (id) => apiClient._deleteCollection('purchases', id),
     getStockJournal: () => apiClient._getCollection('stock-journal'),
     saveStockJournal: (data) => apiClient._saveCollection('stock-journal', data),
+    deleteStockJournal: (id) => apiClient._deleteCollection('stock-journal', id),
     getDeletedPurchases: () => apiClient._getDeletedCollection('purchases'),
     restorePurchase: (id) => apiClient._restoreCollection('purchases', id),
 

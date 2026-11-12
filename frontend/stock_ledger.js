@@ -123,7 +123,10 @@ async function generateLedger() {
                 type: type === 'IN' ? 'Stock Journal IN' : 'Stock Journal OUT',
                 ref: record.remarks || '-',
                 in: type === 'IN' ? qty : 0,
-                out: type === 'OUT' ? qty : 0
+                out: type === 'OUT' ? qty : 0,
+                source: 'journal',
+                recordId: String(record.id || record._id || ''),
+                journalRecord: record
             });
         }
     });
@@ -240,7 +243,7 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
             <td class="fw-bold">${entry.runningBalance.toFixed(2)}</td>
             <td></td>
         `;
-        if (entry.source === 'sale' || entry.saleId) {
+        if (entry.source === 'sale' || entry.saleId || (entry.source === 'journal' && entry.recordId)) {
             const actionsCell = tr.lastElementChild;
             const wrapper = document.createElement('div');
             wrapper.className = 'ledger-actions-wrap';
@@ -250,20 +253,28 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
             toggle.textContent = 'Actions ▾';
             toggle.setAttribute('aria-haspopup', 'true');
             toggle.setAttribute('aria-expanded', 'false');
-            toggle.setAttribute('aria-label', `Actions for direct sale ${entry.saleId}`);
+            const isSale = entry.source === 'sale' || Boolean(entry.saleId);
+            const actionId = isSale ? entry.saleId : entry.recordId;
+            toggle.setAttribute('aria-label', `Actions for ${isSale ? 'direct sale' : 'stock journal'} ${actionId}`);
             const menu = document.createElement('div');
             menu.className = 'ledger-actions-menu';
             menu.hidden = true;
 
             const editAction = document.createElement('button');
             editAction.type = 'button';
-            editAction.textContent = 'Edit sale';
-            editAction.addEventListener('click', () => editDirectSaleFromLedger(entry.saleId));
+            editAction.textContent = isSale ? 'Edit sale' : 'Edit entry';
+            editAction.addEventListener('click', () => {
+                if (isSale) editDirectSaleFromLedger(actionId);
+                else editStockJournalFromLedger(entry.journalRecord);
+            });
             const deleteAction = document.createElement('button');
             deleteAction.type = 'button';
             deleteAction.className = 'text-danger';
-            deleteAction.textContent = 'Delete sale';
-            deleteAction.addEventListener('click', () => deleteDirectSaleFromLedger(entry.saleId));
+            deleteAction.textContent = isSale ? 'Delete sale' : 'Delete entry';
+            deleteAction.addEventListener('click', () => {
+                if (isSale) deleteDirectSaleFromLedger(actionId);
+                else deleteStockJournalFromLedger(actionId);
+            });
             menu.append(editAction, deleteAction);
 
             toggle.addEventListener('click', event => {
@@ -308,6 +319,56 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
 function editDirectSaleFromLedger(invoiceNo) {
     if (!invoiceNo) return alert('This sale has no invoice number and cannot be opened for editing.');
     window.location.href = `direct_sale.html?editInvoice=${encodeURIComponent(invoiceNo)}`;
+}
+
+async function editStockJournalFromLedger(record) {
+    if (!record || !record.id) return alert('This stock journal entry has no ID and cannot be edited.');
+    if (typeof apiClient === 'undefined' || typeof apiClient.saveStockJournal !== 'function') {
+        return alert('Remote stock journal editing is unavailable.');
+    }
+
+    const date = prompt('Entry date (YYYY-MM-DD):', String(record.date || '').slice(0, 10));
+    if (date === null) return;
+    const qtyText = prompt('Quantity:', String(record.qty ?? ''));
+    if (qtyText === null) return;
+    const qty = Number(qtyText);
+    if (!Number.isFinite(qty) || qty <= 0) return alert('Quantity must be greater than zero.');
+    const remarks = prompt('Remarks:', record.remarks || '');
+    if (remarks === null) return;
+
+    const updatedRecord = { ...record, date: date.trim(), qty, remarks: remarks.trim() };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(updatedRecord.date) || Number.isNaN(new Date(updatedRecord.date).getTime())) {
+        return alert('Enter a valid date in YYYY-MM-DD format.');
+    }
+
+    const result = await apiClient.saveStockJournal(updatedRecord);
+    if (!result || result.success === false) {
+        return alert(`Could not update this entry on the shared backend: ${result?.message || 'Connection unavailable'}`);
+    }
+
+    const localRecords = JSON.parse(localStorage.getItem('stockJournal') || '[]');
+    const index = localRecords.findIndex(entry => String(entry.id) === String(record.id));
+    if (index >= 0) localRecords[index] = updatedRecord;
+    else localRecords.push(updatedRecord);
+    localStorage.setItem('stockJournal', JSON.stringify(localRecords));
+    await generateLedger();
+}
+
+async function deleteStockJournalFromLedger(recordId) {
+    if (!recordId) return alert('This stock journal entry has no ID and cannot be deleted.');
+    if (!confirm(`Delete stock journal entry ${recordId}?`)) return;
+    if (typeof apiClient === 'undefined' || typeof apiClient.deleteStockJournal !== 'function') {
+        return alert('Remote stock journal deletion is unavailable. Update apiClient.js and the backend, then retry.');
+    }
+
+    const result = await apiClient.deleteStockJournal(recordId);
+    if (!result || result.success === false) {
+        return alert(`Could not delete this entry from the shared backend: ${result?.message || 'Connection unavailable'}`);
+    }
+
+    const localRecords = JSON.parse(localStorage.getItem('stockJournal') || '[]');
+    localStorage.setItem('stockJournal', JSON.stringify(localRecords.filter(entry => String(entry.id) !== String(recordId))));
+    await generateLedger();
 }
 
 async function deleteDirectSaleFromLedger(invoiceNo) {
