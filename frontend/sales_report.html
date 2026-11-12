@@ -9,6 +9,10 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- DevTools & F12 Blocker -->
     <script src="anti-debug.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="settings.js"></script>
     <script src="brand.service.js"></script>
@@ -60,8 +64,6 @@
                         class="bi bi-plus-circle me-1"></i>New Sale</a>
                 <button class="btn btn-outline-success btn-sm" onclick="exportToCSV()"><i
                         class="bi bi-file-earmark-excel me-1"></i>Export CSV</button>
-                <button class="btn btn-outline-primary btn-sm" onclick="refreshSalesReport()"><i
-                        class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
                 <button class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i
                         class="bi bi-printer me-1"></i>Print Report</button>
             </div>
@@ -265,7 +267,10 @@
             await loadSalesData();
             setDefaultDateRange();
             renderReport();
-            window.addEventListener('focus', refreshSalesReport);
+            setInterval(async () => {
+                await loadSalesData();
+                renderReport();
+            }, 15000);
 
             // If embedded inside SPA iframe, hide page chrome
             try {
@@ -279,51 +284,23 @@
         });
 
         async function loadSalesData() {
-            let storedSales = [];
-            try { storedSales = JSON.parse(localStorage.getItem('sales_records') || '[]'); }
-            catch (error) { console.warn('Ignoring invalid local sales cache:', error); }
+            const storedSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
             const localSales = Array.isArray(storedSales) ? storedSales.map(normalizeSaleRecord) : [];
 
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getSales) {
-                    let remoteSales = await apiClient.getSales();
+                    const remoteSales = await apiClient.getSales();
                     if (Array.isArray(remoteSales)) {
-                        const pendingSales = localSales.filter(sale => sale._syncPending);
-                        const savedPending = [];
-                        for (const sale of pendingSales) {
-                            try {
-                                const result = await apiClient.saveSale(sale);
-                                if (result?.success) savedPending.push(sale);
-                            } catch (error) {
-                                console.warn(`Pending sale ${sale.invoiceNo} could not sync:`, error);
-                            }
+                        const normalizedRemoteSales = remoteSales.map(normalizeSaleRecord);
+                        // A successful but empty server response can happen when an older save
+                        // was kept only in this browser. Keep that local copy visible so it can
+                        // be opened and saved to the server again from its original device.
+                        rawSales = normalizedRemoteSales.length === 0 && localSales.length > 0
+                            ? localSales
+                            : normalizedRemoteSales;
+                        if (normalizedRemoteSales.length > 0) {
+                            localStorage.setItem('sales_records', JSON.stringify(rawSales));
                         }
-                        if (pendingSales.length) {
-                            if (savedPending.length) {
-                                const refreshedSales = await apiClient.getSales();
-                                if (Array.isArray(refreshedSales)) {
-                                    remoteSales = refreshedSales;
-                                    const remoteInvoiceNumbers = new Set(remoteSales.map(sale =>
-                                        String(sale.invoiceNo || sale.invoice_no || sale.id || '')
-                                    ));
-                                    savedPending.forEach(sale => {
-                                        if (remoteInvoiceNumbers.has(String(sale.invoiceNo || sale.invoice_no || sale.id || ''))) {
-                                            delete sale._syncPending;
-                                        }
-                                    });
-                                }
-                            }
-                            localStorage.setItem('sales_records', JSON.stringify(localSales));
-                        }
-
-                        const salesByInvoice = new Map();
-                        remoteSales.map(normalizeSaleRecord).forEach(sale => salesByInvoice.set(String(sale.invoiceNo || sale.id), sale));
-                        localSales.filter(sale => sale._syncPending).forEach(sale => {
-                            const key = String(sale.invoiceNo || sale.id);
-                            if (!salesByInvoice.has(key)) salesByInvoice.set(key, sale);
-                        });
-                        rawSales = Array.from(salesByInvoice.values());
-                        localStorage.setItem('sales_records', JSON.stringify(rawSales));
                         return;
                     }
                     if (localSales.length > 0) {
@@ -336,11 +313,6 @@
             }
 
             rawSales = localSales;
-        }
-
-        async function refreshSalesReport() {
-            await loadSalesData();
-            renderReport();
         }
 
         function setDefaultDateRange() {
