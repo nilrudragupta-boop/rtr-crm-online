@@ -1856,10 +1856,68 @@
                 await new Promise(resolve => setTimeout(resolve, 15));
             }
             try {
-                const remoteData = await apiClient.getInvoices();
+                const [remoteData, deletedRemoteData] = await Promise.all([
+                    apiClient.getInvoices(),
+                    apiClient.getDeletedInvoices ? apiClient.getDeletedInvoices() : Promise.resolve(null)
+                ]);
                 if (Array.isArray(remoteData)) {
-                    localInvoices = remoteData;
+                    const aliasesForInvoice = invoice => {
+                        const aliases = [];
+                        const id = String(invoice?.id || invoice?._id || '').trim().toLowerCase();
+                        const number = String(invoice?.invoice_no || invoice?.invoiceNo || '').trim().toLowerCase();
+                        if (id) aliases.push(`id:${id}`);
+                        if (number) aliases.push(`number:${number}`);
+                        return aliases;
+                    };
+                    const deletedAliases = new Set();
+                    if (Array.isArray(deletedRemoteData)) {
+                        deletedRemoteData.forEach(invoice => aliasesForInvoice(invoice).forEach(alias => deletedAliases.add(alias)));
+                    }
+
+                    const mergedInvoices = remoteData.map(invoice => ({ ...invoice }));
+                    const remoteIndexes = new Map();
+                    mergedInvoices.forEach((invoice, index) => {
+                        aliasesForInvoice(invoice).forEach(alias => remoteIndexes.set(alias, index));
+                    });
+
+                    const localOnlyInvoices = [];
+                    localInvoices.forEach(localInvoice => {
+                        const aliases = aliasesForInvoice(localInvoice);
+                        const matchingIndex = aliases.map(alias => remoteIndexes.get(alias)).find(index => index !== undefined);
+                        if (matchingIndex !== undefined) {
+                            // Keep remote values authoritative while preserving any local-only fields.
+                            mergedInvoices[matchingIndex] = { ...localInvoice, ...mergedInvoices[matchingIndex] };
+                            aliasesForInvoice(mergedInvoices[matchingIndex]).forEach(alias => remoteIndexes.set(alias, matchingIndex));
+                            return;
+                        }
+
+                        if (aliases.some(alias => deletedAliases.has(alias))) return;
+                        const invoice = { ...localInvoice };
+                        mergedInvoices.push(invoice);
+                        const newIndex = mergedInvoices.length - 1;
+                        aliasesForInvoice(invoice).forEach(alias => remoteIndexes.set(alias, newIndex));
+                        localOnlyInvoices.push(invoice);
+                    });
+
+                    localInvoices = mergedInvoices;
                     localStorage.setItem("invoices", JSON.stringify(localInvoices));
+
+                    // Retry syncing local invoices created by this account so they
+                    // become available to the same account on remote devices.
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const pendingInvoices = localOnlyInvoices
+                        .filter(invoice => !invoice.createdBy || invoice.createdBy === 'System' || invoice.createdBy === currentUser)
+                        .map(invoice => ({ ...invoice, createdBy: invoice.createdBy && invoice.createdBy !== 'System' ? invoice.createdBy : currentUser }));
+                    if (pendingInvoices.length && typeof apiClient.saveInvoice === 'function') {
+                        try {
+                            await apiClient._syncRecordsInBatches(
+                                pendingInvoices,
+                                invoice => apiClient.saveInvoice(invoice)
+                            );
+                        } catch (syncError) {
+                            console.warn('Some invoices remain on this device until backend sync succeeds:', syncError);
+                        }
+                    }
                 }
             } catch (e) { console.warn("Failed to fetch remote invoices, using local data."); }
 
