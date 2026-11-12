@@ -212,7 +212,7 @@ const apiClient = {
 
     getSales: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}&_t=${Date.now()}`, { cache: 'no-store' });
+            const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             const sales = Array.isArray(result) ? result : result?.data;
@@ -252,7 +252,7 @@ const apiClient = {
             });
         } catch (error) {
             console.error('Error fetching sales:', error);
-            return null;
+            return [];
         }
     },
 
@@ -303,7 +303,6 @@ const apiClient = {
                 remarks: saleData.remarks || saleData.note || '',
                 items: Array.isArray(saleData.items) ? saleData.items : []
             };
-            delete normalized._syncPending;
             normalized.createdBy = normalized.createdBy || localStorage.getItem('currentUser') || 'System';
             const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
@@ -418,7 +417,7 @@ const apiClient = {
             });
             const result = await response.json();
             if (!response.ok || result?.success === false) {
-                return { success: false, status: response.status, message: result?.message || `HTTP ${response.status}` };
+                return { success: false, message: result?.message || `HTTP ${response.status}` };
             }
             return result;
         } catch (error) {
