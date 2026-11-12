@@ -243,21 +243,28 @@
                     if (Array.isArray(remoteSales)) {
                         const stored = JSON.parse(localStorage.getItem('sales_records') || '[]');
                         const localSales = Array.isArray(stored) ? stored : [];
-                        let syncedPending = false;
+                        const savedPending = [];
                         for (const sale of localSales.filter(record => record._syncPending)) {
                             try {
                                 const result = await apiClient.saveSale(sale);
-                                if (result?.success) {
-                                    sale._syncPending = false;
-                                    syncedPending = true;
-                                }
+                                if (result?.success) savedPending.push(sale);
                             } catch (error) {
                                 console.warn(`Pending sale ${sale.invoiceNo || sale.id} could not sync:`, error);
                             }
                         }
-                        if (syncedPending) {
+                        if (savedPending.length) {
                             const refreshedSales = await apiClient.getSales();
-                            if (Array.isArray(refreshedSales)) remoteSales = refreshedSales;
+                            if (Array.isArray(refreshedSales)) {
+                                remoteSales = refreshedSales;
+                                const remoteInvoiceNumbers = new Set(remoteSales.map(sale =>
+                                    String(sale.invoiceNo || sale.invoice_no || sale.id || '')
+                                ));
+                                savedPending.forEach(sale => {
+                                    if (remoteInvoiceNumbers.has(String(sale.invoiceNo || sale.invoice_no || sale.id || ''))) {
+                                        delete sale._syncPending;
+                                    }
+                                });
+                            }
                         }
                         const byInvoice = new Map(remoteSales.map(sale => [String(sale.invoiceNo || sale.invoice_no || sale.id), sale]));
                         localSales.filter(sale => sale._syncPending).forEach(sale => {
@@ -622,6 +629,13 @@
                 if (typeof apiClient !== 'undefined' && apiClient.saveSale) {
                     const result = await apiClient.saveSale(saleRecord);
                     if (!result?.success) throw new Error(result?.message || 'Backend did not confirm the sale.');
+                    const confirmedSales = await apiClient.getSales();
+                    const invoiceNo = String(saleRecord.invoiceNo || '');
+                    if (!Array.isArray(confirmedSales) || !confirmedSales.some(sale =>
+                        String(sale.invoiceNo || sale.invoice_no || '') === invoiceNo
+                    )) {
+                        throw new Error('The backend accepted the sale but did not return it on refresh. Sync will retry.');
+                    }
                     synced = true;
                 }
             } catch (error) {

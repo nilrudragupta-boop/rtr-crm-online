@@ -212,7 +212,7 @@ const apiClient = {
 
     getSales: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+            const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}&_t=${Date.now()}`, { cache: 'no-store' });
             if (!response.ok) return null;
             const result = await response.json();
             const sales = Array.isArray(result) ? result : result?.data;
