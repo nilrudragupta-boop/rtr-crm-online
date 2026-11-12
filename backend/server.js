@@ -593,8 +593,14 @@ app.get('/api/invoices', async (req, res) => {
 app.post('/api/invoices', async (req, res) => {
     try {
         const payload = { ...req.body };
-        const invoiceNumber = payload.invoiceNo || payload.invoice_no;
+        const rawInvoiceNumber = payload.invoiceNo ?? payload.invoice_no;
+        const invoiceNumber = String(rawInvoiceNumber ?? '').trim();
         if (invoiceNumber) {
+            // The invoices collection has a unique index on invoiceNo. Always
+            // populate its canonical field even when older frontend pages send
+            // only invoice_no; otherwise MongoDB stores a null index value.
+            payload.invoiceNo = invoiceNumber;
+            payload.invoice_no = invoiceNumber;
             const owner = req.query.user || payload.createdBy || 'System';
             payload.createdBy = owner;
             const identity = [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }];
@@ -606,10 +612,7 @@ app.post('/api/invoices', async (req, res) => {
             }, { $set: payload }, { new: true, upsert: true, setDefaultsOnInsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
-            if (!payload.createdBy) payload.createdBy = req.query.user || 'System';
-            const newInvoice = new Invoice(payload);
-            await newInvoice.save();
-            res.status(201).json({ success: true, data: newInvoice });
+            res.status(400).json({ success: false, message: 'Invoice number is required.' });
         }
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
