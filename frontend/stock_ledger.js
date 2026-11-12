@@ -90,6 +90,18 @@ async function generateLedger() {
         : null;
     if (!Array.isArray(stockJournal)) stockJournal = JSON.parse(localStorage.getItem('stockJournal') || '[]');
 
+    // Direct sale records are stored separately from stock journal records.
+    // Include their item quantities as OUT movements so errors can be corrected
+    // from the ledger and remain consistent with the shared sales backend.
+    // The generic collection fetch returns null on a network failure and an
+    // empty array when the shared backend has no active sales. That distinction
+    // prevents deleted remote sales from being resurrected from an old cache.
+    let sales = typeof apiClient !== 'undefined' && apiClient._getCollection
+        ? await apiClient._getCollection('sales-records')
+        : (typeof apiClient !== 'undefined' && apiClient.getSales ? await apiClient.getSales() : null);
+    const localSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
+    if (!Array.isArray(sales)) sales = localSales;
+
     let ledgerEntries = [];
     let openingBalance = 0;
 
@@ -114,6 +126,33 @@ async function generateLedger() {
                 out: type === 'OUT' ? qty : 0
             });
         }
+    });
+
+    sales.forEach(sale => {
+        const saleId = String(sale.invoiceNo || sale.invoice_no || sale.id || sale._id || '');
+        const saleDate = sale.invoiceDate || sale.invoice_date || sale.date || sale.createdAt;
+        const saleDateMs = new Date(saleDate).getTime();
+        if (!saleId || Number.isNaN(saleDateMs) || !Array.isArray(sale.items)) return;
+
+        sale.items.forEach(item => {
+            if (String(item.itemId || item.item_id || '') !== String(itemId)) return;
+            const qty = parseFloat(item.qty ?? item.quantity) || 0;
+            if (!(qty > 0)) return;
+            if (saleDateMs < fromDate) {
+                openingBalance -= qty;
+            } else if (saleDateMs <= toDateMs) {
+                ledgerEntries.push({
+                    date: String(saleDate).split('T')[0],
+                    timestamp: saleDateMs,
+                    type: 'Direct Sale OUT',
+                    ref: `${saleId}${sale.customerName ? ` - ${sale.customerName}` : ''}${sale.remarks ? ` - ${sale.remarks}` : ''}`,
+                    in: 0,
+                    out: qty,
+                    source: 'sale',
+                    saleId
+                });
+            }
+        });
     });
 
     // Sort entries chronologically
@@ -149,7 +188,7 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
     tbody.innerHTML = '';
 
     if (entries.length === 0 && openingBalance === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No transactions found for the selected period.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No transactions found for the selected period.</td></tr>`;
         return;
     }
 
@@ -162,6 +201,7 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
             <td>-</td>
             <td>-</td>
             <td class="fw-bold">${openingBalance.toFixed(2)}</td>
+            <td>-</td>
         `;
         tbody.appendChild(trOp);
     }
@@ -187,7 +227,26 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
             <td>${inHtml}</td>
             <td>${outHtml}</td>
             <td class="fw-bold">${entry.runningBalance.toFixed(2)}</td>
+            <td></td>
         `;
+        if (entry.source === 'sale') {
+            const actionsCell = tr.lastElementChild;
+            const editButton = document.createElement('button');
+            editButton.type = 'button';
+            editButton.className = 'btn btn-sm btn-outline-primary me-1';
+            editButton.textContent = 'Edit';
+            editButton.title = 'Open this sale in direct sale for correction';
+            editButton.addEventListener('click', () => editDirectSaleFromLedger(entry.saleId));
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'btn btn-sm btn-outline-danger';
+            deleteButton.textContent = 'Delete';
+            deleteButton.title = 'Delete the full direct sale invoice';
+            deleteButton.addEventListener('click', () => deleteDirectSaleFromLedger(entry.saleId));
+            actionsCell.append(editButton, deleteButton);
+        } else {
+            tr.lastElementChild.textContent = '-';
+        }
         tbody.appendChild(tr);
     });
 
@@ -200,6 +259,7 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
             <td class="text-success fw-bold">${totalIn.toFixed(2)}</td>
             <td class="text-danger fw-bold">${totalOut.toFixed(2)}</td>
             <td class="fw-bold fs-5">-</td>
+            <td>-</td>
         `;
     } else {
         trCl.innerHTML = `
@@ -207,7 +267,34 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
             <td class="text-success fw-bold">${totalIn.toFixed(2)}</td>
             <td class="text-danger fw-bold">${totalOut.toFixed(2)}</td>
             <td class="fw-bold fs-5">${finalBalance.toFixed(2)}</td>
+            <td>-</td>
         `;
     }
     tbody.appendChild(trCl);
+}
+
+function editDirectSaleFromLedger(invoiceNo) {
+    if (!invoiceNo) return alert('This sale has no invoice number and cannot be opened for editing.');
+    window.location.href = `direct_sale.html?editInvoice=${encodeURIComponent(invoiceNo)}`;
+}
+
+async function deleteDirectSaleFromLedger(invoiceNo) {
+    if (!invoiceNo) return alert('This sale has no invoice number and cannot be deleted from the ledger.');
+    if (!confirm(`Delete direct sale ${invoiceNo}? This deletes the full invoice, including its other item lines.`)) return;
+
+    if (typeof apiClient === 'undefined' || typeof apiClient.deleteSale !== 'function') {
+        return alert('Remote sale deletion is unavailable. Please reconnect and try again.');
+    }
+
+    const result = await apiClient.deleteSale(invoiceNo);
+    if (!result || result.success === false) {
+        return alert(`Could not delete this sale from the shared backend: ${result?.message || 'Connection unavailable'}`);
+    }
+
+    const localSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
+    const updatedSales = localSales.filter(sale =>
+        String(sale.invoiceNo || sale.invoice_no || sale.id || sale._id) !== String(invoiceNo)
+    );
+    localStorage.setItem('sales_records', JSON.stringify(updatedSales));
+    await generateLedger();
 }
