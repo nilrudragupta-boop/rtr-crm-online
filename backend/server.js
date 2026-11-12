@@ -543,6 +543,17 @@ app.get('/api/sales-records', async (req, res) => {
     }
 });
 
+app.get('/api/sales-records/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const sales = await SalesRecord.find(query).sort({ deletedAt: -1, createdAt: -1 });
+        res.json({ success: true, data: sales });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.post('/api/sales-records', async (req, res) => {
     try {
         const payload = { ...req.body };
