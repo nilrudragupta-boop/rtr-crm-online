@@ -263,7 +263,11 @@
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
-            detailModal = new bootstrap.Modal(document.getElementById('invoiceDetailModal'));
+            // The CDN-provided Bootstrap script must not prevent report data
+            // loading when it is unavailable on a remote device.
+            if (window.bootstrap && window.bootstrap.Modal) {
+                detailModal = new window.bootstrap.Modal(document.getElementById('invoiceDetailModal'));
+            }
             await loadSalesData();
             setDefaultDateRange();
             renderReport();
@@ -578,7 +582,14 @@
     `;
 
             document.getElementById('modalContent').innerHTML = content;
-            detailModal.show();
+            if (detailModal) {
+                detailModal.show();
+            } else {
+                const modalElement = document.getElementById('invoiceDetailModal');
+                modalElement.style.display = 'block';
+                modalElement.classList.add('show');
+                modalElement.removeAttribute('aria-hidden');
+            }
             // store current invoice for print/share actions
             window.currentInvoice = sale;
         }
