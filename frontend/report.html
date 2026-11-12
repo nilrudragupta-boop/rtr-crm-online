@@ -5126,23 +5126,39 @@
         }
 
         document.getElementById("btnCancelDelete").addEventListener("click", closeDeleteModal);
-        document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
+        document.getElementById("btnConfirmDelete").addEventListener("click", async (event) => {
+            event.preventDefault();
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
-            const idsToDelete = new Set(pendingDeleteIds);
+            const confirmButton = event.currentTarget;
+            const ids = [...pendingDeleteIds];
+            const idsToDelete = new Set(ids.map(String));
+            confirmButton.disabled = true;
             try {
                 if (typeof apiClient === 'undefined' || !apiClient.deleteInvoice) throw new Error('Invoice deletion service is unavailable.');
-                for (const id of pendingDeleteIds) {
+                for (const id of ids) {
                     const result = await apiClient.deleteInvoice(id);
-                    if (!result?.success) throw new Error(result?.message || `Could not delete invoice ${id}.`);
+                    // Old invoices can exist only in this device's local cache.
+                    // A 404 means there is no remote copy; other failures preserve the row.
+                    if (!result?.success && result?.status !== 404) {
+                        throw new Error(result?.message || `Could not delete invoice ${id}.`);
+                    }
                 }
             } catch (error) {
                 console.error('Invoice deletion failed:', error);
                 showToast(error.message || 'Could not delete invoice(s). Please try again.', '#ff4d4f');
                 closeDeleteModal();
                 return;
+            } finally {
+                confirmButton.disabled = false;
             }
 
-            const recycleBin = JSON.parse(localStorage.getItem('recycleBin_invoices') || '[]');
+            let recycleBin = [];
+            try {
+                const savedRecycleBin = JSON.parse(localStorage.getItem('recycleBin_invoices') || '[]');
+                if (Array.isArray(savedRecycleBin)) recycleBin = savedRecycleBin;
+            } catch (error) {
+                console.warn('Could not read the local invoice recycle bin:', error);
+            }
             invoices.filter(invoice => idsToDelete.has(getInvoiceRecycleId(invoice))).forEach(invoice => {
                 recycleBin.unshift({ ...invoice, deletedAt: new Date().toISOString(), deletedBy: localStorage.getItem('currentUser') || 'System' });
             });

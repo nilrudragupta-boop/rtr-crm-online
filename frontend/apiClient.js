@@ -418,7 +418,7 @@ const apiClient = {
             });
             const result = await response.json();
             if (!response.ok || result?.success === false) {
-                return { success: false, message: result?.message || `HTTP ${response.status}` };
+                return { success: false, status: response.status, message: result?.message || `HTTP ${response.status}` };
             }
             return result;
         } catch (error) {
