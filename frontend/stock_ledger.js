@@ -135,7 +135,18 @@ async function generateLedger() {
         if (!saleId || Number.isNaN(saleDateMs) || !Array.isArray(sale.items)) return;
 
         sale.items.forEach(item => {
-            if (String(item.itemId || item.item_id || '') !== String(itemId)) return;
+            const saleItemId = item.itemId ?? item.item_id ?? item.productId ?? item.product_id ?? '';
+            const selectedItem = allItems.find(candidate => String(candidate.id) === String(itemId));
+            const saleItemName = String(item.itemName || item.item_name || item.item || item.name || '').trim().toLowerCase();
+            const saleItemCode = String(item.itemCode || item.item_code || '').trim().toLowerCase();
+            const selectedNames = selectedItem
+                ? [selectedItem.name, selectedItem.itemName, selectedItem.item, selectedItem.itemCode]
+                    .filter(Boolean).map(value => String(value).trim().toLowerCase())
+                : [];
+            const itemMatches = (saleItemId && String(saleItemId) === String(itemId))
+                || (saleItemName && selectedNames.includes(saleItemName))
+                || (saleItemCode && selectedNames.includes(saleItemCode));
+            if (!itemMatches) return;
             const qty = parseFloat(item.qty ?? item.quantity) || 0;
             if (!(qty > 0)) return;
             if (saleDateMs < fromDate) {
@@ -231,18 +242,40 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
         `;
         if (entry.source === 'sale' || entry.saleId) {
             const actionsCell = tr.lastElementChild;
-            const actionSelect = document.createElement('select');
-            actionSelect.className = 'form-select form-select-sm';
-            actionSelect.setAttribute('aria-label', `Actions for direct sale ${entry.saleId}`);
-            actionSelect.style.minWidth = '100px';
-            actionSelect.innerHTML = '<option value="">Action</option><option value="edit">Edit</option><option value="delete">Delete</option>';
-            actionSelect.addEventListener('change', () => {
-                const action = actionSelect.value;
-                actionSelect.value = '';
-                if (action === 'edit') editDirectSaleFromLedger(entry.saleId);
-                if (action === 'delete') deleteDirectSaleFromLedger(entry.saleId);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'ledger-actions-wrap';
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'btn btn-sm btn-outline-primary';
+            toggle.textContent = 'Actions ▾';
+            toggle.setAttribute('aria-haspopup', 'true');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-label', `Actions for direct sale ${entry.saleId}`);
+            const menu = document.createElement('div');
+            menu.className = 'ledger-actions-menu';
+            menu.hidden = true;
+
+            const editAction = document.createElement('button');
+            editAction.type = 'button';
+            editAction.textContent = 'Edit sale';
+            editAction.addEventListener('click', () => editDirectSaleFromLedger(entry.saleId));
+            const deleteAction = document.createElement('button');
+            deleteAction.type = 'button';
+            deleteAction.className = 'text-danger';
+            deleteAction.textContent = 'Delete sale';
+            deleteAction.addEventListener('click', () => deleteDirectSaleFromLedger(entry.saleId));
+            menu.append(editAction, deleteAction);
+
+            toggle.addEventListener('click', event => {
+                event.stopPropagation();
+                const willOpen = menu.hidden;
+                document.querySelectorAll('.ledger-actions-menu').forEach(otherMenu => { otherMenu.hidden = true; });
+                document.querySelectorAll('.ledger-actions-wrap > button').forEach(otherButton => otherButton.setAttribute('aria-expanded', 'false'));
+                menu.hidden = !willOpen;
+                toggle.setAttribute('aria-expanded', String(willOpen));
             });
-            actionsCell.appendChild(actionSelect);
+            wrapper.append(toggle, menu);
+            actionsCell.appendChild(wrapper);
         } else {
             tr.lastElementChild.textContent = '-';
         }
