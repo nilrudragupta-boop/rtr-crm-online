@@ -241,8 +241,21 @@
                 if (typeof apiClient !== 'undefined' && apiClient.getSales) {
                     const remoteSales = await apiClient.getSales();
                     if (Array.isArray(remoteSales)) {
-                        localStorage.setItem('sales_records', JSON.stringify(remoteSales));
-                        return remoteSales;
+                        const localSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
+                        const deletedSales = apiClient.getDeletedSales ? await apiClient.getDeletedSales() : [];
+                        const getAliases = sale => [sale.invoiceNo, sale.invoice_no, sale.id, sale._id]
+                            .filter(Boolean).map(value => String(value).trim().toLowerCase());
+                        const deletedAliases = new Set((Array.isArray(deletedSales) ? deletedSales : []).flatMap(getAliases));
+                        const merged = [...remoteSales];
+                        const remoteAliases = new Set(merged.flatMap(getAliases));
+                        (Array.isArray(localSales) ? localSales : []).forEach(sale => {
+                            const aliases = getAliases(sale);
+                            if (!aliases.length || aliases.some(alias => deletedAliases.has(alias)) || aliases.some(alias => remoteAliases.has(alias))) return;
+                            merged.push(sale);
+                            aliases.forEach(alias => remoteAliases.add(alias));
+                        });
+                        localStorage.setItem('sales_records', JSON.stringify(merged));
+                        return merged;
                     }
                 }
             } catch (error) {
@@ -579,39 +592,46 @@
             if (!payload) return false;
 
             const existingSales = JSON.parse(localStorage.getItem('sales_records') || '[]');
-            const saleRecord = { ...payload, id: payload.id || `${Date.now()}` };
-            if (window.editingInvoiceNo) {
-                const idx = existingSales.findIndex(s => s.invoiceNo === window.editingInvoiceNo || s.id === window.editingInvoiceNo);
+            const saleRecord = { ...payload, id: payload.id || `${Date.now()}`, remoteSyncPending: true };
+            const editingInvoiceNo = window.editingInvoiceNo;
+            if (editingInvoiceNo) {
+                const idx = existingSales.findIndex(s => s.invoiceNo === editingInvoiceNo || s.invoice_no === editingInvoiceNo || s.id === editingInvoiceNo);
                 if (idx !== -1) {
+                    saleRecord.id = existingSales[idx].id || saleRecord.id;
                     existingSales[idx] = saleRecord;
                 } else {
                     existingSales.push(saleRecord);
                 }
-                // clear edit flag
-                window.editingInvoiceNo = null;
             } else {
                 existingSales.push(saleRecord);
             }
             localStorage.setItem('sales_records', JSON.stringify(existingSales));
 
             try {
-                if (typeof apiClient !== 'undefined' && apiClient.saveSale) {
-                    const result = await apiClient.saveSale(saleRecord);
-                    if (result && result.success === false) {
-                        console.warn('Backend sale sync failed:', result.message);
-                    }
+                if (typeof apiClient === 'undefined' || !apiClient.saveSale) {
+                    throw new Error('Remote sales service is unavailable.');
                 }
+                const result = await apiClient.saveSale(saleRecord);
+                if (!result || result.success === false) throw new Error(result?.message || 'Backend did not confirm the save.');
             } catch (error) {
                 console.warn('Error syncing sale to backend:', error);
+                alert(`Sale ${payload.invoiceNo} is saved on this device, but remote sync failed: ${error.message}. It will remain available here until backend sync succeeds.`);
+                return false;
             }
 
+            saleRecord.createdBy = localStorage.getItem('currentUser') || 'System';
+            saleRecord.remoteSyncPending = false;
+            const savedIndex = existingSales.findIndex(s => s.invoiceNo === saleRecord.invoiceNo || s.invoice_no === saleRecord.invoiceNo || s.id === saleRecord.id);
+            if (savedIndex >= 0) existingSales[savedIndex] = saleRecord;
+            localStorage.setItem('sales_records', JSON.stringify(existingSales));
+            window.editingInvoiceNo = null;
             alert(`Sale ${payload.invoiceNo} saved successfully!`);
             resetForm();
             return true;
         }
 
-        function saveAndPrintSale() {
-            if (saveSaleRecord()) {
+        async function saveAndPrintSale() {
+            if (await saveSaleRecord()) {
                 window.print();
             }
         }

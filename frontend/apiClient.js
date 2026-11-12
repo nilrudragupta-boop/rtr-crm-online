@@ -325,6 +325,7 @@ const apiClient = {
             return await response.json();
         } catch (error) { return { success: false, message: error.message }; }
     },
+    getDeletedSales: () => apiClient._getDeletedCollection('sales-records'),
 
     // --- Credit/Debit Notes ---
     getCreditDebitNotes: () => apiClient._getCollection('credit-debit-notes'),

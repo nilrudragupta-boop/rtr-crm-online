@@ -289,9 +289,41 @@
 
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getSales) {
-                    const remoteSales = await apiClient.getSales();
+                    const [remoteSales, deletedSales] = await Promise.all([
+                        apiClient.getSales(),
+                        apiClient.getDeletedSales ? apiClient.getDeletedSales() : Promise.resolve([])
+                    ]);
                     if (Array.isArray(remoteSales)) {
-                        rawSales = remoteSales.map(normalizeSaleRecord);
+                        const mergedSales = remoteSales.map(normalizeSaleRecord);
+                        const aliasesForSale = sale => [sale.invoiceNo, sale.invoice_no, sale.id, sale._id]
+                            .filter(Boolean).map(value => String(value).trim().toLowerCase());
+                        const remoteAliases = new Set(mergedSales.flatMap(aliasesForSale));
+                        const deletedAliases = new Set((Array.isArray(deletedSales) ? deletedSales : []).flatMap(aliasesForSale));
+                        const currentUser = localStorage.getItem('currentUser') || 'System';
+                        const pendingSales = [];
+
+                        localSales.forEach(localSale => {
+                            const aliases = aliasesForSale(localSale);
+                            if (!aliases.length || aliases.some(alias => remoteAliases.has(alias)) || aliases.some(alias => deletedAliases.has(alias))) return;
+                            if (localSale.createdBy && localSale.createdBy !== 'System' && localSale.createdBy !== currentUser) return;
+                            const pendingSale = { ...localSale, createdBy: currentUser, remoteSyncPending: true };
+                            mergedSales.push(pendingSale);
+                            aliases.forEach(alias => remoteAliases.add(alias));
+                            pendingSales.push(pendingSale);
+                        });
+
+                        // Local records saved while offline remain visible and are
+                        // retried against the shared backend when it is reachable.
+                        for (const pendingSale of pendingSales) {
+                            const syncResult = await apiClient.saveSale(pendingSale);
+                            if (!syncResult || syncResult.success === false) {
+                                console.warn('A direct sale is still waiting for backend sync:', pendingSale.invoiceNo, syncResult?.message);
+                                continue;
+                            }
+                            pendingSale.remoteSyncPending = false;
+                        }
+
+                        rawSales = mergedSales.map(normalizeSaleRecord);
                         localStorage.setItem('sales_records', JSON.stringify(rawSales));
                         return;
                     }
