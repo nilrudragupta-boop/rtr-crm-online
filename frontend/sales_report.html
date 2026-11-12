@@ -289,9 +289,36 @@
 
             try {
                 if (typeof apiClient !== 'undefined' && apiClient.getSales) {
-                    const remoteSales = await apiClient.getSales();
+                    let remoteSales = await apiClient.getSales();
                     if (Array.isArray(remoteSales)) {
-                        rawSales = remoteSales.map(normalizeSaleRecord);
+                        const pendingSales = localSales.filter(sale => sale._syncPending);
+                        let hadSuccessfulRetry = false;
+                        for (const sale of pendingSales) {
+                            try {
+                                const result = await apiClient.saveSale(sale);
+                                if (result?.success) {
+                                    sale._syncPending = false;
+                                    hadSuccessfulRetry = true;
+                                }
+                            } catch (error) {
+                                console.warn(`Pending sale ${sale.invoiceNo} could not sync:`, error);
+                            }
+                        }
+                        if (pendingSales.length) {
+                            localStorage.setItem('sales_records', JSON.stringify(localSales));
+                            if (hadSuccessfulRetry) {
+                                const refreshedSales = await apiClient.getSales();
+                                if (Array.isArray(refreshedSales)) remoteSales = refreshedSales;
+                            }
+                        }
+
+                        const salesByInvoice = new Map();
+                        remoteSales.map(normalizeSaleRecord).forEach(sale => salesByInvoice.set(String(sale.invoiceNo || sale.id), sale));
+                        localSales.filter(sale => sale._syncPending).forEach(sale => {
+                            const key = String(sale.invoiceNo || sale.id);
+                            if (!salesByInvoice.has(key)) salesByInvoice.set(key, sale);
+                        });
+                        rawSales = Array.from(salesByInvoice.values());
                         localStorage.setItem('sales_records', JSON.stringify(rawSales));
                         return;
                     }

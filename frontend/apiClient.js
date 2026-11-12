@@ -252,7 +252,7 @@ const apiClient = {
             });
         } catch (error) {
             console.error('Error fetching sales:', error);
-            return [];
+            return null;
         }
     },
 
@@ -303,6 +303,7 @@ const apiClient = {
                 remarks: saleData.remarks || saleData.note || '',
                 items: Array.isArray(saleData.items) ? saleData.items : []
             };
+            delete normalized._syncPending;
             normalized.createdBy = normalized.createdBy || localStorage.getItem('currentUser') || 'System';
             const response = await fetch(`${API_BASE_URL}/sales-records${apiClient._getAuthQuery()}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
