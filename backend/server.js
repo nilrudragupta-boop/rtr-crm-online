@@ -944,6 +944,23 @@ app.post('/api/stock-journal', async (req, res) => {
     }
 });
 
+app.delete('/api/stock-journal/:id', async (req, res) => {
+    try {
+        const id = decodeURIComponent(req.params.id);
+        const query = { id, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await StockJournal.findOneAndUpdate(
+            query,
+            { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } },
+            { new: true, strict: false }
+        );
+        if (!deleted) return res.status(404).json({ success: false, message: 'Stock journal record not found.' });
+        res.json({ success: true, data: deleted });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- Credit/Debit Note Routes ---
 app.get('/api/credit-debit-notes', async (req, res) => {
     try {
