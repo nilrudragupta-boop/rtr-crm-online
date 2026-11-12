@@ -1859,7 +1859,7 @@
                 const remoteData = await apiClient.getInvoices();
                 if (Array.isArray(remoteData)) {
                     const invoicesByNumber = new Map();
-                    [...localInvoices, ...remoteData].forEach(invoice => {
+                    remoteData.forEach(invoice => {
                         const invoiceNumber = String(invoice.invoice_no || invoice.invoiceNo || invoice.id || '').trim();
                         if (invoiceNumber) invoicesByNumber.set(invoiceNumber, invoice);
                     });
@@ -1878,6 +1878,12 @@
 
             if (overlay) overlay.style.display = 'none';
         }
+
+        // Keep this report current when another device creates or edits invoices.
+        // The backend response is authoritative; localStorage is only an offline cache.
+        setInterval(() => {
+            if (!document.hidden) loadInvoices();
+        }, 15000);
 
         // --- render table ---
         function renderTable(data) {
@@ -2495,6 +2501,11 @@
 
             invoices.unshift(newInvoice);
             localStorage.setItem("invoices", JSON.stringify(invoices));
+            if (typeof apiClient?.saveInvoice === 'function') {
+                apiClient.saveInvoice(newInvoice).then(result => {
+                    if (!result?.success) console.warn('Failed to sync duplicated invoice:', result?.message);
+                }).catch(error => console.warn('Failed to sync duplicated invoice:', error));
+            }
             showToast(`✅ Invoice duplicated: ${newInvoice.invoice_no}`, "#6f42c1");
             applySearch();
         }
@@ -5314,7 +5325,7 @@
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 try {
                     const text = e.target.result;
                     const rows = parseCSV(text);
@@ -5406,6 +5417,9 @@
                     });
 
                     localStorage.setItem("invoices", JSON.stringify(invoices));
+                    if (typeof apiClient?.saveInvoice === 'function') {
+                        await Promise.allSettled(Array.from(invoiceMap.values()).map(invoice => apiClient.saveInvoice(invoice)));
+                    }
                     renderTable(invoices);
 
                     document.getElementById("importSuccessMsg").innerHTML = `Added: <b>${added}</b><br>Updated: <b>${updated}</b>`;
