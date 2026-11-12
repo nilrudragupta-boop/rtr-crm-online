@@ -2155,9 +2155,11 @@
             }
             localStorage.setItem("invoices", JSON.stringify(localInvoices));
 
-            apiClient.saveInvoice(invoiceData).then(result => {
-                if (!result.success) console.warn("API sync failed:", result.message);
-            });
+            const syncResult = await apiClient.saveInvoice(invoiceData);
+            if (!syncResult || syncResult.success === false) {
+                showToast(`Invoice saved on this device, but remote sync failed: ${syncResult?.message || 'Backend unavailable'}`, "#e67e22");
+                return;
+            }
 
             openSaveSuccessModal();
             await loadLastInvoiceNo();
