@@ -3291,60 +3291,36 @@
 
                 try {
                     const frame = await getStockReportFrame();
-                    const reportDoc = frame.contentDocument;
-                    if (!reportDoc) return;
+                    const reportWindow = frame.contentWindow;
+                    if (!reportWindow || typeof reportWindow.getStockData !== 'function') return;
 
-                    const pageSize = reportDoc.getElementById('rowsPerPageSelect');
-                    if (pageSize) {
-                        let allRowsOption = Array.from(pageSize.options).find(option => option.value === '1000000');
-                        if (!allRowsOption) {
-                            allRowsOption = document.createElement('option');
-                            allRowsOption.value = '1000000';
-                            allRowsOption.textContent = 'All rows';
-                            pageSize.appendChild(allRowsOption);
-                        }
-                        if (pageSize.value !== allRowsOption.value) {
-                            pageSize.value = allRowsOption.value;
-                            pageSize.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                    }
+                    // Use the same stock calculation as the report instead of reading paginated table cells.
+                    const reportItems = reportWindow.getStockData();
+                    if (!Array.isArray(reportItems)) return;
 
-                    // The report builds its stock rows asynchronously after loading inventory data.
-                    let reportRows = [];
-                    for (let attempt = 0; attempt < 40; attempt++) {
-                        await new Promise(resolve => setTimeout(resolve, 250));
-                        const headerCells = Array.from(reportDoc.querySelectorAll('#stockTable thead th'));
-                        const stockColumn = headerCells.findIndex(th => th.textContent.trim().toLowerCase().startsWith('current stock'));
-                        reportRows = Array.from(reportDoc.querySelectorAll('#stockTable tbody tr'));
-                        if (stockColumn >= 0 && reportRows.some(row => row.cells.length > stockColumn)) break;
-                    }
-
-                    const headerCells = Array.from(reportDoc.querySelectorAll('#stockTable thead th'));
-                    const headerLabel = th => th.textContent.trim().toLowerCase();
-                    const stockColumn = headerCells.findIndex(th => headerLabel(th).startsWith('current stock'));
-                    const codeColumn = headerCells.findIndex(th => headerLabel(th).startsWith('item code'));
-                    const nameColumn = headerCells.findIndex(th => headerLabel(th).startsWith('item name'));
-                    if (stockColumn < 0 || codeColumn < 0 || nameColumn < 0) return;
-
+                    const normalize = value => String(value || '').trim().toLowerCase();
                     const stockMap = new Map();
-                    reportRows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        if (cells.length <= Math.max(stockColumn, codeColumn, nameColumn)) return;
-                        const itemCode = (cells[codeColumn]?.textContent || '').trim().toLowerCase();
-                        const itemName = (cells[nameColumn]?.textContent || '').trim().toLowerCase();
-                        const stock = (cells[stockColumn]?.textContent || '').trim();
-                        if (itemName) stockMap.set(`name:${itemName}`, stock);
-                        if (itemCode) stockMap.set(`code:${itemCode}`, stock);
+                    reportItems.forEach(reportItem => {
+                        const name = normalize(reportItem.name);
+                        const code = normalize(reportItem.itemCode);
+                        const uom = normalize(reportItem.uom);
+                        const quantity = Number(reportItem.stock);
+                        if (!name || !Number.isFinite(quantity)) return;
+
+                        const displayStock = `${quantity.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${reportItem.uom || ''}`.trim();
+                        if (code) stockMap.set(`code:${code}|uom:${uom}`, displayStock);
+                        stockMap.set(`name:${name}|uom:${uom}`, displayStock);
                     });
 
                     itemTable.querySelectorAll('tbody tr').forEach(row => {
                         if (row.querySelector('th') || row.classList.contains('no-data')) return;
-                        const name = (row.querySelector('textarea[id^="name-"]')?.value || '').trim().toLowerCase();
-                        const code = (row.querySelector('input[id^="code-"]')?.value || '').trim().toLowerCase();
+                        const name = normalize(row.querySelector('textarea[id^="name-"]')?.value || row.querySelector('[id^="view-name-"]')?.textContent);
+                        const code = normalize(row.querySelector('input[id^="code-"]')?.value || row.querySelector('[id^="view-code-"]')?.textContent);
+                        const uom = normalize(row.querySelector('select[id^="uom-"]')?.value || row.querySelector('[id^="view-uom-"]')?.textContent);
                         const stockCell = row.querySelector('.stock-col-cell');
                         if (!stockCell) return;
 
-                        const stock = stockMap.get(`code:${code}`) ?? stockMap.get(`name:${name}`);
+                        const stock = (code && stockMap.get(`code:${code}|uom:${uom}`)) || stockMap.get(`name:${name}|uom:${uom}`);
                         if (stock === undefined || stockCell.textContent.trim() === stock) return;
                         const numericStock = parseFloat(stock.replace(/,/g, '')) || 0;
                         stockCell.style.color = numericStock <= 0 ? '#ef4444' : '#10b981';
@@ -3354,7 +3330,6 @@
                     console.warn('Unable to load Current Stock from stock report:', error);
                 }
             }
-
             function initObserver() {
                 loadCurrentStockColumn();
                 const targetTable = document.getElementById('mainItemTable');
