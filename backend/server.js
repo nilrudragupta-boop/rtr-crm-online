@@ -532,10 +532,24 @@ app.delete('/api/quotations/:id', async (req, res) => {
 
 // --- Invoice Routes ---
 // Direct sales use their own collection so they never mix with formal invoices.
+const getSalesOwnerScope = (user) => {
+    if (!user) return null;
+    const escapedUser = String(user).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const scope = [{ createdBy: 'System' }, { createdBy: null }];
+    if (user !== 'System') {
+        scope.unshift({ createdBy: { $regex: `^${escapedUser}$`, $options: 'i' } });
+    }
+    return scope;
+};
+
 app.get('/api/sales-records', async (req, res) => {
     try {
         const query = { deletedAt: null };
-        if (req.query.user) query.createdBy = req.query.user;
+        // Older direct-sale records were created before account ownership was
+        // attached and are stored as System (or without createdBy). Keep those
+        // legacy records visible alongside the signed-in user's sales.
+        const ownerScope = getSalesOwnerScope(req.query.user);
+        if (ownerScope) query.$or = ownerScope;
         const sales = await SalesRecord.find(query).sort({ date: -1, createdAt: -1 });
         res.json({ success: true, data: sales });
     } catch (err) {
@@ -546,7 +560,8 @@ app.get('/api/sales-records', async (req, res) => {
 app.get('/api/sales-records/recycle-bin', async (req, res) => {
     try {
         const query = { deletedAt: { $ne: null } };
-        if (req.query.user) query.createdBy = req.query.user;
+        const ownerScope = getSalesOwnerScope(req.query.user);
+        if (ownerScope) query.$or = ownerScope;
         const sales = await SalesRecord.find(query).sort({ deletedAt: -1, createdAt: -1 });
         res.json({ success: true, data: sales });
     } catch (err) {
@@ -564,8 +579,9 @@ app.post('/api/sales-records', async (req, res) => {
         payload.invoiceNo = invoiceNo;
         payload.invoice_no = payload.invoice_no || invoiceNo;
         payload.id = payload.id || invoiceNo;
+        const ownerScope = getSalesOwnerScope(user);
         const sale = await SalesRecord.findOneAndUpdate(
-            { createdBy: user, invoiceNo },
+            { invoiceNo, $or: ownerScope },
             { $set: payload },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
@@ -579,7 +595,8 @@ app.delete('/api/sales-records/:id', async (req, res) => {
     try {
         const id = decodeURIComponent(req.params.id);
         const query = { deletedAt: null, $or: [{ id }, { invoiceNo: id }, { invoice_no: id }] };
-        if (req.query.user) query.createdBy = req.query.user;
+        const ownerScope = getSalesOwnerScope(req.query.user);
+        if (ownerScope) query.$and = [{ $or: ownerScope }];
         const deleted = await SalesRecord.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
         if (!deleted) return res.status(404).json({ success: false, message: 'Sales record not found.' });
         res.json({ success: true, data: deleted });
