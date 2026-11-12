@@ -229,21 +229,20 @@ function renderLedgerTable(entries, openingBalance, isFiltered) {
             <td class="fw-bold">${entry.runningBalance.toFixed(2)}</td>
             <td></td>
         `;
-        if (entry.source === 'sale') {
+        if (entry.source === 'sale' || entry.saleId) {
             const actionsCell = tr.lastElementChild;
-            const editButton = document.createElement('button');
-            editButton.type = 'button';
-            editButton.className = 'btn btn-sm btn-outline-primary me-1';
-            editButton.textContent = 'Edit';
-            editButton.title = 'Open this sale in direct sale for correction';
-            editButton.addEventListener('click', () => editDirectSaleFromLedger(entry.saleId));
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'btn btn-sm btn-outline-danger';
-            deleteButton.textContent = 'Delete';
-            deleteButton.title = 'Delete the full direct sale invoice';
-            deleteButton.addEventListener('click', () => deleteDirectSaleFromLedger(entry.saleId));
-            actionsCell.append(editButton, deleteButton);
+            const actionSelect = document.createElement('select');
+            actionSelect.className = 'form-select form-select-sm';
+            actionSelect.setAttribute('aria-label', `Actions for direct sale ${entry.saleId}`);
+            actionSelect.style.minWidth = '100px';
+            actionSelect.innerHTML = '<option value="">Action</option><option value="edit">Edit</option><option value="delete">Delete</option>';
+            actionSelect.addEventListener('change', () => {
+                const action = actionSelect.value;
+                actionSelect.value = '';
+                if (action === 'edit') editDirectSaleFromLedger(entry.saleId);
+                if (action === 'delete') deleteDirectSaleFromLedger(entry.saleId);
+            });
+            actionsCell.appendChild(actionSelect);
         } else {
             tr.lastElementChild.textContent = '-';
         }
