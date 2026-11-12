@@ -623,7 +623,6 @@ app.delete('/api/invoices/:id', async (req, res) => {
             deletedAt: null,
             $or: [
                 { id: invoiceId },
-                { _id: invoiceId },
                 { invoiceNo: invoiceId },
                 { invoice_no: invoiceId }
             ]
@@ -656,7 +655,7 @@ app.post('/api/invoices/:id/restore', async (req, res) => {
         const invoiceId = decodeURIComponent(req.params.id);
         const query = {
             deletedAt: { $ne: null },
-            $or: [{ id: invoiceId }, { _id: invoiceId }, { invoiceNo: invoiceId }, { invoice_no: invoiceId }]
+            $or: [{ id: invoiceId }, { invoiceNo: invoiceId }, { invoice_no: invoiceId }]
         };
         if (req.query.user) query.createdBy = req.query.user;
         const restored = await Invoice.findOneAndUpdate(query, {
