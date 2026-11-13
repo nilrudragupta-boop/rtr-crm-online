@@ -1066,18 +1066,48 @@
                     ]]
                 ];
 
-                const results = await Promise.allSettled(requests.map(([, getter]) =>
-                    typeof getter === 'function' ? getter() : Promise.resolve(null)
-                ));
+                const results = await Promise.allSettled([
+                    ...requests.map(([, getter]) =>
+                        typeof getter === 'function' ? getter() : Promise.resolve(null)
+                    ),
+                    typeof apiClient.getDeletedJournalVouchers === 'function'
+                        ? apiClient.getDeletedJournalVouchers()
+                        : Promise.resolve(null)
+                ]);
+                const deletedVoucherAliases = new Set();
+                const deletedVoucherResult = results[requests.length];
+                if (deletedVoucherResult?.status === 'fulfilled' && Array.isArray(deletedVoucherResult.value)) {
+                    deletedVoucherResult.value.forEach(voucher => {
+                        const id = String(voucher.id || voucher._id || '').trim().toLowerCase();
+                        const number = String(voucher.voucher_no || voucher.voucherNo || '').trim().toLowerCase();
+                        if (id) deletedVoucherAliases.add(`id:${id}`);
+                        if (number) deletedVoucherAliases.add(`voucher:${number}`);
+                    });
+                }
                 let refreshedAny = false;
 
                 results.forEach((result, index) => {
+                    if (index >= requests.length) return;
                     if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
                     const [dataKey, , getAliases] = requests[index];
-                    const localRecords = this.data[dataKey] || [];
-                    const remoteRecords = dataKey === 'invoices'
-                        ? result.value.map(record => this.normalizeInvoice(record))
+                    const localRecords = (this.data[dataKey] || []).filter(record => {
+                        if (dataKey !== 'journalVouchers') return true;
+                        const id = String(record.id || record._id || '').trim().toLowerCase();
+                        const number = String(record.voucher_no || record.voucherNo || '').trim().toLowerCase();
+                        return !(id && deletedVoucherAliases.has(`id:${id}`)) &&
+                            !(number && deletedVoucherAliases.has(`voucher:${number}`));
+                    });
+                    const fetchedRecords = dataKey === 'journalVouchers'
+                        ? result.value.filter(record => {
+                            const id = String(record.id || record._id || '').trim().toLowerCase();
+                            const number = String(record.voucher_no || record.voucherNo || '').trim().toLowerCase();
+                            return !(id && deletedVoucherAliases.has(`id:${id}`)) &&
+                                !(number && deletedVoucherAliases.has(`voucher:${number}`));
+                        })
                         : result.value;
+                    const remoteRecords = dataKey === 'invoices'
+                        ? fetchedRecords.map(record => this.normalizeInvoice(record))
+                        : fetchedRecords;
                     let merged = this.mergeRecords(remoteRecords, localRecords, getAliases);
                     if (dataKey === 'invoices') merged = this.deduplicateInvoices(merged);
                     this.data[dataKey] = merged;

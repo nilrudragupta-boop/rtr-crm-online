@@ -494,6 +494,7 @@ const apiClient = {
     getJournalVouchers: () => apiClient._getCollection('journal-vouchers'),
     saveJournalVoucher: (data) => apiClient._saveCollection('journal-vouchers', data),
     deleteJournalVoucher: (id) => apiClient._deleteCollection('journal-vouchers', id),
+    getDeletedJournalVouchers: () => apiClient._getDeletedCollection('journal-vouchers'),
 
     getFixedAssets: () => apiClient._getCollection('fixed-assets'),
     saveFixedAsset: (data) => apiClient._saveCollection('fixed-assets', data),

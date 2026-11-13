@@ -726,20 +726,123 @@
         let editingId = null;
         let currentDepreciationDetails = null;
 
+        function getVoucherDeleteQueueKey() {
+            const user = (localStorage.getItem('currentUser') || 'System').trim().toLowerCase();
+            return `journal_voucher_delete_queue_${user}`;
+        }
+
+        function getVoucherAliases(voucher) {
+            if (!voucher) return [];
+            const aliases = [];
+            const id = String(voucher.id || voucher._id || '').trim().toLowerCase();
+            const voucherNo = String(voucher.voucher_no || voucher.voucherNo || '').trim().toLowerCase();
+            if (id) aliases.push(`id:${id}`);
+            if (voucherNo) aliases.push(`no:${voucherNo}`);
+            return aliases;
+        }
+
+        function readVoucherDeleteQueue() {
+            try {
+                const queue = JSON.parse(localStorage.getItem(getVoucherDeleteQueueKey()) || '[]');
+                return Array.isArray(queue) ? queue : [];
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function writeVoucherDeleteQueue(queue) {
+            localStorage.setItem(getVoucherDeleteQueueKey(), JSON.stringify(queue));
+        }
+
+        async function syncPendingVoucherDeletions() {
+            const queue = readVoucherDeleteQueue();
+            if (!queue.length || typeof apiClient === 'undefined' || !apiClient.deleteJournalVoucher) return queue;
+
+            const pending = [];
+            for (const voucher of queue) {
+                const identifier = voucher.id || voucher.voucher_no || voucher.voucherNo;
+                if (!identifier) continue;
+                const result = await apiClient.deleteJournalVoucher(identifier);
+                if (!result || result.success !== true) pending.push(voucher);
+            }
+            writeVoucherDeleteQueue(pending);
+            return pending;
+        }
+
         async function fetchVouchersData() {
             let localVouchers = JSON.parse(localStorage.getItem('journal_vouchers')) || [];
+            if (!Array.isArray(localVouchers)) localVouchers = [];
+            const queuedDeletes = await syncPendingVoucherDeletions();
             try {
-                const remoteData = await apiClient.getJournalVouchers();
-                if (remoteData && remoteData.length > 0) {
-                    vouchers = remoteData;
+                const [remoteData, deletedRemoteData] = await Promise.all([
+                    apiClient.getJournalVouchers(),
+                    apiClient.getDeletedJournalVouchers
+                        ? apiClient.getDeletedJournalVouchers()
+                        : Promise.resolve(null)
+                ]);
+                if (Array.isArray(remoteData)) {
+                    const deletedAliases = new Set();
+                    (Array.isArray(deletedRemoteData) ? deletedRemoteData : [])
+                        .forEach(voucher => getVoucherAliases(voucher).forEach(alias => deletedAliases.add(alias)));
+                    queuedDeletes.forEach(voucher => getVoucherAliases(voucher).forEach(alias => deletedAliases.add(alias)));
+
+                    const mergedVouchers = [];
+                    const activeIndexes = new Map();
+                    remoteData.forEach(remoteVoucher => {
+                        const aliases = getVoucherAliases(remoteVoucher);
+                        const existingIndex = aliases.map(alias => activeIndexes.get(alias)).find(index => index !== undefined);
+                        if (existingIndex !== undefined) {
+                            mergedVouchers[existingIndex] = { ...mergedVouchers[existingIndex], ...remoteVoucher };
+                            getVoucherAliases(mergedVouchers[existingIndex]).forEach(alias => activeIndexes.set(alias, existingIndex));
+                            return;
+                        }
+                        const index = mergedVouchers.push({ ...remoteVoucher }) - 1;
+                        aliases.forEach(alias => activeIndexes.set(alias, index));
+                    });
+
+                    const localOnlyVouchers = [];
+                    localVouchers.forEach(localVoucher => {
+                        const aliases = getVoucherAliases(localVoucher);
+                        if (aliases.some(alias => deletedAliases.has(alias))) return;
+
+                        const existingIndex = aliases.map(alias => activeIndexes.get(alias)).find(index => index !== undefined);
+                        if (existingIndex !== undefined) {
+                            mergedVouchers[existingIndex] = { ...localVoucher, ...mergedVouchers[existingIndex] };
+                            getVoucherAliases(mergedVouchers[existingIndex]).forEach(alias => activeIndexes.set(alias, existingIndex));
+                            return;
+                        }
+
+                        const index = mergedVouchers.push({ ...localVoucher }) - 1;
+                        aliases.forEach(alias => activeIndexes.set(alias, index));
+                        localOnlyVouchers.push(mergedVouchers[index]);
+                    });
+
+                    vouchers = mergedVouchers;
                     localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
+
+                    const currentUser = localStorage.getItem('currentUser') || 'System';
+                    const syncableVouchers = localOnlyVouchers
+                        .filter(voucher => !voucher.createdBy || voucher.createdBy === 'System' || voucher.createdBy === currentUser)
+                        .map(voucher => ({
+                            ...voucher,
+                            createdBy: voucher.createdBy && voucher.createdBy !== 'System' ? voucher.createdBy : currentUser
+                        }));
+                    if (syncableVouchers.length && apiClient._syncRecordsInBatches && apiClient.saveJournalVoucher) {
+                        apiClient._syncRecordsInBatches(syncableVouchers, voucher => apiClient.saveJournalVoucher(voucher))
+                            .catch(error => console.warn('Some journal vouchers remain local until sync succeeds.', error));
+                    }
                 } else {
-                    vouchers = localVouchers;
+                    vouchers = localVouchers.filter(voucher =>
+                        !queuedDeletes.some(deleted => getVoucherAliases(voucher).some(alias => getVoucherAliases(deleted).includes(alias)))
+                    );
                 }
             } catch (e) {
                 console.warn("API sync failed, using local data", e);
-                vouchers = localVouchers;
+                vouchers = localVouchers.filter(voucher =>
+                    !queuedDeletes.some(deleted => getVoucherAliases(voucher).some(alias => getVoucherAliases(deleted).includes(alias)))
+                );
             }
+            localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
             renderVoucherList();
         }
 
@@ -2438,13 +2541,37 @@
 
         async function deleteVoucher(id) {
             showConfirm("Delete Voucher", "Are you sure you want to delete this voucher?", async () => {
-                vouchers = vouchers.filter(v => v.id !== id);
-                localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
-                if (typeof apiClient !== 'undefined' && apiClient.deleteJournalVoucher) {
-                    apiClient.deleteJournalVoucher(id).catch(e => console.warn(e));
+                const deletedVoucher = vouchers.find(v => String(v.id || v._id || '') === String(id)) || { id };
+                const deletedAliases = getVoucherAliases(deletedVoucher);
+                const deleteQueue = readVoucherDeleteQueue();
+                if (!deleteQueue.some(voucher => getVoucherAliases(voucher).some(alias => deletedAliases.includes(alias)))) {
+                    deleteQueue.push({
+                        id: deletedVoucher.id || deletedVoucher._id || id,
+                        voucher_no: deletedVoucher.voucher_no || deletedVoucher.voucherNo || ''
+                    });
+                    writeVoucherDeleteQueue(deleteQueue);
                 }
+
+                vouchers = vouchers.filter(v => !getVoucherAliases(v).some(alias => deletedAliases.includes(alias)));
+                localStorage.setItem('journal_vouchers', JSON.stringify(vouchers));
                 renderVoucherList();
-                showSuccess("Voucher deleted successfully!");
+
+                if (typeof apiClient !== 'undefined' && apiClient.deleteJournalVoucher) {
+                    const result = await apiClient.deleteJournalVoucher(id);
+                    if (result && result.success) {
+                        const remainingQueue = readVoucherDeleteQueue().filter(voucher =>
+                            !getVoucherAliases(voucher).some(alias => deletedAliases.includes(alias))
+                        );
+                        writeVoucherDeleteQueue(remainingQueue);
+                        showSuccess("Voucher deleted successfully on all devices.");
+                        return;
+                    }
+                    console.warn("Journal voucher deletion is queued for retry:", result?.message || "Backend unavailable");
+                    showWarning("Voucher was removed on this device. Server sync is pending; it will retry automatically.");
+                    return;
+                }
+
+                showWarning("Voucher was removed on this device. Server sync is pending; it will retry when the backend is available.");
             });
         }
 
