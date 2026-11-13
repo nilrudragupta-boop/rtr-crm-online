@@ -940,55 +940,8 @@
                 journalVouchers: []
             },
 
-            deduplicateInvoices(invoices) {
-                if (!Array.isArray(invoices)) return [];
-
-                const uniqueInvoices = [];
-                const indexByAlias = new Map();
-
-                invoices.forEach(invoice => {
-                    if (!invoice || typeof invoice !== 'object' || Array.isArray(invoice)) return;
-
-                    const id = String(invoice.id || invoice._id || '').trim().toLowerCase();
-                    const invoiceNo = String(invoice.invoice_no || invoice.invoiceNo || '').trim().toLowerCase();
-                    const aliases = [];
-                    if (id) aliases.push(`id:${id}`);
-                    if (invoiceNo) aliases.push(`invoice:${invoiceNo}`);
-
-                    const existingIndex = aliases
-                        .map(alias => indexByAlias.get(alias))
-                        .find(index => index !== undefined);
-
-                    if (existingIndex !== undefined) {
-                        // Preserve one ledger entry while merging fields from duplicate copies.
-                        uniqueInvoices[existingIndex] = {
-                            ...uniqueInvoices[existingIndex],
-                            ...invoice
-                        };
-                        const merged = uniqueInvoices[existingIndex];
-                        const mergedId = String(merged.id || merged._id || '').trim().toLowerCase();
-                        const mergedNo = String(merged.invoice_no || merged.invoiceNo || '').trim().toLowerCase();
-                        if (mergedId) indexByAlias.set(`id:${mergedId}`, existingIndex);
-                        if (mergedNo) indexByAlias.set(`invoice:${mergedNo}`, existingIndex);
-                    } else {
-                        const newIndex = uniqueInvoices.push({ ...invoice }) - 1;
-                        aliases.forEach(alias => indexByAlias.set(alias, newIndex));
-                    }
-                });
-
-                return uniqueInvoices;
-            },
-
             loadData() {
-                const storedInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
-                this.data.invoices = this.deduplicateInvoices(storedInvoices);
-                if (Array.isArray(storedInvoices) && this.data.invoices.length < storedInvoices.length) {
-                    try {
-                        localStorage.setItem("invoices", JSON.stringify(this.data.invoices));
-                    } catch (error) {
-                        console.warn("Duplicate invoices were removed from the ledger view but could not be saved locally.", error);
-                    }
-                }
+                this.data.invoices = JSON.parse(localStorage.getItem("invoices")) || [];
                 this.data.purchases = JSON.parse(localStorage.getItem("purchases")) || [];
                 this.data.expenses = JSON.parse(localStorage.getItem("expenses")) || [];
                 this.data.customers = JSON.parse(localStorage.getItem("customers")) || [];
@@ -1172,18 +1125,6 @@
                     // Unique categories
                     const cats = new Set(this.data.expenses.map(e => e.expense_category));
                     parties = Array.from(cats).map(c => ({ name: c }));
-                }
-
-                if (type === 'Customer') {
-                    const uniqueCustomers = new Map();
-                    parties.forEach((party, index) => {
-                        const normalizedName = String(party?.name || '').trim().toLowerCase();
-                        const key = normalizedName
-                            ? `name:${normalizedName}`
-                            : `unnamed:${party?.id || index}`;
-                        if (!uniqueCustomers.has(key)) uniqueCustomers.set(key, party);
-                    });
-                    parties = Array.from(uniqueCustomers.values());
                 }
 
                 const summary = [];
