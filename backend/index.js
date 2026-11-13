@@ -273,7 +273,10 @@ const journalVoucherSchema = new mongoose.Schema({
     voucherType: String,
     date: String,
     entries: [], // Array of ledger entries
-    narration: String
+    narration: String,
+    createdBy: { type: String, index: true },
+    deletedAt: { type: Date, default: null, index: true },
+    deletedBy: String
 }, { timestamps: true, strict: false });
 
 // --- 7. Credit & Debit Note Schema ---

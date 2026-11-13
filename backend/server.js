@@ -1130,8 +1130,20 @@ app.delete('/api/bank-transactions/:id', async (req, res) => {
 // --- Journal Voucher Routes ---
 app.get('/api/journal-vouchers', async (req, res) => {
     try {
-        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
         const vouchers = await JournalVoucher.find(query).sort({ date: -1 });
+        res.json({ success: true, data: vouchers });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/journal-vouchers/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const vouchers = await JournalVoucher.find(query).sort({ deletedAt: -1 });
         res.json({ success: true, data: vouchers });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -1140,12 +1152,30 @@ app.get('/api/journal-vouchers', async (req, res) => {
 
 app.post('/api/journal-vouchers', async (req, res) => {
     try {
-        const payload = req.body;
+        const payload = { ...req.body };
+        const owner = req.query.user || payload.createdBy || 'System';
+        payload.createdBy = owner;
         if (payload.id) {
-            const updated = await JournalVoucher.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
+            const voucherNo = payload.voucherNo || payload.voucher_no;
+            const identityClauses = [{ id: payload.id }];
+            if (voucherNo) identityClauses.push({ voucherNo }, { voucher_no: voucherNo });
+            const identity = { $or: identityClauses };
+            const deletedRecord = await JournalVoucher.findOne({
+                ...identity,
+                deletedAt: { $ne: null },
+                createdBy: owner
+            });
+            if (deletedRecord) {
+                return res.status(409).json({ success: false, message: 'This voucher was deleted and cannot be saved again.' });
+            }
+            const updated = await JournalVoucher.findOneAndUpdate({
+                id: payload.id,
+                deletedAt: null,
+                createdBy: owner
+            }, { $set: payload }, { new: true, upsert: true, setDefaultsOnInsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
-            const newVoucher = new JournalVoucher(payload);
+            const newVoucher = new JournalVoucher({ ...payload, deletedAt: null });
             await newVoucher.save();
             res.status(201).json({ success: true, data: newVoucher });
         }
@@ -1156,8 +1186,30 @@ app.post('/api/journal-vouchers', async (req, res) => {
 
 app.delete('/api/journal-vouchers/:id', async (req, res) => {
     try {
-        await JournalVoucher.findOneAndDelete({ $or: [{ id: req.params.id }, { voucher_no: req.params.id }] });
-        res.json({ success: true });
+        const voucherId = decodeURIComponent(req.params.id);
+        const identity = {
+            $or: [
+                { id: voucherId },
+                { voucherNo: voucherId },
+                { voucher_no: voucherId }
+            ]
+        };
+        const query = { ...identity, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+
+        const deleted = await JournalVoucher.findOneAndUpdate(
+            query,
+            { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } },
+            { new: true }
+        );
+        if (deleted) return res.json({ success: true, data: deleted });
+
+        const alreadyDeletedQuery = { ...identity, deletedAt: { $ne: null } };
+        if (req.query.user) alreadyDeletedQuery.createdBy = req.query.user;
+        const alreadyDeleted = await JournalVoucher.exists(alreadyDeletedQuery);
+        if (alreadyDeleted) return res.json({ success: true, alreadyDeleted: true });
+
+        return res.status(404).json({ success: false, message: 'Journal voucher not found.' });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
