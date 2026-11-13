@@ -2544,7 +2544,6 @@
     <script>
         // Triggers a centered modal notification and reloads after 10 seconds
         (function () {
-            const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
             const POLL_INTERVAL_MS = 15000; // Poll every 15 seconds
             const COUNTDOWN_SECONDS = 10;   // 10-second warning before reload
 
@@ -2627,11 +2626,18 @@
                 if (isReloading) return;
 
                 try {
-                    const fetchUrl = `${GOOGLE_SCRIPT_URL}?identifier=${encodeURIComponent(userIdentifier)}&_=${Date.now()}`;
-                    const res = await fetch(fetchUrl);
-                    if (!res.ok) return;
+                    let result;
+                    if (window.electronAPI && window.electronAPI.checkClientRefresh) {
+                        result = await window.electronAPI.checkClientRefresh(userIdentifier);
+                    } else {
+                        const fetchUrl = `${API_BASE_URL}/client-refresh?identifier=${encodeURIComponent(userIdentifier)}&_=${Date.now()}`;
+                        const res = await fetch(fetchUrl, { cache: 'no-store' });
+                        if (!res.ok) return;
+                        result = await res.json();
+                    }
+                    if (!result || !result.success) return;
 
-                    const data = await res.json();
+                    const data = result.data;
                     if (!data.found) return;
 
                     const remoteStamp = (data.refreshTimestamp || "").toString().trim();
