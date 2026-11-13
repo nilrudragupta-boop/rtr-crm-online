@@ -5031,10 +5031,40 @@
             const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id)); if (!invoice) return;
             const rows = invoicePaymentHistory(invoice);
             document.getElementById('invoicePaymentHistoryTitle').textContent = `Invoice ${invoice.invoice_no || invoice.invoiceNo || '-'}`;
-            document.getElementById('invoicePaymentHistoryBody').innerHTML = rows.length ? rows.map((payment, index) => `<tr><td>${index + 1}</td><td style="text-align:right;">₹${(Number(payment.amount)||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td><td><input class="invoice-payment-reference" maxlength="100" value="${escapeHtml(payment.reference || '')}" style="width:180px;"><button class="secondary small" onclick="saveInvoicePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:14px;">No payments recorded.</td></tr>';
+            document.getElementById('invoicePaymentHistoryBody').innerHTML = rows.length ? rows.map((payment, index) => `<tr>
+                <td>${index + 1}</td>
+                <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-amount" type="number" min="0.01" step="0.01" value="${(Number(payment.amount)||0).toFixed(2)}" style="width:100px;text-align:right;"><button class="secondary small" onclick="saveInvoicePaymentEntry('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
+                <td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
+                <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-reference" maxlength="100" value="${escapeHtml(payment.reference || '')}" style="width:150px;"><button class="secondary small" onclick="saveInvoicePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
+            </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:14px;">No payments recorded.</td></tr>';
             document.getElementById('invoicePaymentHistoryModal').style.display = 'block';
         }
-        async function saveInvoicePaymentReference(invoiceId, paymentId, button) {
+        async function saveInvoicePaymentEntry(invoiceId, paymentId, button) {
+            const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(invoiceId));
+            if (!invoice) return showToast('Invoice not found.', '#c0392b');
+            if (!Array.isArray(invoice.paymentHistory) || !invoice.paymentHistory.length) invoice.paymentHistory = invoicePaymentHistory(invoice).map(payment => ({ ...payment }));
+            const payment = invoice.paymentHistory.find(item => String(item.id) === String(paymentId));
+            if (!payment) return showToast('Payment entry not found.', '#c0392b');
+            const amount = Number(button.parentElement.querySelector('.invoice-payment-amount').value);
+            if (!Number.isFinite(amount) || amount <= 0) return showToast('Enter a payment amount greater than zero.', '#c0392b');
+            const newTotalPaid = invoice.paymentHistory.reduce((sum, item) => sum + (item === payment ? amount : (Number(item.amount) || 0)), 0);
+            const invoiceTotal = Number(invoice.invoice_total || invoice.total) || 0;
+            if (newTotalPaid > invoiceTotal + 0.01) return showToast('Edited payments cannot exceed the invoice total.', '#c0392b');
+            payment.amount = amount;
+            invoice.paid_cash = invoice.paymentHistory.filter(item => item.mode === 'Cash').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            invoice.paid_bank = invoice.paymentHistory.filter(item => item.mode === 'Bank').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            invoice.total_paid = invoice.paymentHistory.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            invoice.total_due = invoiceTotal - invoice.total_paid;
+            const transactions = JSON.parse(localStorage.getItem('bank_transactions') || '[]');
+            const transaction = transactions.find(item => String(item.paymentId) === String(payment.id));
+            if (transaction) { transaction.amount = amount; localStorage.setItem('bank_transactions', JSON.stringify(transactions)); }
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) await apiClient.saveInvoice(invoice).catch(console.warn);
+            if (transaction && typeof apiClient !== 'undefined' && apiClient.saveBankTransaction) await apiClient.saveBankTransaction(transaction).catch(console.warn);
+            showInvoicePaymentHistory(invoiceId);
+            renderTable(currentFilteredData);
+            showToast('Installment amount updated.');
+        }        async function saveInvoicePaymentReference(invoiceId, paymentId, button) {
             const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(invoiceId)); if (!invoice) return showToast('Invoice not found.', '#c0392b');
             if (!Array.isArray(invoice.paymentHistory)) invoice.paymentHistory = invoicePaymentHistory(invoice).map(payment => ({...payment}));
             const payment = invoice.paymentHistory.find(item => String(item.id) === String(paymentId)); if (!payment) return showToast('Payment entry not found.', '#c0392b');
