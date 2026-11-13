@@ -270,6 +270,36 @@ app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });
 });
 
+// Keep the refresh service URL on the server instead of exposing it in the page.
+app.get('/api/client-refresh', async (req, res) => {
+    const identifier = typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '';
+    const scriptUrl = process.env.CLIENT_REFRESH_SCRIPT_URL || process.env.GOOGLE_SCRIPT_URL;
+
+    if (!identifier || identifier.length > 200) {
+        return res.status(400).json({ success: false, message: 'A valid user identifier is required.' });
+    }
+    if (!scriptUrl || !scriptUrl.startsWith('https://')) {
+        return res.status(503).json({ success: false, message: 'Refresh service is not configured.' });
+    }
+
+    try {
+        const target = new URL(scriptUrl);
+        target.searchParams.set('identifier', identifier);
+        target.searchParams.set('_', String(Date.now()));
+
+        const upstream = await fetch(target);
+        if (!upstream.ok) {
+            return res.status(502).json({ success: false, message: 'Refresh service request failed.' });
+        }
+        const data = await upstream.json();
+        res.set('Cache-Control', 'no-store');
+        return res.json({ success: true, data });
+    } catch (error) {
+        console.error('Client refresh request failed:', error.message);
+        return res.status(502).json({ success: false, message: 'Refresh service is temporarily unavailable.' });
+    }
+});
+
 // --- Admin Creds Routes (Login Validation) ---
 app.get('/api/admin-creds', async (req, res) => {
     try {
