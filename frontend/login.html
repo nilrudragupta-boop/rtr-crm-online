@@ -17,6 +17,7 @@
     <script src="brand.service.js"></script>
     <script src="brandLoader.js"></script>
     <script src="global_urgent_notice.js"></script>
+    <script src="login-shortcuts.js"></script>
     <!-- rest of existing head unchanged -->
     <style>
         :root {
@@ -1182,39 +1183,9 @@
                 });
             }
 
-            // Track currently pressed keys for multi-key shortcuts
-            const pressedKeys = new Set();
-            document.addEventListener('keyup', (e) => {
-                pressedKeys.delete(e.key.toLowerCase());
-            });
+            document.dispatchEvent(new Event('login-settings-ready'));
 
             document.addEventListener('keydown', (e) => {
-                pressedKeys.add(e.key.toLowerCase());
-
-                // Developer Shortcut: Ctrl + Shift + D to autofill credentials
-                if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
-                    e.preventDefault();
-                    document.getElementById("username").value = "RTR-7908040851";
-                    document.getElementById("password").value = "NANCY@20129830428736";
-                    pressedKeys.clear(); // Clear to prevent continuous re-triggering
-                    validateLogin(); // Auto press Login button
-                    document.getElementById("username").value = "";
-                    document.getElementById("password").value = "";
-                }
-
-                // Admin Shortcut: Ctrl + Shift + K + M to autofill default admin credentials
-                if (e.ctrlKey && e.shiftKey && pressedKeys.has('k') && pressedKeys.has('m')) {
-                    e.preventDefault();
-                    const defaultUser = ADMIN_USERS.length > 0 ? ADMIN_USERS[0].username : "Admin";
-                    const defaultPass = ADMIN_USERS.length > 0 ? (ADMIN_USERS[0].password || localStorage.getItem("appPassword") || "") : "";
-                    document.getElementById("username").value = defaultUser;
-                    document.getElementById("password").value = defaultPass;
-                    pressedKeys.clear(); // Clear to prevent continuous re-triggering
-                    validateLogin(); // Auto press Login button
-                    document.getElementById("username").value = "";
-                    document.getElementById("password").value = "";
-                }
-
                 // Setup Login Tips Slider
                 const loginTips = [
                     "Tip: For the best experience, use <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.",
