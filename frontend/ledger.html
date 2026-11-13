@@ -1190,7 +1190,9 @@
                 ]);
                 const deletedVoucherAliases = new Set();
                 const deletedVoucherResult = results[requests.length];
-                if (deletedVoucherResult?.status === 'fulfilled' && Array.isArray(deletedVoucherResult.value)) {
+                const deletedVouchersConfirmed = deletedVoucherResult?.status === 'fulfilled' &&
+                    Array.isArray(deletedVoucherResult.value);
+                if (deletedVouchersConfirmed) {
                     deletedVoucherResult.value.forEach(voucher => {
                         const id = String(voucher.id || voucher._id || '').trim().toLowerCase();
                         const number = String(voucher.voucher_no || voucher.voucherNo || '').trim().toLowerCase();
@@ -1198,6 +1200,23 @@
                         if (number) deletedVoucherAliases.add(`voucher:${number}`);
                     });
                 }
+                try {
+                    const user = (localStorage.getItem('currentUser') || 'System').trim().toLowerCase();
+                    const pendingDeletes = JSON.parse(localStorage.getItem(`journal_voucher_delete_queue_${user}`) || '[]');
+                    if (Array.isArray(pendingDeletes)) {
+                        pendingDeletes.forEach(voucher => {
+                            const id = String(voucher.id || voucher._id || '').trim().toLowerCase();
+                            const number = String(voucher.voucher_no || voucher.voucherNo || '').trim().toLowerCase();
+                            if (id) deletedVoucherAliases.add(`id:${id}`);
+                            if (number) deletedVoucherAliases.add(`voucher:${number}`);
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Could not read pending journal voucher deletions.', error);
+                }
+                // A successful active-voucher fetch excludes server-deleted records.
+                // Only merge local-only vouchers when the recycle-bin check also
+                // succeeded; otherwise a stale local copy could resurrect a delete.
                 let refreshedAny = false;
 
                 results.forEach((result, index) => {
@@ -1206,6 +1225,7 @@
                     const [dataKey, , getAliases] = requests[index];
                     const localRecords = (this.data[dataKey] || []).filter(record => {
                         if (dataKey !== 'journalVouchers') return true;
+                        if (!deletedVouchersConfirmed) return false;
                         const id = String(record.id || record._id || '').trim().toLowerCase();
                         const number = String(record.voucher_no || record.voucherNo || '').trim().toLowerCase();
                         return !(id && deletedVoucherAliases.has(`id:${id}`)) &&
