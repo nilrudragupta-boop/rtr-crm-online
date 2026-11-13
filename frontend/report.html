@@ -1874,10 +1874,29 @@
                         deletedRemoteData.forEach(invoice => aliasesForInvoice(invoice).forEach(alias => deletedAliases.add(alias)));
                     }
 
-                    const mergedInvoices = remoteData.map(invoice => ({ ...invoice }));
+                    const mergedInvoices = [];
                     const remoteIndexes = new Map();
-                    mergedInvoices.forEach((invoice, index) => {
-                        aliasesForInvoice(invoice).forEach(alias => remoteIndexes.set(alias, index));
+                    remoteData.forEach(remoteInvoice => {
+                        const aliases = aliasesForInvoice(remoteInvoice);
+                        const existingIndex = aliases
+                            .map(alias => remoteIndexes.get(alias))
+                            .find(index => index !== undefined);
+
+                        if (existingIndex !== undefined) {
+                            // Older syncs may already contain multiple copies of one invoice.
+                            // Keep a single record and merge the most recently returned values.
+                            mergedInvoices[existingIndex] = {
+                                ...mergedInvoices[existingIndex],
+                                ...remoteInvoice
+                            };
+                            aliasesForInvoice(mergedInvoices[existingIndex]).forEach(alias =>
+                                remoteIndexes.set(alias, existingIndex)
+                            );
+                            return;
+                        }
+
+                        const index = mergedInvoices.push({ ...remoteInvoice }) - 1;
+                        aliases.forEach(alias => remoteIndexes.set(alias, index));
                     });
 
                     const localOnlyInvoices = [];
