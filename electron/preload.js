@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAppSettings: () => ipcRenderer.invoke('get-app-settings'),
     saveAppSettings: (newState) => ipcRenderer.invoke('save-app-settings', newState),
     checkRemoteLicense: (username) => ipcRenderer.invoke('check-remote-license', username),
+    checkClientRefresh: (identifier) => ipcRenderer.invoke('check-client-refresh', identifier),
 
     // New OTP Methods
     requestOtp: (action, email) => ipcRenderer.invoke('request-otp', action, email),

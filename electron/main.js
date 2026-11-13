@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, ipcMain, net, session, globalShortcut, screen, dialog } = require('electron');
+const { app, BrowserWindow, shell, Menu, ipcMain, net, session, screen, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -23,6 +23,28 @@ const HTML_FILE = 'login.html';
 let isQuitting = false; // Flag to track backup status
 let whatsNewWindow = null; // Track What's New window instance
 
+// Apply the DevTools lock to every renderer, including popups and windows
+// created later by Electron APIs.
+function lockDevTools(contents) {
+    contents.on('devtools-opened', () => contents.closeDevTools());
+    contents.on('before-input-event', (event, input) => {
+        const key = String(input.key || '').toLowerCase();
+        const modifier = input.control || input.meta;
+        const inspectKey = ['i', 'j', 'c', 'k'].includes(key);
+        const isInspectShortcut = modifier && (
+            (input.shift && inspectKey) ||
+            (input.alt && ['i', 'j', 'c'].includes(key))
+        );
+        const isViewSourceShortcut = modifier && key === 'u';
+
+        if (key === 'f12' || isInspectShortcut || isViewSourceShortcut) {
+            event.preventDefault();
+        }
+    });
+}
+
+app.on('web-contents-created', (_event, contents) => lockDevTools(contents));
+
 function createWindow() {
     // Remove the application menu (File, Edit, View, etc.) globally
     Menu.setApplicationMenu(null);
@@ -35,6 +57,7 @@ function createWindow() {
         autoHideMenuBar: true,      // hides menu bar completely
         menuBarVisible: false,      // ensures it is not visible
         webPreferences: {
+            devTools: false,
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: false,
@@ -61,6 +84,7 @@ function createWindow() {
             action: 'allow',
             overrideBrowserWindowOptions: {
                 webPreferences: {
+                    devTools: false,
                     preload: path.join(__dirname, 'preload.js'),
                     nodeIntegration: false,
                     contextIsolation: true,
@@ -230,14 +254,6 @@ function processAllScheduledEmails() {
 }
 
 app.whenReady().then(() => {
-    // --- STEP 7: Developer Override Shortcut ---
-    globalShortcut.register('CommandOrControl+Shift+Alt+D', () => {
-        const windows = BrowserWindow.getAllWindows();
-        if (windows.length > 0) {
-            windows[0].webContents.send('force-open-dev-panel');
-        }
-    });
-
     createWindow();
 
     // Process any emails that were scheduled in previous sessions
@@ -351,6 +367,42 @@ const FIXED_ADMIN_EMAIL = null; // TODO: Enter your hardcoded email here. Set to
 
 // 5. SECURE CLOUD URL (Paste Developer Google Script Web App URL here 1. Sending Secure Renewal OTPs 2. Potential Update Checks 3. UI Peermission Tracking)
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec"; // CHANGE THIS to your Google Script URL (must be HTTPS)
+
+ipcMain.handle('check-client-refresh', async (_event, identifier) => {
+    if (typeof identifier !== 'string' || !identifier.trim()) {
+        return { success: false, message: 'A user identifier is required.' };
+    }
+
+    try {
+        const refreshUrl = new URL(GOOGLE_SCRIPT_URL);
+        refreshUrl.searchParams.set('identifier', identifier.trim());
+        refreshUrl.searchParams.set('_', String(Date.now()));
+
+        const responseData = await new Promise((resolve, reject) => {
+            const request = net.request({ method: 'GET', url: refreshUrl.toString() });
+            request.on('response', (response) => {
+                let body = '';
+                response.on('data', chunk => body += chunk);
+                response.on('end', () => {
+                    try {
+                        resolve({ statusCode: response.statusCode, data: JSON.parse(body) });
+                    } catch (error) {
+                        reject(new Error('Refresh service returned invalid JSON.'));
+                    }
+                });
+            });
+            request.on('error', reject);
+            request.end();
+        });
+
+        if (responseData.statusCode < 200 || responseData.statusCode >= 300) {
+            return { success: false, message: `Refresh service returned HTTP ${responseData.statusCode}.` };
+        }
+        return { success: true, data: responseData.data };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+});
 
 
 ipcMain.handle('request-renewal', async (event, { adminId, renewalCode, duration, amount, scriptUrl, currentExpiry }) => {
@@ -1513,6 +1565,7 @@ ipcMain.handle('show-whats-new', () => {
         icon: path.join(__dirname, 'logo.png'),
         autoHideMenuBar: true,
         webPreferences: {
+            devTools: false,
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js')
