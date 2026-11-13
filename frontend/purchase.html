@@ -1313,22 +1313,20 @@
         </div>
     </div>
 
-    <div id="purchasePaymentHistoryModal" class="modal" style="display:none; position:fixed; z-index:10002; inset:0; background:rgba(0,0,0,.5);">
-        <div class="modal-content" style="background:#fff; margin:6vh auto; padding:18px; width:760px; max-width:95vw; max-height:86vh; overflow:auto; border-radius:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                <h3 style="margin:0; color:#2980b9;">Purchase Payment History</h3>
-                <button class="btn-delete" onclick="closePurchasePaymentHistory()">Close</button>
+    <div id="purchasePaymentHistoryModal" class="modal" style="display:none;position:fixed;z-index:10002;inset:0;background:rgba(0,0,0,.5);">
+        <div class="modal-content" style="background:#fff;margin:6vh auto;padding:18px;width:900px;max-width:96vw;max-height:86vh;overflow:auto;border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                <h3 style="margin:0;color:#2980b9;">Purchase Payment History</h3>
+                <div><button id="purchasePaymentAuditToggle" class="btn-search" onclick="togglePurchasePaymentAudit()" style="display:none;">Audit trail</button> <button class="btn-delete" onclick="closePurchasePaymentHistory()">Close</button></div>
             </div>
             <p id="purchasePaymentHistoryTitle" style="font-weight:bold;"></p>
-            <div style="overflow:auto;">
-                <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                    <thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Bank Account</th></tr></thead>
-                    <tbody id="purchasePaymentHistoryBody"></tbody>
-                </table>
-            </div>
+            <div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Bank Account</th></tr></thead>
+                <tbody id="purchasePaymentHistoryBody"></tbody>
+            </table></div>
+            <section id="purchasePaymentAuditPanel" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid #ddd;"><h4 style="margin:0 0 8px;">Payment audit trail</h4><div id="purchasePaymentAuditBody"></div></section>
         </div>
     </div>
-
     <!-- Generic Action Confirmation Modal -->
     <div id="actionConfirmModal" class="modal">
         <div class="modal-content">
@@ -4650,6 +4648,28 @@
             }
         })();
 
+        let currentPurchasePaymentHistoryId = null;
+        function isPurchasePaymentAuditAdmin() {
+            const username = localStorage.getItem('currentUser') || '';
+            try {
+                const users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
+                return users.some(user => String(user.username || '').toLowerCase() === username.toLowerCase() && String(user.role || '').toLowerCase() === 'admin');
+            } catch (error) { return false; }
+        }
+        function recordPurchasePaymentAudit(purchase, action, payment, changes = {}) {
+            if (!Array.isArray(purchase.paymentAuditTrail)) purchase.paymentAuditTrail = [];
+            purchase.paymentAuditTrail.push({ id: `pur-audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, timestamp: new Date().toISOString(), user: localStorage.getItem('currentUser') || 'System', action, paymentId: payment.id, supplierInvoice: purchase.supplierInv || '', mode: payment.mode || '', changes });
+        }
+        function togglePurchasePaymentAudit() {
+            const panel = document.getElementById('purchasePaymentAuditPanel');
+            const show = panel.style.display === 'none'; panel.style.display = show ? 'block' : 'none'; if (!show) return;
+            const purchase = JSON.parse(localStorage.getItem('purchases') || '[]').find(item => String(item.id) === String(currentPurchasePaymentHistoryId));
+            const events = purchase && Array.isArray(purchase.paymentAuditTrail) ? purchase.paymentAuditTrail.slice().reverse() : [];
+            document.getElementById('purchasePaymentAuditBody').innerHTML = events.length ? events.map(event => {
+                const changes = Object.entries(event.changes || {}).map(([key, value]) => `${escapeHtml(key)}: ${escapeHtml(value.from ?? '-')} → ${escapeHtml(value.to ?? '-')}`).join(' · ');
+                return `<div style="padding:8px;border:1px solid #e5e7eb;border-radius:5px;margin:5px 0;"><strong>${escapeHtml(event.action || 'Payment updated')}</strong> · ${escapeHtml(event.mode || '-')}<br><small>${escapeHtml(new Date(event.timestamp).toLocaleString())} · ${escapeHtml(event.user || 'System')} · ${escapeHtml(event.supplierInvoice || '')}</small>${changes ? `<div style="margin-top:4px;">${changes}</div>` : ''}</div>`;
+            }).join('') : '<p style="color:#666;">No payment changes recorded.</p>';
+        }
         // --- Payment Split Logic ---
         function getPurchasePaymentHistory(purchase, includeLegacy = true) {
             if (Array.isArray(purchase.paymentHistory) && purchase.paymentHistory.length) return purchase.paymentHistory;
@@ -4667,52 +4687,80 @@
 
         function showPurchasePaymentHistory(id) {
             const records = JSON.parse(localStorage.getItem('purchases') || '[]');
-            const purchase = records.find(record => String(record.id) === String(id));
-            if (!purchase) return;
+            const purchase = records.find(record => String(record.id) === String(id)); if (!purchase) return;
+            currentPurchasePaymentHistoryId = id;
+            document.getElementById('purchasePaymentAuditToggle').style.display = isPurchasePaymentAuditAdmin() ? 'inline-block' : 'none';
+            document.getElementById('purchasePaymentAuditPanel').style.display = 'none';
             const history = getPurchasePaymentHistory(purchase).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
             document.getElementById('purchasePaymentHistoryTitle').textContent = `${purchase.supplierName || 'Supplier'} · Invoice ${purchase.supplierInv || '-'}`;
             const body = document.getElementById('purchasePaymentHistoryBody');
             body.innerHTML = history.length ? history.map((payment, index) => `
-                <tr data-payment-id="${escapeHtml(payment.id || '')}">
-                    <td style="text-align:center;">${index + 1}</td>
-                    <td style="text-align:right;white-space:nowrap;">₹${(Number(payment.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td>${escapeHtml(payment.date || '-')}</td>
-                    <td>${escapeHtml(payment.mode || '-')}</td>
+                <tr><td style="text-align:center;">${index + 1}</td>
+                    <td><div style="display:flex;gap:4px;align-items:center;"><input class="purchase-payment-amount" type="number" min="0.01" step="0.01" value="${(Number(payment.amount)||0).toFixed(2)}" style="width:100px;text-align:right;"><button class="btn-save" onclick="savePurchasePaymentAmount('${escapeHtml(id)}','${escapeHtml(payment.id || '')}',this)">Save</button></div></td>
+                    <td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
                     <td><div style="display:flex;gap:5px;min-width:180px;"><input class="purchase-payment-reference" type="text" value="${escapeHtml(payment.reference || '')}" maxlength="100" aria-label="Payment reference" style="width:140px;box-sizing:border-box;"><button type="button" class="btn-save" onclick="savePurchasePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id || '')}',this)">Save</button></div></td>
-                    <td>${escapeHtml(payment.bankAccountName || '-')}</td>
-                </tr>`).join('')
+                    <td>${escapeHtml(payment.bankAccountName || '-')}</td></tr>`).join('')
                 : '<tr><td colspan="6" style="text-align:center;padding:16px;">No payments recorded.</td></tr>';
             document.getElementById('purchasePaymentHistoryModal').style.display = 'block';
         }
-
+        async function savePurchasePaymentAmount(purchaseId, paymentId, button) {
+            const purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
+            const purchase = purchases.find(record => String(record.id) === String(purchaseId)); if (!purchase) return showToast('Purchase record was not found.', '#c0392b');
+            if (!Array.isArray(purchase.paymentHistory) || !purchase.paymentHistory.length) purchase.paymentHistory = getPurchasePaymentHistory(purchase).map(payment => ({ ...payment }));
+            const payment = purchase.paymentHistory.find(entry => String(entry.id) === String(paymentId)); if (!payment) return showToast('Payment entry was not found.', '#c0392b');
+            const amount = Number(button.parentElement.querySelector('.purchase-payment-amount').value);
+            if (!Number.isFinite(amount) || amount <= 0) return showToast('Enter a payment amount greater than zero.', '#c0392b');
+            const totalPaid = purchase.paymentHistory.reduce((sum, item) => sum + (item === payment ? amount : (Number(item.amount) || 0)), 0);
+            const base = (Number(purchase.qty) || 0) * (Number(purchase.price) || 0), discount = Number(purchase.discount) || 0;
+            const discountAmount = purchase.discType === 'flat' ? discount : base * discount / 100;
+            const charges = (Number(purchase.freightCharges) || 0) + (Number(purchase.packingCharges) || 0) + (Number(purchase.loadingCharges) || 0);
+            const taxable = base - discountAmount + charges, total = taxable + taxable * (Number(purchase.gst) || 0) / 100 + (Number(purchase.roundOff) || 0);
+            if (totalPaid > total + 0.01) return showToast('Installment total cannot exceed the purchase amount.', '#c0392b');
+            const previousAmount = Number(payment.amount) || 0;
+            if (previousAmount !== amount) recordPurchasePaymentAudit(purchase, 'Amount edited', payment, { amount: { from: previousAmount, to: amount } });
+            payment.amount = amount;
+            purchase.paid_cash = purchase.paymentHistory.filter(item => item.mode === 'Cash' || item.mode === 'Mixed').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            purchase.paid_bank = purchase.paymentHistory.filter(item => item.mode === 'Bank').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            purchase.paid = purchase.paid_cash + purchase.paid_bank;
+            const transactions = JSON.parse(localStorage.getItem('bank_transactions') || '[]');
+            const transaction = transactions.find(item => String(item.paymentId) === String(payment.id));
+            if (transaction) { transaction.amount = amount; localStorage.setItem('bank_transactions', JSON.stringify(transactions)); }
+            localStorage.setItem('purchases', JSON.stringify(purchases));
+            await saveAuditedPurchase(purchase);
+            if (transaction && typeof apiClient !== 'undefined' && typeof apiClient.saveBankTransaction === 'function') await apiClient.saveBankTransaction(transaction).catch(console.warn);
+            showPurchasePaymentHistory(purchaseId); showToast('Installment amount updated.');
+        }
+        async function saveAuditedPurchase(purchase) {
+            if (typeof apiClient === 'undefined' || !apiClient.savePurchase) return;
+            try {
+                const result = await apiClient.savePurchase(purchase);
+                if (!result || result.success === false) throw new Error(result?.message || 'Could not sync purchase.');
+                writePurchasePaymentSyncQueue(readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id)));
+            } catch (error) {
+                const queue = readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id));
+                queue.push(purchase); writePurchasePaymentSyncQueue(queue);
+                showToast('Saved locally; server sync will retry.', '#e67e22');
+            }
+        }
         async function savePurchasePaymentReference(purchaseId, paymentId, button) {
             const purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
-            const purchase = purchases.find(record => String(record.id) === String(purchaseId));
-            if (!purchase) return showToast('Purchase record was not found.', '#c0392b');
+            const purchase = purchases.find(record => String(record.id) === String(purchaseId)); if (!purchase) return showToast('Purchase record was not found.', '#c0392b');
             if (!Array.isArray(purchase.paymentHistory) || !purchase.paymentHistory.length) purchase.paymentHistory = getPurchasePaymentHistory(purchase).map(payment => ({ ...payment }));
-            const payment = purchase.paymentHistory.find(entry => String(entry.id) === String(paymentId));
-            if (!payment) return showToast('Payment entry was not found.', '#c0392b');
-            payment.reference = button.parentElement.querySelector('.purchase-payment-reference').value.trim();
+            const payment = purchase.paymentHistory.find(entry => String(entry.id) === String(paymentId)); if (!payment) return showToast('Payment entry was not found.', '#c0392b');
+            const nextReference = button.parentElement.querySelector('.purchase-payment-reference').value.trim();
+            const previousReference = String(payment.reference || '');
+            if (previousReference !== nextReference) recordPurchasePaymentAudit(purchase, 'Reference edited', payment, { reference: { from: previousReference, to: nextReference } });
+            payment.reference = nextReference;
             localStorage.setItem('purchases', JSON.stringify(purchases));
             if (payment.mode === 'Bank') {
                 const transactions = JSON.parse(localStorage.getItem('bank_transactions') || '[]');
                 const transaction = transactions.find(entry => String(entry.paymentId) === String(payment.id));
                 if (transaction) { transaction.ref = payment.reference; localStorage.setItem('bank_transactions', JSON.stringify(transactions)); }
             }
-            if (typeof apiClient !== 'undefined' && apiClient.savePurchase) {
-                try {
-                    const result = await apiClient.savePurchase(purchase);
-                    if (!result || result.success === false) throw new Error(result?.message || 'Could not sync purchase.');
-                    writePurchasePaymentSyncQueue(readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id)));
-                } catch (error) {
-                    const queue = readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id));
-                    queue.push(purchase); writePurchasePaymentSyncQueue(queue);
-                    showToast('Reference saved locally; server sync will retry.', '#e67e22');
-                    return;
-                }
-            }
-            showToast('Payment reference saved.');
-        }        function closePurchasePaymentHistory() {
+            await saveAuditedPurchase(purchase);
+            showPurchasePaymentHistory(purchaseId); showToast('Payment reference saved.');
+        }
+        function closePurchasePaymentHistory() {
             document.getElementById('purchasePaymentHistoryModal').style.display = 'none';
         }
 
@@ -4888,6 +4936,7 @@
             });
 
             purchase.paymentHistory = [...payments, ...addedPayments];
+            addedPayments.forEach(payment => recordPurchasePaymentAudit(purchase, 'Installment recorded', payment, { amount: { from: 0, to: Number(payment.amount) || 0 }, reference: { from: '', to: payment.reference || '' }, date: { from: '', to: payment.date || '' } }));
             purchase.paid_cash = purchase.paymentHistory.reduce((sum, payment) => sum + (payment.mode === 'Cash' || payment.mode === 'Mixed' ? Number(payment.amount) || 0 : 0), 0);
             purchase.paid_bank = purchase.paymentHistory.reduce((sum, payment) => sum + (payment.mode === 'Bank' ? Number(payment.amount) || 0 : 0), 0);
             purchase.paid = purchase.paid_cash + purchase.paid_bank;
