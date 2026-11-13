@@ -934,8 +934,8 @@
     </div>
     <div id="invoicePaymentHistoryModal" class="modal" style="display:none;position:fixed;z-index:10003;inset:0;background:rgba(0,0,0,.5);">
       <div class="modal-content" style="background:#fff;margin:7vh auto;padding:18px;width:850px;max-width:96vw;max-height:85vh;overflow:auto;border-radius:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;"><h3 style="margin:0;color:#198754;">Invoice Payment History</h3><button class="danger small" onclick="document.getElementById('invoicePaymentHistoryModal').style.display='none'">Close</button></div>
-        <p id="invoicePaymentHistoryTitle" style="font-weight:bold;"></p><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th></tr></thead><tbody id="invoicePaymentHistoryBody"></tbody></table>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><h3 style="margin:0;color:#198754;">Invoice Payment History</h3><div><button id="invoicePaymentAuditToggle" class="secondary small" onclick="toggleInvoicePaymentAudit()" style="display:none;">Audit trail</button> <button class="danger small" onclick="document.getElementById('invoicePaymentHistoryModal').style.display='none'">Close</button></div></div>
+        <p id="invoicePaymentHistoryTitle" style="font-weight:bold;"></p><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th></tr></thead><tbody id="invoicePaymentHistoryBody"></tbody></table><section id="invoicePaymentAuditPanel" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid #ddd;"><h4 style="margin:0 0 8px;">Payment audit trail</h4><div id="invoicePaymentAuditBody"></div></section>
       </div>
     </div>
     <!-- Edit Payment Warning Modal -->
@@ -5018,6 +5018,34 @@
         }
 
         // --- Payment Split Logic ---
+        function isInvoicePaymentAuditAdmin() {
+            const username = localStorage.getItem('currentUser') || '';
+            try {
+                const users = JSON.parse(localStorage.getItem('ADMIN_USERS') || '[]');
+                return users.some(user => String(user.username || '').toLowerCase() === username.toLowerCase() && String(user.role || '').toLowerCase() === 'admin');
+            } catch (error) { return false; }
+        }
+        function recordInvoicePaymentAudit(invoice, action, payment, changes = {}) {
+            if (!Array.isArray(invoice.paymentAuditTrail)) invoice.paymentAuditTrail = [];
+            invoice.paymentAuditTrail.push({
+                id: `pay-audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                timestamp: new Date().toISOString(), user: localStorage.getItem('currentUser') || 'System',
+                action, paymentId: payment.id, invoiceNo: invoice.invoice_no || invoice.invoiceNo || '',
+                mode: payment.mode || '', changes
+            });
+        }
+        function toggleInvoicePaymentAudit() {
+            const panel = document.getElementById('invoicePaymentAuditPanel');
+            const show = panel.style.display === 'none';
+            panel.style.display = show ? 'block' : 'none';
+            if (!show) return;
+            const invoice = invoices.find(item => String(item.id || item.invoice_no) === String(currentInvoicePaymentHistoryId));
+            const events = invoice && Array.isArray(invoice.paymentAuditTrail) ? invoice.paymentAuditTrail.slice().reverse() : [];
+            document.getElementById('invoicePaymentAuditBody').innerHTML = events.length ? events.map(event => {
+                const changes = Object.entries(event.changes || {}).map(([key, value]) => `${escapeHtml(key)}: ${escapeHtml(value.from ?? '-')} → ${escapeHtml(value.to ?? '-')}`).join(' · ');
+                return `<div style="padding:8px;border:1px solid #e5e7eb;border-radius:5px;margin:5px 0;"><strong>${escapeHtml(event.action || 'Payment updated')}</strong> · ${escapeHtml(event.mode || '-')}<br><small>${escapeHtml(new Date(event.timestamp).toLocaleString())} · ${escapeHtml(event.user || 'System')} · ${escapeHtml(event.invoiceNo || '')}</small>${changes ? `<div style="margin-top:4px;">${changes}</div>` : ''}</div>`;
+            }).join('') : '<p style="color:#666;">No payment changes have been recorded yet.</p>';
+        }
         function invoicePaymentHistory(invoice) {
             if (Array.isArray(invoice.paymentHistory) && invoice.paymentHistory.length) return invoice.paymentHistory;
             const cash = Number(invoice.paid_cash) || 0, bank = Number(invoice.paid_bank) || 0;
@@ -5027,8 +5055,13 @@
             if (!legacy.length) { const paid = Number(invoice.total_paid || invoice.paid_amount || invoice.paid) || 0; if (paid > 0) legacy.push({ id: 'legacy-' + (invoice.id || invoice.invoice_no), amount: paid, date, mode: 'Cash', reference: 'Legacy payment (installment details unavailable)' }); }
             return legacy;
         }
+        let currentInvoicePaymentHistoryId = null;
         function showInvoicePaymentHistory(id) {
             const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id)); if (!invoice) return;
+            currentInvoicePaymentHistoryId = id;
+            const auditToggle = document.getElementById('invoicePaymentAuditToggle');
+            auditToggle.style.display = isInvoicePaymentAuditAdmin() ? 'inline-block' : 'none';
+            document.getElementById('invoicePaymentAuditPanel').style.display = 'none';
             const rows = invoicePaymentHistory(invoice);
             document.getElementById('invoicePaymentHistoryTitle').textContent = `Invoice ${invoice.invoice_no || invoice.invoiceNo || '-'}`;
             document.getElementById('invoicePaymentHistoryBody').innerHTML = rows.length ? rows.map((payment, index) => `<tr>
@@ -5050,6 +5083,8 @@
             const newTotalPaid = invoice.paymentHistory.reduce((sum, item) => sum + (item === payment ? amount : (Number(item.amount) || 0)), 0);
             const invoiceTotal = Number(invoice.invoice_total || invoice.total) || 0;
             if (newTotalPaid > invoiceTotal + 0.01) return showToast('Edited payments cannot exceed the invoice total.', '#c0392b');
+            const previousAmount = Number(payment.amount) || 0;
+            if (previousAmount !== amount) recordInvoicePaymentAudit(invoice, 'Amount edited', payment, { amount: { from: previousAmount, to: amount } });
             payment.amount = amount;
             invoice.paid_cash = invoice.paymentHistory.filter(item => item.mode === 'Cash').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             invoice.paid_bank = invoice.paymentHistory.filter(item => item.mode === 'Bank').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
@@ -5064,11 +5099,15 @@
             showInvoicePaymentHistory(invoiceId);
             renderTable(currentFilteredData);
             showToast('Installment amount updated.');
-        }        async function saveInvoicePaymentReference(invoiceId, paymentId, button) {
+        }
+        async function saveInvoicePaymentReference(invoiceId, paymentId, button) {
             const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(invoiceId)); if (!invoice) return showToast('Invoice not found.', '#c0392b');
-            if (!Array.isArray(invoice.paymentHistory)) invoice.paymentHistory = invoicePaymentHistory(invoice).map(payment => ({...payment}));
+            if (!Array.isArray(invoice.paymentHistory) || !invoice.paymentHistory.length) invoice.paymentHistory = invoicePaymentHistory(invoice).map(payment => ({...payment}));
             const payment = invoice.paymentHistory.find(item => String(item.id) === String(paymentId)); if (!payment) return showToast('Payment entry not found.', '#c0392b');
-            payment.reference = button.parentElement.querySelector('.invoice-payment-reference').value.trim();
+            const nextReference = button.parentElement.querySelector('.invoice-payment-reference').value.trim();
+            const previousReference = String(payment.reference || '');
+            if (previousReference !== nextReference) recordInvoicePaymentAudit(invoice, 'Reference edited', payment, { reference: { from: previousReference, to: nextReference } });
+            payment.reference = nextReference;
             localStorage.setItem('invoices', JSON.stringify(invoices));
             const txs = JSON.parse(localStorage.getItem('bank_transactions') || '[]'); const tx = txs.find(item => String(item.paymentId) === String(payment.id)); if (tx) { tx.ref = payment.reference; localStorage.setItem('bank_transactions', JSON.stringify(txs)); }
             if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) await apiClient.saveInvoice(invoice).catch(console.warn);
@@ -5116,6 +5155,7 @@
             if(cash)added.push({id:group+'-cash',date:cashDate,amount:cash,mode:'Cash',reference:cashRef||'',createdAt:new Date().toISOString()});
             if(bank)added.push({id:group+'-bank',date:bankDate,amount:bank,mode:'Bank',reference:bankRef||'',bankAccountId:accountId,createdAt:new Date().toISOString()});
             invoice.paymentHistory.push(...added);
+            added.forEach(payment => recordInvoicePaymentAudit(invoice, 'Installment recorded', payment, { amount: { from: 0, to: Number(payment.amount) || 0 }, reference: { from: '', to: payment.reference || '' }, date: { from: '', to: payment.date || '' } }));
             invoice.paid_cash=invoice.paymentHistory.filter(p=>p.mode==='Cash').reduce((a,p)=>a+(Number(p.amount)||0),0);
             invoice.paid_bank=invoice.paymentHistory.filter(p=>p.mode==='Bank').reduce((a,p)=>a+(Number(p.amount)||0),0);
             invoice.total_paid=invoice.paymentHistory.reduce((a,p)=>a+(Number(p.amount)||0),0); invoice.total_due=currentPaymentTotal-invoice.total_paid;
