@@ -3455,6 +3455,101 @@
             $("successModal").style.display = "none";
         }
 
+        function getSupplierDetailsHtml(p) {
+            let suppliers = [];
+            try {
+                suppliers = JSON.parse(localStorage.getItem("suppliers") || "[]");
+            } catch (error) {
+                suppliers = [];
+            }
+            if (!Array.isArray(suppliers)) suppliers = [];
+
+            const purchaseSupplierId = p.supplierId || p.supplier?.id;
+            const supplier = (purchaseSupplierId
+                ? suppliers.find(record => String(record.id) === String(purchaseSupplierId))
+                : null) || suppliers.find(record =>
+                    String(record.name || "").trim().toLowerCase() === String(p.supplierName || "").trim().toLowerCase()
+                );
+
+            const fields = [];
+            const addedKeys = new Set();
+            const formatValue = value => {
+                if (value === null || value === undefined) return "";
+                if (typeof value === "boolean") return value ? "Yes" : "";
+                if (Array.isArray(value)) {
+                    return value.map(item => typeof item === "object" && item ? item.name || "" : item)
+                        .filter(item => item !== null && item !== undefined && String(item).trim() !== "")
+                        .join(", ");
+                }
+                if (typeof value === "object") return "";
+                return String(value).trim();
+            };
+            const addField = (key, label, value) => {
+                if (!key || addedKeys.has(key)) return;
+                const displayValue = formatValue(value);
+                if (displayValue === "") return;
+                addedKeys.add(key);
+                fields.push({ label, value: displayValue });
+            };
+
+            if (supplier) {
+                const standardFields = [
+                    ["name", "Name"], ["contact", "Contact"], ["email", "Email"],
+                    ["gstin", "GSTIN"], ["address", "Address"], ["pin", "PIN Code"],
+                    ["district", "District"], ["state", "State"], ["stateCode", "State Code"],
+                    ["supplierType", "Supplier Type"], ["description", "Description"]
+                ];
+                standardFields.forEach(([key, label]) => addField(key, label, supplier[key]));
+
+                let customFields = [];
+                try {
+                    customFields = JSON.parse(localStorage.getItem("CUSTOM_FIELDS") || "[]");
+                } catch (error) {
+                    customFields = [];
+                }
+                const supplierCustomFields = customFields.filter(field =>
+                    field && String(field.moduleName || "").toLowerCase() === "supplier" && field.isActive !== false
+                );
+                supplierCustomFields.forEach(field => {
+                    addField(field.fieldName, field.fieldLabel || field.fieldName, supplier[field.fieldName]);
+                });
+
+                const excludedKeys = new Set([
+                    ...standardFields.map(([key]) => key), "id", "attachments", "createdAt", "updatedAt",
+                    "createdBy", "editedBy", "updatedBy", "deletedAt", "deletedBy", "totalDue",
+                    "openingBalance", "balance", "paymentHistory"
+                ]);
+                const customLabels = new Map(supplierCustomFields.map(field => [field.fieldName, field.fieldLabel || field.fieldName]));
+                Object.keys(supplier).forEach(key => {
+                    if (excludedKeys.has(key) || addedKeys.has(key)) return;
+                    const label = customLabels.get(key) || key
+                        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                        .replace(/[_-]+/g, " ")
+                        .replace(/^./, character => character.toUpperCase());
+                    addField(key, label, supplier[key]);
+                });
+
+                if (Array.isArray(supplier.attachments)) {
+                    const attachmentNames = supplier.attachments.map(attachment => attachment && attachment.name).filter(Boolean);
+                    if (attachmentNames.length) addField("attachments", "Attachments", attachmentNames);
+                }
+            } else {
+                addField("name", "Name", p.supplierName);
+            }
+
+            if (!fields.length) return "";
+            return `
+                <div style="margin-bottom:15px; padding:12px 14px; border:1px solid #dfe3e8; border-radius:8px; background:#fff;">
+                    <h4 style="margin:0 0 10px 0; color:#2980b9;">Supplier Details:</h4>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:7px 18px;">
+                        ${fields.map(field => `
+                            <div style="overflow-wrap:anywhere;"><strong>${escapeHtml(field.label)}:</strong> ${escapeHtml(field.value)}</div>
+                        `).join("")}
+                    </div>
+                </div>
+            `;
+        }
+
         function generatePurchaseHtml(p) {
             const allPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
             let group = [p];
@@ -3579,6 +3674,7 @@
             ` : '';
 
             const grnRef = p.supplierInv || `GRN-${String(p.id || '').slice(-8)}`;
+            const supplierDetailsHtml = getSupplierDetailsHtml(p);
 
             return `
                 <div class="purchase-details-container" style="font-size:14px; line-height:1.5; color:#333;">
@@ -3599,6 +3695,8 @@
                             <div><strong>Supplier Name:</strong> ${escapeHtml(p.supplierName || '-')}</div>
                         </div>
                     </div>
+
+                    ${supplierDetailsHtml}
 
                     <!-- 1. General Details -->
                     <div style="margin-bottom:15px; border-bottom:2px solid #eee; padding-bottom:10px;">
@@ -3695,23 +3793,7 @@
                 </div>
             `;
 
-            // 2. Get Supplier Details
-            const suppliers = JSON.parse(localStorage.getItem("suppliers")) || [];
-            const supplier = suppliers.find(s => s.name === p.supplierName);
-            let supplierHtml = '';
-            if (supplier) {
-                supplierHtml = `
-                    <div style="margin-bottom:20px; padding:10px; border:1px solid #ddd; border-radius:4px;">
-                        <h4 style="margin:0 0 8px 0; color:#2980b9;">Supplier Details:</h4>
-                        <p style="margin:2px 0;"><strong>Name:</strong> ${escapeHtml(supplier.name)}</p>
-                        <p style="margin:2px 0;"><strong>Contact:</strong> ${escapeHtml(supplier.contact || '-')}</p>
-                        <p style="margin:2px 0;"><strong>Address:</strong> ${escapeHtml(supplier.address || '-')}</p>
-                        ${supplier.gstin ? `<p style="margin:2px 0;"><strong>GSTIN:</strong> ${escapeHtml(supplier.gstin)}</p>` : ''}
-                    </div>
-                `;
-            }
-
-            // 3. Get Purchase Content
+            // 2. Get Purchase Content
             const rawHtml = generatePurchaseHtml(p);
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = rawHtml;
@@ -3719,14 +3801,13 @@
             noPrintElements.forEach(el => el.remove());
             const purchaseContent = tempDiv.innerHTML;
 
-            // 4. Open Print Window
+            // 3. Open Print Window
             const grnNo = p.supplierInv || `GRN-${String(p.id || '').slice(-8)}`;
             const printWindow = window.open('', '', 'height=800,width=900');
             printWindow.document.write('<html><head><title>Goods Received Note (GRN)</title>');
             printWindow.document.write('<style>@page{margin:18mm;} body{font-family:"Segoe UI",sans-serif;padding:20px;color:#333;background:#fff;} table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;} th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;} th{background:#f5f7fa;} .no-print{display:none !important;} @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>');
             printWindow.document.write('</head><body>');
             printWindow.document.write(companyHtml);
-            printWindow.document.write(supplierHtml);
             printWindow.document.write(purchaseContent);
             printWindow.document.write('</body></html>');
             printWindow.document.close();
