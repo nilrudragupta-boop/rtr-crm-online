@@ -692,6 +692,8 @@
 
             <button id="btnReceiptLog" class="small secondary" style="background:rgb(28, 14, 219);"
                 onclick="openReceiptLogModal()" data-permission-id="perm_payment_receipt_log">Receipt Log</button>
+            <button id="btnPurchasePaymentHistory" class="small secondary" style="background:#198754;"
+                onclick="openPurchasePaymentHistoryReport()">Purchase Payment History</button>
 
             <button id="btnPrintReport" onclick="window.print()" class="small"
                 data-permission-id="perm_print">Print</button>
@@ -1013,6 +1015,34 @@
                             <td colspan="6" style="text-align:center; padding: 20px;">Loading...</td>
                         </tr>
                     </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="purchasePaymentHistoryReportModal" aria-hidden="true"
+        style="display:none; position:fixed; z-index:10005; inset:0; background:rgba(0,0,0,.5);">
+        <div style="background:#fff; position:absolute; top:6%; left:50%; transform:translateX(-50%); padding:20px; width:92%; max-width:1100px; border-radius:8px; max-height:88vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <h3 style="color:#198754; margin:0;">Purchase Payment History</h3>
+                <button class="danger small" onclick="closePurchasePaymentHistoryReport()">Close</button>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin:12px 0; flex-wrap:wrap;">
+                <label>From <input type="date" id="purchasePaymentHistoryFrom"></label>
+                <label>To <input type="date" id="purchasePaymentHistoryTo"></label>
+                <input type="search" id="purchasePaymentHistorySearch" placeholder="Supplier, invoice, item, reference" style="min-width:260px;">
+                <button class="secondary small" onclick="renderPurchasePaymentHistoryReport()">Filter</button>
+                <strong style="margin-left:auto;">Total: ₹<span id="purchasePaymentHistoryTotal">0.00</span></strong>
+            </div>
+            <div style="overflow:auto; flex:1;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <thead style="position:sticky; top:0; background:#f8f9fa;"><tr>
+                        <th style="padding:8px; border:1px solid #ddd;">Date</th><th style="padding:8px; border:1px solid #ddd;">Supplier</th>
+                        <th style="padding:8px; border:1px solid #ddd;">Supplier Invoice</th><th style="padding:8px; border:1px solid #ddd;">Item</th>
+                        <th style="padding:8px; border:1px solid #ddd;">Mode</th><th style="padding:8px; border:1px solid #ddd;">Amount</th>
+                        <th style="padding:8px; border:1px solid #ddd;">Reference</th><th style="padding:8px; border:1px solid #ddd;">Bank Account</th>
+                    </tr></thead>
+                    <tbody id="purchasePaymentHistoryReportBody"></tbody>
                 </table>
             </div>
         </div>
@@ -5284,6 +5314,74 @@
         window.addEventListener('storage', event => {
             if (event.key === 'showRecycleBinButtons') applyInvoiceRecycleBinVisibility();
         });
+
+        async function openPurchasePaymentHistoryReport() {
+            let purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
+            if (!Array.isArray(purchases)) purchases = [];
+            if (typeof apiClient !== 'undefined' && apiClient.getPurchases) {
+                try {
+                    const remotePurchases = await apiClient.getPurchases();
+                    if (Array.isArray(remotePurchases)) {
+                        purchases = remotePurchases;
+                        localStorage.setItem('purchases', JSON.stringify(purchases));
+                    }
+                } catch (error) {
+                    console.warn('Could not refresh purchase payment history from server.', error);
+                }
+            }
+            window.purchasePaymentHistoryRecords = purchases.flatMap(purchase => {
+                if (Array.isArray(purchase.paymentHistory) && purchase.paymentHistory.length) {
+                    return purchase.paymentHistory.map(payment => ({ ...payment, purchase }));
+                }
+                const legacy = [];
+                const cash = Number(purchase.paid_cash) || 0;
+                const bank = Number(purchase.paid_bank) || 0;
+                const date = purchase.paymentDate || purchase.date || '';
+                const reference = 'Legacy payment (installment details unavailable)';
+                if (cash > 0) legacy.push({ purchase, date: purchase.paymentDateCash || date, amount: cash, mode: 'Cash', reference });
+                if (bank > 0) legacy.push({ purchase, date: purchase.paymentDateBank || date, amount: bank, mode: 'Bank', reference });
+                if (!legacy.length && Number(purchase.paid) > 0) legacy.push({ purchase, date, amount: Number(purchase.paid), mode: 'Cash', reference });
+                return legacy;
+            });
+            document.getElementById('purchasePaymentHistoryReportModal').style.display = 'block';
+            renderPurchasePaymentHistoryReport();
+        }
+
+        function closePurchasePaymentHistoryReport() {
+            document.getElementById('purchasePaymentHistoryReportModal').style.display = 'none';
+        }
+
+        function renderPurchasePaymentHistoryReport() {
+            const rows = window.purchasePaymentHistoryRecords || [];
+            const from = document.getElementById('purchasePaymentHistoryFrom').value;
+            const to = document.getElementById('purchasePaymentHistoryTo').value;
+            const term = document.getElementById('purchasePaymentHistorySearch').value.trim().toLowerCase();
+            const filtered = rows.filter(payment => {
+                const date = String(payment.date || '');
+                if (from && date < from) return false;
+                if (to && date > to) return false;
+                const purchase = payment.purchase || {};
+                const haystack = [purchase.supplierName, purchase.supplierInv, purchase.itemName, payment.mode, payment.reference, payment.bankAccountName]
+                    .map(value => String(value || '').toLowerCase()).join(' ');
+                return !term || haystack.includes(term);
+            }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+            const total = filtered.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+            document.getElementById('purchasePaymentHistoryTotal').textContent = total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const body = document.getElementById('purchasePaymentHistoryReportBody');
+            body.innerHTML = filtered.length ? filtered.map(payment => {
+                const purchase = payment.purchase || {};
+                return `<tr>
+                    <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.date || '-')}</td>
+                    <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(purchase.supplierName || '-')}</td>
+                    <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(purchase.supplierInv || '-')}</td>
+                    <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(purchase.itemName || '-')}</td>
+                    <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.mode || '-')}</td>
+                    <td style="padding:7px;border:1px solid #ddd;text-align:right;">₹${(Number(payment.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.reference || '-')}</td>
+                    <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.bankAccountName || '-')}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="8" style="padding:18px;text-align:center;">No purchase payments found.</td></tr>';
+        }
 
         function exportInvoicesCSV() {
             if (!invoices.length) return showToast("No data to export", "#e67e22");

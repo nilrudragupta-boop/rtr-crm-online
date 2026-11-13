@@ -1273,29 +1273,31 @@
     <div id="paymentSplitModal" class="modal"
         style="display:none; position:fixed; z-index:10001; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
         <div class="modal-content"
-            style="background:#fff; margin:10vh auto; padding:20px; width:300px; border-radius:8px; text-align:center; max-height: 80vh; overflow-y: auto;">
+            style="background:#fff; margin:8vh auto; padding:20px; width:420px; max-width:94vw; border-radius:8px; text-align:center; max-height:84vh; overflow-y:auto;">
             <h3>Record Payment</h3>
             <p id="paymentSplitInvoiceNo" style="font-weight:bold; color:#2980b9;"></p>
             <div style="margin-bottom:10px; font-size:14px;">
                 <strong>Total Amount:</strong> ₹<span id="paymentSplitTotal">0.00</span>
             </div>
             <div style="text-align:left; margin-bottom:10px;">
-                <label>Cash Amount:</label>
+                <label>Cash Payment Now:</label>
                 <div style="display:flex; gap:5px;">
                     <input type="number" id="payCash" placeholder="0.00" style="flex:1; padding:8px; margin-top:5px;"
                         oninput="calculatePaymentBalance()">
                     <input type="date" id="payCashDate" style="flex:1; padding:8px; margin-top:5px;"
                         title="Cash Payment Date">
                 </div>
+                <input type="text" id="payCashReference" maxlength="100" placeholder="Cash receipt / reference (optional)" style="width:100%; box-sizing:border-box; padding:7px; margin-top:5px;">
             </div>
             <div style="text-align:left; margin-bottom:10px;">
-                <label>Bank Amount:</label>
+                <label>Bank Payment Now:</label>
                 <div style="display:flex; gap:5px;">
                     <input type="number" id="payBank" placeholder="0.00" style="flex:1; padding:8px; margin-top:5px;"
                         oninput="calculatePaymentBalance()">
                     <input type="date" id="payBankDate" style="flex:1; padding:8px; margin-top:5px;"
                         title="Bank Payment Date">
                 </div>
+                <input type="text" id="payBankReference" maxlength="100" placeholder="Bank UTR / reference (optional)" style="width:100%; box-sizing:border-box; padding:7px; margin-top:5px;">
             </div>
             <div style="text-align:left; margin-bottom:10px;">
                 <label>Bank Account:</label>
@@ -1308,6 +1310,22 @@
             </div>
             <button onclick="savePaymentSplit()" class="btn-save">Save</button>
             <button onclick="closePaymentSplitModal()" class="btn-delete">Cancel</button>
+        </div>
+    </div>
+
+    <div id="purchasePaymentHistoryModal" class="modal" style="display:none; position:fixed; z-index:10002; inset:0; background:rgba(0,0,0,.5);">
+        <div class="modal-content" style="background:#fff; margin:6vh auto; padding:18px; width:760px; max-width:95vw; max-height:86vh; overflow:auto; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <h3 style="margin:0; color:#2980b9;">Purchase Payment History</h3>
+                <button class="btn-delete" onclick="closePurchasePaymentHistory()">Close</button>
+            </div>
+            <p id="purchasePaymentHistoryTitle" style="font-weight:bold;"></p>
+            <div style="overflow:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <thead><tr><th>Date</th><th>Mode</th><th>Amount</th><th>Reference</th><th>Bank Account</th></tr></thead>
+                    <tbody id="purchasePaymentHistoryBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -2470,6 +2488,19 @@
             let localPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
             if (!Array.isArray(localPurchases)) localPurchases = [];
             let localPurchasesToSync = [];
+            let paymentSyncQueue = readPurchasePaymentSyncQueue();
+            for (const queuedPurchase of paymentSyncQueue) {
+                try {
+                    const syncSucceeded = await syncPurchasePaymentRecord(queuedPurchase);
+                    if (syncSucceeded) {
+                        paymentSyncQueue = paymentSyncQueue.filter(record => String(record.id) !== String(queuedPurchase.id));
+                        writePurchasePaymentSyncQueue(paymentSyncQueue);
+                    }
+                } catch (error) {
+                    console.warn('Purchase payment history sync will retry later.', error);
+                }
+            }
+            const pendingPaymentIds = new Set(paymentSyncQueue.map(record => String(record.id)));
 
             const tbody = document.getElementById("purchaseTableBody");
             if (tbody && localPurchases.length === 0) {
@@ -2491,6 +2522,7 @@
                     remoteData.forEach(remoteP => {
                         if (localPurchaseMap.has(remoteP.id)) {
                             const localIdx = localPurchaseMap.get(remoteP.id);
+                            if (pendingPaymentIds.has(String(remoteP.id))) return;
                             localPurchases[localIdx] = { ...localPurchases[localIdx], ...remoteP };
                         } else {
                             localPurchases.push(remoteP);
@@ -2983,6 +3015,7 @@
         <div style="display:flex; align-items:center; gap:5px;" title="Cash: ₹${paidCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nBank: ₹${paidBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}">
             <input type="number" step="any" value="${paid}" id="paidInput-${p.id}" style="width:80px; padding:4px; border:1px solid #ccc; border-radius:4px; font-weight:bold; color:#28a745; cursor:help;" readonly>
             <button class="btn-edit" style="padding:2px 6px; font-size:12px;" onclick="openPaymentSplitModal('${p.id}')">✏️</button>
+            <button class="btn-search" style="padding:2px 6px; font-size:11px;" onclick="showPurchasePaymentHistory('${p.id}')" title="View installment history">History</button>
         </div>
       </td>
       <td id="due-${p.id}" style="font-weight:bold; color:${due > 0.01 ? 'red' : 'green'}">${due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -3316,7 +3349,12 @@
                     id: newId,
                     date: new Date().toISOString().slice(0, 10),
                     paid: 0,
+                    paid_cash: 0,
+                    paid_bank: 0,
+                    paymentHistory: [],
                     paymentDate: "",
+                    paymentDateCash: "",
+                    paymentDateBank: "",
                     remarks: (p.remarks ? p.remarks + " (Copy)" : "Copy"),
                     ...audit
                 };
@@ -4613,6 +4651,74 @@
         })();
 
         // --- Payment Split Logic ---
+        function getPurchasePaymentHistory(purchase, includeLegacy = true) {
+            if (Array.isArray(purchase.paymentHistory) && purchase.paymentHistory.length) return purchase.paymentHistory;
+            const cash = Number(purchase.paid_cash) || 0;
+            const bank = Number(purchase.paid_bank) || 0;
+            if (!includeLegacy) return [];
+            const baseId = `legacy-${purchase.id || purchase.supplierInv || 'purchase'}`;
+            const history = [];
+            if (cash > 0) history.push({ id: `${baseId}-cash`, date: purchase.paymentDateCash || purchase.paymentDate || purchase.date || '', amount: cash, mode: 'Cash', reference: 'Legacy payment (installment details unavailable)', bankAccountName: '' });
+            if (bank > 0) history.push({ id: `${baseId}-bank`, date: purchase.paymentDateBank || purchase.paymentDate || purchase.date || '', amount: bank, mode: 'Bank', reference: 'Legacy payment (installment details unavailable)', bankAccountName: '' });
+            const amount = Number(purchase.paid) || 0;
+            if (!history.length && amount > 0) history.push({ id: baseId, date: purchase.paymentDate || purchase.date || '', amount, mode: 'Cash', reference: 'Legacy payment (installment details unavailable)', bankAccountName: '' });
+            return history;
+        }
+
+        function showPurchasePaymentHistory(id) {
+            const records = JSON.parse(localStorage.getItem('purchases') || '[]');
+            const purchase = records.find(record => String(record.id) === String(id));
+            if (!purchase) return;
+            const history = getPurchasePaymentHistory(purchase).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+            document.getElementById('purchasePaymentHistoryTitle').textContent = `${purchase.supplierName || 'Supplier'} · Invoice ${purchase.supplierInv || '-'}`;
+            const body = document.getElementById('purchasePaymentHistoryBody');
+            body.innerHTML = history.length ? history.map(payment => `
+                <tr><td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
+                <td style="text-align:right;">₹${(Number(payment.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                <td>${escapeHtml(payment.reference || '-')}</td><td>${escapeHtml(payment.bankAccountName || '-')}</td></tr>`).join('')
+                : '<tr><td colspan="5" style="text-align:center;padding:16px;">No payments recorded.</td></tr>';
+            document.getElementById('purchasePaymentHistoryModal').style.display = 'block';
+        }
+
+        function closePurchasePaymentHistory() {
+            document.getElementById('purchasePaymentHistoryModal').style.display = 'none';
+        }
+
+        function getPurchasePaymentSyncQueueKey() {
+            return `purchase_payment_sync_queue_${(localStorage.getItem('currentUser') || 'System').trim().toLowerCase()}`;
+        }
+
+        function readPurchasePaymentSyncQueue() {
+            try {
+                const queue = JSON.parse(localStorage.getItem(getPurchasePaymentSyncQueueKey()) || '[]');
+                return Array.isArray(queue) ? queue : [];
+            } catch (error) { return []; }
+        }
+
+        function writePurchasePaymentSyncQueue(queue) {
+            localStorage.setItem(getPurchasePaymentSyncQueueKey(), JSON.stringify(queue));
+        }
+
+        function buildPurchasePaymentBankTransaction(purchase, payment) {
+            return {
+                id: `tx_${payment.id}`, date: payment.date, type: 'Withdrawal', amount: Number(payment.amount) || 0,
+                accountId: payment.bankAccountId, ref: payment.reference,
+                remarks: `Payment to Supplier: ${purchase.supplierName || 'Supplier'} (${purchase.supplierInv || 'Purchase'})`,
+                cleared: false, purchaseId: purchase.id, paymentId: payment.id
+            };
+        }
+
+        async function syncPurchasePaymentRecord(purchase) {
+            const purchaseResult = await apiClient.savePurchase(purchase);
+            if (!purchaseResult || purchaseResult.success === false) return false;
+            for (const payment of (Array.isArray(purchase.paymentHistory) ? purchase.paymentHistory : [])) {
+                if (payment.mode !== 'Bank' || String(payment.id || '').startsWith('legacy-')) continue;
+                const result = await apiClient.saveBankTransaction(buildPurchasePaymentBankTransaction(purchase, payment));
+                if (!result || result.success === false) return false;
+            }
+            return true;
+        }
+
         function openPaymentSplitModal(id) {
             currentPaymentInvoiceId = id;
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
@@ -4621,24 +4727,25 @@
 
             document.getElementById('paymentSplitInvoiceNo').innerText = purchase.supplierInv || "No Inv";
 
-            const taxable = purchase.qty * purchase.price;
-            const taxAmt = taxable * ((purchase.gst || 0) / 100);
-            const total = taxable + taxAmt;
+            const base = (Number(purchase.qty) || 0) * (Number(purchase.price) || 0);
+            const discount = Number(purchase.discount) || 0;
+            const discountAmount = purchase.discType === 'flat' ? discount : base * discount / 100;
+            const extraCharges = (Number(purchase.freightCharges) || 0) + (Number(purchase.packingCharges) || 0) + (Number(purchase.loadingCharges) || 0);
+            const taxable = base - discountAmount + extraCharges;
+            const total = taxable + taxable * (Number(purchase.gst) || 0) / 100 + (Number(purchase.roundOff) || 0);
 
             document.getElementById('paymentSplitTotal').innerText = total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            document.getElementById('payCash').value = purchase.paid_cash || 0;
-            document.getElementById('payBank').value = purchase.paid_bank || 0;
+            document.getElementById('payCash').value = '';
+            document.getElementById('payBank').value = '';
+            document.getElementById('payCashReference').value = '';
+            document.getElementById('payBankReference').value = '';
 
             const now = new Date();
             const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-            document.getElementById('payCashDate').value = purchase.paymentDateCash || purchase.paymentDate || today;
-            document.getElementById('payBankDate').value = purchase.paymentDateBank || purchase.paymentDate || today;
-
-            // If legacy data (only paid exists), default to Cash
-            if (!purchase.paid_cash && !purchase.paid_bank && purchase.paid) {
-                document.getElementById('payCash').value = purchase.paid;
-            }
+            document.getElementById('payCashDate').value = today;
+            document.getElementById('payBankDate').value = today;
+            document.getElementById('paymentSplitBalance').dataset.currentDue = String(total - (Number(purchase.paid) || 0));
 
             // Populate Bank Accounts
             const accounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
@@ -4664,10 +4771,8 @@
             const cash = parseFloat(document.getElementById('payCash').value) || 0;
             const bank = parseFloat(document.getElementById('payBank').value) || 0;
 
-            const totalStr = document.getElementById('paymentSplitTotal').innerText.replace(/,/g, '');
-            const total = parseFloat(totalStr) || 0;
-
-            const balance = total - (cash + bank);
+            const currentDue = Number(document.getElementById('paymentSplitBalance').dataset.currentDue) || 0;
+            const balance = currentDue - (cash + bank);
 
             const el = document.getElementById('paymentSplitBalance');
             el.innerText = balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -4710,68 +4815,84 @@
         }
 
         async function savePaymentSplit() {
-            const cash = parseFloat(document.getElementById('payCash').value) || 0;
-            const bank = parseFloat(document.getElementById('payBank').value) || 0;
+            const cash = Math.max(0, Number(document.getElementById('payCash').value) || 0);
+            const bank = Math.max(0, Number(document.getElementById('payBank').value) || 0);
             const cashDate = document.getElementById('payCashDate').value;
             const bankDate = document.getElementById('payBankDate').value;
-            const limit = parseFloat(localStorage.getItem('cashLimit')) || 0;
+            const cashReference = document.getElementById('payCashReference').value.trim();
+            const bankReference = document.getElementById('payBankReference').value.trim();
+            const limit = Number(localStorage.getItem('cashLimit')) || 0;
             const applyToPurchase = localStorage.getItem('applyCashLimitToPurchase') === 'true';
 
-            if (limit > 0 && applyToPurchase && cash > limit) {
-                showToast(`⚠️ Cash amount exceeds limit of ₹${limit}`, "#c0392b");
-                return;
-            }
+            if (cash + bank <= 0) return showToast('Enter a positive cash or bank installment.', '#c0392b');
+            const currentDue = Number(document.getElementById('paymentSplitBalance').dataset.currentDue) || 0;
+            if (cash + bank > currentDue + 0.01) return showToast('Payment cannot exceed the outstanding due.', '#c0392b');
+            if (limit > 0 && applyToPurchase && cash > limit) return showToast(`Cash amount exceeds limit of ₹${limit}`, '#c0392b');
+            if ((cash > 0 && !cashDate) || (bank > 0 && !bankDate)) return showToast('Select a date for each payment.', '#c0392b');
 
-            let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            const idx = purchases.findIndex(p => String(p.id) === String(currentPaymentInvoiceId));
+            const purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
+            const index = purchases.findIndex(purchase => String(purchase.id) === String(currentPaymentInvoiceId));
+            if (index < 0) return showToast('Purchase record was not found.', '#c0392b');
 
-            if (idx > -1) {
-                // Auto-feed to Banking (Indian Accounting: Payment -> Withdrawal)
-                const oldBank = parseFloat(purchases[idx].paid_bank || 0);
-                const diff = bank - oldBank;
-                if (Math.abs(diff) > 0.01) {
-                    const accounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
+            const purchase = purchases[index];
+            const accounts = JSON.parse(localStorage.getItem('bank_accounts') || '[]');
+            let accountId = document.getElementById('payBankAccount').value;
+            if (!accountId && accounts.length) accountId = (accounts.find(account => account.isPrimary) || accounts[0]).id;
+            if (bank > 0 && !accountId) return showToast('Select a bank account before recording a bank payment.', '#c0392b');
+            const bankAccount = accounts.find(account => String(account.id) === String(accountId));
+            const payments = getPurchasePaymentHistory(purchase).slice();
+            const groupId = `purpay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const createdBy = localStorage.getItem('currentUser') || 'System';
+            const addedPayments = [];
 
-                    let accId = document.getElementById('payBankAccount').value;
-                    if (!accId && accounts.length > 0) {
-                        const primaryAcc = accounts.find(a => a.isPrimary) || accounts[0];
-                        accId = primaryAcc.id;
-                    }
+            if (cash > 0) addedPayments.push({
+                id: `${groupId}-cash`, date: cashDate, amount: cash, mode: 'Cash',
+                reference: cashReference || `${groupId}-CASH`, createdAt: new Date().toISOString(), createdBy
+            });
+            if (bank > 0) addedPayments.push({
+                id: `${groupId}-bank`, date: bankDate, amount: bank, mode: 'Bank',
+                reference: bankReference || `${groupId}-BANK`, bankAccountId: accountId,
+                bankAccountName: bankAccount?.name || '', createdAt: new Date().toISOString(), createdBy
+            });
 
-                    if (accId) {
-                        const type = diff > 0 ? 'Withdrawal' : 'Deposit'; // Positive diff means money went out
-                        const tx = {
-                            id: 'tx_pur_' + Date.now(),
-                            date: bankDate,
-                            type: type,
-                            amount: Math.abs(diff),
-                            accountId: accId,
-                            ref: purchases[idx].supplierInv || "PUR",
-                            remarks: `Payment to Supplier: ${purchases[idx].supplierName || 'Supplier'}`,
-                            cleared: false
-                        };
-                        const bankTx = JSON.parse(localStorage.getItem('bank_transactions')) || [];
-                        bankTx.push(tx);
-                        localStorage.setItem('bank_transactions', JSON.stringify(bankTx));
-                    } else {
-                        showToast("⚠️ No bank account found. Banking transaction skipped.", "#e67e22");
-                    }
+            purchase.paymentHistory = [...payments, ...addedPayments];
+            purchase.paid_cash = purchase.paymentHistory.reduce((sum, payment) => sum + (payment.mode === 'Cash' || payment.mode === 'Mixed' ? Number(payment.amount) || 0 : 0), 0);
+            purchase.paid_bank = purchase.paymentHistory.reduce((sum, payment) => sum + (payment.mode === 'Bank' ? Number(payment.amount) || 0 : 0), 0);
+            purchase.paid = purchase.paid_cash + purchase.paid_bank;
+            purchase.paymentDate = addedPayments[addedPayments.length - 1].date;
+            if (cash > 0) purchase.paymentDateCash = cashDate;
+            if (bank > 0) purchase.paymentDateBank = bankDate;
+
+            if (bank > 0) {
+                const payment = addedPayments.find(entry => entry.mode === 'Bank');
+                const tx = {
+                    id: `tx_${payment.id}`, date: payment.date, type: 'Withdrawal', amount: payment.amount,
+                    accountId, ref: payment.reference,
+                    remarks: `Payment to Supplier: ${purchase.supplierName || 'Supplier'} (${purchase.supplierInv || 'Purchase'})`,
+                    cleared: false, purchaseId: purchase.id, paymentId: payment.id
+                };
+                const bankTransactions = JSON.parse(localStorage.getItem('bank_transactions') || '[]');
+                if (!bankTransactions.some(transaction => String(transaction.id) === String(tx.id))) {
+                    bankTransactions.push(tx);
+                    localStorage.setItem('bank_transactions', JSON.stringify(bankTransactions));
                 }
-
-                purchases[idx].paid_cash = cash;
-                purchases[idx].paid_bank = bank;
-                purchases[idx].paid = cash + bank; // Update total paid
-                purchases[idx].paymentDateCash = cashDate;
-                purchases[idx].paymentDateBank = bankDate;
-
-                localStorage.setItem("purchases", JSON.stringify(purchases));
-                await apiClient.savePurchase(purchases[idx]).catch(e => console.warn("API sync failed", e));
-                await loadPurchases(); // Refresh table
-                closePaymentSplitModal();
-                showToast("Payment updated successfully");
+                if (apiClient.saveBankTransaction) await apiClient.saveBankTransaction(tx);
             }
-        }
 
+            localStorage.setItem('purchases', JSON.stringify(purchases));
+            const saved = await apiClient.savePurchase(purchase);
+            if (!saved || saved.success === false) {
+                const queue = readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id));
+                queue.push(purchase);
+                writePurchasePaymentSyncQueue(queue);
+                console.warn('Purchase payment history remains saved locally; backend sync will retry.', saved?.message);
+            } else {
+                writePurchasePaymentSyncQueue(readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id)));
+            }
+            await loadPurchases();
+            closePaymentSplitModal();
+            showToast('Installment recorded successfully.');
+        }
         // Close dropdowns on scroll to prevent detaching from row
         window.addEventListener('scroll', function () {
             document.querySelectorAll('.action-dropdown.active').forEach(d => d.classList.remove('active'));
