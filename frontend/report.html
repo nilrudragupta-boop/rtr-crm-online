@@ -896,47 +896,48 @@
     </div>
 
     <!-- Payment Split Modal -->
-    <div id="paymentSplitModal" class="modal"
-        style="display:none; position:fixed; z-index:10001; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
-        <div class="modal-content"
-            style="background:#fff; margin:10vh auto; padding:20px; width:300px; border-radius:8px; text-align:center; max-height: 80vh; overflow-y: auto;">
+    <div id="paymentSplitModal" class="modal" style="display:none;position:fixed;z-index:10001;inset:0;width:100%;height:100%;background:rgba(0,0,0,.5);overflow-y:auto;">
+        <div class="modal-content" style="background:#fff;margin:6vh auto;padding:20px;width:420px;max-width:calc(100vw - 32px);box-sizing:border-box;border-radius:8px;text-align:center;max-height:88vh;overflow-y:auto;">
             <h3>Record Payment</h3>
-            <p id="paymentSplitInvoiceNo" style="font-weight:bold; color:#2980b9;"></p>
-            <div style="margin-bottom:10px; font-size:14px;">
-                <strong>Total Amount:</strong> ₹<span id="paymentSplitTotal">0.00</span>
-            </div>
-            <div style="text-align:left; margin-bottom:10px;">
-                <label>Cash Amount:</label>
-                <div style="display:flex; gap:5px;">
-                    <input type="number" id="payCash" placeholder="0.00" style="flex:1; padding:8px; margin-top:5px;"
-                        oninput="calculatePaymentBalance()">
-                    <input type="date" id="payCashDate" style="flex:1; padding:8px; margin-top:5px;"
-                        title="Cash Payment Date">
+            <p id="paymentSplitInvoiceNo" style="font-weight:bold;color:#2980b9;"></p>
+            <div style="margin-bottom:14px;font-size:14px;"><strong>Total Amount:</strong> ₹<span id="paymentSplitTotal">0.00</span></div>
+
+            <div style="text-align:left;margin-bottom:12px;">
+                <label for="payCash">Cash Amount:</label>
+                <div style="display:flex;gap:6px;align-items:stretch;">
+                    <input type="number" id="payCash" min="0" step="0.01" placeholder="0.00" style="min-width:0;flex:1;padding:8px;box-sizing:border-box;" oninput="calculatePaymentBalance()">
+                    <input type="date" id="payCashDate" title="Cash Payment Date" style="min-width:0;flex:1;padding:8px;box-sizing:border-box;">
                 </div>
+                <input type="text" id="payCashReference" maxlength="100" placeholder="Cash reference (optional)" style="display:block;width:100%;padding:8px;margin-top:6px;box-sizing:border-box;">
             </div>
-            <div style="text-align:left; margin-bottom:10px;">
-                <label>Bank Amount:</label>
-                <div style="display:flex; gap:5px;">
-                    <input type="number" id="payBank" placeholder="0.00" style="flex:1; padding:8px; margin-top:5px;"
-                        oninput="calculatePaymentBalance()">
-                    <input type="date" id="payBankDate" style="flex:1; padding:8px; margin-top:5px;"
-                        title="Bank Payment Date">
+
+            <div style="text-align:left;margin-bottom:12px;">
+                <label for="payBank">Bank Amount:</label>
+                <div style="display:flex;gap:6px;align-items:stretch;">
+                    <input type="number" id="payBank" min="0" step="0.01" placeholder="0.00" style="min-width:0;flex:1;padding:8px;box-sizing:border-box;" oninput="calculatePaymentBalance()">
+                    <input type="date" id="payBankDate" title="Bank Payment Date" style="min-width:0;flex:1;padding:8px;box-sizing:border-box;">
                 </div>
+                <input type="text" id="payBankReference" maxlength="100" placeholder="Bank UTR / reference (optional)" style="display:block;width:100%;padding:8px;margin-top:6px;box-sizing:border-box;">
             </div>
-            <div style="text-align:left; margin-bottom:10px;">
-                <label>Bank Account:</label>
-                <select id="payBankAccount"
-                    style="width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:4px;"></select>
+
+            <div style="text-align:left;margin-bottom:12px;">
+                <label for="payBankAccount">Bank Account:</label>
+                <select id="payBankAccount" style="display:block;width:100%;padding:8px;margin-top:5px;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;"></select>
             </div>
-            <div
-                style="text-align:right; margin-bottom:15px; font-weight:bold; border-top:1px solid #eee; padding-top:5px;">
-                Balance: <span id="paymentSplitBalance" style="color:#c0392b;">0.00</span>
+            <div style="text-align:right;margin-bottom:15px;font-weight:bold;border-top:1px solid #eee;padding-top:8px;">Balance: <span id="paymentSplitBalance" style="color:#c0392b;">0.00</span></div>
+            <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;">
+                <button onclick="savePaymentSplit()" class="secondary small">Add installment</button>
+                <button onclick="showInvoicePaymentHistory(currentPaymentInvoiceId)" class="secondary small">History</button>
+                <button onclick="closePaymentSplitModal()" class="danger small">Cancel</button>
             </div>
-            <button onclick="savePaymentSplit()" class="secondary small">Save</button>
-            <button onclick="closePaymentSplitModal()" class="danger small">Cancel</button>
         </div>
     </div>
-
+    <div id="invoicePaymentHistoryModal" class="modal" style="display:none;position:fixed;z-index:10003;inset:0;background:rgba(0,0,0,.5);">
+      <div class="modal-content" style="background:#fff;margin:7vh auto;padding:18px;width:850px;max-width:96vw;max-height:85vh;overflow:auto;border-radius:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;"><h3 style="margin:0;color:#198754;">Invoice Payment History</h3><button class="danger small" onclick="document.getElementById('invoicePaymentHistoryModal').style.display='none'">Close</button></div>
+        <p id="invoicePaymentHistoryTitle" style="font-weight:bold;"></p><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th></tr></thead><tbody id="invoicePaymentHistoryBody"></tbody></table>
+      </div>
+    </div>
     <!-- Edit Payment Warning Modal -->
     <div id="editPaymentWarningModal" aria-hidden="true">
         <h3 style="margin-top:0; color:#d35400;">⚠️ Edit Payment Amount ?</h3>
@@ -1037,9 +1038,9 @@
             <div style="overflow:auto; flex:1;">
                 <table style="width:100%; border-collapse:collapse; font-size:13px;">
                     <thead style="position:sticky; top:0; background:#f8f9fa;"><tr>
-                        <th style="padding:8px; border:1px solid #ddd;">Date</th><th style="padding:8px; border:1px solid #ddd;">Supplier</th>
+                        <th style="padding:8px; border:1px solid #ddd;">Sl no.</th><th style="padding:8px; border:1px solid #ddd;">Amount</th><th style="padding:8px; border:1px solid #ddd;">Date</th><th style="padding:8px; border:1px solid #ddd;">Supplier</th>
                         <th style="padding:8px; border:1px solid #ddd;">Supplier Invoice</th><th style="padding:8px; border:1px solid #ddd;">Item</th>
-                        <th style="padding:8px; border:1px solid #ddd;">Mode</th><th style="padding:8px; border:1px solid #ddd;">Amount</th>
+                        <th style="padding:8px; border:1px solid #ddd;">Mode</th>
                         <th style="padding:8px; border:1px solid #ddd;">Reference</th><th style="padding:8px; border:1px solid #ddd;">Bank Account</th>
                     </tr></thead>
                     <tbody id="purchasePaymentHistoryReportBody"></tbody>
@@ -2169,7 +2170,7 @@
         <td style="text-align:right;">${highlightMatch(paidBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), searchTerm)}</td>
         <td style="text-align:right; white-space:nowrap;" title="Cash: ₹${paidCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nBank: ₹${paidBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}">
         <input class="paid-input" type="number" min="0" step="0.01" value="${paid.toFixed(2)}" style="width:90px; color:#27ae60; font-weight:bold; cursor:help;" readonly>
-        <button class="small edit-paid-btn" style="background:#FFFFFF; color:#fff; padding:4px 6px; margin-left:4px; border:none; cursor:pointer;" title="Edit Amount">✏️</button>
+        <button class="small invoice-history-btn" onclick="showInvoicePaymentHistory('${id}')" title="Installment history" style="padding:3px 5px;">History</button><button class="small edit-paid-btn" style="background:#FFFFFF; color:#fff; padding:4px 6px; margin-left:4px; border:none; cursor:pointer;" title="Edit Amount">✏️</button>
         
         <button class="small print-receipt-btn" style="background:none; color:#27ae60; padding:4px 6px; border:none; cursor:pointer;" title="Download Payment Receipt Against Individual Invoice Basis"><i class="fas fa-print"></i></button>
         </td>
@@ -5017,127 +5018,84 @@
         }
 
         // --- Payment Split Logic ---
+        function invoicePaymentHistory(invoice) {
+            if (Array.isArray(invoice.paymentHistory) && invoice.paymentHistory.length) return invoice.paymentHistory;
+            const cash = Number(invoice.paid_cash) || 0, bank = Number(invoice.paid_bank) || 0;
+            const legacy = [], date = invoice.payment_date || invoice.payment_date_cash || invoice.date || '';
+            if (cash > 0) legacy.push({ id: 'legacy-' + (invoice.id || invoice.invoice_no) + '-cash', amount: cash, date: invoice.payment_date_cash || date, mode: 'Cash', reference: 'Legacy payment (installment details unavailable)' });
+            if (bank > 0) legacy.push({ id: 'legacy-' + (invoice.id || invoice.invoice_no) + '-bank', amount: bank, date: invoice.payment_date_bank || date, mode: 'Bank', reference: 'Legacy payment (installment details unavailable)' });
+            if (!legacy.length) { const paid = Number(invoice.total_paid || invoice.paid_amount || invoice.paid) || 0; if (paid > 0) legacy.push({ id: 'legacy-' + (invoice.id || invoice.invoice_no), amount: paid, date, mode: 'Cash', reference: 'Legacy payment (installment details unavailable)' }); }
+            return legacy;
+        }
+        function showInvoicePaymentHistory(id) {
+            const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id)); if (!invoice) return;
+            const rows = invoicePaymentHistory(invoice);
+            document.getElementById('invoicePaymentHistoryTitle').textContent = `Invoice ${invoice.invoice_no || invoice.invoiceNo || '-'}`;
+            document.getElementById('invoicePaymentHistoryBody').innerHTML = rows.length ? rows.map((payment, index) => `<tr><td>${index + 1}</td><td style="text-align:right;">₹${(Number(payment.amount)||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td><td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td><td><input class="invoice-payment-reference" maxlength="100" value="${escapeHtml(payment.reference || '')}" style="width:180px;"><button class="secondary small" onclick="saveInvoicePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:14px;">No payments recorded.</td></tr>';
+            document.getElementById('invoicePaymentHistoryModal').style.display = 'block';
+        }
+        async function saveInvoicePaymentReference(invoiceId, paymentId, button) {
+            const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(invoiceId)); if (!invoice) return showToast('Invoice not found.', '#c0392b');
+            if (!Array.isArray(invoice.paymentHistory)) invoice.paymentHistory = invoicePaymentHistory(invoice).map(payment => ({...payment}));
+            const payment = invoice.paymentHistory.find(item => String(item.id) === String(paymentId)); if (!payment) return showToast('Payment entry not found.', '#c0392b');
+            payment.reference = button.parentElement.querySelector('.invoice-payment-reference').value.trim();
+            localStorage.setItem('invoices', JSON.stringify(invoices));
+            const txs = JSON.parse(localStorage.getItem('bank_transactions') || '[]'); const tx = txs.find(item => String(item.paymentId) === String(payment.id)); if (tx) { tx.ref = payment.reference; localStorage.setItem('bank_transactions', JSON.stringify(txs)); }
+            if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) await apiClient.saveInvoice(invoice).catch(console.warn);
+            showToast('Payment reference saved.');
+        }
         function openPaymentSplitModal(id) {
             currentPaymentInvoiceId = id;
-            const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
-            if (!invoice) return;
-
+            const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id)); if (!invoice) return;
             document.getElementById('paymentSplitInvoiceNo').innerText = invoice.invoice_no || invoice.invoiceNo;
             currentPaymentTotal = parseFloat(invoice.invoice_total || invoice.total || 0);
-            document.getElementById('paymentSplitTotal').innerText = currentPaymentTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-            document.getElementById('payCash').value = invoice.paid_cash || 0;
-            document.getElementById('payBank').value = invoice.paid_bank || 0;
-
-            const now = new Date();
-            const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-            document.getElementById('payCashDate').value = invoice.payment_date_cash || invoice.payment_date || today;
-            document.getElementById('payBankDate').value = invoice.payment_date_bank || invoice.payment_date || today;
-
-            // If legacy data (only total_paid exists), default to Cash
-            if (!invoice.paid_cash && !invoice.paid_bank && invoice.total_paid) {
-                document.getElementById('payCash').value = invoice.total_paid;
-            }
-
-            // Populate Bank Accounts
-            const accounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
-            const bankSelect = document.getElementById('payBankAccount');
-            bankSelect.innerHTML = '<option value="">-- Select Bank --</option>';
-
-            accounts.forEach(acc => {
-                if (acc.type === 'Bank') {
-                    const opt = document.createElement('option');
-                    opt.value = acc.id;
-                    opt.textContent = acc.name + (acc.number ? ` (${acc.number})` : '');
-                    if (acc.isPrimary) opt.selected = true;
-                    bankSelect.appendChild(opt);
-                }
-            });
-
-            calculatePaymentBalance();
-
-            document.getElementById('paymentSplitModal').style.display = 'block';
+            document.getElementById('paymentSplitTotal').innerText = currentPaymentTotal.toLocaleString('en-IN', {minimumFractionDigits:2,maximumFractionDigits:2});
+            document.getElementById('payCash').value = ''; document.getElementById('payBank').value = '';
+            document.getElementById('payCashReference').value = ''; document.getElementById('payBankReference').value = '';
+            const now = new Date(), today = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+            document.getElementById('payCashDate').value = today; document.getElementById('payBankDate').value = today;
+            const paid = invoicePaymentHistory(invoice).reduce((sum,p)=>sum+(Number(p.amount)||0),0);
+            document.getElementById('paymentSplitBalance').dataset.currentDue = String(currentPaymentTotal-paid);
+            const accounts = JSON.parse(localStorage.getItem('bank_accounts')) || [], select = document.getElementById('payBankAccount');
+            select.innerHTML = '<option value="">-- Select Bank --</option>';
+            accounts.filter(a=>a.type==='Bank').forEach(acc=>{const opt=document.createElement('option');opt.value=acc.id;opt.textContent=acc.name+(acc.number?` (${acc.number})`:'');if(acc.isPrimary)opt.selected=true;select.appendChild(opt);});
+            calculatePaymentBalance(); document.getElementById('paymentSplitModal').style.display='block';
         }
-
         function calculatePaymentBalance() {
-            const cash = parseFloat(document.getElementById('payCash').value) || 0;
-            const bank = parseFloat(document.getElementById('payBank').value) || 0;
-            const balance = currentPaymentTotal - (cash + bank);
-
-            const el = document.getElementById('paymentSplitBalance');
-            el.innerText = balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-            if (balance > 0.5) el.style.color = "#c0392b"; // Red (Due)
-            else if (balance < -0.5) el.style.color = "#e67e22"; // Orange (Overpaid)
-            else el.style.color = "#27ae60"; // Green (Settled)
+            const cash=parseFloat(document.getElementById('payCash').value)||0, bank=parseFloat(document.getElementById('payBank').value)||0;
+            const due=Number(document.getElementById('paymentSplitBalance').dataset.currentDue)||0, balance=due-cash-bank, el=document.getElementById('paymentSplitBalance');
+            el.innerText=balance.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); el.style.color=balance>0.5?'#c0392b':balance < -0.5?'#e67e22':'#27ae60';
         }
-
-        function closePaymentSplitModal() {
-            document.getElementById('paymentSplitModal').style.display = 'none';
-            currentPaymentInvoiceId = null;
+        function closePaymentSplitModal(){document.getElementById('paymentSplitModal').style.display='none';currentPaymentInvoiceId=null;}
+        async function savePaymentSplit() {
+            const cash=Math.max(0,Number(document.getElementById('payCash').value)||0), bank=Math.max(0,Number(document.getElementById('payBank').value)||0);
+            const cashDate=document.getElementById('payCashDate').value, bankDate=document.getElementById('payBankDate').value;
+            const cashRef=document.getElementById('payCashReference').value.trim(), bankRef=document.getElementById('payBankReference').value.trim();
+            const limit=Number(localStorage.getItem('cashLimit'))||0;
+            if(cash+bank<=0)return showToast('Enter a positive cash or bank installment.','#c0392b');
+            const due=Number(document.getElementById('paymentSplitBalance').dataset.currentDue)||0;
+            if(cash+bank>due+0.01)return showToast('Payment cannot exceed the outstanding due.','#c0392b');
+            if(limit>0&&cash>limit)return showToast(`Cash amount exceeds limit of ₹${limit}`,'#c0392b');
+            if((cash&&!cashDate)||(bank&&!bankDate))return showToast('Select a date for each payment.','#c0392b');
+            const idx=invoices.findIndex(x=>String(x.id||x.invoice_no)===String(currentPaymentInvoiceId)); if(idx<0)return showToast('Invoice not found.','#c0392b');
+            const invoice=invoices[idx], accounts=JSON.parse(localStorage.getItem('bank_accounts'))||[];
+            let accountId=document.getElementById('payBankAccount').value; if(!accountId&&accounts.length)accountId=(accounts.find(a=>a.isPrimary)||accounts[0]).id;
+            if(bank&&!accountId)return showToast('Select a bank account before recording a bank payment.','#c0392b');
+            if(!Array.isArray(invoice.paymentHistory))invoice.paymentHistory=invoicePaymentHistory(invoice).map(p=>({...p}));
+            const group='invpay-'+Date.now()+'-'+Math.random().toString(36).slice(2,8), added=[];
+            if(cash)added.push({id:group+'-cash',date:cashDate,amount:cash,mode:'Cash',reference:cashRef||'',createdAt:new Date().toISOString()});
+            if(bank)added.push({id:group+'-bank',date:bankDate,amount:bank,mode:'Bank',reference:bankRef||'',bankAccountId:accountId,createdAt:new Date().toISOString()});
+            invoice.paymentHistory.push(...added);
+            invoice.paid_cash=invoice.paymentHistory.filter(p=>p.mode==='Cash').reduce((a,p)=>a+(Number(p.amount)||0),0);
+            invoice.paid_bank=invoice.paymentHistory.filter(p=>p.mode==='Bank').reduce((a,p)=>a+(Number(p.amount)||0),0);
+            invoice.total_paid=invoice.paymentHistory.reduce((a,p)=>a+(Number(p.amount)||0),0); invoice.total_due=currentPaymentTotal-invoice.total_paid;
+            invoice.payment_date=added[added.length-1].date;
+            const bankTx=JSON.parse(localStorage.getItem('bank_transactions')||'[]');
+            for(const payment of added.filter(p=>p.mode==='Bank')) { const tx={id:'tx_'+payment.id,date:payment.date,type:'Deposit',amount:payment.amount,accountId:payment.bankAccountId,ref:payment.reference,remarks:`Payment Received: ${invoice.customer_name||'Customer'}`,cleared:false,invoiceId:invoice.id,paymentId:payment.id}; if(!bankTx.some(x=>String(x.id)===String(tx.id)))bankTx.push(tx); if(typeof apiClient!=='undefined'&&apiClient.saveBankTransaction)await apiClient.saveBankTransaction(tx); }
+            localStorage.setItem('bank_transactions',JSON.stringify(bankTx)); localStorage.setItem('invoices',JSON.stringify(invoices));
+            if(typeof apiClient!=='undefined'&&apiClient.saveInvoice)await apiClient.saveInvoice(invoice).catch(console.warn);
+            renderTable(currentFilteredData); closePaymentSplitModal(); showToast('Installment recorded successfully.','#27ae60');
         }
-
-        function savePaymentSplit() {
-            const cash = parseFloat(document.getElementById('payCash').value) || 0;
-            const bank = parseFloat(document.getElementById('payBank').value) || 0;
-            const cashDate = document.getElementById('payCashDate').value;
-            const bankDate = document.getElementById('payBankDate').value;
-            const limit = parseFloat(localStorage.getItem('cashLimit')) || 0;
-
-            if (limit > 0 && cash > limit) {
-                showToast(`⚠️ Cash amount exceeds limit of ₹${limit}`, "#c0392b");
-                return;
-            }
-
-            const idx = invoices.findIndex(x => String(x.id || x.invoice_no) === String(currentPaymentInvoiceId));
-            if (idx > -1) {
-                // Auto-feed to Banking (Indian Accounting: Receipt -> Deposit)
-                const oldBank = parseFloat(invoices[idx].paid_bank || 0);
-                const diff = bank - oldBank;
-                if (Math.abs(diff) > 0.01) {
-                    const accounts = JSON.parse(localStorage.getItem('bank_accounts')) || [];
-
-                    let accId = document.getElementById('payBankAccount').value;
-                    if (!accId && accounts.length > 0) {
-                        const primaryAcc = accounts.find(a => a.isPrimary) || accounts[0];
-                        accId = primaryAcc.id;
-                    }
-
-                    if (accId) {
-                        const type = diff > 0 ? 'Deposit' : 'Withdrawal'; // Positive diff means money came in
-                        const tx = {
-                            id: 'tx_inv_' + Date.now(),
-                            date: bankDate,
-                            type: type,
-                            amount: Math.abs(diff),
-                            accountId: accId,
-                            ref: invoices[idx].invoice_no || "INV",
-                            remarks: `Payment Received: ${invoices[idx].customer_name || 'Customer'}`,
-                            cleared: false
-                        };
-                        const bankTx = JSON.parse(localStorage.getItem('bank_transactions')) || [];
-                        bankTx.push(tx);
-                        localStorage.setItem('bank_transactions', JSON.stringify(bankTx));
-                    } else {
-                        showToast("⚠️ No bank account found. Banking transaction skipped.", "#e67e22");
-                    }
-                }
-
-                invoices[idx].paid_cash = cash;
-                invoices[idx].paid_bank = bank;
-                invoices[idx].total_paid = cash + bank;
-                invoices[idx].payment_date_cash = cashDate;
-                invoices[idx].payment_date_bank = bankDate;
-                invoices[idx].total_due = (parseFloat(invoices[idx].invoice_total) || 0) - (cash + bank);
-
-                localStorage.setItem("invoices", JSON.stringify(invoices));
-                if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[idx]).catch(console.warn);
-                renderTable(currentFilteredData); // Refresh table
-                closePaymentSplitModal();
-                showToast("Payment updated successfully", "#27ae60");
-            }
-        }
-
         // --- Edit Payment Modals ---
         function openEditPaymentWarningModal() {
             document.getElementById("overlay").style.display = "block";

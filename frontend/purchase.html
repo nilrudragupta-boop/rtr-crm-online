@@ -1322,7 +1322,7 @@
             <p id="purchasePaymentHistoryTitle" style="font-weight:bold;"></p>
             <div style="overflow:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                    <thead><tr><th>Date</th><th>Mode</th><th>Amount</th><th>Reference</th><th>Bank Account</th></tr></thead>
+                    <thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Bank Account</th></tr></thead>
                     <tbody id="purchasePaymentHistoryBody"></tbody>
                 </table>
             </div>
@@ -4672,15 +4672,47 @@
             const history = getPurchasePaymentHistory(purchase).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
             document.getElementById('purchasePaymentHistoryTitle').textContent = `${purchase.supplierName || 'Supplier'} · Invoice ${purchase.supplierInv || '-'}`;
             const body = document.getElementById('purchasePaymentHistoryBody');
-            body.innerHTML = history.length ? history.map(payment => `
-                <tr><td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
-                <td style="text-align:right;">₹${(Number(payment.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                <td>${escapeHtml(payment.reference || '-')}</td><td>${escapeHtml(payment.bankAccountName || '-')}</td></tr>`).join('')
-                : '<tr><td colspan="5" style="text-align:center;padding:16px;">No payments recorded.</td></tr>';
+            body.innerHTML = history.length ? history.map((payment, index) => `
+                <tr data-payment-id="${escapeHtml(payment.id || '')}">
+                    <td style="text-align:center;">${index + 1}</td>
+                    <td style="text-align:right;white-space:nowrap;">₹${(Number(payment.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td>${escapeHtml(payment.date || '-')}</td>
+                    <td>${escapeHtml(payment.mode || '-')}</td>
+                    <td><div style="display:flex;gap:5px;min-width:180px;"><input class="purchase-payment-reference" type="text" value="${escapeHtml(payment.reference || '')}" maxlength="100" aria-label="Payment reference" style="width:140px;box-sizing:border-box;"><button type="button" class="btn-save" onclick="savePurchasePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id || '')}',this)">Save</button></div></td>
+                    <td>${escapeHtml(payment.bankAccountName || '-')}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="6" style="text-align:center;padding:16px;">No payments recorded.</td></tr>';
             document.getElementById('purchasePaymentHistoryModal').style.display = 'block';
         }
 
-        function closePurchasePaymentHistory() {
+        async function savePurchasePaymentReference(purchaseId, paymentId, button) {
+            const purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
+            const purchase = purchases.find(record => String(record.id) === String(purchaseId));
+            if (!purchase) return showToast('Purchase record was not found.', '#c0392b');
+            if (!Array.isArray(purchase.paymentHistory) || !purchase.paymentHistory.length) purchase.paymentHistory = getPurchasePaymentHistory(purchase).map(payment => ({ ...payment }));
+            const payment = purchase.paymentHistory.find(entry => String(entry.id) === String(paymentId));
+            if (!payment) return showToast('Payment entry was not found.', '#c0392b');
+            payment.reference = button.parentElement.querySelector('.purchase-payment-reference').value.trim();
+            localStorage.setItem('purchases', JSON.stringify(purchases));
+            if (payment.mode === 'Bank') {
+                const transactions = JSON.parse(localStorage.getItem('bank_transactions') || '[]');
+                const transaction = transactions.find(entry => String(entry.paymentId) === String(payment.id));
+                if (transaction) { transaction.ref = payment.reference; localStorage.setItem('bank_transactions', JSON.stringify(transactions)); }
+            }
+            if (typeof apiClient !== 'undefined' && apiClient.savePurchase) {
+                try {
+                    const result = await apiClient.savePurchase(purchase);
+                    if (!result || result.success === false) throw new Error(result?.message || 'Could not sync purchase.');
+                    writePurchasePaymentSyncQueue(readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id)));
+                } catch (error) {
+                    const queue = readPurchasePaymentSyncQueue().filter(record => String(record.id) !== String(purchase.id));
+                    queue.push(purchase); writePurchasePaymentSyncQueue(queue);
+                    showToast('Reference saved locally; server sync will retry.', '#e67e22');
+                    return;
+                }
+            }
+            showToast('Payment reference saved.');
+        }        function closePurchasePaymentHistory() {
             document.getElementById('purchasePaymentHistoryModal').style.display = 'none';
         }
 
