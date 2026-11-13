@@ -937,11 +937,176 @@
                 expenses: [],
                 customers: [],
                 suppliers: [],
-                journalVouchers: []
+                journalVouchers: [],
+                creditDebitNotes: []
+            },
+
+            deduplicateInvoices(invoices) {
+                if (!Array.isArray(invoices)) return [];
+
+                const uniqueInvoices = [];
+                const indexByAlias = new Map();
+
+                invoices.forEach(invoice => {
+                    if (!invoice || typeof invoice !== 'object' || Array.isArray(invoice)) return;
+
+                    const id = String(invoice.id || invoice._id || '').trim().toLowerCase();
+                    const invoiceNo = String(invoice.invoice_no || invoice.invoiceNo || '').trim().toLowerCase();
+                    const aliases = [];
+                    if (id) aliases.push(`id:${id}`);
+                    if (invoiceNo) aliases.push(`invoice:${invoiceNo}`);
+
+                    const existingIndex = aliases
+                        .map(alias => indexByAlias.get(alias))
+                        .find(index => index !== undefined);
+
+                    if (existingIndex !== undefined) {
+                        // Preserve one ledger entry while merging fields from duplicate copies.
+                        uniqueInvoices[existingIndex] = {
+                            ...uniqueInvoices[existingIndex],
+                            ...invoice
+                        };
+                        const merged = uniqueInvoices[existingIndex];
+                        const mergedId = String(merged.id || merged._id || '').trim().toLowerCase();
+                        const mergedNo = String(merged.invoice_no || merged.invoiceNo || '').trim().toLowerCase();
+                        if (mergedId) indexByAlias.set(`id:${mergedId}`, existingIndex);
+                        if (mergedNo) indexByAlias.set(`invoice:${mergedNo}`, existingIndex);
+                    } else {
+                        const newIndex = uniqueInvoices.push({ ...invoice }) - 1;
+                        aliases.forEach(alias => indexByAlias.set(alias, newIndex));
+                    }
+                });
+
+                return uniqueInvoices;
+            },
+
+            normalizeInvoice(invoice) {
+                if (!invoice || typeof invoice !== 'object') return invoice;
+                const customer = invoice.customer || {};
+                const invoiceNo = invoice.invoice_no ?? invoice.invoiceNo ?? invoice.id ?? invoice._id ?? '';
+                const customerName = invoice.customer_name || invoice.customerName || customer.name || '';
+                const invoiceDate = invoice.invoice_date || invoice.invoiceDate || invoice.date || '';
+                const total = invoice.invoice_total ?? invoice.invoiceTotal ?? invoice.grandTotal ?? invoice.total ?? 0;
+                const paid = invoice.total_paid ?? invoice.paid_amount ?? invoice.amountPaid ?? invoice.paid ?? 0;
+                return {
+                    ...invoice,
+                    id: invoice.id || invoice._id || invoiceNo,
+                    invoice_no: invoiceNo,
+                    invoiceNo,
+                    customer_name: customerName,
+                    invoice_date: invoiceDate,
+                    invoice_total: total,
+                    total,
+                    total_paid: paid,
+                    paid_amount: paid
+                };
+            },
+
+            mergeRecords(remoteRecords, localRecords, getAliases) {
+                const merged = [];
+                const indexByAlias = new Map();
+
+                const addRecord = (record, preferExisting) => {
+                    if (!record || typeof record !== 'object' || Array.isArray(record)) return;
+                    const aliases = getAliases(record).filter(Boolean);
+                    const existingIndex = aliases
+                        .map(alias => indexByAlias.get(alias))
+                        .find(index => index !== undefined);
+
+                    if (existingIndex === undefined) {
+                        const index = merged.push({ ...record }) - 1;
+                        aliases.forEach(alias => indexByAlias.set(alias, index));
+                        return;
+                    }
+
+                    merged[existingIndex] = preferExisting
+                        ? { ...record, ...merged[existingIndex] }
+                        : { ...merged[existingIndex], ...record };
+                    getAliases(merged[existingIndex]).forEach(alias => indexByAlias.set(alias, existingIndex));
+                };
+
+                (Array.isArray(remoteRecords) ? remoteRecords : []).forEach(record => addRecord(record, false));
+                (Array.isArray(localRecords) ? localRecords : []).forEach(record => addRecord(record, true));
+                return merged;
+            },
+
+            async refreshFromBackend() {
+                if (typeof apiClient === 'undefined') return false;
+
+                const requests = [
+                    ['customers', apiClient.getCustomers, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : '',
+                        record.name ? `name:${String(record.name).trim().toLowerCase()}` : ''
+                    ]],
+                    ['suppliers', apiClient.getSuppliers, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : '',
+                        record.name ? `name:${String(record.name).trim().toLowerCase()}` : ''
+                    ]],
+                    ['invoices', apiClient.getInvoices, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : '',
+                        record.invoice_no || record.invoiceNo
+                            ? `invoice:${String(record.invoice_no || record.invoiceNo).trim().toLowerCase()}` : ''
+                    ]],
+                    ['purchases', apiClient.getPurchases, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : ''
+                    ]],
+                    ['expenses', apiClient.getExpenses, record => [
+                        record.expense_id || record.id || record._id
+                            ? `id:${record.expense_id || record.id || record._id}` : ''
+                    ]],
+                    ['journalVouchers', apiClient.getJournalVouchers, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : '',
+                        record.voucher_no || record.voucherNo
+                            ? `voucher:${String(record.voucher_no || record.voucherNo).trim().toLowerCase()}` : ''
+                    ]],
+                    ['creditDebitNotes', apiClient.getCreditDebitNotes, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : '',
+                        record.note_no || record.noteNo
+                            ? `note:${String(record.note_no || record.noteNo).trim().toLowerCase()}` : ''
+                    ]]
+                ];
+
+                const results = await Promise.allSettled(requests.map(([, getter]) =>
+                    typeof getter === 'function' ? getter() : Promise.resolve(null)
+                ));
+                let refreshedAny = false;
+
+                results.forEach((result, index) => {
+                    if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
+                    const [dataKey, , getAliases] = requests[index];
+                    const localRecords = this.data[dataKey] || [];
+                    const remoteRecords = dataKey === 'invoices'
+                        ? result.value.map(record => this.normalizeInvoice(record))
+                        : result.value;
+                    let merged = this.mergeRecords(remoteRecords, localRecords, getAliases);
+                    if (dataKey === 'invoices') merged = this.deduplicateInvoices(merged);
+                    this.data[dataKey] = merged;
+                    try {
+                        const storageKey = dataKey === 'journalVouchers' ? 'journal_vouchers'
+                            : dataKey === 'creditDebitNotes' ? 'credit_debit_notes' : dataKey;
+                        localStorage.setItem(storageKey, JSON.stringify(merged));
+                    } catch (error) {
+                        console.warn(`Could not cache refreshed ledger ${dataKey}.`, error);
+                    }
+                    refreshedAny = true;
+                });
+
+                return refreshedAny;
             },
 
             loadData() {
-                this.data.invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+                const storedInvoices = JSON.parse(localStorage.getItem("invoices")) || [];
+                const normalizedInvoices = Array.isArray(storedInvoices)
+                    ? storedInvoices.map(invoice => this.normalizeInvoice(invoice))
+                    : storedInvoices;
+                this.data.invoices = this.deduplicateInvoices(normalizedInvoices);
+                if (Array.isArray(storedInvoices) && this.data.invoices.length < storedInvoices.length) {
+                    try {
+                        localStorage.setItem("invoices", JSON.stringify(this.data.invoices));
+                    } catch (error) {
+                        console.warn("Duplicate invoices were removed from the ledger view but could not be saved locally.", error);
+                    }
+                }
                 this.data.purchases = JSON.parse(localStorage.getItem("purchases")) || [];
                 this.data.expenses = JSON.parse(localStorage.getItem("expenses")) || [];
                 this.data.customers = JSON.parse(localStorage.getItem("customers")) || [];
@@ -993,16 +1158,17 @@
                     });
                 } else if (type === 'Expense') {
                     this.data.expenses.forEach(e => {
-                        if ((e.expense_category || "").toLowerCase() === name.toLowerCase()) {
+                        const category = e.expense_category || e.expenseCategory || e.category || "";
+                        if (String(category).trim().toLowerCase() === name.trim().toLowerCase()) {
                             transactions.push({
-                                date: e.expense_date,
-                                desc: `Exp: ${e.vendor_name || ''} (${e.payment_mode})`,
+                                date: e.expense_date || e.expenseDate || e.date,
+                                desc: `Exp: ${e.vendor_name || e.vendorName || ''} (${e.payment_mode || e.paymentMode || ''})`,
                                 type: 'Expense',
-                                debit: parseFloat(e.debit_amount || 0),
+                                debit: parseFloat(e.debit_amount ?? e.debitAmount ?? e.amount ?? 0),
                                 credit: 0,
-                                ref: e.invoice_number || '',
+                                ref: e.invoice_number || e.invoiceNumber || '',
                                 remarks: e.remarks || '',
-                                id: e.expense_id,
+                                id: e.expense_id || e.id || e._id,
                                 createdBy: e.createdBy,
                                 editedBy: e.editedBy
                             });
@@ -1065,11 +1231,11 @@
                                 if (dr > 0 || cr > 0) {
                                     transactions.push({
                                         date: jv.date,
-                                        desc: `${jv.voucher_type || 'Journal'}: ${jv.voucher_no || '-'}`,
-                                        type: jv.voucher_type || 'Journal',
+                                        desc: `${jv.voucher_type || jv.voucherType || 'Journal'}: ${jv.voucher_no || jv.voucherNo || '-'}`,
+                                        type: jv.voucher_type || jv.voucherType || 'Journal',
                                         debit: dr,
                                         credit: cr,
-                                        ref: jv.voucher_no,
+                                        ref: jv.voucher_no || jv.voucherNo,
                                         remarks: jv.narration || '',
                                         id: jv.id,
                                         createdBy: jv.createdBy,
@@ -1083,9 +1249,10 @@
 
                 // Pull entries from Credit/Debit Notes
                 this.data.creditDebitNotes.forEach(note => {
-                    if (note.status === 'CANCELLED') return;
-                    if ((note.customer_name || "").toLowerCase() === name.toLowerCase()) {
-                        const amt = parseFloat(note.total_amount) || 0;
+                    if (String(note.status || '').toUpperCase() === 'CANCELLED') return;
+                    const noteCustomer = note.customer_name || note.customerName || '';
+                    if (String(noteCustomer).trim().toLowerCase() === name.trim().toLowerCase()) {
+                        const amt = parseFloat(note.total_amount ?? note.totalAmount) || 0;
                         let dr = 0, cr = 0;
                         if (type === 'Customer') {
                             if (note.type === 'CREDIT') cr = amt;
@@ -1097,12 +1264,12 @@
 
                         if (dr > 0 || cr > 0) {
                             transactions.push({
-                                date: note.note_date || note.date,
-                                desc: `${note.type === 'CREDIT' ? 'Credit' : 'Debit'} Note: ${note.note_no}`,
+                                date: note.note_date || note.noteDate || note.date,
+                                desc: `${note.type === 'CREDIT' ? 'Credit' : 'Debit'} Note: ${note.note_no || note.noteNo}`,
                                 type: 'Credit/Debit Note',
                                 debit: dr,
                                 credit: cr,
-                                ref: note.note_no,
+                                ref: note.note_no || note.noteNo,
                                 remarks: note.reason || note.remarks || '',
                                 id: note.id,
                                 createdBy: note.created_by,
@@ -1125,6 +1292,18 @@
                     // Unique categories
                     const cats = new Set(this.data.expenses.map(e => e.expense_category));
                     parties = Array.from(cats).map(c => ({ name: c }));
+                }
+
+                if (type === 'Customer') {
+                    const uniqueCustomers = new Map();
+                    parties.forEach((party, index) => {
+                        const normalizedName = String(party?.name || '').trim().toLowerCase();
+                        const key = normalizedName
+                            ? `name:${normalizedName}`
+                            : `unnamed:${party?.id || index}`;
+                        if (!uniqueCustomers.has(key)) uniqueCustomers.set(key, party);
+                    });
+                    parties = Array.from(uniqueCustomers.values());
                 }
 
                 const summary = [];
@@ -1253,7 +1432,14 @@
                     parties = Array.from(cats).map(c => ({ name: c }));
                 }
 
-                parties.sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
+                const uniqueParties = new Map();
+                parties.forEach((party, index) => {
+                    const name = String(party?.name || '').trim();
+                    const key = name ? name.toLowerCase() : `unnamed:${party?.id || index}`;
+                    if (!uniqueParties.has(key)) uniqueParties.set(key, { ...party, name });
+                });
+
+                Array.from(uniqueParties.values()).sort((a, b) => a.name.localeCompare(b.name)).forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.name;
                     list.appendChild(opt);
@@ -2316,10 +2502,18 @@
 
         // --- Main App Controller ---
         const ledgerApp = {
-            init() {
+            async init() {
                 ledgerService.loadData();
                 themeManager.init();
                 ledgerUI.init();
+
+                const partyType = document.getElementById('partyType').value;
+                const partyName = document.getElementById('partyName').value;
+                await ledgerService.refreshFromBackend();
+                document.getElementById('partyType').value = partyType;
+                ledgerUI.loadParties();
+                document.getElementById('partyName').value = partyName;
+                this.generateReport();
             },
 
             generateReport() {
@@ -2383,8 +2577,14 @@
                 }, 300); // Simulate processing delay for UX
             },
 
-            refreshData() {
+            async refreshData() {
                 ledgerService.loadData();
+                const partyType = document.getElementById('partyType').value;
+                const partyName = document.getElementById('partyName').value;
+                await ledgerService.refreshFromBackend();
+                document.getElementById('partyType').value = partyType;
+                ledgerUI.loadParties();
+                document.getElementById('partyName').value = partyName;
                 this.generateReport();
             },
 
