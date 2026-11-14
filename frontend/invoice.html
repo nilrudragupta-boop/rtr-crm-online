@@ -710,6 +710,20 @@
                 </div>
                 <h3 style="margin: 0 0 0 10px;">Grand Total: ₹ <span id="Total">0.00</span></h3>
             </div>
+            <div style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:10px; padding:8px; background:#f7f9fb; border-radius:5px;">
+                <label for="amountReceivedNow" style="font-weight:600; color:#444;">Amount Received Now (₹):</label>
+                <input type="number" id="amountReceivedNow" min="0" step="0.01" value="0"
+                    oninput="updatePaymentPreview()" style="width:130px; padding:6px; text-align:right; margin:0;">
+                <label for="initialPaymentMode" style="font-weight:600; color:#444;">Mode:</label>
+                <select id="initialPaymentMode" style="padding:6px; margin:0;">
+                    <option value="Cash">Cash</option>
+                    <option value="Bank">Bank / UPI</option>
+                    <option value="Other">Other</option>
+                </select>
+                <button type="button" onclick="setInvoicePaidInFull()" style="padding:6px 9px; background:#198754;">Paid in full</button>
+                <strong id="invoiceDuePreview" style="color:#c0392b;">Balance Due: ₹0.00</strong>
+                <small id="invoicePaymentHint" style="width:100%; text-align:right; color:#666;">Enter only what the customer pays now. Leave at ₹0 to save the invoice as unpaid / customer debt.</small>
+            </div>
         </div>
 
         <div style="text-align: center;">
@@ -1164,6 +1178,7 @@
         let isFreightBeforeGstVisible = localStorage.getItem("invoiceShowFreightBeforeGst") === "true";
         let isPreventNegativeStock = localStorage.getItem("invoicePreventNegativeStock") === "true";
         let isPreviousDueVisible = localStorage.getItem("invoiceShowPreviousDue") === "true";
+        let isExistingInvoiceEdit = false;
         let isTotalTaxableVisible = localStorage.getItem("invoiceShowTotalTaxable") === "true";
         let isFetchItemCodeVisible = localStorage.getItem("invoiceShowFetchItemCode") !== "false";
         let isGreyButtons = localStorage.getItem("invoiceGreyButtons") === "true";
@@ -1909,6 +1924,9 @@
             const invoiceType = document.getElementById("invoiceType").value;
             const gstType = document.getElementById("gstType").value;
             const invoice_total = parseFloat(document.getElementById("Total").innerText.replace(/,/g, "")) || 0;
+            const receivedRaw = document.getElementById("amountReceivedNow").value;
+            const amountReceivedNow = Math.round((receivedRaw === "" ? 0 : Number(receivedRaw)) * 100) / 100;
+            const initialPaymentMode = document.getElementById("initialPaymentMode").value || "Cash";
             const roundOff = document.getElementById("roundOffToggle").checked;
             const overallDiscount = parseFloat(document.getElementById("overallDiscount").value) || 0;
             const previousDue = parseFloat(document.getElementById("previousDue").value) || 0;
@@ -1917,6 +1935,11 @@
 
             if (!invoice_no || !customer_name) {
                 showToast("⚠️ Invoice No & Customer Name required!", "#e74c3c");
+                return;
+            }
+
+            if (!Number.isFinite(amountReceivedNow) || amountReceivedNow < 0 || amountReceivedNow > invoice_total + 0.005) {
+                showToast("Amount received must be between ₹0 and the invoice total.", "#e74c3c");
                 return;
             }
 
@@ -1960,7 +1983,8 @@
                     }
                 });
 
-                if ((currentOutstanding + invoice_total) > creditLimit) {
+                const newInvoiceDue = Math.max(0, invoice_total - amountReceivedNow);
+                if ((currentOutstanding + newInvoiceDue) > creditLimit) {
                     showToast(`⚠️ Credit Limit Exceeded! Limit: ₹${creditLimit}, Balance: ₹${currentOutstanding.toFixed(2)}`, "#dc3545");
                     return;
                 }
@@ -2114,13 +2138,25 @@
             const customCharges = parseFloat(document.getElementById("customCharges").value) || 0;
             const freightBeforeGst = parseFloat(document.getElementById("freightBeforeGst").value) || 0;
             const freightBeforeGstRate = parseFloat(document.getElementById("freightBeforeGstRate").value) || 0;
+            const initialPaymentHistory = amountReceivedNow > 0 ? [{
+                id: `created-${invoice_no}-${Date.now()}`,
+                amount: amountReceivedNow,
+                date: invoice_date,
+                mode: initialPaymentMode,
+                reference: "Payment received when invoice was created"
+            }] : [];
 
             const payload = {
                 id: Date.now().toString(),
                 previousDue,
                 invoice_no, invoice_date, invoice_time, customer_name, address, contact, pin, district, state, stateCode, gst_no,
                 shipName, shipAddress, shipContact, shipPin, shipDistrict, shipState, shipStateCode, shipGST, isShipSame, printShipTo, lrNo, lrDate,
-                ewayBillNo, deliveryChallanNo, buyersOrderNo, buyersOrderDate, dispatchedThrough, dispatchedDetails, items, invoice_total, total_paid: invoice_total, total_due: 0, payment_date: invoice_date, roundOff, roundOffAmount, gstType, invoiceType, overallDiscount, overallDiscountType, overallDiscountAmount, freightCharges, packingCharges, customChargeName, customCharges
+                ewayBillNo, deliveryChallanNo, buyersOrderNo, buyersOrderDate, dispatchedThrough, dispatchedDetails, items, invoice_total,
+                total_paid: amountReceivedNow, total_due: Math.max(0, Math.round((invoice_total - amountReceivedNow) * 100) / 100),
+                payment_date: amountReceivedNow > 0 ? invoice_date : "", paymentHistory: initialPaymentHistory,
+                paid_cash: initialPaymentMode === "Cash" ? amountReceivedNow : 0,
+                paid_bank: initialPaymentMode === "Bank" ? amountReceivedNow : 0,
+                roundOff, roundOffAmount, gstType, invoiceType, overallDiscount, overallDiscountType, overallDiscountAmount, freightCharges, packingCharges, customChargeName, customCharges
                 , freightBeforeGst, freightBeforeGstRate
             };
 
@@ -2135,7 +2171,12 @@
                     if (existing.createdBy) audit.createdBy = existing.createdBy;
                     if (existing.createdDate) audit.createdDate = existing.createdDate;
 
-                    invoices[existingInvIndex] = { ...payload, ...audit };
+                    const updatedInvoice = { ...payload, ...audit };
+                    ["total_paid", "total_due", "payment_date", "payment_date_cash", "payment_date_bank", "paid_cash", "paid_bank", "paid_amount", "paid", "paymentHistory", "paymentAuditTrail"]
+                        .forEach(key => {
+                            if (existing[key] !== undefined) updatedInvoice[key] = existing[key];
+                        });
+                    invoices[existingInvIndex] = updatedInvoice;
                     finalizeSave(invoices[existingInvIndex]);
                 });
             } else {
@@ -2661,7 +2702,38 @@
                 gstTypeEl.value = 'Inter-State';
                 breakdownEl.innerHTML = `IGST: ₹${finalGSTVal.toFixed(2)}`;
             }
+            updatePaymentPreview();
         }
+
+        function updatePaymentPreview() {
+            const total = parseFloat(document.getElementById("Total").innerText.replace(/,/g, "")) || 0;
+            const amountInput = document.getElementById("amountReceivedNow");
+            const amount = amountInput.value === "" ? 0 : Number(amountInput.value);
+            const duePreview = document.getElementById("invoiceDuePreview");
+            const hint = document.getElementById("invoicePaymentHint");
+            if (!Number.isFinite(amount) || amount < 0 || amount > total + 0.005) {
+                duePreview.textContent = "Balance Due: Check amount received";
+                duePreview.style.color = "#c0392b";
+                hint.textContent = "Amount received cannot be greater than the invoice total.";
+                hint.style.color = "#c0392b";
+                return;
+            }
+            const due = Math.max(0, Math.round((total - amount) * 100) / 100);
+            duePreview.textContent = `Balance Due: ₹${due.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            duePreview.style.color = due > 0.005 ? "#c0392b" : "#198754";
+            hint.textContent = isExistingInvoiceEdit
+                ? "Payment records for an existing invoice are managed from the Invoice Report."
+                : "Enter only what the customer pays now. Leave at ₹0 to save the invoice as unpaid / customer debt.";
+            hint.style.color = "#666";
+        }
+
+        function setInvoicePaidInFull() {
+            if (isExistingInvoiceEdit) return;
+            const total = parseFloat(document.getElementById("Total").innerText.replace(/,/g, "")) || 0;
+            document.getElementById("amountReceivedNow").value = total.toFixed(2);
+            updatePaymentPreview();
+        }
+
         function removeItemAndUpdate(btn) {
             askConfirm("Remove Item", "Are you sure you want to remove this item?", () => {
                 btn.closest("tr").remove();
@@ -2747,6 +2819,18 @@
 
         // 🔸 Populate form for editing
         function populateInvoiceForm(invoice) {
+            isExistingInvoiceEdit = true;
+            const amountReceivedInput = document.getElementById("amountReceivedNow");
+            const initialPaymentModeSelect = document.getElementById("initialPaymentMode");
+            const savedPaidAmount = Number(invoice.total_paid ?? invoice.paid_amount ?? invoice.paid ?? 0) || 0;
+            if (amountReceivedInput) {
+                amountReceivedInput.value = savedPaidAmount.toFixed(2);
+                amountReceivedInput.disabled = true;
+            }
+            if (initialPaymentModeSelect) {
+                initialPaymentModeSelect.value = Number(invoice.paid_bank) > 0 ? "Bank" : (Number(invoice.paid_cash) > 0 ? "Cash" : "Other");
+                initialPaymentModeSelect.disabled = true;
+            }
             document.getElementById("invoiceNo").value = invoice.invoice_no || invoice.invoiceNo || "";
             document.getElementById("invoiceTime").value = invoice.invoice_time || "";
             let d = invoice.invoice_date || invoice.date;
@@ -3077,7 +3161,18 @@
 
         // Helpers
         function clearInvoice() {
+            isExistingInvoiceEdit = false;
             document.querySelectorAll('#invoice input:not([type=date])').forEach(i => i.value = '');
+            const amountReceivedInput = document.getElementById("amountReceivedNow");
+            if (amountReceivedInput) {
+                amountReceivedInput.value = "0";
+                amountReceivedInput.disabled = false;
+            }
+            const paymentMode = document.getElementById("initialPaymentMode");
+            if (paymentMode) {
+                paymentMode.value = "Cash";
+                paymentMode.disabled = false;
+            }
             document.getElementById('invoiceTime').value = '';
             document.querySelector('#itemTable tbody').innerHTML = '';
             document.getElementById('freightCharges').value = '0';
