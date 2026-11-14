@@ -676,11 +676,15 @@
         </div>
 
         <div class="filter-container">
-            <label for="fromDate">From:</label>
+            <label for="fromDate">From date:</label>
             <input type="date" id="fromDate">
-            <label for="toDate">To:</label>
+            <label for="toDate">To date:</label>
             <input type="date" id="toDate">
             <button id="btnDateSearch">Search</button>
+            <span id="dateRangeSummary" role="status" aria-live="polite"
+                style="font-weight:600; color:#34495e; padding:4px 8px; border-radius:4px; background:#eef3f7;">
+                Selected date range: All dates
+            </span>
         </div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1100,6 +1104,15 @@
                     <option value="system">System Default</option>
                 </select>
             </div>
+            <div style="margin-top:8px; display:flex; align-items:center; gap:5px;">
+                <label for="reportCalendarMode" style="font-weight:bold;">Date calendar:</label>
+                <select id="reportCalendarMode" onchange="changeReportCalendarMode()"
+                    style="padding:4px; border-radius:4px; border:1px solid #ccc;">
+                    <option value="all">All dates</option>
+                    <option value="financial">April–March (Indian financial year)</option>
+                    <option value="calendar">January–December (calendar year)</option>
+                </select>
+            </div>
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
                 <input type="checkbox" id="showDiscountToggle" onchange="toggleShowDiscount()"> Show Discount in Invoice
                 PDF
@@ -1448,6 +1461,8 @@
         }
         let isCompactView = localStorage.getItem("reportCompactView") === "true";
         let currentTheme = localStorage.getItem("appThemeMode") || "system";
+        let reportCalendarMode = ["all", "financial", "calendar"].includes(localStorage.getItem("reportCalendarMode"))
+            ? localStorage.getItem("reportCalendarMode") : "financial";
         let showDiscountInPdf = localStorage.getItem("reportShowDiscountInPdf") === "true";
         let showSubDetailsInPdf = localStorage.getItem("reportShowSubDetailsInPdf") === "true";
         let showItemCodeInPdf = localStorage.getItem("reportShowItemCodeInPdf") !== "false";
@@ -4484,6 +4499,13 @@
             document.getElementById("filterDistrict").value = "";
             document.getElementById("filterState").value = "";
             document.getElementById("filterSupplier").value = "";
+            document.getElementById("fromDate").value = "";
+            document.getElementById("toDate").value = "";
+            reportCalendarMode = "all";
+            localStorage.setItem("reportCalendarMode", reportCalendarMode);
+            const calendarSelect = document.getElementById("reportCalendarMode");
+            if (calendarSelect) calendarSelect.value = reportCalendarMode;
+            updateDateRangeSummary();
             renderTable(invoices);
         }
 
@@ -4498,6 +4520,11 @@
 
             const from = document.getElementById("fromDate").value;
             const to = document.getElementById("toDate").value;
+            updateDateRangeSummary();
+            if (from && to && from > to) {
+                showToast("From date must be on or before To date.", "#e67e22");
+                return;
+            }
 
             const fInvNo = (document.getElementById("search_invNo")?.value || "").toLowerCase().trim();
             const fInvType = (document.getElementById("search_invType")?.value || "").toLowerCase().trim();
@@ -4518,9 +4545,8 @@
             }
 
             const filtered = invoices.filter(inv => {
-                const d = inv.invoice_date || inv.date || "";
-                if (from && d < from) return false;
-                if (to && d > to) return false;
+                const d = normalizeReportDate(inv.invoice_date || inv.date);
+                if ((from || to) && (!d || (from && d < from) || (to && d > to))) return false;
 
                 const { total, paid, due } = getInvoiceTotals(inv);
 
@@ -4635,7 +4661,71 @@
         }
 
         document.getElementById("btnDateSearch").addEventListener("click", applyDateFilter);
+        document.getElementById("fromDate").addEventListener("input", updateDateRangeSummary);
+        document.getElementById("toDate").addEventListener("input", updateDateRangeSummary);
         function applyDateFilter() {
+            applySearch();
+        }
+
+        function updateDateRangeSummary() {
+            const summary = document.getElementById("dateRangeSummary");
+            if (!summary) return;
+            const from = document.getElementById("fromDate").value;
+            const to = document.getElementById("toDate").value;
+            localStorage.setItem("reportDateRange", JSON.stringify({ from, to }));
+            const displayDate = value => {
+                if (!value) return "";
+                const [year, month, day] = value.split("-").map(Number);
+                return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+                    day: "2-digit", month: "short", year: "numeric"
+                });
+            };
+
+            if (from && to && from > to) {
+                summary.textContent = "Selected date range: Invalid — From date must be on or before To date";
+            } else if (from && to) {
+                summary.textContent = `Selected date range: ${displayDate(from)} to ${displayDate(to)}`;
+            } else if (from) {
+                summary.textContent = `Selected date range: From ${displayDate(from)} onward`;
+            } else if (to) {
+                summary.textContent = `Selected date range: Through ${displayDate(to)}`;
+            } else {
+                summary.textContent = "Selected date range: All dates";
+            }
+        }
+
+        function normalizeReportDate(value) {
+            if (!value) return "";
+            const raw = String(value).trim().split("T")[0];
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            const match = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            if (match) return `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+            return "";
+        }
+
+        function changeReportCalendarMode() {
+            reportCalendarMode = document.getElementById("reportCalendarMode").value;
+            localStorage.setItem("reportCalendarMode", reportCalendarMode);
+            if (reportCalendarMode === "all") {
+                document.getElementById("fromDate").value = "";
+                document.getElementById("toDate").value = "";
+                applySearch();
+                return;
+            }
+            const now = new Date();
+            let startYear = now.getFullYear();
+            let startMonth = 0;
+            let endYear = startYear;
+            let endMonth = 11;
+            if (reportCalendarMode === "financial") {
+                if (now.getMonth() < 3) startYear--;
+                startMonth = 3;
+                endYear = startYear + 1;
+                endMonth = 2;
+            }
+            const pad = n => String(n).padStart(2, "0");
+            document.getElementById("fromDate").value = `${startYear}-${pad(startMonth + 1)}-01`;
+            document.getElementById("toDate").value = `${endYear}-${pad(endMonth + 1)}-${new Date(endYear, endMonth + 1, 0).getDate()}`;
             applySearch();
         }
 
@@ -5718,6 +5808,8 @@
         function openSettingsModal() {
             document.getElementById("overlay").style.display = "block";
             document.getElementById("settingsModal").style.display = "block";
+            const calendarSelect = document.getElementById("reportCalendarMode");
+            if (calendarSelect) calendarSelect.value = reportCalendarMode;
 
             const container = document.getElementById("columnToggles");
             if (container.children.length === 0) {
@@ -6365,6 +6457,22 @@
 
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;
+            const calendarSelect = document.getElementById("reportCalendarMode");
+            if (calendarSelect) calendarSelect.value = reportCalendarMode;
+            try {
+                const savedDateRange = JSON.parse(localStorage.getItem("reportDateRange") || "{}");
+                if (savedDateRange && typeof savedDateRange === "object") {
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(savedDateRange.from || "")) {
+                        document.getElementById("fromDate").value = savedDateRange.from;
+                    }
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(savedDateRange.to || "")) {
+                        document.getElementById("toDate").value = savedDateRange.to;
+                    }
+                }
+            } catch (error) {
+                localStorage.removeItem("reportDateRange");
+            }
+            updateDateRangeSummary();
 
             loadColumnWidths();
             enableColumnResizing();
