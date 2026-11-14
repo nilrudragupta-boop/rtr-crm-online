@@ -1597,6 +1597,19 @@
             localStorage.setItem("reportActionBtnState", JSON.stringify(actionBtnState));
         }
 
+        function hasMakeInvoicePermission() {
+            try {
+                if (typeof getUIPermissions === "function") {
+                    return getUIPermissions().perm_make_invoice !== false;
+                }
+                const user = localStorage.getItem("currentUser") || "admin";
+                const raw = localStorage.getItem("remotePermissions_" + user);
+                return !raw || JSON.parse(raw).perm_make_invoice !== false;
+            } catch (error) {
+                return false;
+            }
+        }
+
         function toggleActionBtn(type) {
             const isChecked = document.getElementById(`showAction${type.charAt(0).toUpperCase() + type.slice(1)}`).checked;
 
@@ -1620,6 +1633,9 @@
                 if (actionBtnState[key]) table.classList.remove(`hide-${key}`);
                 else table.classList.add(`hide-${key}`);
             });
+            const canMakeInvoice = hasMakeInvoicePermission();
+            table.classList.toggle("hide-edit", !actionBtnState.edit || !canMakeInvoice);
+            table.classList.toggle("hide-printSmart", !actionBtnState.printSmart || !canMakeInvoice);
         }
 
 
@@ -2399,6 +2415,10 @@
             // edit buttons
             tbody.querySelectorAll(".edit-btn").forEach(btn => {
                 btn.onclick = (e) => {
+                    if (!hasMakeInvoicePermission()) {
+                        showToast("Invoice editing is disabled for this user.", "#c0392b");
+                        return;
+                    }
                     const tr = e.target.closest("tr");
                     const id = tr.dataset.invoiceId;
                     const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
@@ -2424,6 +2444,10 @@
             // print smart format
             tbody.querySelectorAll(".print-smart-btn").forEach(btn => {
                 btn.onclick = async (e) => {
+                    if (!hasMakeInvoicePermission()) {
+                        showToast("Smart Format printing is disabled for this user.", "#c0392b");
+                        return;
+                    }
                     const tr = e.target.closest("tr");
                     const id = tr.dataset.invoiceId;
                     const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
@@ -3770,6 +3794,10 @@
         }
 
         async function generateTallyInvoicePDF(invoice, isDirectPrint = false, copyLabel = null, suffix = null) {
+            if (!hasMakeInvoicePermission()) {
+                showToast("Smart Format printing is disabled for this user.", "#c0392b");
+                return;
+            }
             const mergePdf = localStorage.getItem('reportMergeInvoicePdf') === 'true';
 
             let copies = [];
@@ -5322,6 +5350,10 @@
 
         // --- Edit Invoice Warning Modal ---
         function openEditInvoiceWarningModal() {
+            if (!hasMakeInvoicePermission()) {
+                showToast("Invoice editing is disabled for this user.", "#c0392b");
+                return;
+            }
             document.getElementById("overlay").style.display = "block";
             document.getElementById("editInvoiceWarningModal").style.display = "block";
         }
@@ -5331,6 +5363,11 @@
             pendingEditInvoice = null;
         }
         document.getElementById("btnEditSmart").addEventListener("click", () => {
+            if (!hasMakeInvoicePermission()) {
+                closeEditInvoiceWarningModal();
+                showToast("Invoice editing is disabled for this user.", "#c0392b");
+                return;
+            }
             if (pendingEditInvoice) {
                 localStorage.setItem("editInvoice", JSON.stringify(pendingEditInvoice));
                 window.location.href = "invoice.html?invoiceNo=" + encodeURIComponent(pendingEditInvoice.invoice_no || pendingEditInvoice.invoiceNo || "");
@@ -5338,6 +5375,11 @@
             closeEditInvoiceWarningModal();
         });
         document.getElementById("btnEditSimple").addEventListener("click", () => {
+            if (!hasMakeInvoicePermission()) {
+                closeEditInvoiceWarningModal();
+                showToast("Invoice editing is disabled for this user.", "#c0392b");
+                return;
+            }
             if (pendingEditInvoice) {
                 localStorage.setItem("editInvoice", JSON.stringify(pendingEditInvoice));
                 window.location.href = "invoiceB.html?invoiceNo=" + encodeURIComponent(pendingEditInvoice.invoice_no || pendingEditInvoice.invoiceNo || "");
@@ -5888,6 +5930,14 @@
             Object.keys(actionBtnState).forEach(key => {
                 const cb = document.getElementById(`showAction${key.charAt(0).toUpperCase() + key.slice(1)}`);
                 if (cb) cb.checked = actionBtnState[key];
+            });
+            const canMakeInvoice = hasMakeInvoicePermission();
+            ["showActionEdit", "showActionPrintSmart"].forEach(id => {
+                const toggle = document.getElementById(id);
+                if (toggle) {
+                    toggle.disabled = !canMakeInvoice;
+                    toggle.title = canMakeInvoice ? "" : "Disabled by Remote Permissions: perm_make_invoice";
+                }
             });
 
             const searchInput = document.getElementById("columnSearchInput");
@@ -6448,6 +6498,7 @@
         document.addEventListener("DOMContentLoaded", () => {
             // Load Brand Name
             applyToolbarBtnVisibility(); // Apply before permissions or loader scripts finish
+            applyActionBtnVisibility();
             updateColumnStyles();
             applyCompactView();
             applyTheme();
@@ -6482,6 +6533,14 @@
 
             window.addEventListener('storage', event => {
                 if (event.key === 'customers') refreshReportCustomerDetails();
+                if (event.key && (event.key.startsWith('remotePermissions_') || event.key.startsWith('ui_permissions_'))) {
+                    applyActionBtnVisibility();
+                    const canMakeInvoice = hasMakeInvoicePermission();
+                    ["showActionEdit", "showActionPrintSmart"].forEach(id => {
+                        const toggle = document.getElementById(id);
+                        if (toggle) toggle.disabled = !canMakeInvoice;
+                    });
+                }
             });
             window.addEventListener('focus', refreshReportCustomerDetails);
             setInterval(refreshReportCustomerDetails, 30000);
