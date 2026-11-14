@@ -519,6 +519,38 @@
             return '-';
         }
 
+        function getMovementItemLines(row) {
+            let rawItems = row && row.itemsRaw;
+            if (typeof rawItems === 'string') {
+                try { rawItems = JSON.parse(rawItems); } catch (error) { rawItems = []; }
+            }
+            if (Array.isArray(rawItems) && rawItems.length) {
+                return rawItems.map(item => {
+                    const name = String(item.name || item.itemName || item.item || item.description || '').trim();
+                    const qty = item.qty ?? item.quantity ?? item.dispatchedQty ?? item.receivedQty;
+                    const uom = String(item.uom || item.unit || '').trim();
+                    if (!name) return '';
+                    return { name, qty: qty === undefined || qty === null || qty === '' ? '' : String(qty), uom };
+                }).filter(item => item.name);
+            }
+            const summary = String((row && row.itemsSummary) || '').trim();
+            return summary ? [{ name: summary, qty: '', uom: '' }] : [];
+        }
+
+        function escapeMovementHtml(value) {
+            return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+        }
+
+        function renderMovementItems(row) {
+            const items = getMovementItemLines(row);
+            if (!items.length) return '<span class="text-muted">-</span>';
+            return items.map(item => {
+                const name = escapeMovementHtml(item.name);
+                const qty = item.qty ? ' <strong class="text-dark">x ' + escapeMovementHtml(item.qty) + (item.uom ? ' ' + escapeMovementHtml(item.uom) : '') + '</strong>' : '';
+                return '<div class="small text-break">' + name + qty + '</div>';
+            }).join('');
+        }
+
         function renderTable(data) {
             const tbody = document.getElementById("movementBody");
             tbody.innerHTML = "";
@@ -600,7 +632,7 @@
           <td><span class="small fw-semibold text-secondary">${row.flow}</span></td>
           <td><i class="fa fa-user-circle me-1 text-muted"></i>${row.operator}</td>
           <td><span class="small">${row.transport}</span></td>
-          <td><span class="fw-medium small">${row.itemsSummary}</span></td>
+          <td class="movement-items-cell">${renderMovementItems(row)}</td>
             <td class="small text-break"></td>
           <td>${statusBadge}</td>
           <td class="text-end text-nowrap">${actionBtn}</td>
@@ -749,7 +781,7 @@
                 const matchesQuery = (m.id && m.id.toLowerCase().includes(query)) ||
                     invNo.includes(query) ||
                     gdnName.includes(query) ||
-                    (m.itemsSummary && m.itemsSummary.toLowerCase().includes(query)) ||
+                    getMovementItemLines(m).some(item => item.name.toLowerCase().includes(query) || item.qty.toLowerCase().includes(query) || item.uom.toLowerCase().includes(query)) ||
                     (m.operator && m.operator.toLowerCase().includes(query)) ||
                     (m.flow && m.flow.toLowerCase().includes(query)) ||
                     (m.transport && m.transport.toLowerCase().includes(query));
