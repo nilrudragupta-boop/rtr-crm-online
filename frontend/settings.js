@@ -351,6 +351,7 @@ var EXPENSE_LEDGER_SCHEMA = {
 var UI_PERMISSION_REGISTRY = [
     { id: 'perm_quick_entry', label: 'Quick Daily Entry', feature: 'invoice' },
     { id: 'perm_make_invoice', label: 'Smart Invoice', feature: 'invoice' },
+    { id: 'perm_edit_invoice', label: 'Edit Existing Invoice', feature: 'invoice' },
     { id: 'perm_regular_invoice', label: 'Regular Invoice', feature: 'invoice' },
     { id: 'perm_quotation', label: 'Quotation', feature: 'quotation' },
     { id: 'perm_restaurant_pos', label: 'Restaurant POS' },

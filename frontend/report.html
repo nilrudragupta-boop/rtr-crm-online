@@ -1610,6 +1610,19 @@
             }
         }
 
+        function hasEditInvoicePermission() {
+            try {
+                if (typeof getUIPermissions === "function") {
+                    return getUIPermissions().perm_edit_invoice !== false;
+                }
+                const user = localStorage.getItem("currentUser") || "admin";
+                const raw = localStorage.getItem("remotePermissions_" + user);
+                return !raw || JSON.parse(raw).perm_edit_invoice !== false;
+            } catch (error) {
+                return false;
+            }
+        }
+
         function toggleActionBtn(type) {
             const isChecked = document.getElementById(`showAction${type.charAt(0).toUpperCase() + type.slice(1)}`).checked;
 
@@ -1633,9 +1646,8 @@
                 if (actionBtnState[key]) table.classList.remove(`hide-${key}`);
                 else table.classList.add(`hide-${key}`);
             });
-            const canMakeInvoice = hasMakeInvoicePermission();
-            table.classList.toggle("hide-edit", !actionBtnState.edit || !canMakeInvoice);
-            table.classList.toggle("hide-printSmart", !actionBtnState.printSmart || !canMakeInvoice);
+            table.classList.toggle("hide-edit", !actionBtnState.edit || !hasEditInvoicePermission());
+            table.classList.toggle("hide-printSmart", !actionBtnState.printSmart || !hasMakeInvoicePermission());
         }
 
 
@@ -2415,7 +2427,7 @@
             // edit buttons
             tbody.querySelectorAll(".edit-btn").forEach(btn => {
                 btn.onclick = (e) => {
-                    if (!hasMakeInvoicePermission()) {
+                    if (!hasEditInvoicePermission()) {
                         showToast("Invoice editing is disabled for this user.", "#c0392b");
                         return;
                     }
@@ -5350,7 +5362,7 @@
 
         // --- Edit Invoice Warning Modal ---
         function openEditInvoiceWarningModal() {
-            if (!hasMakeInvoicePermission()) {
+            if (!hasEditInvoicePermission()) {
                 showToast("Invoice editing is disabled for this user.", "#c0392b");
                 return;
             }
@@ -5363,7 +5375,7 @@
             pendingEditInvoice = null;
         }
         document.getElementById("btnEditSmart").addEventListener("click", () => {
-            if (!hasMakeInvoicePermission()) {
+            if (!hasEditInvoicePermission()) {
                 closeEditInvoiceWarningModal();
                 showToast("Invoice editing is disabled for this user.", "#c0392b");
                 return;
@@ -5375,7 +5387,7 @@
             closeEditInvoiceWarningModal();
         });
         document.getElementById("btnEditSimple").addEventListener("click", () => {
-            if (!hasMakeInvoicePermission()) {
+            if (!hasEditInvoicePermission()) {
                 closeEditInvoiceWarningModal();
                 showToast("Invoice editing is disabled for this user.", "#c0392b");
                 return;
@@ -5931,14 +5943,16 @@
                 const cb = document.getElementById(`showAction${key.charAt(0).toUpperCase() + key.slice(1)}`);
                 if (cb) cb.checked = actionBtnState[key];
             });
-            const canMakeInvoice = hasMakeInvoicePermission();
-            ["showActionEdit", "showActionPrintSmart"].forEach(id => {
-                const toggle = document.getElementById(id);
-                if (toggle) {
-                    toggle.disabled = !canMakeInvoice;
-                    toggle.title = canMakeInvoice ? "" : "Disabled by Remote Permissions: perm_make_invoice";
-                }
-            });
+            const editToggle = document.getElementById("showActionEdit");
+            if (editToggle) {
+                editToggle.disabled = !hasEditInvoicePermission();
+                editToggle.title = editToggle.disabled ? "Disabled by Remote Permissions: perm_edit_invoice" : "";
+            }
+            const smartPrintToggle = document.getElementById("showActionPrintSmart");
+            if (smartPrintToggle) {
+                smartPrintToggle.disabled = !hasMakeInvoicePermission();
+                smartPrintToggle.title = smartPrintToggle.disabled ? "Disabled by Remote Permissions: perm_make_invoice" : "";
+            }
 
             const searchInput = document.getElementById("columnSearchInput");
             if (searchInput) {
@@ -6535,11 +6549,10 @@
                 if (event.key === 'customers') refreshReportCustomerDetails();
                 if (event.key && (event.key.startsWith('remotePermissions_') || event.key.startsWith('ui_permissions_'))) {
                     applyActionBtnVisibility();
-                    const canMakeInvoice = hasMakeInvoicePermission();
-                    ["showActionEdit", "showActionPrintSmart"].forEach(id => {
-                        const toggle = document.getElementById(id);
-                        if (toggle) toggle.disabled = !canMakeInvoice;
-                    });
+                    const editToggle = document.getElementById("showActionEdit");
+                    if (editToggle) editToggle.disabled = !hasEditInvoicePermission();
+                    const smartPrintToggle = document.getElementById("showActionPrintSmart");
+                    if (smartPrintToggle) smartPrintToggle.disabled = !hasMakeInvoicePermission();
                 }
             });
             window.addEventListener('focus', refreshReportCustomerDetails);

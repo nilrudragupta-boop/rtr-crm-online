@@ -553,14 +553,14 @@ Branch: </textarea>
         </div>
 
         <script>
-            function invoiceBHasMakeInvoicePermission() {
+            function invoiceBHasPermission(permissionId) {
                 try {
                     if (typeof getUIPermissions === "function") {
-                        return getUIPermissions().perm_make_invoice !== false;
+                        return getUIPermissions()[permissionId] !== false;
                     }
                     const user = localStorage.getItem("currentUser") || "admin";
                     const raw = localStorage.getItem("remotePermissions_" + user);
-                    return !raw || JSON.parse(raw).perm_make_invoice !== false;
+                    return !raw || JSON.parse(raw)[permissionId] !== false;
                 } catch (error) {
                     return false;
                 }
@@ -1246,7 +1246,7 @@ Branch: </textarea>
             }
 
             function loadInvoiceForEdit(invoiceNo) {
-                if (!invoiceBHasMakeInvoicePermission()) {
+                if (!invoiceBHasPermission("perm_edit_invoice")) {
                     alert("Invoice editing is disabled for this user.");
                     window.location.replace("report.html");
                     return;
@@ -1336,8 +1336,10 @@ Branch: </textarea>
             async function saveInvoice() {
                 const invoiceNo = document.getElementById('invoiceNo').value.trim();
                 if (!invoiceNo) return alert("Invoice No is required to save.");
-                if (new URLSearchParams(window.location.search).has("invoiceNo") && !invoiceBHasMakeInvoicePermission()) {
-                    alert("Invoice editing is disabled for this user.");
+                const isEditing = new URLSearchParams(window.location.search).has("invoiceNo");
+                const requiredPermission = isEditing ? "perm_edit_invoice" : "perm_regular_invoice";
+                if (!invoiceBHasPermission(requiredPermission)) {
+                    alert(isEditing ? "Invoice editing is disabled for this user." : "Invoice creation is disabled for this user.");
                     window.location.replace("report.html");
                     return;
                 }
@@ -1507,8 +1509,10 @@ Branch: </textarea>
 
             window.addEventListener('DOMContentLoaded', () => {
                 const editInvoiceNo = new URLSearchParams(window.location.search).get('invoiceNo');
-                if (editInvoiceNo && !invoiceBHasMakeInvoicePermission()) {
-                    document.body.innerHTML = '<main style="max-width:600px;margin:10vh auto;padding:24px;font-family:Arial,sans-serif;text-align:center;border:1px solid #ddd;border-radius:8px;"><h2>Invoice editing is disabled</h2><p>Your account does not have permission to edit invoices.</p><a href="report.html">Return to Invoice Report</a></main>';
+                const requiredPermission = editInvoiceNo ? "perm_edit_invoice" : "perm_regular_invoice";
+                if (!invoiceBHasPermission(requiredPermission)) {
+                    const action = editInvoiceNo ? "edit invoices" : "create regular invoices";
+                    document.body.innerHTML = `<main style="max-width:600px;margin:10vh auto;padding:24px;font-family:Arial,sans-serif;text-align:center;border:1px solid #ddd;border-radius:8px;"><h2>Access disabled</h2><p>Your account does not have permission to ${action}.</p><a href="report.html">Return to Invoice Report</a></main>`;
                     return;
                 }
                 loadPurchaseItems();
