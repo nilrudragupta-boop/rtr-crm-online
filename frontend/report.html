@@ -692,8 +692,7 @@
 
             <button id="btnReceiptLog" class="small secondary" style="background:rgb(28, 14, 219);"
                 onclick="openReceiptLogModal()" data-permission-id="perm_payment_receipt_log">Receipt Log</button>
-            <button id="btnPurchasePaymentHistory" class="small secondary" style="background:#198754;"
-                onclick="openPurchasePaymentHistoryReport()">Purchase Payment History</button>
+            <button id="btnPurchasePaymentHistory" class="small secondary" style="background:#198754;" onclick="openPurchasePaymentHistoryReport()">Purchase Payment History</button>
 
             <button id="btnPrintReport" onclick="window.print()" class="small"
                 data-permission-id="perm_print">Print</button>
@@ -1038,7 +1037,7 @@
                 <label>To <input type="date" id="purchasePaymentHistoryTo"></label>
                 <input type="search" id="purchasePaymentHistorySearch" placeholder="Supplier, invoice, item, reference" style="min-width:260px;">
                 <button class="secondary small" onclick="renderPurchasePaymentHistoryReport()">Filter</button>
-                <strong style="margin-left:auto;">Total: ₹<span id="purchasePaymentHistoryTotal">0.00</span></strong>
+                <strong style="margin-left:auto;">Payments in view: ₹<span id="purchasePaymentHistoryTotal">0.00</span></strong><strong style="color:#c0392b;">Total Due: ₹<span id="purchasePaymentHistoryDue">0.00</span></strong>
             </div>
             <div style="overflow:auto; flex:1;">
                 <table style="width:100%; border-collapse:collapse; font-size:13px;">
@@ -1157,6 +1156,9 @@
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
                         <input type="checkbox" id="showBtnReceiptLog" onchange="toggleToolbarBtn('receiptLog')"> Receipt
                         Log
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                        <input type="checkbox" id="showBtnPurchasePaymentHistory" onchange="toggleToolbarBtn('purchasePaymentHistory')"> Purchase Payment History
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
                         <input type="checkbox" id="showBtnPrint" onchange="toggleToolbarBtn('print')"> Print
@@ -1611,9 +1613,12 @@
             exportCsv: true,
             importCsv: true,
             receiptLog: true,
+            purchasePaymentHistory: true,
             print: true,
             analytics: true
         };
+
+        if (!Object.prototype.hasOwnProperty.call(toolbarBtnState, "purchasePaymentHistory")) toolbarBtnState.purchasePaymentHistory = true;
 
         function toggleToolbarBtn(type) {
             const isChecked = document.getElementById(`showBtn${type.charAt(0).toUpperCase() + type.slice(1)}`).checked;
@@ -1627,6 +1632,7 @@
                 exportCsv: '#btnExportCsv',
                 importCsv: '#btnImportCsv',
                 receiptLog: '#btnReceiptLog',
+                purchasePaymentHistory: '#btnPurchasePaymentHistory',
                 print: '#btnPrintReport',
                 analytics: '#btnSaleAnalytics'
             };
@@ -5384,6 +5390,7 @@
                     console.warn('Could not refresh purchase payment history from server.', error);
                 }
             }
+            window.purchasePaymentHistoryPurchases = purchases;
             window.purchasePaymentHistoryRecords = purchases.flatMap(purchase => {
                 if (Array.isArray(purchase.paymentHistory) && purchase.paymentHistory.length) {
                     return purchase.paymentHistory.map(payment => ({ ...payment, purchase }));
@@ -5406,6 +5413,14 @@
             document.getElementById('purchasePaymentHistoryReportModal').style.display = 'none';
         }
 
+        function getReportPurchaseTotal(purchase) {
+            const base = (Number(purchase.qty) || 0) * (Number(purchase.price) || 0);
+            const discount = Number(purchase.discount) || 0;
+            const discountAmount = (purchase.discType || '%') === 'flat' ? discount : base * discount / 100;
+            const extraCharges = (Number(purchase.freightCharges) || 0) + (Number(purchase.packingCharges) || 0) + (Number(purchase.loadingCharges) || 0);
+            const taxable = base - discountAmount + extraCharges;
+            return taxable + taxable * (Number(purchase.gst) || 0) / 100 + (Number(purchase.roundOff) || 0);
+        }
         function renderPurchasePaymentHistoryReport() {
             const rows = window.purchasePaymentHistoryRecords || [];
             const from = document.getElementById('purchasePaymentHistoryFrom').value;
@@ -5420,24 +5435,31 @@
                     .map(value => String(value || '').toLowerCase()).join(' ');
                 return !term || haystack.includes(term);
             }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-            const total = filtered.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
-            document.getElementById('purchasePaymentHistoryTotal').textContent = total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const totalPayments = filtered.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+            const purchases = window.purchasePaymentHistoryPurchases || [];
+            const totalDue = purchases.reduce((sum, purchase) => {
+                const paid = Number(purchase.paid) || 0;
+                return sum + (getReportPurchaseTotal(purchase) - paid);
+            }, 0);
+            const format = value => (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('purchasePaymentHistoryTotal').textContent = format(totalPayments);
+            document.getElementById('purchasePaymentHistoryDue').textContent = format(totalDue);
             const body = document.getElementById('purchasePaymentHistoryReportBody');
-            body.innerHTML = filtered.length ? filtered.map(payment => {
+            body.innerHTML = filtered.length ? filtered.map((payment, index) => {
                 const purchase = payment.purchase || {};
                 return `<tr>
+                    <td style="padding:7px;border:1px solid #ddd;text-align:center;">${index + 1}</td>
+                    <td style="padding:7px;border:1px solid #ddd;text-align:right;white-space:nowrap;">₹${format(payment.amount)}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.date || '-')}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(purchase.supplierName || '-')}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(purchase.supplierInv || '-')}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(purchase.itemName || '-')}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.mode || '-')}</td>
-                    <td style="padding:7px;border:1px solid #ddd;text-align:right;">₹${(Number(payment.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.reference || '-')}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.bankAccountName || '-')}</td>
                 </tr>`;
-            }).join('') : '<tr><td colspan="8" style="padding:18px;text-align:center;">No purchase payments found.</td></tr>';
+            }).join('') : '<tr><td colspan="9" style="padding:18px;text-align:center;">No purchase payments found.</td></tr>';
         }
-
         function exportInvoicesCSV() {
             if (!invoices.length) return showToast("No data to export", "#e67e22");
 
