@@ -2206,6 +2206,7 @@
           <button class="edit-btn">✏️ Edit</button>
           <button class="copy-btn">📋 Copy</button>
           <button class="delete-btn" style="color: #dc3545 !important;">🗑️ Delete</button>
+          <button class="godown-auth-btn" style="background:#b45309;color:white;" onclick="openGodownAuthorization('${escapeHtml(id)}')">Godown authorization</button>
           <button class="print-smart-btn">📄 Print (Smart Format)</button>
           <button class="print-std-btn">📄 Print (Standard Format)</button>
       </div>
@@ -6333,6 +6334,24 @@
             if (stickyToggle) stickyToggle.checked = isStickyHeader;
         }
 
+        
+        function openGodownAuthorization(invoiceId) {
+            const invoice=invoices.find(item=>String(item.id||item.invoice_no||item.invoiceNo)===String(invoiceId));
+            if(!invoice||!Array.isArray(invoice.items)) return showToast('Invoice items could not be found.','#c0392b');
+            document.getElementById('godownAuthorizationTitle').textContent='Godown authorization ? '+(invoice.invoice_no||invoice.invoiceNo||invoice.id);
+            document.getElementById('godownAuthorizationRows').innerHTML=invoice.items.map((item,index)=>{const name=escapeHtml(item.item||item.itemName||'Unnamed item'),code=escapeHtml(item.itemCode||''),qty=Number(item.qty)||0,checked=item.godownDelivery===true||item.godownDelivery==='true';return '<tr><td><input type="checkbox" class="godown-auth-line" data-index="'+index+'" '+(checked?'checked':'')+'></td><td>'+name+(code?' <small>('+code+')</small>':'')+'</td><td>'+qty+' '+escapeHtml(item.uom||'')+'</td></tr>';}).join('');
+            const modal=document.getElementById('godownAuthorizationModal');modal.dataset.invoiceId=String(invoice.id||invoice.invoice_no||invoice.invoiceNo);modal.style.display='flex';
+        }
+        function closeGodownAuthorization(){document.getElementById('godownAuthorizationModal').style.display='none';}
+        async function saveGodownAuthorization(){
+            const id=document.getElementById('godownAuthorizationModal').dataset.invoiceId,invoice=invoices.find(item=>String(item.id||item.invoice_no||item.invoiceNo)===id);
+            if(!invoice||!Array.isArray(invoice.items))return showToast('Invoice could not be found.','#c0392b');
+            document.querySelectorAll('.godown-auth-line').forEach(box=>{invoice.items[Number(box.dataset.index)].godownDelivery=box.checked;});
+            invoice.godownDeliveryUpdatedAt=new Date().toISOString();invoice.godownDeliveryUpdatedBy=localStorage.getItem('currentUser')||'System';localStorage.setItem('invoices',JSON.stringify(invoices));
+            try{if(typeof apiClient?.saveInvoice==='function'){const result=await apiClient.saveInvoice(invoice);if(result&&result.success===false)throw Error(result.message||'Remote save failed');}closeGodownAuthorization();applySearch();showToast('Godown authorization saved.','#198754');}
+            catch(error){console.error('Godown authorization sync failed:',error);showToast('Saved on this device, but not synced. Godown access may not update on other devices until sync succeeds.','#c0392b');}
+        }
+
         // --- init ---
         document.addEventListener("DOMContentLoaded", () => {
             // Load Brand Name
@@ -6572,6 +6591,14 @@
             }
         }
     </script>
+
+    <div id="godownAuthorizationModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10050;align-items:center;justify-content:center;padding:16px;">
+      <div style="background:white;color:#222;border-radius:10px;padding:20px;width:min(680px,100%);max-height:85vh;overflow:auto;box-shadow:0 10px 40px #0005;">
+        <h3 id="godownAuthorizationTitle" style="margin:0 0 8px;">Godown authorization</h3><p style="margin:0 0 14px;color:#555;">Select only the invoice lines that the godown may deliver. Unchecked lines will not appear in the godown customer-dispatch invoice list.</p>
+        <table style="width:100%;border-collapse:collapse;"><thead><tr><th>Godown?</th><th style="text-align:left;">Item</th><th style="text-align:left;">Invoice quantity</th></tr></thead><tbody id="godownAuthorizationRows"></tbody></table>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;"><button class="secondary" onclick="closeGodownAuthorization()">Cancel</button><button style="background:#198754;color:white;" onclick="saveGodownAuthorization()">Save authorization</button></div>
+      </div>
+    </div>
 </body>
 
 </html>

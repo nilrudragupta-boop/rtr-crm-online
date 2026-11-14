@@ -1069,10 +1069,28 @@
             renderInvoiceDatalist(reportInvoices);
         }
 
+
+        function isGodownDeliveryAuthorized(item){return item&&(item.godownDelivery===true||item.godownDelivery==='true');}
+        function getInvoiceNo(invoice){return String(invoice?.invoice_no||invoice?.invoiceNo||invoice?.id||'').trim();}
+        function getPreviouslyDispatchedQtyByItem(invoice) {
+            const invoiceNo=getInvoiceNo(invoice).toLowerCase(),totals=new Map(),movements=JSON.parse(localStorage.getItem('godown_movements')||'[]');
+            movements.filter(m=>String(m.invoiceNo||'').trim().toLowerCase()===invoiceNo&&m.status==='DELIVERED_TO_CUSTOMER').forEach(m=>(m.itemsRaw||[]).forEach(d=>{const key=String(d.name||d.item||'').trim().toLowerCase()+'|'+String(d.uom||'').trim().toLowerCase();totals.set(key,(totals.get(key)||0)+(Number(d.qty)||0));}));
+            return totals;
+        }
+        function getRemainingAuthorizedInvoiceItems(invoice) {
+            const dispatched=getPreviouslyDispatchedQtyByItem(invoice),used=new Map();
+            return (Array.isArray(invoice?.items)?invoice.items:[]).filter(isGodownDeliveryAuthorized).map(item=>{
+                const key=String(item.item||item.itemName||'').trim().toLowerCase()+'|'+String(item.uom||'').trim().toLowerCase();
+                const prior=dispatched.get(key)||0,allocated=used.get(key)||0,qty=Math.max(0,(Number(item.qty)||0)-Math.max(0,prior-allocated));
+                used.set(key,allocated+(Number(item.qty)||0));
+                return {...item,godownRemainingQty:qty};
+            }).filter(item=>item.godownRemainingQty>0);
+        }
+
         function renderInvoiceDatalist(invoicesList) {
             const dl = document.getElementById('reportInvoiceList');
             dl.innerHTML = '';
-            (invoicesList || []).slice(-50).reverse().forEach(inv => {
+            (invoicesList || []).filter(inv => getRemainingAuthorizedInvoiceItems(inv).length > 0).slice(-50).reverse().forEach(inv => {
                 const cName = (inv.customer && inv.customer.name) || inv.customerName || inv.customer_name || 'Customer';
                 const invNo = inv.invoice_no || inv.id;
                 const dateStr = inv.invoice_date || inv.date || '';
@@ -1087,7 +1105,7 @@
                 opt.dataset.cust = cName;
                 opt.dataset.custAddress = (inv.customer && inv.customer.address) || inv.customer_address || inv.address || '';
                 opt.dataset.custPhone = (inv.customer && (inv.customer.contact || inv.customer.mobile)) || inv.customer_phone || inv.customer_contact || inv.contact || '';
-                opt.dataset.items = JSON.stringify(inv.items || []);
+                opt.dataset.items = JSON.stringify(getRemainingAuthorizedInvoiceItems(inv));
                 dl.appendChild(opt);
             });
         }
@@ -1253,7 +1271,7 @@
                     if (items && items.length > 0) {
                         document.getElementById('materialBody').innerHTML = '';
                         items.forEach(itm => {
-                            appendItemRow(itm.itemId || '', itm.itemName || itm.item, itm.qty || 1, itm.uom || 'Pcs');
+                            appendItemRow(itm.itemCode || itm.itemId || '', itm.itemName || itm.item, itm.godownRemainingQty || 1, itm.uom || 'Pcs');
                         });
                     }
                 } catch (e) {
@@ -1456,12 +1474,12 @@
 
             // 3. CUSTOMER DISPATCH
             else if (currentMode === 'CUSTOMER') {
+                const rawInvoiceVal=document.getElementById('searchInvoiceNo').value.trim();
+                const linkedInv=rawInvoiceVal?rawInvoiceVal.split('|')[0].trim():'';
+                if(linkedInv){const invoice=reportInvoices.find(inv=>getInvoiceNo(inv).toLowerCase()===linkedInv.toLowerCase());if(!invoice){alert('Invoice could not be verified. Refresh invoices and select a valid invoice.');return;}const permitted=new Map();getRemainingAuthorizedInvoiceItems(invoice).forEach(item=>{const key=String(item.item||item.itemName||'').trim().toLowerCase()+'|'+String(item.uom||'').trim().toLowerCase();permitted.set(key,(permitted.get(key)||0)+(Number(item.godownRemainingQty)||0));});const requested=new Map();lineItems.forEach(item=>{const key=String(item.name).trim().toLowerCase()+'|'+String(item.uom).trim().toLowerCase();requested.set(key,(requested.get(key)||0)+(Number(item.qty)||0));});if([...requested.entries()].some(([key,qty])=>qty>(permitted.get(key)||0))){alert('Dispatch blocked: invoice lines must be authorized for godown delivery, and quantities cannot exceed the remaining authorized amount.');return;}}
                 const custName = document.getElementById('txCustomerName').value.trim() || 'Direct Customer';
                 const custAddr = document.getElementById('txCustomerAddress').value.trim();
                 const custPhone = document.getElementById('txCustomerPhone').value.trim();
-                const rawInvoiceVal = document.getElementById('searchInvoiceNo').value.trim();
-                const linkedInv = rawInvoiceVal ? rawInvoiceVal.split('|')[0].trim() : '';
-
                 const partyFull = `${custName}${custPhone ? ' (' + custPhone + ')' : ''}${custAddr ? ' - ' + custAddr : ''}`;
                 movements.unshift({
                     id: docNo,
