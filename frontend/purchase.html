@@ -67,6 +67,10 @@
             color: #fff;
         }
 
+        body.purchase-delete-disabled #btnDeleteSelectedPurchases {
+            display: none !important;
+        }
+
         .btn-search {
             background: #007bff;
             color: #fff;
@@ -1001,7 +1005,7 @@
         style="display: flex; flex-direction: row; gap: 10px; align-items: center; margin-bottom: 15px;">
         <button class="btn-clear" id="clearBtn">Clear Fields</button>
 
-        <button onclick="deleteSelectedPurchases()" style="background:#dc3545; color: white;"
+        <button id="btnDeleteSelectedPurchases" onclick="deleteSelectedPurchases()" style="background:#dc3545; color: white;"
             data-permission-id="perm_delete_action">Delete Selected</button>
         <button id="purchaseRecycleBinBtn" onclick="openPurchaseRecycleBin()"
             style="background:#6f42c1; color:#fff; display:none;">♻️ Recycle Bin</button>
@@ -1574,6 +1578,45 @@
         let idsToDelete = [];
         let currentPage = 1;
         let rowsPerPage = 20;
+
+        function hasPurchasePermission(permissionId) {
+            try {
+                if (typeof getUIPermissions === "function") {
+                    return getUIPermissions()[permissionId] !== false;
+                }
+                const user = localStorage.getItem("currentUser") || "admin";
+                const raw = localStorage.getItem("remotePermissions_" + user);
+                return !raw || JSON.parse(raw)[permissionId] !== false;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function canEditPurchase() {
+            return hasPurchasePermission("perm_edit_purchase");
+        }
+
+        function canDeletePurchase() {
+            return hasPurchasePermission("perm_delete_purchase") && hasPurchasePermission("perm_delete_action");
+        }
+
+        function applyPurchaseActionPermissions() {
+            const editToggle = $("showEditBtn");
+            const deleteToggle = $("showDeleteBtn");
+            const canEdit = canEditPurchase();
+            const canDelete = canDeletePurchase();
+            if (editToggle) {
+                editToggle.disabled = !canEdit;
+                editToggle.title = canEdit ? "" : "Disabled by Remote Permissions: perm_edit_purchase";
+            }
+            if (deleteToggle) {
+                deleteToggle.disabled = !canDelete;
+                deleteToggle.title = canDelete ? "" : "Disabled by Remote Permissions: perm_delete_purchase";
+            }
+            document.body.classList.toggle("purchase-delete-disabled", !canDelete);
+            const updateButton = $("updateBtn");
+            if (updateButton && editingId) updateButton.style.display = canEdit ? "inline-block" : "none";
+        }
 
         // Dark Mode Logic
         let currentTheme = localStorage.getItem("appThemeMode") || "system";
@@ -2412,6 +2455,7 @@
 
         async function updatePurchase() {
             if (!editingId) return;
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             const itemName = $("itemInput").value.trim();
             const itemCode = $("itemCode").value.trim();
             const items = JSON.parse(localStorage.getItem("items")) || [];
@@ -3139,9 +3183,9 @@
             <button class="action-btn-main" onclick="toggleActionMenu(this)">⚙️ Options</button>
             <div class="action-dropdown-content">
                 ${actionButtonVisibility.view ? `<button onclick="viewPurchase('${p.id}')">👁️ View</button>` : ''}
-                ${actionButtonVisibility.edit ? `<button onclick="editPurchase('${p.id}')">✏️ Edit</button>` : ''}
+                ${actionButtonVisibility.edit && canEditPurchase() ? `<button onclick="editPurchase('${p.id}')">✏️ Edit</button>` : ''}
                 ${actionButtonVisibility.copy ? `<button onclick="duplicatePurchase('${p.id}')">📋 Copy</button>` : ''}
-                ${actionButtonVisibility.delete ? `<button onclick="deletePurchase('${p.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>` : ''}
+                ${actionButtonVisibility.delete && canDeletePurchase() ? `<button onclick="deletePurchase('${p.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>` : ''}
             </div>
         </div>
       </td>
@@ -3381,7 +3425,9 @@
         }
 
         async function editPurchase(id) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             askConfirm("Confirm Edit", "Load this purchase into the form for editing?", async () => {
+                if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
                 const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
                 const p = purchases.find(x => x.id == id);
                 if (p) {
@@ -3429,6 +3475,7 @@
         }
 
         function deleteSelectedPurchases() {
+            if (!canDeletePurchase()) return showToast("Purchase deletion is disabled for this user.", "#c0392b");
             const checkboxes = document.querySelectorAll(".purchase-checkbox:checked");
             if (checkboxes.length === 0) return showToast("Please select items to delete ⚠️");
 
@@ -3471,12 +3518,17 @@
         }
 
         function deletePurchase(id) {
+            if (!canDeletePurchase()) return showToast("Purchase deletion is disabled for this user.", "#c0392b");
             idsToDelete = [id];
             $("modalMessage").innerText = "Are you sure you want to delete this purchase?";
             $("confirmationModal").style.display = "flex";
         }
 
         async function confirmDelete() {
+            if (!canDeletePurchase()) {
+                closeModal();
+                return showToast("Purchase deletion is disabled for this user.", "#c0392b");
+            }
             if (idsToDelete.length === 0) return;
             let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const recycleBin = JSON.parse(localStorage.getItem('recycleBin_purchases') || '[]');
@@ -4206,6 +4258,7 @@
             document.getElementById("showCopyBtn").checked = actionButtonVisibility.copy;
             document.getElementById("showDeleteBtn").checked = actionButtonVisibility.delete;
             document.getElementById("showViewBtn").checked = actionButtonVisibility.view;
+            applyPurchaseActionPermissions();
 
             const searchInput = document.getElementById("columnSearchInput");
             if (searchInput) {
@@ -4239,6 +4292,14 @@
         }
 
         function toggleActionButton(type) {
+            if (type === "edit" && !canEditPurchase()) {
+                $("showEditBtn").checked = actionButtonVisibility.edit;
+                return showToast("Purchase editing is disabled for this user.", "#c0392b");
+            }
+            if (type === "delete" && !canDeletePurchase()) {
+                $("showDeleteBtn").checked = actionButtonVisibility.delete;
+                return showToast("Purchase deletion is disabled for this user.", "#c0392b");
+            }
             actionButtonVisibility[type] = document.getElementById(`show${type.charAt(0).toUpperCase() + type.slice(1)}Btn`).checked;
             localStorage.setItem("purchaseActionButtons", JSON.stringify(actionButtonVisibility));
             loadPurchases();
@@ -4667,6 +4728,7 @@
             const calendarSelect = $("purchaseCalendarMode");
             if (calendarSelect) calendarSelect.value = purchaseCalendarMode;
             restorePurchaseDateRange();
+            applyPurchaseActionPermissions();
             const d = new Date().toISOString().slice(0, 10);
             $("purchaseDate").value = d;
             loadPurchases();
@@ -4696,6 +4758,13 @@
                 }
             });
 
+            window.addEventListener("storage", event => {
+                if (event.key && (event.key.startsWith("remotePermissions_") || event.key.startsWith("ui_permissions_"))) {
+                    applyPurchaseActionPermissions();
+                    loadPurchases();
+                }
+            });
+
             // Add Enter key listener to add item to draft / update
             const purchaseForm = document.getElementById('purchaseFormContainer');
             if (purchaseForm) {
@@ -4718,7 +4787,9 @@
 
             const urlParams = new URLSearchParams(window.location.search);
             const id = urlParams.get('id');
-            if (id) {
+            if (id && !canEditPurchase()) {
+                showToast("Purchase editing is disabled for this user.", "#c0392b");
+            } else if (id) {
                 const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
                 const p = purchases.find(x => x.id == id);
                 if (p) {

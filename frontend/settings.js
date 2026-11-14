@@ -403,6 +403,8 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_print', label: 'Print Button' },
     { id: 'perm_export_excel', label: 'Export Excel' },
     { id: 'perm_delete_action', label: 'Delete Actions' },
+    { id: 'perm_edit_purchase', label: 'Edit Purchases', feature: 'inventory' },
+    { id: 'perm_delete_purchase', label: 'Delete Purchases', feature: 'inventory' },
     { id: 'perm_help', label: 'Help & Support' },
     { id: 'perm_payment_receipt_log', label: 'Payment Receipt Log' },
     { id: 'perm_manage_company_info', label: 'Settings: Manage Company Info' },
