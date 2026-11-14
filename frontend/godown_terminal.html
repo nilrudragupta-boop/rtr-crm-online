@@ -1100,19 +1100,26 @@
         }
 
 
-        function isGodownDeliveryAuthorized(item){return item&&(item.godownDelivery===true||item.godownDelivery==='true');}
+        function isGodownDeliveryAuthorized(item,godownId=activeGodownId){
+            if(!item||(item.godownDelivery!==true&&item.godownDelivery!=='true')) return false;
+            const assignedGodownId=String(item.godownDeliveryGodownId||'');
+            // Legacy authorization records have no godown ID and remain visible to existing terminals.
+            return !assignedGodownId||assignedGodownId===String(godownId||'');
+        }
         function getInvoiceNo(invoice){return String(invoice?.invoice_no||invoice?.invoiceNo||invoice?.id||'').trim();}
-        function getPreviouslyDispatchedQtyByItem(invoice) {
+        function getPreviouslyDispatchedQtyByItem(invoice,godownId='') {
             const invoiceNo=getInvoiceNo(invoice).toLowerCase(),totals=new Map(),movements=JSON.parse(localStorage.getItem('godown_movements')||'[]');
-            movements.filter(m=>String(m.invoiceNo||'').trim().toLowerCase()===invoiceNo&&m.status==='DELIVERED_TO_CUSTOMER').forEach(m=>(m.itemsRaw||[]).forEach(d=>{const key=String(d.name||d.item||'').trim().toLowerCase()+'|'+String(d.uom||'').trim().toLowerCase();totals.set(key,(totals.get(key)||0)+(Number(d.qty)||0));}));
+            movements.filter(m=>String(m.invoiceNo||'').trim().toLowerCase()===invoiceNo&&m.status==='DELIVERED_TO_CUSTOMER'&&(!godownId||String(m.godownId||'')===String(godownId))).forEach(m=>(m.itemsRaw||[]).forEach(d=>{const key=String(d.name||d.item||'').trim().toLowerCase()+'|'+String(d.uom||'').trim().toLowerCase();totals.set(key,(totals.get(key)||0)+(Number(d.qty)||0));}));
             return totals;
         }
         function getRemainingAuthorizedInvoiceItems(invoice) {
-            const dispatched=getPreviouslyDispatchedQtyByItem(invoice),used=new Map();
-            return (Array.isArray(invoice?.items)?invoice.items:[]).filter(isGodownDeliveryAuthorized).map(item=>{
+            const dispatchedByGodown=new Map(),used=new Map();
+            return (Array.isArray(invoice?.items)?invoice.items:[]).filter(item=>isGodownDeliveryAuthorized(item,activeGodownId)).map(item=>{
                 const key=String(item.item||item.itemName||'').trim().toLowerCase()+'|'+String(item.uom||'').trim().toLowerCase();
-                const prior=dispatched.get(key)||0,allocated=used.get(key)||0,qty=Math.max(0,(Number(item.qty)||0)-Math.max(0,prior-allocated));
-                used.set(key,allocated+(Number(item.qty)||0));
+                const scope=String(item.godownDeliveryGodownId||'');
+                if(!dispatchedByGodown.has(scope)) dispatchedByGodown.set(scope,getPreviouslyDispatchedQtyByItem(invoice,scope));
+                const scopedKey=scope+'|'+key,dispatched=dispatchedByGodown.get(scope),prior=dispatched.get(key)||0,allocated=used.get(scopedKey)||0,qty=Math.max(0,(Number(item.qty)||0)-Math.max(0,prior-allocated));
+                used.set(scopedKey,allocated+(Number(item.qty)||0));
                 return {...item,godownRemainingQty:qty};
             }).filter(item=>item.godownRemainingQty>0);
         }
@@ -1531,7 +1538,7 @@
                     const requestedKeys = new Set(requested.keys());
                     const consumedItems = invoice.items.filter(item => {
                         const key = String(item.item || item.itemName || '').trim().toLowerCase() + '|' + String(item.uom || '').trim().toLowerCase();
-                        return isGodownDeliveryAuthorized(item) && requestedKeys.has(key);
+                        return isGodownDeliveryAuthorized(item,activeGodownId) && requestedKeys.has(key);
                     });
                     if (!consumedItems.length) {
                         alert('No active Godown authorization was found for this shipment. Ask an admin to authorize the invoice items again.');
