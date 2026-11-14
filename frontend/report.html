@@ -933,9 +933,14 @@
         </div>
     </div>
     <div id="invoicePaymentHistoryModal" class="modal" style="display:none;position:fixed;z-index:10003;inset:0;background:rgba(0,0,0,.5);">
-      <div class="modal-content" style="background:#fff;margin:7vh auto;padding:18px;width:850px;max-width:96vw;max-height:85vh;overflow:auto;border-radius:8px;">
+      <div class="modal-content" style="background:#fff;margin:7vh auto;padding:18px;width:1100px;max-width:98vw;max-height:85vh;overflow:auto;border-radius:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><h3 style="margin:0;color:#198754;">Invoice Payment History</h3><div><button id="invoicePaymentAuditToggle" class="secondary small" onclick="toggleInvoicePaymentAudit()" style="display:none;">Audit trail</button> <button class="danger small" onclick="document.getElementById('invoicePaymentHistoryModal').style.display='none'">Close</button></div></div>
-        <p id="invoicePaymentHistoryTitle" style="font-weight:bold;"></p><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th></tr></thead><tbody id="invoicePaymentHistoryBody"></tbody></table><section id="invoicePaymentAuditPanel" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid #ddd;"><h4 style="margin:0 0 8px;">Payment audit trail</h4><div id="invoicePaymentAuditBody"></div></section>
+        <p id="invoicePaymentHistoryTitle" style="font-weight:bold;"></p>
+        <div style="display:flex;flex-wrap:wrap;gap:18px;padding:10px 12px;margin:10px 0 12px;background:#f3f8fc;border:1px solid #d8e6f1;border-radius:6px;font-weight:bold;">
+            <span>Invoice Total: ₹<span id="invoiceHistoryTotal">0.00</span></span>
+            <span style="color:#198754;">Total Paid: ₹<span id="invoiceHistoryPaid">0.00</span></span>
+            <span id="invoiceHistoryBalanceLabel" style="color:#c0392b;">Balance Due: ₹<span id="invoiceHistoryBalance">0.00</span></span>
+        </div><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Sl no.</th><th>Installment</th><th>Cumulative Paid</th><th>Date</th><th>Mode</th><th>Balance After Payment</th><th>Reference</th></tr></thead><tbody id="invoicePaymentHistoryBody"></tbody></table><section id="invoicePaymentAuditPanel" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid #ddd;"><h4 style="margin:0 0 8px;">Payment audit trail</h4><div id="invoicePaymentAuditBody"></div></section>
       </div>
     </div>
     <!-- Edit Payment Warning Modal -->
@@ -5056,20 +5061,42 @@
             return legacy;
         }
         let currentInvoicePaymentHistoryId = null;
+        function formatInvoicePaymentAmount(value) {
+            return (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
         function showInvoicePaymentHistory(id) {
             const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id)); if (!invoice) return;
             currentInvoicePaymentHistoryId = id;
             const auditToggle = document.getElementById('invoicePaymentAuditToggle');
             auditToggle.style.display = isInvoicePaymentAuditAdmin() ? 'inline-block' : 'none';
             document.getElementById('invoicePaymentAuditPanel').style.display = 'none';
-            const rows = invoicePaymentHistory(invoice);
+            const rows = invoicePaymentHistory(invoice).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+            const invoiceTotal = Number(invoice.invoice_total || invoice.invoiceTotal || invoice.total) || 0;
+            const totalPaid = rows.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+            const balanceDue = invoiceTotal - totalPaid;
             document.getElementById('invoicePaymentHistoryTitle').textContent = `Invoice ${invoice.invoice_no || invoice.invoiceNo || '-'}`;
-            document.getElementById('invoicePaymentHistoryBody').innerHTML = rows.length ? rows.map((payment, index) => `<tr>
-                <td>${index + 1}</td>
-                <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-amount" type="number" min="0.01" step="0.01" value="${(Number(payment.amount)||0).toFixed(2)}" style="width:100px;text-align:right;"><button class="secondary small" onclick="saveInvoicePaymentEntry('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
-                <td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
-                <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-reference" maxlength="100" value="${escapeHtml(payment.reference || '')}" style="width:150px;"><button class="secondary small" onclick="saveInvoicePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
-            </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:14px;">No payments recorded.</td></tr>';
+            document.getElementById('invoiceHistoryTotal').textContent = formatInvoicePaymentAmount(invoiceTotal);
+            document.getElementById('invoiceHistoryPaid').textContent = formatInvoicePaymentAmount(totalPaid);
+            const balanceLabel = document.getElementById('invoiceHistoryBalanceLabel');
+            balanceLabel.style.color = balanceDue < -0.01 ? '#e67e22' : '#c0392b';
+            balanceLabel.innerHTML = balanceDue < -0.01
+                ? `Overpaid: ₹<span id="invoiceHistoryBalance">${formatInvoicePaymentAmount(Math.abs(balanceDue))}</span>`
+                : `Balance Due: ₹<span id="invoiceHistoryBalance">${formatInvoicePaymentAmount(Math.max(0, balanceDue))}</span>`;
+            let cumulativePaid = 0;
+            document.getElementById('invoicePaymentHistoryBody').innerHTML = rows.length ? rows.map((payment, index) => {
+                const amount = Number(payment.amount) || 0; cumulativePaid += amount;
+                const remaining = invoiceTotal - cumulativePaid;
+                const balanceText = remaining < -0.01 ? `Overpaid ₹${formatInvoicePaymentAmount(Math.abs(remaining))}` : `₹${formatInvoicePaymentAmount(Math.max(0, remaining))}`;
+                const balanceColor = remaining < -0.01 ? '#e67e22' : remaining <= 0.01 ? '#198754' : '#c0392b';
+                return `<tr>
+                    <td style="text-align:center;">${index + 1}</td>
+                    <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-amount" type="number" min="0.01" step="0.01" value="${amount.toFixed(2)}" style="width:100px;text-align:right;"><button class="secondary small" onclick="saveInvoicePaymentEntry('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
+                    <td style="text-align:right;white-space:nowrap;">₹${formatInvoicePaymentAmount(cumulativePaid)}</td>
+                    <td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
+                    <td style="text-align:right;color:${balanceColor};font-weight:bold;white-space:nowrap;">${balanceText}</td>
+                    <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-reference" maxlength="100" value="${escapeHtml(payment.reference || '')}" style="width:150px;"><button class="secondary small" onclick="saveInvoicePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="7" style="text-align:center;padding:14px;">No payments recorded.</td></tr>';
             document.getElementById('invoicePaymentHistoryModal').style.display = 'block';
         }
         async function saveInvoicePaymentEntry(invoiceId, paymentId, button) {
@@ -5081,7 +5108,7 @@
             const amount = Number(button.parentElement.querySelector('.invoice-payment-amount').value);
             if (!Number.isFinite(amount) || amount <= 0) return showToast('Enter a payment amount greater than zero.', '#c0392b');
             const newTotalPaid = invoice.paymentHistory.reduce((sum, item) => sum + (item === payment ? amount : (Number(item.amount) || 0)), 0);
-            const invoiceTotal = Number(invoice.invoice_total || invoice.total) || 0;
+            const invoiceTotal = Number(invoice.invoice_total || invoice.invoiceTotal || invoice.total) || 0;
             if (newTotalPaid > invoiceTotal + 0.01) return showToast('Edited payments cannot exceed the invoice total.', '#c0392b');
             const previousAmount = Number(payment.amount) || 0;
             if (previousAmount !== amount) recordInvoicePaymentAudit(invoice, 'Amount edited', payment, { amount: { from: previousAmount, to: amount } });

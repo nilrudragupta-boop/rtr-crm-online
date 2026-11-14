@@ -1314,14 +1314,19 @@
     </div>
 
     <div id="purchasePaymentHistoryModal" class="modal" style="display:none;position:fixed;z-index:10002;inset:0;background:rgba(0,0,0,.5);">
-        <div class="modal-content" style="background:#fff;margin:6vh auto;padding:18px;width:900px;max-width:96vw;max-height:86vh;overflow:auto;border-radius:8px;">
+        <div class="modal-content" style="background:#fff;margin:6vh auto;padding:18px;width:1100px;max-width:98vw;max-height:86vh;overflow:auto;border-radius:8px;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
                 <h3 style="margin:0;color:#2980b9;">Purchase Payment History</h3>
                 <div><button id="purchasePaymentAuditToggle" class="btn-search" onclick="togglePurchasePaymentAudit()" style="display:none;">Audit trail</button> <button class="btn-delete" onclick="closePurchasePaymentHistory()">Close</button></div>
             </div>
             <p id="purchasePaymentHistoryTitle" style="font-weight:bold;"></p>
+            <div id="purchasePaymentTotals" style="display:flex;flex-wrap:wrap;gap:18px;padding:10px 12px;margin-bottom:12px;background:#f3f8fc;border:1px solid #d8e6f1;border-radius:6px;font-weight:bold;">
+                <span>Purchase Total: ₹<span id="purchaseHistoryTotal">0.00</span></span>
+                <span style="color:#198754;">Total Paid: ₹<span id="purchaseHistoryPaid">0.00</span></span>
+                <span id="purchaseHistoryBalanceLabel" style="color:#c0392b;">Balance Due: ₹<span id="purchaseHistoryBalance">0.00</span></span>
+            </div>
             <div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
-                <thead><tr><th>Sl no.</th><th>Amount</th><th>Date</th><th>Mode</th><th>Reference</th><th>Bank Account</th></tr></thead>
+                <thead><tr><th>Sl no.</th><th>Installment</th><th>Cumulative Paid</th><th>Date</th><th>Mode</th><th>Balance After Payment</th><th>Reference</th><th>Bank Account</th></tr></thead>
                 <tbody id="purchasePaymentHistoryBody"></tbody>
             </table></div>
             <section id="purchasePaymentAuditPanel" style="display:none;margin-top:16px;padding-top:12px;border-top:1px solid #ddd;"><h4 style="margin:0 0 8px;">Payment audit trail</h4><div id="purchasePaymentAuditBody"></div></section>
@@ -4685,6 +4690,17 @@
             return history;
         }
 
+        function getPurchasePaymentTotal(purchase) {
+            const base = (Number(purchase.qty) || 0) * (Number(purchase.price) || 0);
+            const discount = Number(purchase.discount) || 0;
+            const discountAmount = purchase.discType === 'flat' ? discount : base * discount / 100;
+            const charges = (Number(purchase.freightCharges) || 0) + (Number(purchase.packingCharges) || 0) + (Number(purchase.loadingCharges) || 0);
+            const taxable = base - discountAmount + charges;
+            return taxable + taxable * (Number(purchase.gst) || 0) / 100 + (Number(purchase.roundOff) || 0);
+        }
+        function formatPurchaseHistoryAmount(value) {
+            return (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
         function showPurchasePaymentHistory(id) {
             const records = JSON.parse(localStorage.getItem('purchases') || '[]');
             const purchase = records.find(record => String(record.id) === String(id)); if (!purchase) return;
@@ -4692,15 +4708,33 @@
             document.getElementById('purchasePaymentAuditToggle').style.display = isPurchasePaymentAuditAdmin() ? 'inline-block' : 'none';
             document.getElementById('purchasePaymentAuditPanel').style.display = 'none';
             const history = getPurchasePaymentHistory(purchase).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+            const purchaseTotal = getPurchasePaymentTotal(purchase);
+            const totalPaid = history.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+            const balanceDue = purchaseTotal - totalPaid;
             document.getElementById('purchasePaymentHistoryTitle').textContent = `${purchase.supplierName || 'Supplier'} · Invoice ${purchase.supplierInv || '-'}`;
+            document.getElementById('purchaseHistoryTotal').textContent = formatPurchaseHistoryAmount(purchaseTotal);
+            document.getElementById('purchaseHistoryPaid').textContent = formatPurchaseHistoryAmount(totalPaid);
+            document.getElementById('purchaseHistoryBalance').textContent = formatPurchaseHistoryAmount(Math.max(0, balanceDue));
+            const balanceLabel = document.getElementById('purchaseHistoryBalance').parentElement;
+            balanceLabel.style.color = balanceDue < -0.01 ? '#e67e22' : '#c0392b';
+            if (balanceDue < -0.01) balanceLabel.innerHTML = `Overpaid: ₹<span id="purchaseHistoryBalance">${formatPurchaseHistoryAmount(Math.abs(balanceDue))}</span>`;
+            else balanceLabel.innerHTML = `Balance Due: ₹<span id="purchaseHistoryBalance">${formatPurchaseHistoryAmount(balanceDue)}</span>`;
             const body = document.getElementById('purchasePaymentHistoryBody');
-            body.innerHTML = history.length ? history.map((payment, index) => `
-                <tr><td style="text-align:center;">${index + 1}</td>
-                    <td><div style="display:flex;gap:4px;align-items:center;"><input class="purchase-payment-amount" type="number" min="0.01" step="0.01" value="${(Number(payment.amount)||0).toFixed(2)}" style="width:100px;text-align:right;"><button class="btn-save" onclick="savePurchasePaymentAmount('${escapeHtml(id)}','${escapeHtml(payment.id || '')}',this)">Save</button></div></td>
+            let cumulativePaid = 0;
+            body.innerHTML = history.length ? history.map((payment, index) => {
+                const amount = Number(payment.amount) || 0;
+                cumulativePaid += amount;
+                const remaining = purchaseTotal - cumulativePaid;
+                const balanceText = remaining < -0.01 ? `Overpaid ₹${formatPurchaseHistoryAmount(Math.abs(remaining))}` : `₹${formatPurchaseHistoryAmount(Math.max(0, remaining))}`;
+                const balanceColor = remaining < -0.01 ? '#e67e22' : (remaining <= 0.01 ? '#198754' : '#c0392b');
+                return `<tr><td style="text-align:center;">${index + 1}</td>
+                    <td><div style="display:flex;gap:4px;align-items:center;"><input class="purchase-payment-amount" type="number" min="0.01" step="0.01" value="${amount.toFixed(2)}" style="width:100px;text-align:right;"><button class="btn-save" onclick="savePurchasePaymentAmount('${escapeHtml(id)}','${escapeHtml(payment.id || '')}',this)">Save</button></div></td>
+                    <td style="text-align:right;white-space:nowrap;">₹${formatPurchaseHistoryAmount(cumulativePaid)}</td>
                     <td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
+                    <td style="text-align:right;color:${balanceColor};font-weight:bold;white-space:nowrap;">${balanceText}</td>
                     <td><div style="display:flex;gap:5px;min-width:180px;"><input class="purchase-payment-reference" type="text" value="${escapeHtml(payment.reference || '')}" maxlength="100" aria-label="Payment reference" style="width:140px;box-sizing:border-box;"><button type="button" class="btn-save" onclick="savePurchasePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id || '')}',this)">Save</button></div></td>
-                    <td>${escapeHtml(payment.bankAccountName || '-')}</td></tr>`).join('')
-                : '<tr><td colspan="6" style="text-align:center;padding:16px;">No payments recorded.</td></tr>';
+                    <td>${escapeHtml(payment.bankAccountName || '-')}</td></tr>`;
+            }).join('') : '<tr><td colspan="8" style="text-align:center;padding:16px;">No payments recorded.</td></tr>';
             document.getElementById('purchasePaymentHistoryModal').style.display = 'block';
         }
         async function savePurchasePaymentAmount(purchaseId, paymentId, button) {
