@@ -1614,6 +1614,22 @@
             }
         }
 
+        function hasSmartPrintPermission() {
+            try {
+                if (typeof getUIPermissions === "function") {
+                    const permissions = getUIPermissions();
+                    return permissions.perm_make_invoice !== false && permissions.perm_print_smart !== false;
+                }
+                const user = localStorage.getItem("currentUser") || "admin";
+                const raw = localStorage.getItem("remotePermissions_" + user);
+                if (!raw) return true;
+                const permissions = JSON.parse(raw);
+                return permissions.perm_make_invoice !== false && permissions.perm_print_smart !== false;
+            } catch (error) {
+                return false;
+            }
+        }
+
         function hasEditInvoicePermission() {
             try {
                 if (typeof getUIPermissions === "function") {
@@ -1668,7 +1684,7 @@
             });
             table.classList.toggle("hide-edit", !actionBtnState.edit || !hasEditInvoicePermission());
             table.classList.toggle("hide-delete", !actionBtnState.delete || !hasDeleteInvoicePermission());
-            table.classList.toggle("hide-printSmart", !actionBtnState.printSmart || !hasMakeInvoicePermission());
+            table.classList.toggle("hide-printSmart", !actionBtnState.printSmart || !hasSmartPrintPermission());
             document.body.classList.toggle("invoice-delete-disabled", !hasDeleteInvoicePermission());
         }
 
@@ -2482,7 +2498,7 @@
             // print smart format
             tbody.querySelectorAll(".print-smart-btn").forEach(btn => {
                 btn.onclick = async (e) => {
-                    if (!hasMakeInvoicePermission()) {
+                    if (!hasSmartPrintPermission()) {
                         showToast("Smart Format printing is disabled for this user.", "#c0392b");
                         return;
                     }
@@ -3832,7 +3848,7 @@
         }
 
         async function generateTallyInvoicePDF(invoice, isDirectPrint = false, copyLabel = null, suffix = null) {
-            if (!hasMakeInvoicePermission()) {
+            if (!hasSmartPrintPermission()) {
                 showToast("Smart Format printing is disabled for this user.", "#c0392b");
                 return;
             }
@@ -6004,8 +6020,8 @@
             }
             const smartPrintToggle = document.getElementById("showActionPrintSmart");
             if (smartPrintToggle) {
-                smartPrintToggle.disabled = !hasMakeInvoicePermission();
-                smartPrintToggle.title = smartPrintToggle.disabled ? "Disabled by Remote Permissions: perm_make_invoice" : "";
+                smartPrintToggle.disabled = !hasSmartPrintPermission();
+                smartPrintToggle.title = smartPrintToggle.disabled ? "Disabled by Remote Permissions: perm_print_smart or perm_make_invoice" : "";
             }
 
             const searchInput = document.getElementById("columnSearchInput");
@@ -6608,7 +6624,10 @@
                     const deleteToggle = document.getElementById("showActionDelete");
                     if (deleteToggle) deleteToggle.disabled = !hasDeleteInvoicePermission();
                     const smartPrintToggle = document.getElementById("showActionPrintSmart");
-                    if (smartPrintToggle) smartPrintToggle.disabled = !hasMakeInvoicePermission();
+                    if (smartPrintToggle) {
+                        smartPrintToggle.disabled = !hasSmartPrintPermission();
+                        smartPrintToggle.title = smartPrintToggle.disabled ? "Disabled by Remote Permissions: perm_print_smart or perm_make_invoice" : "";
+                    }
                 }
             });
             window.addEventListener('focus', refreshReportCustomerDetails);
