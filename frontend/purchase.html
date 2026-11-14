@@ -1028,9 +1028,15 @@
             <option value="18">18%</option>
             <option value="28">28%</option>
         </select>
+        <label for="fromDate">From date:</label>
         <input type="date" id="fromDate">
+        <label for="toDate">To date:</label>
         <input type="date" id="toDate">
         <button class="btn-search" id="searchBtn">Search</button>
+        <span id="purchaseDateRangeSummary" role="status" aria-live="polite"
+            style="font-weight:600; color:#34495e; padding:4px 8px; border-radius:4px; background:#eef3f7;">
+            Selected date range: All dates
+        </span>
         <button class="btn-search" id="refreshBtn">Refresh</button>
         <button class="btn-save" onclick="exportToExcel()" style="background:#217346;"
             data-permission-id="perm_export_excel">Export Excel</button>
@@ -1184,6 +1190,15 @@
                 <h3 style="color: #607d8b; text-align: left; margin: 0;">⚙️ Table Settings</h3>
                 <button type="button" class="btn-close" onclick="closeSettingsModal()" aria-label="Close Table Settings"
                     title="Close" style="padding:2px 7px; font-size:16px; line-height:1;">&times;</button>
+            </div>
+            <div style="margin:0 0 12px; padding:8px; background:#f4f7f9; border-radius:5px; text-align:left;">
+                <label for="purchaseCalendarMode" style="font-weight:bold; display:block; margin-bottom:5px;">Date calendar:</label>
+                <select id="purchaseCalendarMode" onchange="changePurchaseCalendarMode()"
+                    style="padding:6px; border-radius:4px; border:1px solid #ccc; width:100%;">
+                    <option value="all">All dates</option>
+                    <option value="financial">April–March (Indian financial year)</option>
+                    <option value="calendar">January–December (calendar year)</option>
+                </select>
             </div>
             <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; text-align: left;">
                 <label
@@ -1562,6 +1577,8 @@
 
         // Dark Mode Logic
         let currentTheme = localStorage.getItem("appThemeMode") || "system";
+        let purchaseCalendarMode = ["all", "financial", "calendar"].includes(localStorage.getItem("purchaseCalendarMode"))
+            ? localStorage.getItem("purchaseCalendarMode") : "all";
 
         function changeTheme() {
             currentTheme = document.getElementById("themeSelect").value;
@@ -2488,6 +2505,13 @@
         }
 
         async function loadPurchases() {
+            const from = $("fromDate").value;
+            const to = $("toDate").value;
+            updatePurchaseDateRangeSummary();
+            if (from && to && from > to) {
+                showToast("From date must be on or before To date.", "#e67e22");
+                return;
+            }
             let localPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
             if (!Array.isArray(localPurchases)) localPurchases = [];
             let localPurchasesToSync = [];
@@ -2672,17 +2696,15 @@
 
             const supplierFilter = $("filterSupplier") ? $("filterSupplier").value : "";
             const gstFilter = $("filterGst") ? $("filterGst").value : "";
-            const from = $("fromDate").value;
-            const to = $("toDate").value;
-
             if (s || from || to || supplierFilter || fDate || fSupplier || fInv || fItem || fCreatedBy || fEditedBy) {
                 data = data.filter(p => {
                     let match = true;
                     if (s) match = match && ((p.itemName && p.itemName.toLowerCase().includes(s)) || (p.supplierName && p.supplierName.toLowerCase().includes(s)));
                     if (supplierFilter) match = match && (p.supplierName === supplierFilter);
                     if (gstFilter !== "" && String(p.gst || 0) !== gstFilter) match = false;
-                    if (from) match = match && (p.date >= from);
-                    if (to) match = match && (p.date <= to);
+                    const purchaseDate = normalizePurchaseReportDate(p.date);
+                    if (from) match = match && !!purchaseDate && purchaseDate >= from;
+                    if (to) match = match && !!purchaseDate && purchaseDate <= to;
 
                     // Column filters
                     if (fDate) match = match && (p.date && String(p.date).toLowerCase().includes(fDate));
@@ -2793,6 +2815,82 @@
             const parts = d.split('-');
             if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
             return d;
+        }
+
+        function normalizePurchaseReportDate(value) {
+            if (!value) return "";
+            const raw = String(value).trim().split("T")[0];
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+            const match = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            if (match) return `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+            return "";
+        }
+
+        function updatePurchaseDateRangeSummary() {
+            const summary = $("purchaseDateRangeSummary");
+            if (!summary) return;
+            const from = $("fromDate").value;
+            const to = $("toDate").value;
+            localStorage.setItem("purchaseReportDateRange", JSON.stringify({ from, to }));
+            const displayDate = value => {
+                if (!value) return "";
+                const [year, month, day] = value.split("-").map(Number);
+                return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+                    day: "2-digit", month: "short", year: "numeric"
+                });
+            };
+
+            if (from && to && from > to) {
+                summary.textContent = "Selected date range: Invalid — From date must be on or before To date";
+            } else if (from && to) {
+                summary.textContent = `Selected date range: ${displayDate(from)} to ${displayDate(to)}`;
+            } else if (from) {
+                summary.textContent = `Selected date range: From ${displayDate(from)} onward`;
+            } else if (to) {
+                summary.textContent = `Selected date range: Through ${displayDate(to)}`;
+            } else {
+                summary.textContent = "Selected date range: All dates";
+            }
+        }
+
+        function restorePurchaseDateRange() {
+            try {
+                const savedRange = JSON.parse(localStorage.getItem("purchaseReportDateRange") || "{}");
+                if (savedRange && typeof savedRange === "object") {
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(savedRange.from || "")) $("fromDate").value = savedRange.from;
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(savedRange.to || "")) $("toDate").value = savedRange.to;
+                }
+            } catch (error) {
+                localStorage.removeItem("purchaseReportDateRange");
+            }
+            updatePurchaseDateRangeSummary();
+        }
+
+        function changePurchaseCalendarMode() {
+            purchaseCalendarMode = $("purchaseCalendarMode").value;
+            localStorage.setItem("purchaseCalendarMode", purchaseCalendarMode);
+            if (purchaseCalendarMode === "all") {
+                $("fromDate").value = "";
+                $("toDate").value = "";
+            } else {
+                const now = new Date();
+                let startYear = now.getFullYear();
+                let startMonth = 0;
+                let endYear = startYear;
+                let endMonth = 11;
+                if (purchaseCalendarMode === "financial") {
+                    if (now.getMonth() < 3) startYear--;
+                    startMonth = 3;
+                    endYear = startYear + 1;
+                    endMonth = 2;
+                }
+                const pad = number => String(number).padStart(2, "0");
+                $("fromDate").value = `${startYear}-${pad(startMonth + 1)}-01`;
+                $("toDate").value = `${endYear}-${pad(endMonth + 1)}-${pad(new Date(endYear, endMonth + 1, 0).getDate())}`;
+            }
+            currentPage = 1;
+            updatePurchaseDateRangeSummary();
+            loadPurchases();
         }
 
         function filterBySupplier(supplierName) {
@@ -4070,6 +4168,8 @@
 
         function openSettingsModal() {
             $("settingsModal").style.display = 'flex';
+            const calendarSelect = $("purchaseCalendarMode");
+            if (calendarSelect) calendarSelect.value = purchaseCalendarMode;
             renderColumnToggles();
 
             const gtScreenToggle = document.getElementById("showGrandTotalScreenToggle");
@@ -4546,6 +4646,8 @@
             currentPage = 1;
             loadPurchases();
         });
+        $("fromDate").addEventListener("input", updatePurchaseDateRangeSummary);
+        $("toDate").addEventListener("input", updatePurchaseDateRangeSummary);
         $("fromDate").addEventListener("change", () => { currentPage = 1; loadPurchases(); });
         $("toDate").addEventListener("change", () => { currentPage = 1; loadPurchases(); });
 
@@ -4562,6 +4664,9 @@
             await loadItems();
             await loadSuppliers();
             await loadUOMs();
+            const calendarSelect = $("purchaseCalendarMode");
+            if (calendarSelect) calendarSelect.value = purchaseCalendarMode;
+            restorePurchaseDateRange();
             const d = new Date().toISOString().slice(0, 10);
             $("purchaseDate").value = d;
             loadPurchases();
