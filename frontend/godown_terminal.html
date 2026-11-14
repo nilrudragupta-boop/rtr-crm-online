@@ -370,8 +370,10 @@
                     <small class="text-muted">Search and review receipts, counter transfers, and customer
                         dispatches.</small>
                 </div>
-                <button class="btn btn-sm btn-outline-secondary" onclick="refreshRecentMovements()"
-                    title="Refresh movements"><i class="fa fa-sync-alt"></i></button>
+                <button type="button" id="refreshTerminalDataBtn" class="btn btn-sm btn-outline-secondary" onclick="refreshTerminalData()"
+                    title="Fetch the latest movements, invoices, items, customers, suppliers, and godown profiles">
+                    <i class="fa fa-sync-alt me-1"></i>Refresh
+                </button>
             </div>
             <div class="row g-2 align-items-end mb-3">
                 <div class="col-lg-4 col-md-6">
@@ -555,10 +557,7 @@
             setDefaultRecentMovementDateRange();
             await syncGodownRemoteData();
             checkSessionAndResolve();
-            loadInventoryItems();
-            loadReportInvoices();
-            loadMasterCustomers();
-            loadMasterSuppliers();
+            await Promise.all([loadInventoryItems(), loadReportInvoices(), loadMasterCustomers(), loadMasterSuppliers()]);
             addMaterialRow();
             switchMode('RECEIVE');
         });
@@ -574,16 +573,6 @@
                 loadMasterSuppliers();
             }
         });
-
-        setInterval(async () => {
-            const profilesChanged = await syncGodownRemoteData();
-            if (profilesChanged && activeGodownId) {
-                const activeProfile = getSavedProfiles().find(profile => profile.id === activeGodownId);
-                if (activeProfile) applyGodownSession(activeProfile);
-                else checkSessionAndResolve();
-            }
-            renderCounterTrackerTable();
-        }, 10000);
 
         // ==========================================
         // DYNAMIC PIN-BASED GODOWN RESOLUTION
@@ -1016,26 +1005,67 @@
             document.getElementById('recentMovementNext').disabled = recentMovementPage >= totalPages || totalRows === 0;
         }
 
-        async function refreshRecentMovements() {
-            await syncGodownRemoteData();
-            renderCounterTrackerTable();
+        async function refreshTerminalData() {
+            const button = document.getElementById('refreshTerminalDataBtn');
+            if (button && button.disabled) return;
+            const originalContent = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Refreshing...';
+            }
+            try {
+                const profilesChanged = await syncGodownRemoteData();
+                if (profilesChanged && activeGodownId) {
+                    const activeProfile = getSavedProfiles().find(profile => profile.id === activeGodownId);
+                    if (activeProfile) applyGodownSession(activeProfile);
+                }
+                await Promise.all([loadInventoryItems(), loadReportInvoices(), loadMasterCustomers(), loadMasterSuppliers()]);
+                renderCounterTrackerTable();
+                if (button) button.title = 'Last refreshed ' + new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Could not refresh godown terminal data:', error);
+                alert('Could not fetch the latest data. Please check the connection and try Refresh again.');
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalContent || '<i class="fa fa-sync-alt me-1"></i>Refresh';
+                }
+            }
         }
 
-        function loadInventoryItems() {
+        async function loadInventoryItems() {
             try {
-                inventoryItems = JSON.parse(localStorage.getItem('items')) || [];
+                let items = [];
+                if (typeof apiClient !== 'undefined' && apiClient.getItems) {
+                    const remoteItems = await apiClient.getItems();
+                    if (Array.isArray(remoteItems)) items = remoteItems;
+                }
+                if (!items.length) items = JSON.parse(localStorage.getItem('items')) || [];
+                inventoryItems = Array.isArray(items) ? items : [];
+                if (inventoryItems.length) localStorage.setItem('items', JSON.stringify(inventoryItems));
                 const dl = document.getElementById('inventoryDatalist');
                 dl.innerHTML = '';
                 inventoryItems.forEach(item => {
                     const opt = document.createElement('option');
-                    opt.value = `${item.name} ${item.itemCode ? '[' + item.itemCode + ']' : ''}`;
+                    opt.value = item.name + (item.itemCode ? ' [' + item.itemCode + ']' : '');
                     opt.dataset.id = item.id;
                     opt.dataset.name = item.name;
                     opt.dataset.uom = item.uom || 'Pcs';
                     dl.appendChild(opt);
                 });
-            } catch (e) {
-                console.error(e);
+            } catch (error) {
+                console.error('Could not load inventory items:', error);
+                inventoryItems = JSON.parse(localStorage.getItem('items')) || [];
+                const dl = document.getElementById('inventoryDatalist');
+                dl.innerHTML = '';
+                inventoryItems.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.name + (item.itemCode ? ' [' + item.itemCode + ']' : '');
+                    opt.dataset.id = item.id;
+                    opt.dataset.name = item.name;
+                    opt.dataset.uom = item.uom || 'Pcs';
+                    dl.appendChild(opt);
+                });
             }
         }
 
@@ -1474,9 +1504,60 @@
 
             // 3. CUSTOMER DISPATCH
             else if (currentMode === 'CUSTOMER') {
-                const rawInvoiceVal=document.getElementById('searchInvoiceNo').value.trim();
-                const linkedInv=rawInvoiceVal?rawInvoiceVal.split('|')[0].trim():'';
-                if(linkedInv){const invoice=reportInvoices.find(inv=>getInvoiceNo(inv).toLowerCase()===linkedInv.toLowerCase());if(!invoice){alert('Invoice could not be verified. Refresh invoices and select a valid invoice.');return;}const permitted=new Map();getRemainingAuthorizedInvoiceItems(invoice).forEach(item=>{const key=String(item.item||item.itemName||'').trim().toLowerCase()+'|'+String(item.uom||'').trim().toLowerCase();permitted.set(key,(permitted.get(key)||0)+(Number(item.godownRemainingQty)||0));});const requested=new Map();lineItems.forEach(item=>{const key=String(item.name).trim().toLowerCase()+'|'+String(item.uom).trim().toLowerCase();requested.set(key,(requested.get(key)||0)+(Number(item.qty)||0));});if([...requested.entries()].some(([key,qty])=>qty>(permitted.get(key)||0))){alert('Dispatch blocked: invoice lines must be authorized for godown delivery, and quantities cannot exceed the remaining authorized amount.');return;}}
+                const rawInvoiceVal = document.getElementById('searchInvoiceNo').value.trim();
+                const linkedInv = rawInvoiceVal ? rawInvoiceVal.split('|')[0].trim() : '';
+                if (linkedInv) {
+                    const invoice = reportInvoices.find(inv => getInvoiceNo(inv).toLowerCase() === linkedInv.toLowerCase());
+                    if (!invoice) {
+                        alert('Invoice could not be verified. Refresh invoices and select a valid invoice.');
+                        return;
+                    }
+                    const permitted = new Map();
+                    getRemainingAuthorizedInvoiceItems(invoice).forEach(item => {
+                        const key = String(item.item || item.itemName || '').trim().toLowerCase() + '|' + String(item.uom || '').trim().toLowerCase();
+                        permitted.set(key, (permitted.get(key) || 0) + (Number(item.godownRemainingQty) || 0));
+                    });
+                    const requested = new Map();
+                    lineItems.forEach(item => {
+                        const key = String(item.name).trim().toLowerCase() + '|' + String(item.uom).trim().toLowerCase();
+                        requested.set(key, (requested.get(key) || 0) + (Number(item.qty) || 0));
+                    });
+                    if ([...requested.entries()].some(([key, qty]) => qty > (permitted.get(key) || 0))) {
+                        alert('Dispatch blocked: invoice lines must be authorized for godown delivery, and quantities cannot exceed the remaining authorized amount.');
+                        return;
+                    }
+
+                    // Consume authorization for the invoice lines included in this shipment.
+                    const requestedKeys = new Set(requested.keys());
+                    const consumedItems = invoice.items.filter(item => {
+                        const key = String(item.item || item.itemName || '').trim().toLowerCase() + '|' + String(item.uom || '').trim().toLowerCase();
+                        return isGodownDeliveryAuthorized(item) && requestedKeys.has(key);
+                    });
+                    if (!consumedItems.length) {
+                        alert('No active Godown authorization was found for this shipment. Ask an admin to authorize the invoice items again.');
+                        return;
+                    }
+                    consumedItems.forEach(item => { item.godownDelivery = false; });
+                    invoice.godownDeliveryUpdatedAt = new Date().toISOString();
+                    invoice.godownDeliveryUpdatedBy = operator || localStorage.getItem('currentUser') || 'Godown';
+                    try {
+                        if (!apiClient || typeof apiClient.saveInvoice !== 'function') throw new Error('Invoice save is unavailable.');
+                        const saveResult = await apiClient.saveInvoice(invoice);
+                        if (!saveResult || !saveResult.success) throw new Error(saveResult?.message || 'Invoice authorization could not be saved.');
+                        const cachedInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+                        const aliases = new Set([invoice.id, invoice.invoice_no, invoice.invoiceNo].filter(Boolean).map(String));
+                        const cacheIndex = cachedInvoices.findIndex(cached => [cached.id, cached.invoice_no, cached.invoiceNo].some(value => value && aliases.has(String(value))));
+                        if (cacheIndex >= 0) cachedInvoices[cacheIndex] = invoice;
+                        else cachedInvoices.push(invoice);
+                        localStorage.setItem('invoices', JSON.stringify(cachedInvoices));
+                        renderInvoiceDatalist(reportInvoices);
+                    } catch (error) {
+                        consumedItems.forEach(item => { item.godownDelivery = true; });
+                        console.error('Could not consume Godown authorization:', error);
+                        alert('Shipment was not recorded because the invoice authorization could not be saved. Check the connection and try again.');
+                        return;
+                    }
+                }
                 const custName = document.getElementById('txCustomerName').value.trim() || 'Direct Customer';
                 const custAddr = document.getElementById('txCustomerAddress').value.trim();
                 const custPhone = document.getElementById('txCustomerPhone').value.trim();
