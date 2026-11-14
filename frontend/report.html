@@ -569,6 +569,10 @@
             display: none !important;
         }
 
+        body.invoice-delete-disabled #btnDeleteSelected {
+            display: none !important;
+        }
+
         table.hide-copy .copy-btn {
             display: none !important;
         }
@@ -1623,6 +1627,22 @@
             }
         }
 
+        function hasDeleteInvoicePermission() {
+            try {
+                if (typeof getUIPermissions === "function") {
+                    const permissions = getUIPermissions();
+                    return permissions.perm_delete_invoice !== false && permissions.perm_delete_action !== false;
+                }
+                const user = localStorage.getItem("currentUser") || "admin";
+                const raw = localStorage.getItem("remotePermissions_" + user);
+                if (!raw) return true;
+                const permissions = JSON.parse(raw);
+                return permissions.perm_delete_invoice !== false && permissions.perm_delete_action !== false;
+            } catch (error) {
+                return false;
+            }
+        }
+
         function toggleActionBtn(type) {
             const isChecked = document.getElementById(`showAction${type.charAt(0).toUpperCase() + type.slice(1)}`).checked;
 
@@ -1647,7 +1667,9 @@
                 else table.classList.add(`hide-${key}`);
             });
             table.classList.toggle("hide-edit", !actionBtnState.edit || !hasEditInvoicePermission());
+            table.classList.toggle("hide-delete", !actionBtnState.delete || !hasDeleteInvoicePermission());
             table.classList.toggle("hide-printSmart", !actionBtnState.printSmart || !hasMakeInvoicePermission());
+            document.body.classList.toggle("invoice-delete-disabled", !hasDeleteInvoicePermission());
         }
 
 
@@ -2444,6 +2466,10 @@
             // delete buttons
             tbody.querySelectorAll(".delete-btn").forEach(btn => {
                 btn.onclick = async (e) => {
+                    if (!hasDeleteInvoicePermission()) {
+                        showToast("Invoice deletion is disabled for this user.", "#c0392b");
+                        return;
+                    }
                     const tr = e.target.closest("tr");
                     const id = tr.dataset.invoiceId;
                     const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
@@ -4779,6 +4805,10 @@
 
         // --- delete selected ---
         document.getElementById("btnDeleteSelected").addEventListener("click", async () => {
+            if (!hasDeleteInvoicePermission()) {
+                showToast("Invoice deletion is disabled for this user.", "#c0392b");
+                return;
+            }
             const checked = Array.from(document.querySelectorAll("#reportTable tbody input.selectRow:checked"));
             if (checked.length === 0) return showToast("⚠ Please select at least one invoice.", "#e67e22");
 
@@ -5402,6 +5432,10 @@
 
         // --- Delete Modal Logic ---
         function openDeleteModal(ids, msg) {
+            if (!hasDeleteInvoicePermission()) {
+                showToast("Invoice deletion is disabled for this user.", "#c0392b");
+                return;
+            }
             pendingDeleteIds = ids;
             document.getElementById("deleteConfirmMsg").textContent = msg;
             document.getElementById("overlay").style.display = "block";
@@ -5416,6 +5450,11 @@
 
         document.getElementById("btnCancelDelete").addEventListener("click", closeDeleteModal);
         document.getElementById("btnConfirmDelete").addEventListener("click", async () => {
+            if (!hasDeleteInvoicePermission()) {
+                closeDeleteModal();
+                showToast("Invoice deletion is disabled for this user.", "#c0392b");
+                return;
+            }
             if (!pendingDeleteIds || pendingDeleteIds.length === 0) return;
             const idsToDelete = new Set(pendingDeleteIds);
             try {
@@ -5947,6 +5986,11 @@
             if (editToggle) {
                 editToggle.disabled = !hasEditInvoicePermission();
                 editToggle.title = editToggle.disabled ? "Disabled by Remote Permissions: perm_edit_invoice" : "";
+            }
+            const deleteToggle = document.getElementById("showActionDelete");
+            if (deleteToggle) {
+                deleteToggle.disabled = !hasDeleteInvoicePermission();
+                deleteToggle.title = deleteToggle.disabled ? "Disabled by Remote Permissions: perm_delete_invoice" : "";
             }
             const smartPrintToggle = document.getElementById("showActionPrintSmart");
             if (smartPrintToggle) {
@@ -6551,6 +6595,8 @@
                     applyActionBtnVisibility();
                     const editToggle = document.getElementById("showActionEdit");
                     if (editToggle) editToggle.disabled = !hasEditInvoicePermission();
+                    const deleteToggle = document.getElementById("showActionDelete");
+                    if (deleteToggle) deleteToggle.disabled = !hasDeleteInvoicePermission();
                     const smartPrintToggle = document.getElementById("showActionPrintSmart");
                     if (smartPrintToggle) smartPrintToggle.disabled = !hasMakeInvoicePermission();
                 }
