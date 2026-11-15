@@ -365,8 +365,8 @@ function parseEmailError(error) {
 const ADMIN_ID_HASH = "NANCY@2012"; // Admin ID as per requirements
 const FIXED_ADMIN_EMAIL = null; // TODO: Enter your hardcoded email here. Set to null to allow editing.
 
-// 5. SECURE CLOUD URL (Paste Developer Google Script Web App URL here 1. Sending Secure Renewal OTPs 2. Potential Update Checks 3. UI Peermission Tracking)
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec"; // CHANGE THIS to your Google Script URL (must be HTTPS)
+// Electron requests use the backend proxy; the Apps Script deployment URL is server-side only.
+const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_PROXY_URL || 'http://localhost:5000/api/google-script';
 
 ipcMain.handle('check-client-refresh', async (_event, identifier) => {
     if (typeof identifier !== 'string' || !identifier.trim()) {
@@ -1080,9 +1080,6 @@ ipcMain.handle('get-app-settings', async () => {
             loginHistory: s.LOGIN_HISTORY || [],
             appMode: s.APP_MODE || "Trading / Business",
             customFeatures: s.CUSTOM_FEATURES || {},
-                        cloudBackupUrl: s.CLOUD_BACKUP_URL || "",
-                        updateServerUrl: s.UPDATE_SERVER_URL || "",
-            googleScriptUrl: GOOGLE_SCRIPT_URL
         };
     } catch (error) {
         return { success: false, message: error.message };
@@ -1754,7 +1751,7 @@ async function performDailyCloudBackup() {
 
 function startHeartbeat(username) {
     // Replace this with your actual deployed Google Apps Script Web App URL
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
+    const SCRIPT_URL = GOOGLE_SCRIPT_URL;
 
     // Ping the server every 2 minutes (120,000 milliseconds)
     setInterval(() => {
