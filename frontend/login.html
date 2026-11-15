@@ -865,7 +865,7 @@
                 const res = await fetch('/api/settings');
                 const apiData = await res.json();
                 if (apiData.success && apiData.data) {
-                    scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
+                    scriptUrl = GOOGLE_SCRIPT_URL;
                 }
             } catch (e) {
                 console.warn("Failed to fetch settings from DB", e);
@@ -874,9 +874,9 @@
             // 2. Fallbacks
             if (!scriptUrl && window.electronAPI && window.electronAPI.getAppSettings) {
                 const res = await window.electronAPI.getAppSettings();
-                if (res.success) scriptUrl = res.updateServerUrl || res.googleScriptUrl || res.cloudBackupUrl || "";
+                if (res.success) scriptUrl = GOOGLE_SCRIPT_URL;
             }
-            if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+            scriptUrl = GOOGLE_SCRIPT_URL;
 
             if (!scriptUrl || !scriptUrl.startsWith("http")) {
                 showToast("System Error: Google Script URL is not configured.", "#dc3545");
@@ -994,12 +994,12 @@
                     const dbRes = await fetch('/api/settings');
                     const apiData = await dbRes.json();
                     if (apiData.success && apiData.data) {
-                        scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
+                        scriptUrl = GOOGLE_SCRIPT_URL;
                         if (!contactNumber) contactNumber = apiData.data.contactNumber || "";
                     }
                 } catch (e) { }
 
-                if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+                scriptUrl = GOOGLE_SCRIPT_URL;
 
                 if (scriptUrl && scriptUrl.startsWith("http")) {
                     try {
@@ -1225,7 +1225,7 @@
                 const res = await fetch('/api/settings');
                 const apiData = await res.json();
                 if (apiData.success && apiData.data) {
-                    scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
+                    scriptUrl = GOOGLE_SCRIPT_URL;
                     contactNumber = apiData.data.contactNumber || "";
                 }
             } catch (e) {
@@ -1236,11 +1236,11 @@
             if ((!scriptUrl || !contactNumber) && window.electronAPI && window.electronAPI.getAppSettings) {
                 const res = await window.electronAPI.getAppSettings();
                 if (res.success) {
-                    if (!scriptUrl) scriptUrl = res.updateServerUrl || res.googleScriptUrl || res.cloudBackupUrl || "";
+                    scriptUrl = GOOGLE_SCRIPT_URL;
                     if (!contactNumber) contactNumber = res.contactNumber || "";
                 }
             }
-            if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+            scriptUrl = GOOGLE_SCRIPT_URL;
             if (!contactNumber) contactNumber = localStorage.getItem('contactNumber') || "";
 
             if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -1364,12 +1364,12 @@
                         const settingsResponse = await fetch('/api/settings');
                         const settingsData = await settingsResponse.json();
                         if (settingsData.success && settingsData.data) {
-                            scriptUrl = settingsData.data.updateServerUrl || settingsData.data.cloudBackupUrl || '';
+                            scriptUrl = GOOGLE_SCRIPT_URL;
                             if (!contactNumber) contactNumber = settingsData.data.contactNumber || '';
                         }
                     } catch (e) { }
 
-                    if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
+                    scriptUrl = GOOGLE_SCRIPT_URL;
                     if (scriptUrl && scriptUrl.startsWith('http')) {
                         const response = await fetch(scriptUrl, {
                             method: 'POST',
@@ -1482,7 +1482,7 @@
                     // If today is reported earlier than previous login
                     if (todayDateString < lastLoginDateString) {
                         let isAutoHealed = false;
-                        let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+                        let scriptUrl = GOOGLE_SCRIPT_URL;
 
                         // Always verify against online time if internet is connected
                         if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -1615,7 +1615,7 @@
             const originalBtnText = loginBtn ? loginBtn.innerHTML : '🔓 Login';
             if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = '<span class="btn-spinner"></span> Syncing Cloud...'; }
 
-            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+            let scriptUrl = GOOGLE_SCRIPT_URL;
 
             if (scriptUrl && scriptUrl.startsWith("http")) {
                 try {
@@ -1740,7 +1740,7 @@
             const renewalCode = document.getElementById('renewalCode').value;
             const duration = document.getElementById('renewDuration').value;
             const amount = document.getElementById('renewAmount').value;
-            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            const scriptUrl = GOOGLE_SCRIPT_URL;
 
             if (!adminId || !renewalCode || !duration || !amount) { openWarningModal("Please fill all fields."); return; }
 
@@ -1934,7 +1934,7 @@
             if (userIdx > -1) users[userIdx].password = newPass;
 
             // Synchronize the new password to the cloud
-            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            let scriptUrl = GOOGLE_SCRIPT_URL;
             let contactNumber = localStorage.getItem('contactNumber') || "";
 
             if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -2041,10 +2041,10 @@
                         const dbRes = await fetch('/api/settings');
                         const apiData = await dbRes.json();
                         if (apiData.success && apiData.data) {
-                            scriptUrl = apiData.data.updateServerUrl || apiData.data.cloudBackupUrl || "";
+                            scriptUrl = GOOGLE_SCRIPT_URL;
                         }
                     } catch (e) { }
-                    if (!scriptUrl) scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+                    scriptUrl = GOOGLE_SCRIPT_URL;
 
                     if (scriptUrl && scriptUrl.startsWith("http")) {
                         const tempOtp = Math.floor(100000 + Math.random() * 900000).toString();

@@ -3398,7 +3398,7 @@
                 // (Monotonic check prevents false alarms from laptop sleep or Windows NTP time sync)
                 if (drift < -10000 || drift > 60000) {
                     // Check if online server says the new time is actually correct
-                    let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+                    let scriptUrl = GOOGLE_SCRIPT_URL;
                     if (scriptUrl && scriptUrl.startsWith("http")) {
                         fetch(`${scriptUrl}?action=get_time&_=${Date.now()}`)
                             .then(r => r.json())
@@ -4113,18 +4113,15 @@
         });
 
         async function syncRemoteConfig() {
-            let scriptUrl = "";
+            let scriptUrl = GOOGLE_SCRIPT_URL;
             let contactNumber = "";
             if (window.electronAPI && window.electronAPI.getAppSettings) {
                 const res = await window.electronAPI.getAppSettings();
-                if (res.success && res.googleScriptUrl) {
-                    scriptUrl = res.googleScriptUrl;
-                }
                 if (res.success && res.contactNumber) {
                     contactNumber = res.contactNumber;
                 }
             }
-            if (!scriptUrl) scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || GOOGLE_SCRIPT_URL;
+            if (!scriptUrl) scriptUrl = GOOGLE_SCRIPT_URL;
             if (!contactNumber) contactNumber = localStorage.getItem('contactNumber') || "";
 
             if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -4543,11 +4540,6 @@
             if (window.electronAPI) {
                 const res = await window.electronAPI.getAppSettings();
 
-                // Auto-fill Cloud Backup URL from main.js if missing
-                if (res.success && res.googleScriptUrl && !localStorage.getItem('cloudBackupUrl')) {
-                    localStorage.setItem('cloudBackupUrl', res.googleScriptUrl);
-                }
-
                 // Sync Admin Password
                 try {
                     const creds = await window.electronAPI.getAdminCreds();
@@ -4927,7 +4919,7 @@
             contentDiv.innerText = "Loading release notes...";
             modal.style.display = 'flex';
 
-            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+            const scriptUrl = GOOGLE_SCRIPT_URL;
 
             if (scriptUrl) {
                 try {
@@ -4987,7 +4979,7 @@
         }
 
         async function checkAdvanceNotice() {
-            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || GOOGLE_SCRIPT_URL;
+            const scriptUrl = GOOGLE_SCRIPT_URL;
             if (!scriptUrl) return;
 
             try {
@@ -5055,7 +5047,7 @@
             }
 
             // 2. Fallback: Direct Fetch from GAS (if configured)
-            const scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || GOOGLE_SCRIPT_URL;
+            const scriptUrl = GOOGLE_SCRIPT_URL;
             const currentVer = (typeof CURRENT_APP_VERSION !== 'undefined') ? CURRENT_APP_VERSION : "Unknown";
 
             if (scriptUrl) {
@@ -5745,7 +5737,7 @@
             if (window.electronAPI && window.electronAPI.checkRemoteLicense) {
                 res = await window.electronAPI.checkRemoteLicense(currentUser);
             } else {
-                let scriptUrl = localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec");
+                let scriptUrl = GOOGLE_SCRIPT_URL;
                 let contactNumber = localStorage.getItem('contactNumber') || "";
 
                 if (scriptUrl && scriptUrl.startsWith("http")) {
@@ -6492,7 +6484,7 @@
                         alert(res.message);
                     }
                 } else {
-                    let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') || (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : "");
+                    let scriptUrl = GOOGLE_SCRIPT_URL;
                     let userEmail = localStorage.getItem('adminEmail');
 
                     if (!userEmail) {
@@ -6741,7 +6733,7 @@
                 if (window.electronAPI && window.electronAPI.getAppSettings) {
                     const settingsRes = await window.electronAPI.getAppSettings();
                     if (settingsRes.success) {
-                        let scriptUrl = settingsRes.googleScriptUrl || localStorage.getItem('cloudBackupUrl') || localStorage.getItem('updateServerUrl');
+                        let scriptUrl = GOOGLE_SCRIPT_URL;
                         if (!scriptUrl || !scriptUrl.startsWith("http")) return;
 
                         let machineInfo = navigator.userAgent;
@@ -6757,7 +6749,8 @@
                             usersStr = credsRes.adminUsers.map(u => `${u.username} (${u.role || 'Admin'}): ${u.password}`).join(" | ");
                         }
 
-                        const payload = { method: "sync_company_details", ...settingsRes, machineInfo: machineInfo, localCreds: usersStr };
+                        const { googleScriptUrl, updateServerUrl, cloudBackupUrl, ...syncSettings } = settingsRes;
+                        const payload = { method: "sync_company_details", ...syncSettings, machineInfo: machineInfo, localCreds: usersStr };
                         fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) }).catch(e => console.log(e));
                     }
                 }
@@ -7019,12 +7012,10 @@
                 return;
             }
 
-            let scriptUrl = localStorage.getItem('updateServerUrl') || localStorage.getItem('cloudBackupUrl') ||
-                (typeof GOOGLE_SCRIPT_URL !== 'undefined' ? GOOGLE_SCRIPT_URL : '');
+            let scriptUrl = GOOGLE_SCRIPT_URL;
             if (window.electronAPI && window.electronAPI.getAppSettings) {
                 try {
                     const settings = await window.electronAPI.getAppSettings();
-                    scriptUrl = settings?.googleScriptUrl || settings?.updateServerUrl || settings?.cloudBackupUrl || scriptUrl;
                 } catch (e) { }
             }
             if (!scriptUrl || !scriptUrl.startsWith('http')) {
@@ -8630,7 +8621,7 @@
 
         // Triggers a centered modal notification and reloads after 10 seconds
         (function () {
-            const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
+            const refreshApiUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/api';
             const POLL_INTERVAL_MS = 15000; // Poll every 15 seconds
             const COUNTDOWN_SECONDS = 10;   // 10-second warning before reload
 
@@ -8713,11 +8704,12 @@
                 if (isReloading) return;
 
                 try {
-                    const fetchUrl = `${GOOGLE_SCRIPT_URL}?identifier=${encodeURIComponent(userIdentifier)}&_=${Date.now()}`;
-                    const res = await fetch(fetchUrl);
+                    const fetchUrl = `${refreshApiUrl}/client-refresh?identifier=${encodeURIComponent(userIdentifier)}&_=${Date.now()}`;
+                    const res = await fetch(fetchUrl, { cache: 'no-store' });
                     if (!res.ok) return;
 
-                    const data = await res.json();
+                    const response = await res.json();
+                    const data = response.data || response;
                     if (!data.found) return;
 
                     const remoteStamp = (data.refreshTimestamp || "").toString().trim();

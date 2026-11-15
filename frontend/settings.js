@@ -1,5 +1,22 @@
-// Global Google Apps Script URL for Cloud Sync, OTP & Registration
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec";
+// Browser calls use the backend proxy; the Apps Script deployment URL stays server-side.
+const GOOGLE_SCRIPT_URL = (() => {
+    const configuredApi = localStorage.getItem('backendApiUrl');
+    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
+    const apiBase = configuredApi || (isLocalHost ? 'http://localhost:5000/api' : `${window.location.origin}/api`);
+    const proxyUrl = `${apiBase.replace(/\/+$/, '')}/google-script`;
+
+    // Migrate previously stored direct Apps Script URLs to the server proxy.
+    ['cloudBackupUrl', 'updateServerUrl'].forEach(key => {
+        const savedUrl = localStorage.getItem(key);
+        if (savedUrl && (/^https:\/\/script\.google\.com\/macros\/s\//i.test(savedUrl) || /\/api\/google-script$/.test(savedUrl))) {
+            localStorage.setItem(key, proxyUrl);
+        }
+    });
+    if (!localStorage.getItem('cloudBackupUrl')) localStorage.setItem('cloudBackupUrl', proxyUrl);
+    if (!localStorage.getItem('updateServerUrl')) localStorage.setItem('updateServerUrl', proxyUrl);
+
+    return proxyUrl;
+})();
 
 var APP_SETTINGS = {
     SELLER_STATE: "",
