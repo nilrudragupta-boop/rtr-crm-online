@@ -898,24 +898,39 @@
             try {
                 const sDate = document.getElementById('filterStartDate') ? document.getElementById('filterStartDate').value : null;
                 const eDate = document.getElementById('filterEndDate') ? document.getElementById('filterEndDate').value : null;
+                const localVisits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
 
                 // --- Fetch from Backend first ---
                 if (typeof apiClient !== 'undefined' && apiClient.getMarketingVisits) {
                     try {
                         const remoteVisits = await apiClient.getMarketingVisits(sDate, eDate);
                         if (remoteVisits) {
-                            allVisits = remoteVisits;
+                            const remoteList = Array.isArray(remoteVisits) ? remoteVisits : (remoteVisits.data || []);
+                            const localById = new Map(localVisits.map(visit => [String(visit.id), visit]));
+                            const remoteIds = new Set(remoteList.map(visit => String(visit.id)));
+                            allVisits = remoteList.map(remote => {
+                                const cached = localById.get(String(remote.id)) || {};
+                                return {
+                                    ...cached,
+                                    ...remote,
+                                    reportMakerName: remote.reportMakerName || cached.reportMakerName || '',
+                                    reportMakerContact: remote.reportMakerContact || cached.reportMakerContact || '',
+                                    visitZone: remote.visitZone || cached.visitZone || ''
+                                };
+                            });
+                            // Keep locally saved visits and maker details when the backend omits custom fields or is not yet synced.
+                            allVisits.push(...localVisits.filter(visit => !remoteIds.has(String(visit.id))));
                             // Only update entire local storage cache if no date filter is active
-                            if (!sDate && !eDate && remoteVisits.length > 0) {
-                                localStorage.setItem('marketing_visits', JSON.stringify(remoteVisits));
+                            if (!sDate && !eDate) {
+                                localStorage.setItem('marketing_visits', JSON.stringify(allVisits));
                             }
                         }
                     } catch (e) {
                         console.warn("Could not fetch remote visits. Using local data.", e);
-                        allVisits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+                        allVisits = localVisits;
                     }
                 } else {
-                    allVisits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
+                    allVisits = localVisits;
                 }
 
                 // If working purely offline or falling back, apply local filtering to allVisits
@@ -1090,32 +1105,46 @@
 
 
         /* ========= PDF EXPORT ========= */
-        function exportToPDF() {
+        function exportToPDF(report = null) {
             if (!window.jspdf) return showToast('jsPDF not loaded', 'warning');
             const { jsPDF } = window.jspdf;
             if (!docAutoTableAvailable()) return showToast('PDF table plugin not loaded', 'warning');
 
-            const visitNo = document.getElementById('srVisitNo').value.trim();
-            const visitDate = document.getElementById('srVisitDate').value;
-            const customerName = document.getElementById('customerName').value.trim();
-            const customerAddress = document.getElementById('customerAddress').value.trim();
+            const visitNo = report ? String(report.visitNo || '').trim() : document.getElementById('srVisitNo').value.trim();
+            const visitDate = report ? (report.visitDate || '') : document.getElementById('srVisitDate').value;
+            const customerName = report ? String(report.customerName || '').trim() : document.getElementById('customerName').value.trim();
+            const customerAddress = report ? String(report.customerAddress || '').trim() : document.getElementById('customerAddress').value.trim();
             if (!visitNo || !visitDate || !customerName) {
                 return showToast('Visit No, Customer Name & Date Required', 'warning');
             }
 
-            const makerName = document.getElementById('reportMakerName').value.trim();
-            const makerContact = document.getElementById('reportMakerContact').value.trim();
-            const visitZone = document.getElementById('visitZone').value.trim();
+            const makerName = report ? String(report.reportMakerName || '').trim() : document.getElementById('reportMakerName').value.trim();
+            const makerContact = report ? String(report.reportMakerContact || '').trim() : document.getElementById('reportMakerContact').value.trim();
+            const visitZone = report ? String(report.visitZone || '').trim() : document.getElementById('visitZone').value.trim();
+            const activeExpenses = report ? (report.expenses || []) : (expenseData || []);
+            const activeContacts = report ? (report.contacts || []) : (contactData || []);
             const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
             const margin = 12;
             const usableWidth = pageWidth - margin * 2;
-            let companyName = 'Company Name';
-            try {
-                if (window.BrandService) companyName = window.BrandService.getBrand().name || companyName;
-                else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) companyName = APP_SETTINGS.COMPANY_NAME;
-            } catch (error) { console.warn('Could not load company name for PDF.', error); }
+            let brand = {};
+            try { if (window.BrandService) brand = window.BrandService.getBrand() || {}; }
+            catch (error) { console.warn('Could not load brand details for PDF.', error); }
+            const appSettings = window.APP_SETTINGS || {};
+            const brandValue = (settingKey, storageKey, fallback = '') => appSettings[settingKey] || localStorage.getItem(storageKey) || fallback || '';
+            const companyName = brand.name || brandValue('COMPANY_NAME', 'companyName') || 'Company Name';
+            const brandDetails = [
+                brandValue('ADDRESS_LINE_1', 'addressLine1'),
+                brandValue('ADDRESS_LINE_2', 'addressLine2'),
+                [brandValue('DISTRICT', 'district'), brandValue('SELLER_STATE', 'sellerState')].filter(Boolean).join(', '),
+                [
+                    brandValue('CONTACT_NUMBER', 'contactNumber', brand.phone) && `Ph: ${brandValue('CONTACT_NUMBER', 'contactNumber', brand.phone)}`,
+                    brandValue('COMPANY_EMAIL', 'companyEmail') && `Email: ${brandValue('COMPANY_EMAIL', 'companyEmail')}`,
+                    brandValue('COMPANY_WEBSITE', 'companyWebsite')
+                ].filter(Boolean).join(' | '),
+                brandValue('COMPANY_GSTIN', 'companyGstin', brand.gst) && `GSTIN: ${brandValue('COMPANY_GSTIN', 'companyGstin', brand.gst)}`
+            ].filter(Boolean);
 
             const formatDate = value => {
                 if (!value) return '-';
@@ -1124,14 +1153,25 @@
             };
             const pageHeader = () => {
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(15);
-                doc.text(String(companyName), pageWidth / 2, 11, { align: 'center', maxWidth: usableWidth });
-                doc.setFontSize(11);
-                doc.text('MARKETING REPORT & EXPENSES', pageWidth / 2, 17, { align: 'center' });
+                doc.setFontSize(14);
+                doc.text(String(companyName), pageWidth / 2, 9, { align: 'center', maxWidth: usableWidth });
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                let line = 14;
+                brandDetails.forEach(detail => {
+                    const wrapped = doc.splitTextToSize(String(detail).replace(/<br>/gi, ', '), usableWidth);
+                    doc.text(wrapped, pageWidth / 2, line, { align: 'center' });
+                    line += wrapped.length * 3.5;
+                });
+                line += 1;
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.text('MARKETING REPORT & EXPENSES', pageWidth / 2, line, { align: 'center' });
+                line += 5;
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(9);
-                doc.text(`Visit No: ${visitNo}    Date: ${formatDate(visitDate)}    Customer: ${customerName}`, margin, 24, { maxWidth: usableWidth });
-                let line = 29;
+                doc.text(`Visit No: ${visitNo}    Date: ${formatDate(visitDate)}    Customer: ${customerName}`, margin, line, { maxWidth: usableWidth });
+                line += 5;
                 if (customerAddress) {
                     const wrapped = doc.splitTextToSize(`Address: ${customerAddress}`, usableWidth);
                     doc.text(wrapped, margin, line);
@@ -1154,7 +1194,7 @@
             doc.text('REPORT MAKER DETAILS', margin, startY);
             doc.autoTable({
                 startY: startY + 2,
-                margin: { left: margin, right: margin, top: 35, bottom: 12 },
+                margin: { left: margin, right: margin, top: 48, bottom: 12 },
                 head: [['Name', 'Contact', 'Visit Zone']],
                 body: [[makerName || '-', makerContact || '-', visitZone || '-']],
                 theme: 'grid',
@@ -1165,7 +1205,7 @@
             });
             const expenseStartY = doc.lastAutoTable.finalY + 5;
             const money = value => (Number.parseFloat(value) || 0).toFixed(2);
-            const expenseRows = (expenseData || []).map((row, index) => [
+            const expenseRows = activeExpenses.map((row, index) => [
                 index + 1,
                 formatDate(row.date),
                 row.expense_type || '-',
@@ -1175,12 +1215,12 @@
                 (row.attachments || []).map(file => file.name || file.originalName).filter(Boolean).join(', ') || '-'
             ]);
             if (!expenseRows.length) expenseRows.push(['-', '-', 'No expenses recorded', '-', '-', '-', '-']);
-            const expenseTotal = (expenseData || []).reduce((sum, row) => sum + (Number.parseFloat(row.amount) || 0), 0);
+            const expenseTotal = activeExpenses.reduce((sum, row) => sum + (Number.parseFloat(row.amount) || 0), 0);
             expenseRows.push(['', '', '', 'Total', money(expenseTotal), '', '']);
 
             doc.autoTable({
                 startY: expenseStartY,
-                margin: { left: margin, right: margin, top: 35, bottom: 12 },
+                margin: { left: margin, right: margin, top: 48, bottom: 12 },
                 head: [['SL', 'Date', 'Expense Type', 'Mode', 'Amount (Rs)', 'Remarks', 'Attachments']],
                 body: expenseRows,
                 theme: 'grid',
@@ -1202,26 +1242,35 @@
                 return y + 3;
             };
             let y = drawSectionTitle('Expense Summary', 14);
-            doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 35, bottom: 12 }, body: [[`Total Expense: Rs ${money(expenseTotal)}`, `Total in words: ${document.getElementById('totalWords').innerText || '-'}`]], theme: 'plain', styles: { fontSize: 9, cellPadding: 2 }, columnStyles: { 0: { cellWidth: 65, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } }, didDrawPage: pageHeader });
+            const totalWords = convertToWords(Math.round(expenseTotal));
+            doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 48, bottom: 12 }, body: [[`Total Expense: Rs ${money(expenseTotal)}`, `Total in words: ${totalWords}`]], theme: 'plain', styles: { fontSize: 9, cellPadding: 2 }, columnStyles: { 0: { cellWidth: 65, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } }, didDrawPage: pageHeader });
 
             y = drawSectionTitle('Contact Details', 24);
-            const contacts = (contactData || []).map((contact, index) => [index + 1, contact.name || '-', contact.designation || '-', contact.department || '-', contact.mobile || '-', contact.email || '-', contact.remarks || '-']);
+            const contacts = activeContacts.map((contact, index) => [index + 1, contact.name || '-', contact.designation || '-', contact.department || '-', contact.mobile || '-', contact.email || '-', contact.remarks || '-']);
             if (!contacts.length) contacts.push(['-', 'No contact details recorded', '-', '-', '-', '-', '-']);
-            doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 35, bottom: 12 }, head: [['SL', 'Name', 'Designation', 'Department', 'Mobile', 'Email', 'Remarks']], body: contacts, theme: 'grid', headStyles: { fillColor: [57, 146, 235], textColor: 255 }, styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' }, columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 38 }, 2: { cellWidth: 35 }, 3: { cellWidth: 32 }, 4: { cellWidth: 28 }, 5: { cellWidth: 48 }, 6: { cellWidth: 'auto' } }, didDrawPage: pageHeader });
+            doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 48, bottom: 12 }, head: [['SL', 'Name', 'Designation', 'Department', 'Mobile', 'Email', 'Remarks']], body: contacts, theme: 'grid', headStyles: { fillColor: [57, 146, 235], textColor: 255 }, styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' }, columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 38 }, 2: { cellWidth: 35 }, 3: { cellWidth: 32 }, 4: { cellWidth: 28 }, 5: { cellWidth: 48 }, 6: { cellWidth: 'auto' } }, didDrawPage: pageHeader });
 
             const addTextSection = (title, content) => {
                 const text = content.trim() || 'No data';
                 const lines = doc.splitTextToSize(text, usableWidth - 8);
                 y = drawSectionTitle(title, Math.min(18 + lines.length * 4, pageHeight - 24));
-                doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 35, bottom: 12 }, body: [[text]], theme: 'grid', styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'top' }, columnStyles: { 0: { cellWidth: usableWidth } }, didDrawPage: pageHeader });
+                doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 48, bottom: 12 }, body: [[text]], theme: 'grid', styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'top' }, columnStyles: { 0: { cellWidth: usableWidth } }, didDrawPage: pageHeader });
             };
-            addTextSection('Purpose of Visit', document.getElementById('purposeVisit').value);
-            addTextSection('Customer Requirement', document.getElementById('customerRequirement').value);
-            addTextSection('Main Remarks', document.getElementById('mainRemarks').value);
+            addTextSection('Purpose of Visit', report ? (report.purposeVisit || '') : document.getElementById('purposeVisit').value);
+            addTextSection('Customer Requirement', report ? (report.customerRequirement || '') : document.getElementById('customerRequirement').value);
+            addTextSection('Main Remarks', report ? (report.mainRemarks || '') : document.getElementById('mainRemarks').value);
 
             addFooter();
             const safeVisitNo = visitNo.replace(/[\\/:*?"<>|]+/g, '_');
             doc.save(`${safeVisitNo}_Marketing_Report.pdf`);
+        }
+
+        function exportSavedVisitToPDF(id) {
+            let visits = [];
+            try { visits = JSON.parse(localStorage.getItem('marketing_visits')) || []; } catch (_) { visits = []; }
+            const report = visits.find(visit => String(visit.id) === String(id));
+            if (!report) return showToast('Saved report not found', 'warning');
+            exportToPDF(report);
         }
 
         function docAutoTableAvailable() {
@@ -1483,6 +1532,7 @@
                         <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
                         <div class="action-dropdown-content">
                             <button onclick="viewReportFromList('${v.id}')">👁️ View</button>
+                            <button onclick="exportSavedVisitToPDF('${v.id}')">📄 Print PDF</button>
                             <button onclick="openReminderForVisit('${v.id}')">🔔 Reminder</button>
                             <button onclick="editReportFromList('${v.id}')">✏️ Edit</button>
                             <button onclick="deleteReportFromList('${v.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>
@@ -1499,7 +1549,8 @@
         function exportListToPDF() {
             if (!window.jspdf) return showToast('jsPDF not loaded', 'warning');
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF("p", "mm", "a4");
+            const doc = new jsPDF("l", "mm", "a4");
+            const pageWidth = doc.internal.pageSize.getWidth();
 
             const term = document.getElementById('listSearch').value.toLowerCase();
             let visits = JSON.parse(localStorage.getItem('marketing_visits')) || [];
@@ -1532,22 +1583,70 @@
                 }
             });
 
-            let companyName = "Company Name";
-            if (window.BrandService) {
-                companyName = window.BrandService.getBrand().name || companyName;
-            } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
-                companyName = APP_SETTINGS.COMPANY_NAME;
+            const appSettings = window.APP_SETTINGS || {};
+            let brand = {};
+            try { if (window.BrandService) brand = window.BrandService.getBrand() || {}; } catch (error) { console.warn('Could not load brand details for PDF.', error); }
+            const brandValue = (settingKey, storageKey, brandValue = '') => appSettings[settingKey] || localStorage.getItem(storageKey) || brandValue || '';
+            const companyName = brand.name || brandValue('COMPANY_NAME', 'companyName') || 'Company Name';
+            const brandAddress = [
+                brandValue('ADDRESS_LINE_1', 'addressLine1'),
+                brandValue('ADDRESS_LINE_2', 'addressLine2'),
+                [brandValue('DISTRICT', 'district'), brandValue('SELLER_STATE', 'sellerState')].filter(Boolean).join(', ')
+            ].filter(Boolean);
+            const brandContact = [
+                brandValue('CONTACT_NUMBER', 'contactNumber', brand.phone) && `Ph: ${brandValue('CONTACT_NUMBER', 'contactNumber', brand.phone)}`,
+                brandValue('COMPANY_EMAIL', 'companyEmail') && `Email: ${brandValue('COMPANY_EMAIL', 'companyEmail')}`,
+                brandValue('COMPANY_WEBSITE', 'companyWebsite')
+            ].filter(Boolean).join(' | ');
+            const brandGstin = brandValue('COMPANY_GSTIN', 'companyGstin', brand.gst);
+            const brandLines = [...brandAddress, brandContact, brandGstin && `GSTIN: ${brandGstin}`].filter(Boolean);
+            let brandY = 11;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(15);
+            doc.text(String(companyName), pageWidth / 2, brandY, { align: 'center', maxWidth: pageWidth - 24 });
+            brandY += 5;
+            if (brandLines.length) {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                brandLines.forEach(line => {
+                    const wrapped = doc.splitTextToSize(String(line).replace(/<br>/gi, ', '), pageWidth - 24);
+                    doc.text(wrapped, pageWidth / 2, brandY, { align: 'center' });
+                    brandY += wrapped.length * 3.5;
+                });
             }
+            brandY += 2;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.text('Marketing Reports List', pageWidth / 2, brandY, { align: 'center' });
+            brandY += 4;
 
-            doc.setFontSize(16);
-            doc.text("Marketing Reports List", 105, 15, { align: "center" });
-            doc.setFontSize(10);
-            doc.text("Company: " + companyName, 105, 22, { align: "center" });
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text('REPORT MAKER DETAILS', 12, brandY + 2);
+            const makerRows = filtered.map(visit => [visit.visitNo || '-', visit.reportMakerName || '-', visit.reportMakerContact || '-', visit.visitZone || '-']);
+            doc.autoTable({
+                startY: brandY + 4,
+                margin: { left: 12, right: 12 },
+                head: [['Visit No', 'Report Maker', 'Maker Contact', 'Visit Zone']],
+                body: makerRows,
+                theme: 'grid',
+                headStyles: { fillColor: [57, 146, 235], textColor: 255 },
+                styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
+                columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 75 }, 2: { cellWidth: 55 }, 3: { cellWidth: 'auto' } }
+            });
+            let reportsTitleY = doc.lastAutoTable.finalY + 7;
+            if (reportsTitleY > doc.internal.pageSize.getHeight() - 18) {
+                doc.addPage();
+                reportsTitleY = 15;
+            }
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.text('REPORTS', 12, reportsTitleY);
 
             const allHeaders = ["Date", "Visit No", "Customer Name", "Address", "Expenses (Rs)", "Contacts"];
             const headers = [];
             allHeaders.forEach((h, i) => {
-                if (columnVisibility[i] !== false) headers.push(h);
+                if (i >= 6 || columnVisibility[i] !== false) headers.push(h);
             });
 
             const data = filtered.map(v => {
@@ -1564,28 +1663,13 @@
                 return fullRow.filter((_, i) => columnVisibility[i] !== false);
             });
 
-            let columnStyles = {};
-            let expensesColIdx = -1;
-            let contactsColIdx = -1;
-            let currentIdx = 0;
-            allHeaders.forEach((h, i) => {
-                if (columnVisibility[i] !== false) {
-                    if (i === 4) expensesColIdx = currentIdx;
-                    if (i === 5) contactsColIdx = currentIdx;
-                    currentIdx++;
-                }
-            });
-            if (expensesColIdx > -1) columnStyles[expensesColIdx] = { halign: 'right' };
-            if (contactsColIdx > -1) columnStyles[contactsColIdx] = { halign: 'center' };
-
             doc.autoTable({
-                startY: 28,
+                startY: reportsTitleY + 2,
                 head: [headers],
                 body: data,
                 theme: 'striped',
-                headStyles: { fillColor: [52, 58, 64], textColor: 255 },
-                styles: { fontSize: 9, cellPadding: 3 },
-                columnStyles: columnStyles
+                headStyles: { fillColor: [52, 58, 64], textColor: 255, halign: 'left' },
+                styles: { fontSize: 9, cellPadding: 3, halign: 'left' }
             });
 
             doc.save("Marketing_Reports_List.pdf");
