@@ -100,6 +100,9 @@
         };
     }
 
+    // Allow pages that load shared settings asynchronously to reuse the same brand rendering logic.
+    window.applyBrandLoaderSettings = updateBrand;
+
     // Expose for PDF generation
     window.getBrandSettings = loadFromStorage;
 

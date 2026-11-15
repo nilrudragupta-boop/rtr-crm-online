@@ -177,6 +177,14 @@ const apiClient = {
     saveQuotation: (data) => apiClient._saveCollection('quotations', data),
     deleteQuotation: (id) => apiClient._deleteCollection('quotations', id),
 
+    // --- Advance Ledger and Order Sheets ---
+    getAdvancePayments: () => apiClient._getCollection('advance-payments'),
+    saveAdvancePayment: (data) => apiClient._saveCollection('advance-payments', data),
+    deleteAdvancePayment: (id) => apiClient._deleteCollection('advance-payments', id),
+    getOrderSheets: () => apiClient._getCollection('order-sheets'),
+    saveOrderSheet: (data) => apiClient._saveCollection('order-sheets', data),
+    deleteOrderSheet: (orderNo) => apiClient._deleteCollection('order-sheets', orderNo),
+
     // --- CRM Enquiry Workflow ---
     getCrmEnquiries: () => apiClient._getCollection('crm-enquiries'),
     saveCrmEnquiry: (data) => apiClient._saveCollection('crm-enquiries', data),

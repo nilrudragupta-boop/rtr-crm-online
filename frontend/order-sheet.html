@@ -691,6 +691,7 @@
         let currentMode = 'form';
         let currentPage = 1;
         let rowsPerPage = 20;
+        let orderSyncRunning = false;
 
         let defaultVisibility = new Array(13).fill(true);
         // Hide IMEI, Batch, Lot, Serial, UOM by default
@@ -706,6 +707,8 @@
             loadSuppliers();
             loadItems();
             generateOrderNo();
+            syncOrderSheetsFromServer();
+            window.addEventListener('online', flushOrderSheetSyncQueue);
             addRow(); // Initial row
 
             // Populate UOM List
@@ -752,6 +755,58 @@
                 toggleBtn.innerHTML = '<i class="fas fa-list"></i> View Orders';
                 currentMode = 'form';
                 clearForm();
+            }
+        }
+
+        async function syncOrderSheetsFromServer() {
+            if (typeof apiClient === 'undefined' || !apiClient.getOrderSheets) return;
+            try {
+                const remoteOrders = await apiClient.getOrderSheets();
+                if (!Array.isArray(remoteOrders)) return;
+                const localOrders = JSON.parse(localStorage.getItem('order_sheets') || '[]');
+                const pending = JSON.parse(localStorage.getItem('order_sheets_pending_sync') || '[]');
+                const deletedNumbers = new Set(pending.filter(item => item.type === 'delete').map(item => String(item.orderNo)));
+                const pendingSaves = new Map(pending.filter(item => item.type === 'save').map(item => [String(item.orderNo), item.record]));
+                const remoteNumbers = new Set(remoteOrders.map(order => String(order.orderNo)));
+                const localOnly = localOrders.filter(order => !remoteNumbers.has(String(order.orderNo)));
+                localOnly.forEach(order => queueOrderSheetSync('save', order.orderNo, order));
+                const merged = remoteOrders.filter(order => !deletedNumbers.has(String(order.orderNo)) && !pendingSaves.has(String(order.orderNo)));
+                merged.push(...pendingSaves.values(), ...localOnly.filter(order => !deletedNumbers.has(String(order.orderNo))));
+                localStorage.setItem('order_sheets', JSON.stringify(merged));
+                if (currentMode === 'list') renderOrderList();
+                const currentOrderNo = document.getElementById('orderNo').value.trim();
+                if (currentOrderNo && remoteNumbers.has(currentOrderNo)) generateOrderNo();
+                flushOrderSheetSyncQueue();
+            } catch (error) {
+                console.warn('Order sheets remain available from this device until the server reconnects.', error);
+            }
+        }
+
+        function queueOrderSheetSync(type, orderNo, record) {
+            const pending = JSON.parse(localStorage.getItem('order_sheets_pending_sync') || '[]').filter(item => item.orderNo !== orderNo);
+            pending.push({ type, orderNo, record, queuedAt: Date.now() + Math.random() });
+            localStorage.setItem('order_sheets_pending_sync', JSON.stringify(pending));
+            flushOrderSheetSyncQueue();
+        }
+
+        async function flushOrderSheetSyncQueue() {
+            if (orderSyncRunning || typeof apiClient === 'undefined') return;
+            orderSyncRunning = true;
+            try {
+                let pending = JSON.parse(localStorage.getItem('order_sheets_pending_sync') || '[]');
+                while (pending.length) {
+                    const operation = pending[0];
+                    const result = operation.type === 'delete'
+                        ? await apiClient.deleteOrderSheet(operation.orderNo)
+                        : await apiClient.saveOrderSheet(operation.record);
+                    if (!result || result.success === false) break;
+                    pending = pending.filter(item => item.queuedAt !== operation.queuedAt || item.orderNo !== operation.orderNo);
+                    localStorage.setItem('order_sheets_pending_sync', JSON.stringify(pending));
+                }
+            } catch (error) {
+                console.warn('Order sheets are saved locally and will sync when connected.', error);
+            } finally {
+                orderSyncRunning = false;
             }
         }
 
@@ -843,6 +898,7 @@
                     () => {
                         order.status = newStatus;
                         localStorage.setItem("order_sheets", JSON.stringify(orders));
+                        if (typeof apiClient !== 'undefined' && apiClient.saveOrderSheet) queueOrderSheetSync('save', orderNo, order);
 
                         let statusColor = '#333';
                         if (newStatus === 'Completed') statusColor = '#27ae60';
@@ -1079,6 +1135,7 @@
             let orders = JSON.parse(localStorage.getItem("order_sheets")) || [];
             orders = orders.filter(o => o.orderNo !== orderNo);
             localStorage.setItem("order_sheets", JSON.stringify(orders));
+            if (typeof apiClient !== 'undefined' && apiClient.deleteOrderSheet) queueOrderSheetSync('delete', orderNo);
 
             renderOrderList();
             showSuccess(`Order ${orderNo} deleted.`);
@@ -1181,8 +1238,16 @@
             if (lastDisp) lastDisp.innerText = `Last Order: ${lastOrderStr}`;
         }
 
-        function loadSuppliers() {
-            const suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+        async function loadSuppliers() {
+            let suppliers = JSON.parse(localStorage.getItem('suppliers')) || [];
+            if (typeof apiClient !== 'undefined' && apiClient.getSuppliers) {
+                const remoteSuppliers = await apiClient.getSuppliers();
+                if (Array.isArray(remoteSuppliers)) {
+                    const remoteIds = new Set(remoteSuppliers.map(item => String(item.id || item.name || '').toLowerCase()));
+                    suppliers = [...remoteSuppliers, ...suppliers.filter(item => !remoteIds.has(String(item.id || item.name || '').toLowerCase()))];
+                    localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                }
+            }
             const dl = document.getElementById('supplierList');
             dl.innerHTML = '';
             suppliers.forEach(s => {
@@ -1533,6 +1598,7 @@
             }
 
             localStorage.setItem("order_sheets", JSON.stringify(orders));
+            if (typeof apiClient !== 'undefined' && apiClient.saveOrderSheet) queueOrderSheetSync('save', orderNo, orderData);
 
             // Also add to audit if possible
             if (window.getAuditTrail) {

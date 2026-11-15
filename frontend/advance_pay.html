@@ -92,9 +92,8 @@
                     <i class="fa-solid fa-file-invoice-dollar text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">AdvanceFlow
-                    </h1>
-                    <p class="text-xs text-slate-500 hidden sm:block">Customer & Supplier Advance Payment Register</p>
+                    <h1 data-brand="name" class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">AdvanceFlow</h1>
+                    <p data-brand="address" class="text-xs text-slate-500 hidden sm:block">Customer & Supplier Advance Payment Register</p>
                 </div>
             </div>
 
@@ -111,12 +110,6 @@
                     <span class="hidden md:inline">Export CSV</span>
                 </button>
 
-                <button onclick="openResetModal()"
-                    class="inline-flex items-center gap-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-600 border border-transparent font-medium text-xs sm:text-sm px-3 py-2 rounded-lg transition"
-                    title="Reset or Clear Data">
-                    <i class="fa-solid fa-rotate-left"></i>
-                    <span class="hidden lg:inline">Data Options</span>
-                </button>
             </div>
         </div>
     </header>
@@ -254,7 +247,7 @@
                                 <span id="partyNameLabel">Customer Name</span> <span class="text-rose-500">*</span>
                             </label>
                             <div class="relative">
-                                <input type="text" id="partyName" list="partyDatalist" required
+                                <input type="text" id="partyName" list="partyDatalist" oninput="updateReferenceOptions()" onchange="autofillPartyDetails()" required
                                     placeholder="e.g., Apex Retail Solutions"
                                     class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
                                 <datalist id="partyDatalist"></datalist>
@@ -326,8 +319,10 @@
                         <div>
                             <label for="orderRef" class="block text-xs font-semibold text-slate-700 mb-1">Against SO /
                                 PO / Quote</label>
-                            <input type="text" id="orderRef" placeholder="e.g., PO-2026-114"
+                            <input type="text" id="orderRef" list="referenceDatalist" onchange="handleReferenceChange()" placeholder="Search quote, sales order, or purchase order"
                                 class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                            <datalist id="referenceDatalist"></datalist>
+                            <p id="referenceDetails" class="mt-1 text-[11px] text-slate-500 hidden"></p>
                         </div>
 
                         <div>
@@ -413,18 +408,18 @@
                         </div>
                     </div>
 
-                    <!-- Search & Dropdown Filters -->
+                    <!-- Search and ledger filters -->
                     <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                        <div class="sm:col-span-6 relative">
+                        <div class="sm:col-span-4 relative">
                             <i
                                 class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                            <input type="text" id="searchInput" oninput="renderTable()"
+                            <input type="text" id="searchInput" oninput="applyFilters()"
                                 placeholder="Search party name, voucher #, PO/SO, or UTR..."
                                 class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white pl-9 pr-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
                         </div>
 
-                        <div class="sm:col-span-3">
-                            <select id="filterStatus" onchange="renderTable()"
+                        <div class="sm:col-span-2">
+                            <select id="filterStatus" onchange="applyFilters()"
                                 class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none">
                                 <option value="All">All Statuses</option>
                                 <option value="Open">Unadjusted / Open</option>
@@ -434,8 +429,8 @@
                             </select>
                         </div>
 
-                        <div class="sm:col-span-3">
-                            <select id="filterMode" onchange="renderTable()"
+                        <div class="sm:col-span-2">
+                            <select id="filterMode" onchange="applyFilters()"
                                 class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none">
                                 <option value="All">All Modes</option>
                                 <option value="Bank Transfer">Bank Transfer</option>
@@ -444,6 +439,14 @@
                                 <option value="Cash">Cash</option>
                                 <option value="Card">Card</option>
                             </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="filterFromDate" class="block text-[11px] font-semibold text-slate-500 mb-1">From Date</label>
+                            <input type="date" id="filterFromDate" onchange="applyFilters()" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="filterToDate" class="block text-[11px] font-semibold text-slate-500 mb-1">To Date</label>
+                            <input type="date" id="filterToDate" onchange="applyFilters()" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none">
                         </div>
                     </div>
                 </div>
@@ -478,6 +481,18 @@
                         <h3 class="text-base font-semibold text-slate-800">No advance records found</h3>
                         <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Try adjusting your search filters or
                             record a new Customer or Supplier advance payment using the form.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+                        <label class="flex items-center gap-2 text-xs text-slate-600">Rows per page
+                            <select id="pageSize" onchange="changePageSize()" class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
+                                <option value="20">20</option><option value="50">50</option><option value="70">70</option><option value="100">100</option>
+                            </select>
+                        </label>
+                        <div class="flex items-center gap-3 text-xs text-slate-600">
+                            <span id="pageInfo">Showing 0–0 of 0</span>
+                            <button id="prevPage" onclick="changePage(-1)" class="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40" disabled>Previous</button>
+                            <button id="nextPage" onclick="changePage(1)" class="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40" disabled>Next</button>
+                        </div>
                     </div>
                 </div>
 
@@ -572,6 +587,9 @@
             <div id="printVoucherArea" class="p-6 sm:p-8 space-y-5 text-slate-800">
                 <div class="flex justify-between items-start border-b-2 border-slate-800 pb-4">
                     <div>
+                        <img data-brand="logo" alt="Company logo" style="display:none" class="max-h-12 max-w-32 object-contain mb-2">
+                        <h3 data-brand="name" class="text-sm font-bold text-slate-800">AdvanceFlow</h3>
+                        <p data-brand="address" class="text-[11px] text-slate-500 mb-2"></p>
                         <h2 id="vPrintTitle" class="text-xl font-bold uppercase tracking-tight text-slate-900">ADVANCE
                             RECEIPT VOUCHER</h2>
                         <p class="text-xs text-slate-500 mt-0.5">AdvanceFlow Financial Ledger</p>
@@ -632,7 +650,7 @@
         </div>
     </div>
 
-    <!-- Custom Confirmation / Data Reset Modal -->
+    <!-- Delete Confirmation Modal -->
     <div id="confirmModal"
         class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full shadow-xl border border-slate-200 p-6 space-y-4">
@@ -666,7 +684,12 @@
 
         let records = [];
         let activeTab = 'All'; // 'All', 'Customer', 'Supplier'
+        let currentPage = 1;
+        let pageSize = 20;
         let currencySymbol = localStorage.getItem(CURRENCY_KEY) || '₹';
+        let partySources = { Customer: [], Supplier: [] };
+        let referenceOptions = [];
+        let advanceSyncRunning = false;
 
         // Sample realistic data for first-time initialization
         const sampleRecords = [
@@ -735,10 +758,15 @@
         // --- Initialization ---
         window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('currencySelect').value = currencySymbol;
+            const now = new Date();
+            document.getElementById('filterFromDate').value = toLocalDateInput(new Date(now.getFullYear(), now.getMonth(), 1));
+            document.getElementById('filterToDate').value = toLocalDateInput(new Date(now.getFullYear(), now.getMonth() + 1, 0));
             updateCurrencyPrefixes();
             loadData();
             resetForm();
             refreshUI();
+            syncRemoteData();
+            window.addEventListener('online', flushAdvanceSyncQueue);
         });
 
         function loadData() {
@@ -758,6 +786,130 @@
         function saveData() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
             refreshUI();
+        }
+
+        function readLocalArray(key) {
+            try { return JSON.parse(localStorage.getItem(key) || '[]') || []; }
+            catch (error) { return []; }
+        }
+
+        function queueAdvanceSync(type, id, record) {
+            const pending = readLocalArray('advanceflow_pending_sync').filter(item => item.id !== id);
+            pending.push({ type, id, record, queuedAt: Date.now() });
+            localStorage.setItem('advanceflow_pending_sync', JSON.stringify(pending));
+            flushAdvanceSyncQueue();
+        }
+
+        async function flushAdvanceSyncQueue() {
+            if (advanceSyncRunning || typeof apiClient === 'undefined') return;
+            advanceSyncRunning = true;
+            try {
+                let pending = readLocalArray('advanceflow_pending_sync');
+                while (pending.length) {
+                    const operation = pending[0];
+                    const result = operation.type === 'delete'
+                        ? await apiClient.deleteAdvancePayment(operation.id)
+                        : await apiClient.saveAdvancePayment(operation.record);
+                    if (!result || result.success === false) break;
+                    pending = pending.filter(item => item.queuedAt !== operation.queuedAt || item.id !== operation.id);
+                    localStorage.setItem('advanceflow_pending_sync', JSON.stringify(pending));
+                }
+            } catch (error) {
+                console.warn('Advance records are saved locally and will sync when connected.', error);
+            } finally {
+                advanceSyncRunning = false;
+            }
+        }
+
+        async function syncRemoteData() {
+            if (typeof apiClient === 'undefined') return;
+            try {
+                const [remoteAdvances, remoteCustomers, remoteSuppliers, remoteQuotes, remoteOrders, settings] = await Promise.all([
+                    apiClient.getAdvancePayments(), apiClient.getCustomers(), apiClient.getSuppliers(),
+                    apiClient.getQuotations(), apiClient.getOrderSheets(), apiClient.getSettings()
+                ]);
+
+                if (Array.isArray(remoteAdvances)) {
+                    const localRecords = records.slice();
+                    const remoteIds = new Set(remoteAdvances.map(record => String(record.id)));
+                    const pending = readLocalArray('advanceflow_pending_sync');
+                    const pendingIds = new Set(pending.map(operation => String(operation.id)));
+                    const localOnly = localRecords.filter(record => !remoteIds.has(String(record.id)) || pendingIds.has(String(record.id)));
+                    const removedIds = new Set(pending.filter(operation => operation.type === 'delete').map(operation => String(operation.id)));
+                    records = [...remoteAdvances.filter(record => !removedIds.has(String(record.id))), ...localOnly.filter(record => !removedIds.has(String(record.id)))];
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+                    localOnly.forEach(record => queueAdvanceSync('save', record.id, record));
+                }
+
+                if (Array.isArray(remoteCustomers)) {
+                    partySources.Customer = mergePartyDirectories(remoteCustomers, readLocalArray('customers'));
+                    localStorage.setItem('customers', JSON.stringify(partySources.Customer));
+                } else partySources.Customer = readLocalArray('customers');
+
+                if (Array.isArray(remoteSuppliers)) {
+                    partySources.Supplier = mergePartyDirectories(remoteSuppliers, readLocalArray('suppliers'));
+                    localStorage.setItem('suppliers', JSON.stringify(partySources.Supplier));
+                } else partySources.Supplier = readLocalArray('suppliers');
+
+                if (Array.isArray(remoteQuotes)) {
+                    const localQuotes = readLocalArray('quotations');
+                    const quoteIds = new Set(remoteQuotes.map(item => String(item.refNo || item.id)));
+                    localQuotes.filter(item => !quoteIds.has(String(item.refNo || item.id)))
+                        .forEach(item => apiClient.saveQuotation(item).catch(console.warn));
+                    localStorage.setItem('quotations', JSON.stringify([...remoteQuotes, ...localQuotes.filter(item => !quoteIds.has(String(item.refNo || item.id)))]));
+                }
+
+                if (Array.isArray(remoteOrders)) {
+                    const localOrders = readLocalArray('order_sheets');
+                    const orderIds = new Set(remoteOrders.map(item => String(item.orderNo)));
+                    const localOnlyOrders = localOrders.filter(item => !orderIds.has(String(item.orderNo)));
+                    localOnlyOrders.forEach(item => apiClient.saveOrderSheet(item).catch(console.warn));
+                    localStorage.setItem('order_sheets', JSON.stringify([...remoteOrders, ...localOnlyOrders]));
+                }
+
+                applyRemoteBrandSettings(settings);
+                updatePartyDatalist();
+                updateReferenceOptions();
+                refreshUI();
+                flushAdvanceSyncQueue();
+            } catch (error) {
+                console.warn('Remote ledger sync is unavailable; using this device’s saved data.', error);
+            }
+        }
+
+        function applyRemoteBrandSettings(settings) {
+            if (!settings) return;
+            const normalizedSettings = {};
+            const brandKeys = {
+                companyName: ['companyName', 'COMPANY_NAME'],
+                addressLine1: ['addressLine1', 'ADDRESS_LINE_1'],
+                addressLine2: ['addressLine2', 'ADDRESS_LINE_2'],
+                contactNumber: ['contactNumber', 'CONTACT_NUMBER'],
+                companyEmail: ['companyEmail', 'COMPANY_EMAIL'],
+                companyWebsite: ['companyWebsite', 'COMPANY_WEBSITE'],
+                companyGstin: ['companyGstin', 'COMPANY_GSTIN'],
+                district: ['district', 'DISTRICT'],
+                sellerState: ['sellerState', 'SELLER_STATE'],
+                logoPath: ['logoPath', 'LOGO_PATH']
+            };
+            Object.entries(brandKeys).forEach(([storageKey, candidates]) => {
+                const value = candidates.map(key => settings[key]).find(item => item !== undefined && item !== null && item !== '');
+                if (value) {
+                    localStorage.setItem(storageKey, value);
+                    normalizedSettings[storageKey] = value;
+                    if (candidates[1]) {
+                        window.APP_SETTINGS = window.APP_SETTINGS || {};
+                        window.APP_SETTINGS[candidates[1]] = value;
+                    }
+                }
+            });
+            if (localStorage.getItem('companyName') && window.BrandService?.applyBrand) window.BrandService.applyBrand();
+            if (window.applyBrandLoaderSettings) window.applyBrandLoaderSettings(normalizedSettings);
+        }
+
+        function mergePartyDirectories(remoteRecords, localRecords) {
+            const remoteKeys = new Set(remoteRecords.map(item => String(item.id || item.name || '').trim().toLocaleLowerCase()));
+            return [...remoteRecords, ...localRecords.filter(item => !remoteKeys.has(String(item.id || item.name || '').trim().toLocaleLowerCase()))];
         }
 
         function refreshUI() {
@@ -821,8 +973,66 @@
         function updatePartyDatalist() {
             const type = document.querySelector('input[name="entityType"]:checked').value;
             const datalist = document.getElementById('partyDatalist');
-            const uniqueNames = [...new Set(records.filter(r => r.entityType === type).map(r => r.partyName))];
+            const names = [
+                ...partySources[type].map(party => party.name || party.partyName),
+                ...records.filter(r => r.entityType === type).map(r => r.partyName)
+            ].filter(Boolean);
+            const uniqueNames = [...new Set(names)];
             datalist.innerHTML = uniqueNames.map(name => `<option value="${escapeHtml(name)}">`).join('');
+            updateReferenceOptions();
+        }
+
+        function autofillPartyDetails() {
+            const type = document.querySelector('input[name="entityType"]:checked').value;
+            const name = document.getElementById('partyName').value.trim().toLocaleLowerCase();
+            const party = partySources[type].find(item => String(item.name || item.partyName || '').trim().toLocaleLowerCase() === name);
+            if (!party) return;
+            const contact = party.contact || party.phone || party.mobile || '';
+            const email = party.email || '';
+            document.getElementById('partyContact').value = [contact, email].filter(Boolean).join(' | ');
+        }
+
+        function updateReferenceOptions() {
+            if (!document.getElementById('referenceDatalist')) return;
+            const type = document.querySelector('input[name="entityType"]:checked').value;
+            const options = [];
+            if (type === 'Customer') {
+                readLocalArray('quotations').forEach(quote => {
+                    const ref = quote.refNo || quote.id;
+                    if (!ref) return;
+                    const partyName = quote.custName || quote.customerName || '';
+                    const selectedParty = document.getElementById('partyName').value.trim().toLocaleLowerCase();
+                    if (selectedParty && partyName && partyName.trim().toLocaleLowerCase() !== selectedParty) return;
+                    options.push({
+                        type: 'Quotation', id: String(ref), date: quote.date || '', amount: quote.grandTotal || '',
+                        partyName, label: `Quotation | ${ref}${partyName ? ` — ${partyName}` : ''}`
+                    });
+                });
+                readLocalArray('order_sheets').filter(order => order.customerName && (!document.getElementById('partyName').value.trim() || order.customerName.trim().toLocaleLowerCase() === document.getElementById('partyName').value.trim().toLocaleLowerCase())).forEach(order => {
+                    options.push({ type: 'Sales Order', id: order.orderNo, date: order.orderDate || '', amount: order.grandTotal || '', partyName: order.customerName, label: `Sales Order | ${order.orderNo} — ${order.customerName}` });
+                });
+            } else {
+                readLocalArray('order_sheets').filter(order => order.supplierName && (!document.getElementById('partyName').value.trim() || order.supplierName.trim().toLocaleLowerCase() === document.getElementById('partyName').value.trim().toLocaleLowerCase())).forEach(order => {
+                    options.push({ type: 'Purchase Order', id: order.orderNo, date: order.orderDate || '', amount: order.grandTotal || '', partyName: order.supplierName, label: `Purchase Order | ${order.orderNo} — ${order.supplierName}` });
+                });
+            }
+            referenceOptions = options;
+            document.getElementById('referenceDatalist').innerHTML = options.map(option => `<option value="${escapeHtml(option.label)}">`).join('');
+        }
+
+        function handleReferenceChange() {
+            const value = document.getElementById('orderRef').value.trim();
+            const match = referenceOptions.find(option => option.label === value || option.id === value);
+            const details = document.getElementById('referenceDetails');
+            if (!match) {
+                details.textContent = '';
+                details.classList.add('hidden');
+                return;
+            }
+            const dateText = match.date ? ` • ${formatDateDisplay(match.date)}` : '';
+            const amountText = match.amount ? ` • ${formatMoney(String(match.amount).replace(/,/g, ''))}` : '';
+            details.textContent = `${match.type}: ${match.id}${dateText}${amountText}`;
+            details.classList.remove('hidden');
         }
 
         function recalculateFormBalance(autoUpdateStatus = false) {
@@ -874,7 +1084,9 @@
             const adjustedAmount = parseFloat(document.getElementById('adjustedAmount').value) || 0;
             const paymentMode = document.getElementById('paymentMode').value;
             const transactionRef = document.getElementById('transactionRef').value.trim();
-            const orderRef = document.getElementById('orderRef').value.trim();
+            const referenceText = document.getElementById('orderRef').value.trim();
+            const linkedReference = referenceOptions.find(option => option.label === referenceText || option.id === referenceText);
+            const orderRef = linkedReference ? linkedReference.id : referenceText;
             const status = document.getElementById('status').value;
             const remarks = document.getElementById('remarks').value.trim();
 
@@ -895,6 +1107,10 @@
                 paymentMode,
                 transactionRef,
                 orderRef,
+                referenceType: linkedReference?.type || '',
+                referenceId: linkedReference?.id || '',
+                referenceDate: linkedReference?.date || '',
+                referenceAmount: linkedReference?.amount || '',
                 status,
                 remarks
             };
@@ -911,6 +1127,7 @@
             }
 
             saveData();
+            queueAdvanceSync('save', entryObj.id, entryObj);
             resetForm();
         }
 
@@ -919,6 +1136,8 @@
             document.getElementById('entryId').value = '';
             document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('voucherNo').value = generateNextVoucherNo();
+            document.getElementById('referenceDetails').textContent = '';
+            document.getElementById('referenceDetails').classList.add('hidden');
             document.getElementById('adjustedAmount').value = '0';
             document.getElementById('formRemainingBalance').textContent = formatMoney(0);
 
@@ -939,6 +1158,7 @@
             onEntityTypeChange();
 
             document.getElementById('partyName').value = rec.partyName;
+            updateReferenceOptions();
             document.getElementById('partyContact').value = rec.partyContact || '';
             document.getElementById('voucherNo').value = rec.voucherNo;
             document.getElementById('paymentDate').value = rec.paymentDate;
@@ -947,6 +1167,9 @@
             document.getElementById('paymentMode').value = rec.paymentMode;
             document.getElementById('transactionRef').value = rec.transactionRef || '';
             document.getElementById('orderRef').value = rec.orderRef || '';
+            const linkedReference = referenceOptions.find(option => option.type === rec.referenceType && option.id === rec.referenceId);
+            if (linkedReference) document.getElementById('orderRef').value = linkedReference.label;
+            handleReferenceChange();
             document.getElementById('status').value = rec.status;
             document.getElementById('remarks').value = rec.remarks || '';
 
@@ -1001,6 +1224,7 @@
 
         function setEntityTab(tab) {
             activeTab = tab;
+            currentPage = 1;
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.className = 'tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5';
             });
@@ -1009,15 +1233,42 @@
             renderTable();
         }
 
+        function toLocalDateInput(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function applyFilters() {
+            currentPage = 1;
+            renderTable();
+        }
+
+        function changePageSize() {
+            pageSize = Number(document.getElementById('pageSize').value) || 20;
+            currentPage = 1;
+            renderTable();
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderTable();
+        }
+
         function getFilteredRecords() {
             const search = document.getElementById('searchInput').value.toLowerCase().trim();
             const statusFilter = document.getElementById('filterStatus').value;
             const modeFilter = document.getElementById('filterMode').value;
+            const fromDate = document.getElementById('filterFromDate').value;
+            const toDate = document.getElementById('filterToDate').value;
 
             return records.filter(r => {
                 if (activeTab !== 'All' && r.entityType !== activeTab) return false;
                 if (statusFilter !== 'All' && r.status !== statusFilter) return false;
                 if (modeFilter !== 'All' && r.paymentMode !== modeFilter) return false;
+                if (fromDate && r.paymentDate < fromDate) return false;
+                if (toDate && r.paymentDate > toDate) return false;
 
                 if (search) {
                     const haystack = [
@@ -1040,6 +1291,15 @@
             const emptyState = document.getElementById('emptyState');
 
             document.getElementById('visibleCount').textContent = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+            currentPage = Math.min(Math.max(1, currentPage), totalPages);
+            const startIndex = (currentPage - 1) * pageSize;
+            const pageRecords = filtered.slice(startIndex, startIndex + pageSize);
+            const firstVisible = filtered.length ? startIndex + 1 : 0;
+            const lastVisible = Math.min(startIndex + pageSize, filtered.length);
+            document.getElementById('pageInfo').textContent = `Showing ${firstVisible}–${lastVisible} of ${filtered.length}`;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
 
             if (filtered.length === 0) {
                 tbody.innerHTML = '';
@@ -1048,7 +1308,7 @@
             }
 
             emptyState.classList.add('hidden');
-            tbody.innerHTML = filtered.map(r => {
+            tbody.innerHTML = pageRecords.map(r => {
                 const isCustomer = r.entityType === 'Customer';
                 const remaining = r.status === 'Refunded' ? 0 : Math.max(0, r.amount - (r.adjustedAmount || 0));
 
@@ -1074,7 +1334,7 @@
                         <td class="py-3.5 px-4 align-top">
                             <div class="font-semibold text-slate-900 text-sm">${escapeHtml(r.partyName)}</div>
                             ${r.partyContact ? `<div class="text-xs text-slate-500 mt-0.5"><i class="fa-regular fa-address-book mr-1 text-slate-400"></i>${escapeHtml(r.partyContact)}</div>` : ''}
-                            ${r.orderRef ? `<div class="inline-block mt-1 text-[11px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded">Ref: ${escapeHtml(r.orderRef)}</div>` : ''}
+                            ${r.orderRef ? `<div class="inline-block mt-1 text-[11px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded">Ref: ${escapeHtml([r.referenceType, r.orderRef].filter(Boolean).join(': '))}</div>` : ''}
                             ${r.remarks ? `<p class="text-xs text-slate-500 mt-1 line-clamp-1 max-w-xs" title="${escapeHtml(r.remarks)}">${escapeHtml(r.remarks)}</p>` : ''}
                         </td>
                         <td class="py-3.5 px-4 align-top whitespace-nowrap">
@@ -1174,6 +1434,7 @@
             }
 
             saveData();
+            queueAdvanceSync('save', rec.id, rec);
             closeModal('adjustModal');
             showToast(`Settlement updated for ${rec.voucherNo}`);
         }
@@ -1194,7 +1455,7 @@
             document.getElementById('vPrintPartyContact').textContent = rec.partyContact || '—';
             document.getElementById('vPrintMode').textContent = rec.paymentMode;
             document.getElementById('vPrintRef').textContent = rec.transactionRef ? `Ref: ${rec.transactionRef}` : 'Ref: N/A';
-            document.getElementById('vPrintOrderRef').textContent = rec.orderRef || 'General Advance';
+            document.getElementById('vPrintOrderRef').textContent = rec.orderRef ? `${rec.referenceType ? `${rec.referenceType}: ` : ''}${rec.orderRef}` : 'General Advance';
             document.getElementById('vPrintStatus').textContent = rec.status;
             document.getElementById('vPrintAmount').textContent = formatMoney(rec.amount);
             document.getElementById('vPrintAdjusted').textContent = formatMoney(rec.adjustedAmount || 0);
@@ -1221,35 +1482,9 @@
         function deleteRecord(id) {
             records = records.filter(r => r.id !== id);
             saveData();
+            queueAdvanceSync('delete', id);
             closeModal('confirmModal');
             showToast('Advance entry deleted.');
-        }
-
-        function openResetModal() {
-            document.getElementById('confirmModalTitle').textContent = 'Manage Ledger Data';
-            document.getElementById('confirmModalMessage').textContent = 'Would you like to restore the default sample entries or clear all records to start fresh?';
-            document.getElementById('confirmModalActions').innerHTML = `
-                <button onclick="closeModal('confirmModal')" class="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-600 text-xs sm:text-sm font-medium hover:bg-slate-50">Cancel</button>
-                <button onclick="restoreSampleData()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold">Restore Samples</button>
-                <button onclick="clearAllData()" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold">Clear All</button>
-            `;
-            document.getElementById('confirmModal').classList.remove('hidden');
-        }
-
-        function restoreSampleData() {
-            records = [...sampleRecords];
-            saveData();
-            resetForm();
-            closeModal('confirmModal');
-            showToast('Sample records restored.');
-        }
-
-        function clearAllData() {
-            records = [];
-            saveData();
-            resetForm();
-            closeModal('confirmModal');
-            showToast('All records cleared.');
         }
 
         function closeModal(modalId) {
