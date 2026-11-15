@@ -271,9 +271,10 @@ app.get('/api/status', (req, res) => {
 });
 
 // Keep the refresh service URL on the server instead of exposing it in the page.
+const GOOGLE_SCRIPT_TARGET_URL = process.env.GOOGLE_SCRIPT_URL || process.env.CLIENT_REFRESH_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec';
 app.get('/api/client-refresh', async (req, res) => {
     const identifier = typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '';
-    const scriptUrl = process.env.CLIENT_REFRESH_SCRIPT_URL || process.env.GOOGLE_SCRIPT_URL;
+    const scriptUrl = GOOGLE_SCRIPT_TARGET_URL;
 
     if (!identifier || identifier.length > 200) {
         return res.status(400).json({ success: false, message: 'A valid user identifier is required.' });
@@ -297,6 +298,51 @@ app.get('/api/client-refresh', async (req, res) => {
     } catch (error) {
         console.error('Client refresh request failed:', error.message);
         return res.status(502).json({ success: false, message: 'Refresh service is temporarily unavailable.' });
+    }
+});
+
+// Proxy the browser's Apps Script calls through the backend so the deployment URL
+// remains in the server environment instead of appearing in browser source/network URLs.
+app.all('/api/google-script', express.text({ type: 'text/plain', limit: '50mb' }), async (req, res) => {
+    const configuredUrl = GOOGLE_SCRIPT_TARGET_URL;
+    if (!configuredUrl) {
+        return res.status(503).json({ success: false, message: 'Apps Script service is not configured on the server.' });
+    }
+
+    let target;
+    try {
+        target = new URL(configuredUrl);
+        if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !target.pathname.startsWith('/macros/s/')) {
+            return res.status(503).json({ success: false, message: 'Apps Script service configuration is invalid.' });
+        }
+    } catch (_) {
+        return res.status(503).json({ success: false, message: 'Apps Script service configuration is invalid.' });
+    }
+
+    try {
+        const incomingUrl = new URL(req.originalUrl, 'http://localhost');
+        incomingUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));
+
+        const headers = {};
+        const contentType = req.get('content-type');
+        if (contentType) headers['Content-Type'] = contentType;
+
+        let body;
+        if (req.method !== 'GET' && req.method !== 'HEAD' && req.body !== undefined) {
+            if (typeof req.body === 'string') body = req.body;
+            else if (contentType && contentType.includes('application/x-www-form-urlencoded')) body = new URLSearchParams(req.body).toString();
+            else body = JSON.stringify(req.body);
+        }
+
+        const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'follow' });
+        const responseBody = await upstream.text();
+        res.set('Cache-Control', 'no-store');
+        const responseType = upstream.headers.get('content-type');
+        if (responseType) res.set('Content-Type', responseType);
+        return res.status(upstream.status).send(responseBody);
+    } catch (error) {
+        console.error('Apps Script proxy request failed:', error.message);
+        return res.status(502).json({ success: false, message: 'Apps Script service is temporarily unavailable.' });
     }
 });
 
@@ -345,10 +391,15 @@ customPageSchema.index({ pageId: 1, createdBy: 1 }, { unique: true });
 const CustomPage = mongoose.model('CustomPage', customPageSchema);
 
 // --- General App Settings Routes ---
+function maskGoogleScriptSettings(data, req) {
+    const proxyUrl = `${req.protocol}://${req.get('host')}/api/google-script`;
+    return { ...(data || {}), cloudBackupUrl: proxyUrl, updateServerUrl: proxyUrl, googleScriptUrl: proxyUrl };
+}
+
 app.get('/api/settings', async (req, res) => {
     try {
         const settings = await Setting.findOne({ id: 'global_settings' });
-        res.json({ success: true, data: settings ? settings.data : {} });
+        res.json({ success: true, data: maskGoogleScriptSettings(settings ? settings.data : {}, req) });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -363,7 +414,7 @@ app.post('/api/settings', async (req, res) => {
             { data: mergedData },
             { new: true, upsert: true }
         );
-        res.json({ success: true, data: updated.data });
+        res.json({ success: true, data: maskGoogleScriptSettings(updated.data, req) });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
