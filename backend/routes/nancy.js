@@ -31,7 +31,15 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             if (!stockMap.has(key)) {
                 const master = allItems.find(i => String(i.name || '').toLowerCase() === String(name).toLowerCase() && (!code || String(i.itemCode || '').toLowerCase() === String(code).toLowerCase()))
                     || allItems.find(i => String(i.name || '').toLowerCase() === String(name).toLowerCase()) || {};
-                stockMap.set(key, { name, itemCode: code || master.itemCode || '', uom: uom || '-', purchased: 0, sold: 0, consumed: 0 });
+                stockMap.set(key, {
+                    name,
+                    itemCode: code || master.itemCode || '',
+                    uom: uom || '-',
+                    opening: number(master.openingStock),
+                    purchased: 0,
+                    sold: 0,
+                    consumed: 0
+                });
             }
             return stockMap.get(key);
         };
@@ -46,7 +54,11 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             }
             return null;
         };
-        allItems.forEach(i => ensure(i.name || i.itemName || i.item_name, i.itemCode || i.item_code || i.code, '-'));
+        allItems.forEach(i => ensure(
+            i.name || i.itemName || i.item_name,
+            i.itemCode || i.item_code || i.code,
+            i.uom || i.unit || '-'
+        ));
         purchases.forEach(p => {
             // Purchase records are stored as one row per item by purchase.html.
             const row = ensure(p.itemName || p.item_name || p.name, p.itemCode || p.item_code || p.code, p.uom || p.unit || '-');
@@ -76,8 +88,8 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 && (!code || row.itemCode.toLowerCase() === String(code).toLowerCase())
                 && (!unit || row.uom.toLowerCase() === String(unit).toLowerCase()));
             const currentStock = matchingRows.length
-                ? matchingRows.reduce((sum, row) => sum + row.purchased - row.sold - row.consumed, 0)
-                : number(item.currentStock ?? item.stock ?? item.openingStock ?? item.quantity);
+                ? matchingRows.reduce((sum, row) => sum + row.opening + row.purchased - row.sold - row.consumed, 0)
+                : number(item.openingStock ?? item.currentStock ?? item.stock ?? item.quantity);
             const purchasedQuantity = matchingRows.reduce((sum, row) => sum + row.purchased, 0);
             return { ...item, currentStock, purchasedQuantity };
         });
@@ -134,7 +146,6 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 let status;
                 if (stock < 0) status = 'Negative Stock';
                 else if (stock === 0) status = 'Out of Stock';
-                else if (number(item.purchasedQuantity) > 0 && stock >= number(item.purchasedQuantity)) status = 'In Stock';
                 else if (stock < threshold) status = 'Low Stock';
                 else status = 'In Stock';
                 return { ...item, stockStatus: status, reorderThreshold: threshold };
@@ -213,6 +224,7 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 if (customer.id) customerIdentity.unshift({ customerId: customer.id });
                 const invoices = await Invoice.find({
                     ...ownerQuery(userId),
+                    status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] },
                     $or: customerIdentity
                 }).lean();
                 const invoiceBalance = invoices.reduce((sum, invoice) =>
@@ -252,6 +264,14 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 }).lean();
                 const purchaseBalance = purchases.reduce((sum, purchase) =>
                     sum + (() => {
+                        // Purchase records are stored per item; use the same total and
+                        // paid fields as the purchase screen when present.
+                        if (purchase.totalAmount !== undefined && purchase.totalAmount !== null && Number.isFinite(Number(purchase.totalAmount)) && Number(purchase.totalAmount) > 0) {
+                            const paidTotal = purchase.paid !== undefined && purchase.paid !== null
+                                ? number(purchase.paid)
+                                : (number(purchase.amountPaid) || number(purchase.total_paid) || number(purchase.paid_amount));
+                            return number(purchase.totalAmount) - paidTotal;
+                        }
                         const base = number(purchase.qty) * number(purchase.price);
                         const discountValue = number(purchase.discount);
                         const discount = (purchase.discType || '%') === 'flat'
@@ -259,7 +279,9 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                         const charges = number(purchase.freightCharges) + number(purchase.packingCharges) + number(purchase.loadingCharges);
                         const taxable = base - discount + charges;
                         const computedTotal = taxable + taxable * number(purchase.gst) / 100 + number(purchase.roundOff);
-                        const paid = number(purchase.paid) || number(purchase.total_paid) || number(purchase.paid_amount) || number(purchase.amountPaid);
+                        const paid = purchase.paid !== undefined && purchase.paid !== null
+                            ? number(purchase.paid)
+                            : (number(purchase.amountPaid) || number(purchase.total_paid) || number(purchase.paid_amount));
                         return computedTotal - paid;
                     })(), 0);
                 const outstanding = Math.max(0, purchaseBalance);
@@ -294,7 +316,7 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             const invoices = await Invoice.find({
                 ...ownerQuery(userId),
                 date: { $gte: start, $lte: now },
-                status: { $ne: 'CANCELLED' }
+                status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
             }).lean();
             return {
                 period: period === 'today' ? 'today' : 'this month',
@@ -304,7 +326,10 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
         },
 
         async getUnpaidInvoices({ userId }) {
-            const invoices = await Invoice.find(ownerQuery(userId)).sort({ date: -1 }).lean();
+            const invoices = await Invoice.find({
+                ...ownerQuery(userId),
+                status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
+            }).sort({ date: -1 }).lean();
             // Match report.html's Summary bar definition of Unpaid: nothing paid,
             // with a positive invoice total. Partial invoices are excluded.
             return invoices.map(invoice => ({
