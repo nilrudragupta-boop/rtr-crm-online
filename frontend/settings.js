@@ -971,16 +971,3 @@ async function confirmAndChangeAppMode(newMode) {
     }
 }
 
-// --- Global Developer Shortcut ---
-document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key.toLowerCase() === 'n' || e.code === 'KeyN')) {
-        const devAuthPass = document.getElementById('devAuthPass');
-        if (devAuthPass) {
-            e.preventDefault();
-            devAuthPass.value = 'NANCY@20129830428736';
-            if (typeof verifyDevAccess === 'function') {
-                verifyDevAccess();
-            }
-        }
-    }
-});
