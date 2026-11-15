@@ -384,6 +384,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_manage_bom', label: 'Manage BOM', feature: 'inventory' },
     { id: 'perm_production_entry', label: 'Production Entries', feature: 'inventory' },
     { id: 'perm_order_sheet', label: 'Order Sheet', feature: 'inventory' },
+    { id: 'perm_advance_pay', label: 'Advance Payment', defaultValue: false },
     { id: 'perm_stock_report', label: 'Stock Report', feature: 'inventory' },
     { id: 'perm_stock_journal', label: 'Stock Entry & Exit', feature: 'inventory' },
     { id: 'perm_stock_ledger', label: 'Stock Ledger', feature: 'inventory' },
@@ -466,7 +467,7 @@ function getUIPermissions() {
 
     const permissions = stored ? JSON.parse(stored) : {};
     UI_PERMISSION_REGISTRY.forEach(item => {
-        if (permissions[item.id] === undefined) permissions[item.id] = true;
+        if (permissions[item.id] === undefined) permissions[item.id] = item.defaultValue === undefined ? true : item.defaultValue;
     });
 
     try {

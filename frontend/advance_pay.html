@@ -54,6 +54,16 @@
             background: #94a3b8;
         }
 
+        .brand-header-details {
+            display: block;
+            width: min(52vw, 560px);
+            max-height: 3.3em;
+            line-height: 1.1em;
+            overflow: hidden;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
         @media print {
             body * {
                 visibility: hidden;
@@ -85,19 +95,19 @@
 
     <!-- Top Navigation Bar -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div
-                    class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div class="flex min-w-0 flex-1 basis-56 items-center gap-3">
+                <div class="relative w-10 h-10 shrink-0 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200 overflow-hidden">
                     <i class="fa-solid fa-file-invoice-dollar text-lg"></i>
+                    <img data-brand="logo" alt="Company logo" style="display:none" class="absolute inset-0 h-full w-full rounded-xl bg-white p-1 object-contain">
                 </div>
-                <div>
-                    <h1 data-brand="name" class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">AdvanceFlow</h1>
-                    <p data-brand="address" class="text-xs text-slate-500 hidden sm:block">Customer & Supplier Advance Payment Register</p>
+                <div class="min-w-0 flex-1">
+                    <h1 id="brandHeaderName" data-brand="name" class="block max-w-full truncate text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">AdvanceFlow</h1>
+                    <p id="brandHeaderDetails" data-brand="address" title="Customer & Supplier Advance Payment Register" class="brand-header-details text-[10px] text-slate-500">Customer & Supplier Advance Payment Register</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 sm:gap-3">
+            <div class="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
                 <!-- Currency Selector -->
                 <select id="currencySelect" onchange="changeCurrency(this.value)" title="Select Currency"
                     class="text-xs sm:text-sm bg-slate-100 border border-slate-200 text-slate-700 rounded-lg px-2.5 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -108,6 +118,11 @@
                     class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium text-xs sm:text-sm px-3 py-2 rounded-lg transition shadow-xs">
                     <i class="fa-solid fa-download text-slate-500"></i>
                     <span class="hidden md:inline">Export CSV</span>
+                </button>
+
+                <button onclick="openAuditTrail()" class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium text-xs sm:text-sm px-3 py-2 rounded-lg transition" title="View advance audit trail">
+                    <i class="fa-solid fa-clock-rotate-left"></i><span class="hidden md:inline">Audit Trail</span>
+                    <span id="auditCount" class="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px]">0</span>
                 </button>
 
             </div>
@@ -500,6 +515,15 @@
         </div>
     </main>
 
+    <div id="rowActionMenu" class="hidden fixed z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+        <button onclick="runRowAction('adjust')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-amber-50 hover:text-amber-700"><i class="fa-solid fa-sliders w-4"></i>Adjust / Settle</button>
+        <button onclick="runRowAction('voucher')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"><i class="fa-solid fa-print w-4"></i>View Voucher</button>
+        <button onclick="runRowAction('edit')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"><i class="fa-solid fa-pen w-4"></i>Edit Entry</button>
+        <button onclick="runRowAction('audit')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-sky-50 hover:text-sky-700"><i class="fa-solid fa-clock-rotate-left w-4"></i>Audit Trail</button>
+        <div class="my-1 border-t border-slate-100"></div>
+        <button onclick="runRowAction('delete')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"><i class="fa-solid fa-trash-can w-4"></i>Delete Entry</button>
+    </div>
+
     <!-- Quick Adjust / Settle Modal -->
     <div id="adjustModal"
         class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
@@ -667,6 +691,19 @@
         </div>
     </div>
 
+    <div id="auditModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] shadow-xl border border-slate-200 overflow-hidden flex flex-col">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                    <h3 id="auditModalTitle" class="font-semibold text-base flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-indigo-300"></i> Audit Trail</h3>
+                    <p class="text-[11px] text-slate-300 mt-1">Recorded changes to advance entries</p>
+                </div>
+                <button onclick="closeModal('auditModal')" class="text-slate-400 hover:text-white" aria-label="Close audit trail"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="auditTrailList" class="p-5 space-y-3 overflow-y-auto"></div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast"
         class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
@@ -681,8 +718,14 @@
         // --- State & Storage Configuration ---
         const STORAGE_KEY = 'advanceflow_records_v1';
         const CURRENCY_KEY = 'advanceflow_currency_v1';
+        const AUDIT_USER = localStorage.getItem('currentUser') || 'System';
+        const AUDIT_STORAGE_KEY = `advanceflow_audit_v1_${encodeURIComponent(AUDIT_USER)}`;
+        const AUDIT_PENDING_KEY = `advanceflow_audit_pending_v1_${encodeURIComponent(AUDIT_USER)}`;
 
         let records = [];
+        let auditEvents = [];
+        let currentAuditAdvanceId = null;
+        let currentRowActionId = null;
         let activeTab = 'All'; // 'All', 'Customer', 'Supplier'
         let currentPage = 1;
         let pageSize = 20;
@@ -690,6 +733,7 @@
         let partySources = { Customer: [], Supplier: [] };
         let referenceOptions = [];
         let advanceSyncRunning = false;
+        let auditSyncRunning = false;
 
         // Sample realistic data for first-time initialization
         const sampleRecords = [
@@ -761,12 +805,19 @@
             const now = new Date();
             document.getElementById('filterFromDate').value = toLocalDateInput(new Date(now.getFullYear(), now.getMonth(), 1));
             document.getElementById('filterToDate').value = toLocalDateInput(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+            auditEvents = readLocalArray(AUDIT_STORAGE_KEY);
+            updateAuditCount();
+            ensureBrandNameVisible();
             updateCurrencyPrefixes();
             loadData();
             resetForm();
             refreshUI();
             syncRemoteData();
             window.addEventListener('online', flushAdvanceSyncQueue);
+            window.addEventListener('online', flushAuditSyncQueue);
+            document.addEventListener('click', closeRowActionMenuOnOutsideClick);
+            document.addEventListener('scroll', closeRowActionMenu, true);
+            window.addEventListener('resize', closeRowActionMenu);
         });
 
         function loadData() {
@@ -824,9 +875,9 @@
         async function syncRemoteData() {
             if (typeof apiClient === 'undefined') return;
             try {
-                const [remoteAdvances, remoteCustomers, remoteSuppliers, remoteQuotes, remoteOrders, settings] = await Promise.all([
+                const [remoteAdvances, remoteCustomers, remoteSuppliers, remoteQuotes, remoteOrders, settings, remoteAudit] = await Promise.all([
                     apiClient.getAdvancePayments(), apiClient.getCustomers(), apiClient.getSuppliers(),
-                    apiClient.getQuotations(), apiClient.getOrderSheets(), apiClient.getSettings()
+                    apiClient.getQuotations(), apiClient.getOrderSheets(), apiClient.getSettings(), apiClient.getAdvanceAudit()
                 ]);
 
                 if (Array.isArray(remoteAdvances)) {
@@ -867,6 +918,8 @@
                     localStorage.setItem('order_sheets', JSON.stringify([...remoteOrders, ...localOnlyOrders]));
                 }
 
+                if (Array.isArray(remoteAudit)) mergeRemoteAuditEvents(remoteAudit);
+
                 applyRemoteBrandSettings(settings);
                 updatePartyDatalist();
                 updateReferenceOptions();
@@ -905,11 +958,173 @@
             });
             if (localStorage.getItem('companyName') && window.BrandService?.applyBrand) window.BrandService.applyBrand();
             if (window.applyBrandLoaderSettings) window.applyBrandLoaderSettings(normalizedSettings);
+            ensureBrandNameVisible();
+        }
+
+        function ensureBrandNameVisible() {
+            let savedBrand = null;
+            if (window.getBrandSettings) {
+                try { savedBrand = window.getBrandSettings(); } catch (error) { savedBrand = null; }
+            }
+            const companyName = [
+                localStorage.getItem('companyName'),
+                window.APP_SETTINGS?.COMPANY_NAME,
+                savedBrand?.companyName
+            ].find(value => typeof value === 'string' && value.trim());
+            const fallbackName = companyName ? companyName.trim() : 'AdvanceFlow';
+            document.querySelectorAll('[data-brand="name"]').forEach(element => {
+                if (companyName || !element.textContent.trim()) element.textContent = fallbackName;
+                element.title = fallbackName;
+            });
+            const detailElement = document.getElementById('brandHeaderDetails');
+            if (detailElement) {
+                const fullDetails = detailElement.innerText.replace(/\s+/g, ' ').trim();
+                if (fullDetails) detailElement.title = fullDetails;
+            }
         }
 
         function mergePartyDirectories(remoteRecords, localRecords) {
             const remoteKeys = new Set(remoteRecords.map(item => String(item.id || item.name || '').trim().toLocaleLowerCase()));
             return [...remoteRecords, ...localRecords.filter(item => !remoteKeys.has(String(item.id || item.name || '').trim().toLocaleLowerCase()))];
+        }
+
+        function getAuditSnapshot(record) {
+            if (!record) return null;
+            return {
+                entityType: record.entityType || '',
+                partyName: record.partyName || '',
+                partyContact: record.partyContact || '',
+                voucherNo: record.voucherNo || '',
+                paymentDate: record.paymentDate || '',
+                amount: Number(record.amount) || 0,
+                adjustedAmount: Number(record.adjustedAmount) || 0,
+                paymentMode: record.paymentMode || '',
+                transactionRef: record.transactionRef || '',
+                reference: record.orderRef ? [record.referenceType, record.orderRef].filter(Boolean).join(': ') : '',
+                status: record.status || '',
+                remarks: record.remarks || ''
+            };
+        }
+
+        function getAuditChanges(before, after, action) {
+            const fields = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])];
+            return fields.filter(field => String(before?.[field] ?? '') !== String(after?.[field] ?? ''))
+                .map(field => ({ field, from: before?.[field] ?? '', to: after ? (after[field] ?? '') : (action === 'Deleted' ? 'Deleted' : '') }));
+        }
+
+        function logAuditEvent(action, record, before, after) {
+            const beforeSnapshot = before ? getAuditSnapshot(before) : null;
+            const afterSnapshot = after ? getAuditSnapshot(after) : null;
+            const changes = getAuditChanges(beforeSnapshot, afterSnapshot, action);
+            if (changes.length === 0) return;
+            const event = {
+                id: `adv-audit-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                advanceId: String(record.id),
+                voucherNo: record.voucherNo || '',
+                partyName: record.partyName || '',
+                entityType: record.entityType || '',
+                action,
+                timestamp: new Date().toISOString(),
+                actor: localStorage.getItem('currentUser') || 'System',
+                before: beforeSnapshot,
+                after: afterSnapshot,
+                changes
+            };
+            auditEvents.unshift(event);
+            localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(auditEvents));
+            updateAuditCount();
+            queueAuditSync(event);
+            if (!document.getElementById('auditModal').classList.contains('hidden')) renderAuditTrail();
+        }
+
+        function queueAuditSync(event) {
+            const pending = readLocalArray(AUDIT_PENDING_KEY).filter(item => item.id !== event.id);
+            pending.push({ id: event.id, event, queuedAt: Date.now() + Math.random() });
+            localStorage.setItem(AUDIT_PENDING_KEY, JSON.stringify(pending));
+            flushAuditSyncQueue();
+        }
+
+        async function flushAuditSyncQueue() {
+            if (auditSyncRunning || typeof apiClient === 'undefined' || !apiClient.saveAdvanceAuditEvent) return;
+            auditSyncRunning = true;
+            try {
+                while (true) {
+                    const pending = readLocalArray(AUDIT_PENDING_KEY);
+                    if (!pending.length) break;
+                    const operation = pending[0];
+                    const result = await apiClient.saveAdvanceAuditEvent(operation.event);
+                    if (!result || result.success === false) break;
+                    const latest = readLocalArray(AUDIT_PENDING_KEY).filter(item => item.id !== operation.id || item.queuedAt !== operation.queuedAt);
+                    localStorage.setItem(AUDIT_PENDING_KEY, JSON.stringify(latest));
+                }
+            } catch (error) {
+                console.warn('Audit events are saved locally and will sync when connected.', error);
+            } finally {
+                auditSyncRunning = false;
+            }
+        }
+
+        function mergeRemoteAuditEvents(remoteEvents) {
+            const localEvents = readLocalArray(AUDIT_STORAGE_KEY);
+            const pending = readLocalArray(AUDIT_PENDING_KEY);
+            const pendingIds = new Set(pending.map(item => String(item.id)));
+            const remoteIds = new Set(remoteEvents.map(event => String(event.id)));
+            const mergedById = new Map(remoteEvents.map(event => [String(event.id), event]));
+            localEvents.forEach(event => {
+                if (!remoteIds.has(String(event.id)) || pendingIds.has(String(event.id))) mergedById.set(String(event.id), event);
+            });
+            auditEvents = [...mergedById.values()].sort((a, b) => new Date(b.timestamp || b.createdAt || 0) - new Date(a.timestamp || a.createdAt || 0));
+            localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(auditEvents));
+            localEvents.filter(event => !remoteIds.has(String(event.id)) && !pendingIds.has(String(event.id))).forEach(queueAuditSync);
+            updateAuditCount();
+            if (!document.getElementById('auditModal').classList.contains('hidden')) renderAuditTrail();
+            flushAuditSyncQueue();
+        }
+
+        function updateAuditCount() {
+            const count = document.getElementById('auditCount');
+            if (count) count.textContent = auditEvents.length;
+        }
+
+        function openAuditTrail(advanceId) {
+            currentAuditAdvanceId = advanceId ? String(advanceId) : null;
+            const record = records.find(item => String(item.id) === String(advanceId));
+            document.getElementById('auditModalTitle').textContent = advanceId
+                ? `Audit Trail · ${record?.voucherNo || auditEvents.find(event => String(event.advanceId) === String(advanceId))?.voucherNo || 'Advance'}`
+                : 'Audit Trail';
+            document.getElementById('auditModal').classList.remove('hidden');
+            renderAuditTrail(advanceId);
+            if (typeof apiClient !== 'undefined' && apiClient.getAdvanceAudit) {
+                apiClient.getAdvanceAudit().then(remote => {
+                    if (Array.isArray(remote)) mergeRemoteAuditEvents(remote);
+                }).catch(error => console.warn('Could not refresh remote audit history.', error));
+            }
+        }
+
+        function formatAuditValue(field, value) {
+            if (value === '' || value === null || value === undefined) return '—';
+            if (value === 'Deleted') return value;
+            if (field === 'amount' || field === 'adjustedAmount') return formatMoney(value);
+            if (field === 'paymentDate') return formatDateDisplay(value);
+            return String(value);
+        }
+
+        function renderAuditTrail(advanceId = currentAuditAdvanceId) {
+            const filtered = auditEvents
+                .filter(event => !advanceId || String(event.advanceId) === String(advanceId))
+                .sort((a, b) => new Date(b.timestamp || b.createdAt || 0) - new Date(a.timestamp || a.createdAt || 0));
+            const container = document.getElementById('auditTrailList');
+            if (!filtered.length) {
+                container.innerHTML = '<div class="py-10 text-center text-sm text-slate-500">No audit history is recorded for this advance yet.</div>';
+                return;
+            }
+            const labels = { entityType: 'Party Type', partyName: 'Party Name', partyContact: 'Contact', voucherNo: 'Voucher No.', paymentDate: 'Payment Date', amount: 'Advance Amount', adjustedAmount: 'Adjusted Amount', paymentMode: 'Payment Mode', transactionRef: 'Transaction Reference', reference: 'Against Reference', status: 'Status', remarks: 'Remarks' };
+            container.innerHTML = filtered.map(event => {
+                const changes = Array.isArray(event.changes) ? event.changes : getAuditChanges(event.before, event.after, event.action);
+                const timestamp = event.timestamp ? new Date(event.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Time unavailable';
+                const rows = changes.map(change => `<div class="grid grid-cols-[minmax(90px,1fr)_minmax(0,2fr)_minmax(0,2fr)] gap-2 border-t border-slate-100 py-1.5 text-xs"><span class="font-semibold text-slate-600">${escapeHtml(labels[change.field] || change.field)}</span><span class="break-words text-slate-500">${escapeHtml(formatAuditValue(change.field, change.from))}</span><span class="break-words text-slate-800">${escapeHtml(formatAuditValue(change.field, change.to))}</span></div>`).join('');
+                return `<article class="rounded-xl border border-slate-200 bg-white p-4"><div class="flex flex-wrap items-start justify-between gap-2"><div><p class="font-semibold text-slate-900">${escapeHtml(event.action || 'Changed')} · ${escapeHtml(event.voucherNo || 'Advance')}</p><p class="text-xs text-slate-500 mt-0.5">${escapeHtml(event.partyName || '')}${event.entityType ? ` · ${escapeHtml(event.entityType)}` : ''}</p></div><span class="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">${escapeHtml(event.actor || event.createdBy || 'System')}</span></div><p class="text-[11px] text-slate-500 mt-2">${escapeHtml(timestamp)}</p>${rows ? `<div class="mt-3"><div class="grid grid-cols-[minmax(90px,1fr)_minmax(0,2fr)_minmax(0,2fr)] gap-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><span>Field</span><span>Previous</span><span>New</span></div>${rows}</div>` : '<p class="mt-3 text-xs text-slate-500">No field values changed.</p>'}</article>`;
+            }).join('');
         }
 
         function refreshUI() {
@@ -1075,6 +1290,7 @@
         function handleFormSubmit(e) {
             e.preventDefault();
             const id = document.getElementById('entryId').value;
+            const existingRecord = id ? records.find(record => String(record.id) === String(id)) : null;
             const entityType = document.querySelector('input[name="entityType"]:checked').value;
             const partyName = document.getElementById('partyName').value.trim();
             const partyContact = document.getElementById('partyContact').value.trim();
@@ -1114,6 +1330,14 @@
                 status,
                 remarks
             };
+
+            if (existingRecord) {
+                const changedFields = getAuditChanges(getAuditSnapshot(existingRecord), getAuditSnapshot(entryObj), 'Updated');
+                const action = changedFields.some(change => ['status', 'adjustedAmount'].includes(change.field)) ? 'Settlement Updated' : 'Updated';
+                logAuditEvent(action, entryObj, existingRecord, entryObj);
+            } else {
+                logAuditEvent('Created', entryObj, null, entryObj);
+            }
 
             if (id) {
                 const index = records.findIndex(r => r.id === id);
@@ -1286,6 +1510,7 @@
         }
 
         function renderTable() {
+            closeRowActionMenu();
             const filtered = getFilteredRecords();
             const tbody = document.getElementById('ledgerTableBody');
             const emptyState = document.getElementById('emptyState');
@@ -1352,24 +1577,59 @@
                             ${statusBadge}
                         </td>
                         <td class="py-3.5 px-4 align-top text-right whitespace-nowrap">
-                            <div class="inline-flex items-center justify-end gap-1">
-                                <button onclick="openAdjustModal('${r.id}')" title="Adjust / Settle Advance" class="p-2 rounded-lg text-amber-600 hover:bg-amber-50 transition">
-                                    <i class="fa-solid fa-sliders"></i>
-                                </button>
-                                <button onclick="openVoucherModal('${r.id}')" title="Print / View Voucher" class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition">
-                                    <i class="fa-solid fa-print"></i>
-                                </button>
-                                <button onclick="editRecord('${r.id}')" title="Edit Entry" class="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button onclick="confirmDeleteRecord('${r.id}')" title="Delete Entry" class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 transition">
-                                    <i class="fa-solid fa-trash-can"></i>
+                            <div class="inline-flex items-center justify-end">
+                                <button type="button" class="row-action-trigger inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition" aria-label="Actions for ${escapeHtml(r.voucherNo)}" aria-haspopup="true" aria-expanded="false" onclick="toggleRowActionMenu(event, '${r.id}')">
+                                    <i class="fa-solid fa-ellipsis-vertical"></i><span class="sr-only">Actions</span>
                                 </button>
                             </div>
                         </td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        function toggleRowActionMenu(event, id) {
+            event.stopPropagation();
+            const menu = document.getElementById('rowActionMenu');
+            if (!menu) return;
+            if (!menu.classList.contains('hidden') && String(currentRowActionId) === String(id)) {
+                closeRowActionMenu();
+                return;
+            }
+            currentRowActionId = id;
+            document.querySelectorAll('.row-action-trigger').forEach(button => button.setAttribute('aria-expanded', 'false'));
+            event.currentTarget.setAttribute('aria-expanded', 'true');
+            menu.classList.remove('hidden');
+            const rect = event.currentTarget.getBoundingClientRect();
+            const menuWidth = menu.offsetWidth;
+            const menuHeight = menu.offsetHeight;
+            const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+            let top = rect.bottom + 4;
+            if (top + menuHeight > window.innerHeight - 8) top = rect.top - menuHeight - 4;
+            menu.style.left = `${left}px`;
+            menu.style.top = `${Math.max(8, top)}px`;
+        }
+
+        function closeRowActionMenu() {
+            const menu = document.getElementById('rowActionMenu');
+            if (menu) menu.classList.add('hidden');
+            currentRowActionId = null;
+            document.querySelectorAll('.row-action-trigger').forEach(button => button.setAttribute('aria-expanded', 'false'));
+        }
+
+        function closeRowActionMenuOnOutsideClick(event) {
+            if (!event.target.closest('#rowActionMenu') && !event.target.closest('.row-action-trigger')) closeRowActionMenu();
+        }
+
+        function runRowAction(action) {
+            const id = currentRowActionId;
+            closeRowActionMenu();
+            if (!id) return;
+            if (action === 'adjust') openAdjustModal(id);
+            else if (action === 'voucher') openVoucherModal(id);
+            else if (action === 'edit') editRecord(id);
+            else if (action === 'audit') openAuditTrail(id);
+            else if (action === 'delete') confirmDeleteRecord(id);
         }
 
         // --- Quick Adjust Modal ---
@@ -1415,6 +1675,7 @@
             const id = document.getElementById('adjustEntryId').value;
             const rec = records.find(r => r.id === id);
             if (!rec) return;
+            const auditBefore = { ...rec };
 
             let newAdj = parseFloat(document.getElementById('modalAdjustedInput').value) || 0;
             newAdj = Math.min(rec.amount, Math.max(0, newAdj));
@@ -1432,6 +1693,8 @@
             if (note) {
                 rec.remarks = rec.remarks ? `${rec.remarks} | ${note}` : note;
             }
+
+            logAuditEvent('Settlement Updated', rec, auditBefore, rec);
 
             saveData();
             queueAdvanceSync('save', rec.id, rec);
@@ -1480,6 +1743,8 @@
         }
 
         function deleteRecord(id) {
+            const deletedRecord = records.find(record => String(record.id) === String(id));
+            if (deletedRecord) logAuditEvent('Deleted', deletedRecord, deletedRecord, null);
             records = records.filter(r => r.id !== id);
             saveData();
             queueAdvanceSync('delete', id);
