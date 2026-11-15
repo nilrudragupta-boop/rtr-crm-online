@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, AdvancePayment, OrderSheet, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, SalesRecord, Item, Supplier, Purchase, StockJournal, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, AdvancePayment, OrderSheet, AdvanceAuditEvent, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, SalesRecord, Item, Supplier, Purchase, StockJournal, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -589,6 +589,28 @@ app.delete('/api/order-sheets/:orderNo', async (req, res) => {
         if (!deleted) return res.json({ success: true, notFound: true });
         res.json({ success: true, data: deleted });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.get('/api/advance-audit', async (req, res) => {
+    try {
+        const query = {};
+        if (req.query.user) query.createdBy = req.query.user;
+        if (req.query.advanceId) query.advanceId = req.query.advanceId;
+        res.json({ success: true, data: await AdvanceAuditEvent.find(query).sort({ timestamp: -1, createdAt: -1 }) });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/advance-audit', async (req, res) => {
+    try {
+        const payload = { ...req.body };
+        if (!payload.id || !payload.advanceId || !payload.action || !payload.timestamp) {
+            return res.status(400).json({ success: false, message: 'Audit event ID, advance ID, action, and timestamp are required.' });
+        }
+        const query = { id: payload.id };
+        if (payload.createdBy) query.createdBy = payload.createdBy;
+        const saved = await AdvanceAuditEvent.findOneAndUpdate(query, { $set: payload }, { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true });
+        res.json({ success: true, data: saved });
+    } catch (err) { res.status(400).json({ success: false, message: err.message }); }
 });
 
 // --- Invoice Routes ---

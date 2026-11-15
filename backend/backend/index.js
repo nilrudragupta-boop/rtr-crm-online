@@ -34,6 +34,13 @@ const orderSheetSchema = new mongoose.Schema({
     deletedAt: { type: Date, default: null }
 }, { timestamps: true, strict: false });
 
+const advanceAuditEventSchema = new mongoose.Schema({
+    id: { type: String, required: true, index: true },
+    advanceId: { type: String, required: true, index: true },
+    action: { type: String, required: true },
+    timestamp: { type: String, required: true }
+}, { timestamps: true, strict: false });
+
 
 // --- CRM Phase 1 Schemas ---
 const crmContactSchema = new mongoose.Schema({
@@ -410,6 +417,7 @@ module.exports = {
     Customer: mongoose.model('Customer', customerSchema),
     AdvancePayment: mongoose.model('AdvancePayment', advancePaymentSchema),
     OrderSheet: mongoose.model('OrderSheet', orderSheetSchema),
+    AdvanceAuditEvent: mongoose.model('AdvanceAuditEvent', advanceAuditEventSchema),
     CrmContact: mongoose.model('CrmContact', crmContactSchema),
     CrmPlant: mongoose.model('CrmPlant', crmPlantSchema),
     CrmActivity: mongoose.model('CrmActivity', crmActivitySchema),
