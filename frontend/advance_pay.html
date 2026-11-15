@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AdvanceFlow — Customer & Supplier Advance Ledger</title>
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for crisp accounting icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="apiClient.js"></script>
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar and print utilities */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #printVoucherArea,
+            #printVoucherArea * {
+                visibility: visible;
+            }
+
+            #printVoucherArea {
+                position: fixed;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white;
+                padding: 2rem;
+                box-shadow: none;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200">
+                    <i class="fa-solid fa-file-invoice-dollar text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">AdvanceFlow
+                    </h1>
+                    <p class="text-xs text-slate-500 hidden sm:block">Customer & Supplier Advance Payment Register</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Currency Selector -->
+                <select id="currencySelect" onchange="changeCurrency(this.value)" title="Select Currency"
+                    class="text-xs sm:text-sm bg-slate-100 border border-slate-200 text-slate-700 rounded-lg px-2.5 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="₹">INR (₹)</option>
+                </select>
+
+                <button onclick="exportToCSV()"
+                    class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium text-xs sm:text-sm px-3 py-2 rounded-lg transition shadow-xs">
+                    <i class="fa-solid fa-download text-slate-500"></i>
+                    <span class="hidden md:inline">Export CSV</span>
+                </button>
+
+                <button onclick="openResetModal()"
+                    class="inline-flex items-center gap-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-600 border border-transparent font-medium text-xs sm:text-sm px-3 py-2 rounded-lg transition"
+                    title="Reset or Clear Data">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span class="hidden lg:inline">Data Options</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Summary KPI Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Customer Advances Received -->
+            <div
+                class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Customer Advances</p>
+                        <p class="text-xs text-emerald-600 font-medium mt-0.5">Received (Liability)</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-down-left"></i>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h3 id="kpiCustomerTotal" class="text-2xl font-bold text-slate-900">₹0.00</h3>
+                    <p id="kpiCustomerUnadjusted" class="text-xs text-slate-500 mt-1">Unadjusted: ₹0.00</p>
+                </div>
+            </div>
+
+            <!-- Supplier Advances Paid -->
+            <div
+                class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Supplier Advances</p>
+                        <p class="text-xs text-indigo-600 font-medium mt-0.5">Paid (Asset)</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-up-right"></i>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h3 id="kpiSupplierTotal" class="text-2xl font-bold text-slate-900">₹0.00</h3>
+                    <p id="kpiSupplierUnadjusted" class="text-xs text-slate-500 mt-1">Unadjusted: ₹0.00</p>
+                </div>
+            </div>
+
+            <!-- Net Open Balance -->
+            <div
+                class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Open Balance</p>
+                        <p class="text-xs text-amber-600 font-medium mt-0.5">Pending Settlement</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <i class="fa-solid fa-scale-balanced"></i>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h3 id="kpiOpenBalance" class="text-2xl font-bold text-slate-900">₹0.00</h3>
+                    <p id="kpiSettledTotal" class="text-xs text-slate-500 mt-1">Total Adjusted: ₹0.00</p>
+                </div>
+            </div>
+
+            <!-- Open Vouchers Count -->
+            <div
+                class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Vouchers</p>
+                        <p class="text-xs text-slate-500 font-medium mt-0.5">Open / Partial Entries</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h3 id="kpiOpenCount" class="text-2xl font-bold text-slate-900">0</h3>
+                    <p id="kpiTotalCount" class="text-xs text-slate-500 mt-1">Out of 0 total records</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Workspace Grid: Form (Left 4 cols) + Ledger (Right 8 cols) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- LEFT COLUMN: Advance Payment Entry Form -->
+            <section
+                class="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <i id="formHeaderIcon" class="fa-solid fa-plus-circle text-indigo-400"></i>
+                        <h2 id="formHeaderTitle" class="font-semibold text-base">Record Advance Payment</h2>
+                    </div>
+                    <button type="button" id="cancelEditBtn" onclick="resetForm()"
+                        class="hidden text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded-lg transition">
+                        Cancel Edit
+                    </button>
+                </div>
+
+                <form id="advanceForm" onsubmit="handleFormSubmit(event)" class="p-5 space-y-4">
+                    <input type="hidden" id="entryId">
+
+                    <!-- Entity Type Toggle Pill -->
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Party
+                            Type <span class="text-rose-500">*</span></label>
+                        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="entityType" value="Customer" class="peer sr-only" checked
+                                    onchange="onEntityTypeChange()">
+                                <div
+                                    class="text-center py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:shadow-xs transition flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-user-check"></i> Customer
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="entityType" value="Supplier" class="peer sr-only"
+                                    onchange="onEntityTypeChange()">
+                                <div
+                                    class="text-center py-2 px-3 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:shadow-xs transition flex items-center justify-center gap-1.5">
+                                    <i class="fa-solid fa-truck-field"></i> Supplier
+                                </div>
+                            </label>
+                        </div>
+                        <p id="entityHelperText" class="text-[11px] text-emerald-700 mt-1 font-medium">
+                            <i class="fa-solid fa-circle-info mr-1"></i>Recording an advance payment received from a
+                            Customer.
+                        </p>
+                    </div>
+
+                    <!-- Party Name & Contact -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="sm:col-span-2">
+                            <label for="partyName" class="block text-xs font-semibold text-slate-700 mb-1">
+                                <span id="partyNameLabel">Customer Name</span> <span class="text-rose-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <input type="text" id="partyName" list="partyDatalist" required
+                                    placeholder="e.g., Apex Retail Solutions"
+                                    class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                                <datalist id="partyDatalist"></datalist>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="partyContact" class="block text-xs font-semibold text-slate-700 mb-1">Phone /
+                                Email</label>
+                            <input type="text" id="partyContact" placeholder="+91 98765 43210"
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                        </div>
+
+                        <div>
+                            <label for="voucherNo" class="block text-xs font-semibold text-slate-700 mb-1">Voucher No.
+                                <span class="text-rose-500">*</span></label>
+                            <input type="text" id="voucherNo" required placeholder="ADV-2026-001"
+                                class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-mono font-medium text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                        </div>
+                    </div>
+
+                    <!-- Payment Date & Advance Amount -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="paymentDate" class="block text-xs font-semibold text-slate-700 mb-1">Payment
+                                Date <span class="text-rose-500">*</span></label>
+                            <input type="date" id="paymentDate" required
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                        </div>
+
+                        <div>
+                            <label for="amount" class="block text-xs font-semibold text-slate-700 mb-1">Advance Amount
+                                <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <span id="formCurrencyPrefix"
+                                    class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">₹</span>
+                                <input type="number" id="amount" step="0.01" min="0.01" required placeholder="0.00"
+                                    oninput="recalculateFormBalance()"
+                                    class="w-full rounded-xl border border-slate-300 pl-7 pr-3 py-2 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Mode & Transaction Reference -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="paymentMode" class="block text-xs font-semibold text-slate-700 mb-1">Payment
+                                Mode <span class="text-rose-500">*</span></label>
+                            <select id="paymentMode" required
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                                <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
+                                <option value="UPI">UPI / QR Transfer</option>
+                                <option value="Cheque">Cheque / DD</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Credit / Debit Card</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="transactionRef" class="block text-xs font-semibold text-slate-700 mb-1">UTR /
+                                Cheque / Ref ID</label>
+                            <input type="text" id="transactionRef" placeholder="e.g., UTR92837465"
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                        </div>
+                    </div>
+
+                    <!-- Order / PO Reference & Status -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="orderRef" class="block text-xs font-semibold text-slate-700 mb-1">Against SO /
+                                PO / Quote</label>
+                            <input type="text" id="orderRef" placeholder="e.g., PO-2026-114"
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                        </div>
+
+                        <div>
+                            <label for="status" class="block text-xs font-semibold text-slate-700 mb-1">Settlement
+                                Status</label>
+                            <select id="status" onchange="onStatusDropdownChange()"
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                                <option value="Open">Unadjusted / Open</option>
+                                <option value="Partially Adjusted">Partially Adjusted</option>
+                                <option value="Settled">Fully Adjusted / Settled</option>
+                                <option value="Refunded">Refunded / Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Adjusted Amount & Auto-calculated Balance -->
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="adjustedAmount" class="block text-xs font-semibold text-slate-600 mb-1">Adjusted
+                                Against Bill</label>
+                            <input type="number" id="adjustedAmount" step="0.01" min="0" value="0"
+                                oninput="recalculateFormBalance(true)"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900 focus:border-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Remaining Balance</label>
+                            <div id="formRemainingBalance"
+                                class="w-full rounded-lg bg-slate-200/70 px-2.5 py-1.5 text-sm font-bold text-slate-800">
+                                ₹0.00
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Remarks / Purpose -->
+                    <div>
+                        <label for="remarks" class="block text-xs font-semibold text-slate-700 mb-1">Remarks / Purpose
+                            of Advance</label>
+                        <textarea id="remarks" rows="2"
+                            placeholder="e.g., 30% mobilization advance for raw materials..."
+                            class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition resize-none"></textarea>
+                    </div>
+
+                    <!-- Submit & Clear Buttons -->
+                    <div class="pt-1 flex items-center gap-2.5">
+                        <button type="submit" id="submitBtn"
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm py-2.5 px-4 rounded-xl shadow-sm shadow-indigo-200 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-check"></i>
+                            <span id="submitBtnText">Save Advance Entry</span>
+                        </button>
+                        <button type="button" onclick="resetForm()"
+                            class="px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 text-sm font-medium transition"
+                            title="Clear Form">
+                            Clear
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- RIGHT COLUMN: Advance Payment Ledger & Filters -->
+            <section class="lg:col-span-7 xl:col-span-8 space-y-4">
+
+                <!-- Filter & Tab Bar Card -->
+                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 space-y-4">
+                    <!-- Top Tabs: All / Customers / Suppliers -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                        <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                            <button onclick="setEntityTab('All')" id="tab-All"
+                                class="tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-xs transition">
+                                All Records
+                            </button>
+                            <button onclick="setEntityTab('Customer')" id="tab-Customer"
+                                class="tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Customers
+                            </button>
+                            <button onclick="setEntityTab('Supplier')" id="tab-Supplier"
+                                class="tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Suppliers
+                            </button>
+                        </div>
+
+                        <div class="text-xs text-slate-500 font-medium">
+                            Showing <span id="visibleCount" class="font-bold text-slate-800">0</span> entries
+                        </div>
+                    </div>
+
+                    <!-- Search & Dropdown Filters -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div class="sm:col-span-6 relative">
+                            <i
+                                class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="searchInput" oninput="renderTable()"
+                                placeholder="Search party name, voucher #, PO/SO, or UTR..."
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white pl-9 pr-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
+                        </div>
+
+                        <div class="sm:col-span-3">
+                            <select id="filterStatus" onchange="renderTable()"
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none">
+                                <option value="All">All Statuses</option>
+                                <option value="Open">Unadjusted / Open</option>
+                                <option value="Partially Adjusted">Partially Adjusted</option>
+                                <option value="Settled">Settled</option>
+                                <option value="Refunded">Refunded</option>
+                            </select>
+                        </div>
+
+                        <div class="sm:col-span-3">
+                            <select id="filterMode" onchange="renderTable()"
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none">
+                                <option value="All">All Modes</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="UPI">UPI</option>
+                                <option value="Cheque">Cheque</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Card</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ledger Table Container -->
+                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr
+                                    class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                    <th class="py-3.5 px-4">Voucher & Date</th>
+                                    <th class="py-3.5 px-4">Party Details</th>
+                                    <th class="py-3.5 px-4">Payment Info</th>
+                                    <th class="py-3.5 px-4 text-right">Advance / Bal.</th>
+                                    <th class="py-3.5 px-4 text-center">Status</th>
+                                    <th class="py-3.5 px-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ledgerTableBody" class="divide-y divide-slate-100 text-sm">
+                                <!-- Rows injected via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="emptyState" class="hidden py-12 px-4 text-center">
+                        <div
+                            class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-xl">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                        <h3 class="text-base font-semibold text-slate-800">No advance records found</h3>
+                        <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Try adjusting your search filters or
+                            record a new Customer or Supplier advance payment using the form.</p>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- Quick Adjust / Settle Modal -->
+    <div id="adjustModal"
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div
+            class="bg-white rounded-2xl max-w-md w-full shadow-xl border border-slate-200 overflow-hidden animate-fade-in">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <h3 class="font-semibold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-amber-400"></i> Adjust / Settle Advance
+                </h3>
+                <button onclick="closeModal('adjustModal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="submitQuickAdjust(event)" class="p-5 space-y-4">
+                <input type="hidden" id="adjustEntryId">
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1">
+                    <div class="flex justify-between text-xs text-slate-500">
+                        <span id="adjustVoucherLabel" class="font-mono font-semibold text-slate-700">ADV-001</span>
+                        <span id="adjustEntityBadge" class="font-semibold">Customer</span>
+                    </div>
+                    <p id="adjustPartyLabel" class="font-bold text-slate-900 text-base">Party Name</p>
+                    <div class="flex justify-between text-xs pt-2 border-t border-slate-200/80 mt-2">
+                        <span class="text-slate-600">Total Advance Paid:</span>
+                        <span id="adjustTotalLabel" class="font-bold text-slate-900">₹0.00</span>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="modalAdjustedInput" class="text-xs font-semibold text-slate-700">Total Adjusted
+                            Amount</label>
+                        <button type="button" onclick="setFullSettlementInModal()"
+                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                            Settle 100%
+                        </button>
+                    </div>
+                    <input type="number" id="modalAdjustedInput" step="0.01" min="0" required
+                        oninput="updateModalRemainingPreview()"
+                        class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                    <p class="text-xs text-slate-500 mt-1.5 flex justify-between">
+                        <span>Remaining Unadjusted Balance:</span>
+                        <span id="modalRemainingPreview" class="font-bold text-amber-600">₹0.00</span>
+                    </p>
+                </div>
+
+                <div>
+                    <label for="modalAdjustNote" class="text-xs font-semibold text-slate-700 block mb-1">Adjustment Note
+                        / Invoice Ref</label>
+                    <input type="text" id="modalAdjustNote" placeholder="e.g., Adjusted against Final Inv #INV-902"
+                        class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 outline-none">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('adjustModal')"
+                        class="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-xs">
+                        Update Settlement
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Print / View Voucher Receipt Modal -->
+    <div id="voucherModal"
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-xl border border-slate-200 overflow-hidden">
+            <div class="px-5 py-3.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between no-print">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-600">Advance Voucher Preview</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="window.print()"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-print"></i> Print Voucher
+                    </button>
+                    <button onclick="closeModal('voucherModal')" class="text-slate-500 hover:text-slate-800 p-1">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Printable Receipt Area -->
+            <div id="printVoucherArea" class="p-6 sm:p-8 space-y-5 text-slate-800">
+                <div class="flex justify-between items-start border-b-2 border-slate-800 pb-4">
+                    <div>
+                        <h2 id="vPrintTitle" class="text-xl font-bold uppercase tracking-tight text-slate-900">ADVANCE
+                            RECEIPT VOUCHER</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">AdvanceFlow Financial Ledger</p>
+                    </div>
+                    <div class="text-right">
+                        <p id="vPrintVoucherNo" class="font-mono font-bold text-base text-indigo-700">ADV-2026-001</p>
+                        <p id="vPrintDate" class="text-xs text-slate-600 mt-0.5">Date: 15 Nov 2026</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div>
+                        <p id="vPrintPartyRole" class="text-[11px] uppercase font-bold text-slate-400">Received From
+                            (Customer)</p>
+                        <p id="vPrintPartyName" class="font-bold text-slate-900 text-base mt-0.5">Party Name</p>
+                        <p id="vPrintPartyContact" class="text-xs text-slate-600 mt-0.5">Contact Info</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[11px] uppercase font-bold text-slate-400">Payment Mode</p>
+                        <p id="vPrintMode" class="font-semibold text-slate-800 mt-0.5">Bank Transfer</p>
+                        <p id="vPrintRef" class="text-xs font-mono text-slate-600 mt-0.5">Ref: UTR12345</p>
+                    </div>
+                </div>
+
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between py-2 border-b border-slate-100">
+                        <span class="text-slate-500">Against Order / PO Reference:</span>
+                        <span id="vPrintOrderRef" class="font-semibold text-slate-800">—</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-100">
+                        <span class="text-slate-500">Current Settlement Status:</span>
+                        <span id="vPrintStatus" class="font-semibold text-slate-800">Open</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-100">
+                        <span class="text-slate-500">Total Advance Amount:</span>
+                        <span id="vPrintAmount" class="font-bold text-base text-slate-900">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-slate-100">
+                        <span class="text-slate-500">Amount Adjusted Against Bills:</span>
+                        <span id="vPrintAdjusted" class="font-medium text-emerald-700">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between py-2.5 px-3 bg-slate-100 rounded-lg font-bold">
+                        <span class="text-slate-800">Unadjusted Balance Remaining:</span>
+                        <span id="vPrintBalance" class="text-indigo-700">₹0.00</span>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+                    <span class="font-bold text-slate-700">Remarks / Notes:</span>
+                    <p id="vPrintRemarks" class="mt-1">No additional notes.</p>
+                </div>
+
+                <div class="pt-8 flex justify-between text-xs text-slate-500">
+                    <div class="border-t border-slate-300 pt-1.5 w-36 text-center">Prepared By</div>
+                    <div class="border-t border-slate-300 pt-1.5 w-36 text-center">Authorized Signatory</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation / Data Reset Modal -->
+    <div id="confirmModal"
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full shadow-xl border border-slate-200 p-6 space-y-4">
+            <div class="flex items-center gap-3 text-rose-600">
+                <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 id="confirmModalTitle" class="font-bold text-slate-900 text-base">Confirm Action</h3>
+            </div>
+            <p id="confirmModalMessage" class="text-sm text-slate-600">Are you sure you want to proceed?</p>
+            <div id="confirmModalActions" class="flex flex-wrap justify-end gap-2 pt-2">
+                <!-- Buttons populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"
+        class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div
+            class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium border border-slate-700">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toastMessage">Saved successfully!</span>
+        </div>
+    </div>
+
+    <script>
+        // --- State & Storage Configuration ---
+        const STORAGE_KEY = 'advanceflow_records_v1';
+        const CURRENCY_KEY = 'advanceflow_currency_v1';
+
+        let records = [];
+        let activeTab = 'All'; // 'All', 'Customer', 'Supplier'
+        let currencySymbol = localStorage.getItem(CURRENCY_KEY) || '₹';
+
+        // Sample realistic data for first-time initialization
+        const sampleRecords = [
+            {
+                id: 'adv-101',
+                entityType: 'Customer',
+                partyName: 'Meridian Retail Enterprises',
+                partyContact: '+91 98301 44510',
+                voucherNo: 'ADV-2026-001',
+                paymentDate: '2026-11-10',
+                amount: 75000,
+                adjustedAmount: 25000,
+                paymentMode: 'Bank Transfer',
+                transactionRef: 'NEFT882910442',
+                orderRef: 'SO-2026-089',
+                status: 'Partially Adjusted',
+                remarks: '40% advance received against festive season bulk order. First batch billed.'
+            },
+            {
+                id: 'adv-102',
+                entityType: 'Supplier',
+                partyName: 'Bharat Steel & Alloys Ltd.',
+                partyContact: 'accounts@bharatsteel.in',
+                voucherNo: 'ADV-2026-002',
+                paymentDate: '2026-11-12',
+                amount: 120000,
+                adjustedAmount: 0,
+                paymentMode: 'Bank Transfer',
+                transactionRef: 'RTGS00948271',
+                orderRef: 'PO-2026-412',
+                status: 'Open',
+                remarks: 'Advance paid for raw steel coil procurement; dispatch scheduled next week.'
+            },
+            {
+                id: 'adv-103',
+                entityType: 'Customer',
+                partyName: 'GreenLeaf Organics Pvt Ltd',
+                partyContact: '+91 91234 55678',
+                voucherNo: 'ADV-2026-003',
+                paymentDate: '2026-11-14',
+                amount: 32500,
+                adjustedAmount: 0,
+                paymentMode: 'UPI',
+                transactionRef: 'UPI/631928475610',
+                orderRef: 'QT-2026-118',
+                status: 'Open',
+                remarks: 'Booking token advance for custom packaging batch.'
+            },
+            {
+                id: 'adv-104',
+                entityType: 'Supplier',
+                partyName: 'SwiftLogix Freight Carriers',
+                partyContact: '+91 99032 11908',
+                voucherNo: 'ADV-2026-004',
+                paymentDate: '2026-11-05',
+                amount: 18000,
+                adjustedAmount: 18000,
+                paymentMode: 'Cheque',
+                transactionRef: 'CHQ-409281',
+                orderRef: 'PO-2026-398',
+                status: 'Settled',
+                remarks: 'Fleet transit advance fully adjusted against final freight bill #FR-882.'
+            }
+        ];
+
+        // --- Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('currencySelect').value = currencySymbol;
+            updateCurrencyPrefixes();
+            loadData();
+            resetForm();
+            refreshUI();
+        });
+
+        function loadData() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw === null) {
+                records = [...sampleRecords];
+                saveData();
+            } else {
+                try {
+                    records = JSON.parse(raw) || [];
+                } catch (e) {
+                    records = [];
+                }
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+            refreshUI();
+        }
+
+        function refreshUI() {
+            updateSummaryCards();
+            updatePartyDatalist();
+            renderTable();
+        }
+
+        // --- Currency & Formatting Helpers ---
+        function changeCurrency(symbol) {
+            currencySymbol = symbol;
+            localStorage.setItem(CURRENCY_KEY, symbol);
+            updateCurrencyPrefixes();
+            recalculateFormBalance();
+            refreshUI();
+        }
+
+        function updateCurrencyPrefixes() {
+            document.getElementById('formCurrencyPrefix').textContent = currencySymbol;
+        }
+
+        function formatMoney(num) {
+            const val = parseFloat(num) || 0;
+            return currencySymbol + val.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function formatDateDisplay(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        function generateNextVoucherNo() {
+            const year = new Date().getFullYear();
+            const count = records.length + 1;
+            const padded = String(count).padStart(3, '0');
+            return `ADV-${year}-${padded}`;
+        }
+
+        // --- Form Handling ---
+        function onEntityTypeChange() {
+            const type = document.querySelector('input[name="entityType"]:checked').value;
+            const label = document.getElementById('partyNameLabel');
+            const helper = document.getElementById('entityHelperText');
+
+            if (type === 'Customer') {
+                label.textContent = 'Customer Name';
+                helper.className = 'text-[11px] text-emerald-700 mt-1 font-medium';
+                helper.innerHTML = '<i class="fa-solid fa-circle-info mr-1"></i>Recording an advance payment received from a Customer.';
+            } else {
+                label.textContent = 'Supplier / Vendor Name';
+                helper.className = 'text-[11px] text-indigo-700 mt-1 font-medium';
+                helper.innerHTML = '<i class="fa-solid fa-circle-info mr-1"></i>Recording an advance payment paid to a Supplier.';
+            }
+            updatePartyDatalist();
+        }
+
+        function updatePartyDatalist() {
+            const type = document.querySelector('input[name="entityType"]:checked').value;
+            const datalist = document.getElementById('partyDatalist');
+            const uniqueNames = [...new Set(records.filter(r => r.entityType === type).map(r => r.partyName))];
+            datalist.innerHTML = uniqueNames.map(name => `<option value="${escapeHtml(name)}">`).join('');
+        }
+
+        function recalculateFormBalance(autoUpdateStatus = false) {
+            const amount = parseFloat(document.getElementById('amount').value) || 0;
+            let adjusted = parseFloat(document.getElementById('adjustedAmount').value) || 0;
+
+            if (adjusted > amount && amount > 0) {
+                adjusted = amount;
+                document.getElementById('adjustedAmount').value = amount;
+            }
+
+            const remaining = Math.max(0, amount - adjusted);
+            document.getElementById('formRemainingBalance').textContent = formatMoney(remaining);
+
+            if (autoUpdateStatus && amount > 0) {
+                const statusSelect = document.getElementById('status');
+                if (statusSelect.value !== 'Refunded') {
+                    if (adjusted === 0) {
+                        statusSelect.value = 'Open';
+                    } else if (adjusted < amount) {
+                        statusSelect.value = 'Partially Adjusted';
+                    } else {
+                        statusSelect.value = 'Settled';
+                    }
+                }
+            }
+        }
+
+        function onStatusDropdownChange() {
+            const status = document.getElementById('status').value;
+            const amount = parseFloat(document.getElementById('amount').value) || 0;
+            if (status === 'Settled' && amount > 0) {
+                document.getElementById('adjustedAmount').value = amount;
+            } else if (status === 'Open') {
+                document.getElementById('adjustedAmount').value = 0;
+            }
+            recalculateFormBalance(false);
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('entryId').value;
+            const entityType = document.querySelector('input[name="entityType"]:checked').value;
+            const partyName = document.getElementById('partyName').value.trim();
+            const partyContact = document.getElementById('partyContact').value.trim();
+            const voucherNo = document.getElementById('voucherNo').value.trim();
+            const paymentDate = document.getElementById('paymentDate').value;
+            const amount = parseFloat(document.getElementById('amount').value) || 0;
+            const adjustedAmount = parseFloat(document.getElementById('adjustedAmount').value) || 0;
+            const paymentMode = document.getElementById('paymentMode').value;
+            const transactionRef = document.getElementById('transactionRef').value.trim();
+            const orderRef = document.getElementById('orderRef').value.trim();
+            const status = document.getElementById('status').value;
+            const remarks = document.getElementById('remarks').value.trim();
+
+            if (!partyName || !voucherNo || !paymentDate || amount <= 0) {
+                showToast('Please fill all required fields with valid amounts.', 'error');
+                return;
+            }
+
+            const entryObj = {
+                id: id || 'adv-' + Date.now(),
+                entityType,
+                partyName,
+                partyContact,
+                voucherNo,
+                paymentDate,
+                amount,
+                adjustedAmount: Math.min(amount, adjustedAmount),
+                paymentMode,
+                transactionRef,
+                orderRef,
+                status,
+                remarks
+            };
+
+            if (id) {
+                const index = records.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    records[index] = entryObj;
+                    showToast(`Updated voucher ${voucherNo}`);
+                }
+            } else {
+                records.unshift(entryObj);
+                showToast(`Recorded ${entityType} advance (${voucherNo})`);
+            }
+
+            saveData();
+            resetForm();
+        }
+
+        function resetForm() {
+            document.getElementById('advanceForm').reset();
+            document.getElementById('entryId').value = '';
+            document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('voucherNo').value = generateNextVoucherNo();
+            document.getElementById('adjustedAmount').value = '0';
+            document.getElementById('formRemainingBalance').textContent = formatMoney(0);
+
+            document.getElementById('formHeaderTitle').textContent = 'Record Advance Payment';
+            document.getElementById('formHeaderIcon').className = 'fa-solid fa-plus-circle text-indigo-400';
+            document.getElementById('submitBtnText').textContent = 'Save Advance Entry';
+            document.getElementById('cancelEditBtn').classList.add('hidden');
+            onEntityTypeChange();
+        }
+
+        function editRecord(id) {
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+
+            document.getElementById('entryId').value = rec.id;
+            const radio = document.querySelector(`input[name="entityType"][value="${rec.entityType}"]`);
+            if (radio) radio.checked = true;
+            onEntityTypeChange();
+
+            document.getElementById('partyName').value = rec.partyName;
+            document.getElementById('partyContact').value = rec.partyContact || '';
+            document.getElementById('voucherNo').value = rec.voucherNo;
+            document.getElementById('paymentDate').value = rec.paymentDate;
+            document.getElementById('amount').value = rec.amount;
+            document.getElementById('adjustedAmount').value = rec.adjustedAmount || 0;
+            document.getElementById('paymentMode').value = rec.paymentMode;
+            document.getElementById('transactionRef').value = rec.transactionRef || '';
+            document.getElementById('orderRef').value = rec.orderRef || '';
+            document.getElementById('status').value = rec.status;
+            document.getElementById('remarks').value = rec.remarks || '';
+
+            recalculateFormBalance(false);
+
+            document.getElementById('formHeaderTitle').textContent = `Edit ${rec.voucherNo}`;
+            document.getElementById('formHeaderIcon').className = 'fa-solid fa-pen-to-square text-amber-400';
+            document.getElementById('submitBtnText').textContent = 'Update Advance Entry';
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+            // Smooth scroll to form on mobile/tablet
+            document.getElementById('advanceForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // --- KPI & Table Rendering ---
+        function updateSummaryCards() {
+            let custTotal = 0, custUnadj = 0;
+            let suppTotal = 0, suppUnadj = 0;
+            let totalAdjusted = 0, openCount = 0;
+
+            records.forEach(r => {
+                const amt = parseFloat(r.amount) || 0;
+                const adj = parseFloat(r.adjustedAmount) || 0;
+                const rem = r.status === 'Refunded' ? 0 : Math.max(0, amt - adj);
+
+                if (r.entityType === 'Customer') {
+                    custTotal += amt;
+                    custUnadj += rem;
+                } else {
+                    suppTotal += amt;
+                    suppUnadj += rem;
+                }
+
+                totalAdjusted += adj;
+                if (r.status === 'Open' || r.status === 'Partially Adjusted') {
+                    openCount++;
+                }
+            });
+
+            document.getElementById('kpiCustomerTotal').textContent = formatMoney(custTotal);
+            document.getElementById('kpiCustomerUnadjusted').textContent = `Unadjusted: ${formatMoney(custUnadj)}`;
+
+            document.getElementById('kpiSupplierTotal').textContent = formatMoney(suppTotal);
+            document.getElementById('kpiSupplierUnadjusted').textContent = `Unadjusted: ${formatMoney(suppUnadj)}`;
+
+            document.getElementById('kpiOpenBalance').textContent = formatMoney(custUnadj + suppUnadj);
+            document.getElementById('kpiSettledTotal').textContent = `Total Adjusted: ${formatMoney(totalAdjusted)}`;
+
+            document.getElementById('kpiOpenCount').textContent = openCount;
+            document.getElementById('kpiTotalCount').textContent = `Out of ${records.length} total records`;
+        }
+
+        function setEntityTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = 'tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5';
+            });
+            const activeBtn = document.getElementById(`tab-${tab}`);
+            activeBtn.className = 'tab-btn px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-xs transition flex items-center gap-1.5';
+            renderTable();
+        }
+
+        function getFilteredRecords() {
+            const search = document.getElementById('searchInput').value.toLowerCase().trim();
+            const statusFilter = document.getElementById('filterStatus').value;
+            const modeFilter = document.getElementById('filterMode').value;
+
+            return records.filter(r => {
+                if (activeTab !== 'All' && r.entityType !== activeTab) return false;
+                if (statusFilter !== 'All' && r.status !== statusFilter) return false;
+                if (modeFilter !== 'All' && r.paymentMode !== modeFilter) return false;
+
+                if (search) {
+                    const haystack = [
+                        r.partyName,
+                        r.voucherNo,
+                        r.orderRef,
+                        r.transactionRef,
+                        r.partyContact,
+                        r.remarks
+                    ].join(' ').toLowerCase();
+                    if (!haystack.includes(search)) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderTable() {
+            const filtered = getFilteredRecords();
+            const tbody = document.getElementById('ledgerTableBody');
+            const emptyState = document.getElementById('emptyState');
+
+            document.getElementById('visibleCount').textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            tbody.innerHTML = filtered.map(r => {
+                const isCustomer = r.entityType === 'Customer';
+                const remaining = r.status === 'Refunded' ? 0 : Math.max(0, r.amount - (r.adjustedAmount || 0));
+
+                const entityBadge = isCustomer
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70"><i class="fa-solid fa-arrow-down-left text-[9px]"></i> Customer</span>`
+                    : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70"><i class="fa-solid fa-arrow-up-right text-[9px]"></i> Supplier</span>`;
+
+                const statusStyles = {
+                    'Open': 'bg-amber-50 text-amber-700 border-amber-200',
+                    'Partially Adjusted': 'bg-sky-50 text-sky-700 border-sky-200',
+                    'Settled': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    'Refunded': 'bg-slate-100 text-slate-600 border-slate-200'
+                };
+                const statusBadge = `<span class="inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border ${statusStyles[r.status] || statusStyles['Open']}">${escapeHtml(r.status)}</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition group">
+                        <td class="py-3.5 px-4 align-top whitespace-nowrap">
+                            <div class="font-mono font-bold text-xs text-slate-900">${escapeHtml(r.voucherNo)}</div>
+                            <div class="text-xs text-slate-500 mt-0.5">${formatDateDisplay(r.paymentDate)}</div>
+                            <div class="mt-1">${entityBadge}</div>
+                        </td>
+                        <td class="py-3.5 px-4 align-top">
+                            <div class="font-semibold text-slate-900 text-sm">${escapeHtml(r.partyName)}</div>
+                            ${r.partyContact ? `<div class="text-xs text-slate-500 mt-0.5"><i class="fa-regular fa-address-book mr-1 text-slate-400"></i>${escapeHtml(r.partyContact)}</div>` : ''}
+                            ${r.orderRef ? `<div class="inline-block mt-1 text-[11px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded">Ref: ${escapeHtml(r.orderRef)}</div>` : ''}
+                            ${r.remarks ? `<p class="text-xs text-slate-500 mt-1 line-clamp-1 max-w-xs" title="${escapeHtml(r.remarks)}">${escapeHtml(r.remarks)}</p>` : ''}
+                        </td>
+                        <td class="py-3.5 px-4 align-top whitespace-nowrap">
+                            <div class="text-xs font-semibold text-slate-800">${escapeHtml(r.paymentMode)}</div>
+                            ${r.transactionRef ? `<div class="text-[11px] font-mono text-slate-500 mt-0.5">${escapeHtml(r.transactionRef)}</div>` : '<div class="text-[11px] text-slate-400 mt-0.5">No Ref ID</div>'}
+                        </td>
+                        <td class="py-3.5 px-4 align-top text-right whitespace-nowrap">
+                            <div class="font-bold text-sm text-slate-900">${formatMoney(r.amount)}</div>
+                            ${r.adjustedAmount > 0 ? `<div class="text-[11px] text-emerald-600 font-medium">Adj: ${formatMoney(r.adjustedAmount)}</div>` : ''}
+                            <div class="text-xs font-semibold mt-0.5 ${remaining > 0 ? 'text-amber-600' : 'text-slate-400'}">
+                                Bal: ${formatMoney(remaining)}
+                            </div>
+                        </td>
+                        <td class="py-3.5 px-4 align-top text-center whitespace-nowrap">
+                            ${statusBadge}
+                        </td>
+                        <td class="py-3.5 px-4 align-top text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-1">
+                                <button onclick="openAdjustModal('${r.id}')" title="Adjust / Settle Advance" class="p-2 rounded-lg text-amber-600 hover:bg-amber-50 transition">
+                                    <i class="fa-solid fa-sliders"></i>
+                                </button>
+                                <button onclick="openVoucherModal('${r.id}')" title="Print / View Voucher" class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition">
+                                    <i class="fa-solid fa-print"></i>
+                                </button>
+                                <button onclick="editRecord('${r.id}')" title="Edit Entry" class="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="confirmDeleteRecord('${r.id}')" title="Delete Entry" class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 transition">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- Quick Adjust Modal ---
+        function openAdjustModal(id) {
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+
+            document.getElementById('adjustEntryId').value = rec.id;
+            document.getElementById('adjustVoucherLabel').textContent = rec.voucherNo;
+            document.getElementById('adjustEntityBadge').textContent = `${rec.entityType} Advance`;
+            document.getElementById('adjustEntityBadge').className = rec.entityType === 'Customer' ? 'font-semibold text-emerald-600' : 'font-semibold text-indigo-600';
+            document.getElementById('adjustPartyLabel').textContent = rec.partyName;
+            document.getElementById('adjustTotalLabel').textContent = formatMoney(rec.amount);
+
+            const input = document.getElementById('modalAdjustedInput');
+            input.max = rec.amount;
+            input.value = rec.adjustedAmount || 0;
+            document.getElementById('modalAdjustNote').value = '';
+
+            updateModalRemainingPreview();
+            document.getElementById('adjustModal').classList.remove('hidden');
+        }
+
+        function setFullSettlementInModal() {
+            const id = document.getElementById('adjustEntryId').value;
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+            document.getElementById('modalAdjustedInput').value = rec.amount;
+            updateModalRemainingPreview();
+        }
+
+        function updateModalRemainingPreview() {
+            const id = document.getElementById('adjustEntryId').value;
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+            const adj = parseFloat(document.getElementById('modalAdjustedInput').value) || 0;
+            const rem = Math.max(0, rec.amount - adj);
+            document.getElementById('modalRemainingPreview').textContent = formatMoney(rem);
+        }
+
+        function submitQuickAdjust(e) {
+            e.preventDefault();
+            const id = document.getElementById('adjustEntryId').value;
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+
+            let newAdj = parseFloat(document.getElementById('modalAdjustedInput').value) || 0;
+            newAdj = Math.min(rec.amount, Math.max(0, newAdj));
+            const note = document.getElementById('modalAdjustNote').value.trim();
+
+            rec.adjustedAmount = newAdj;
+            if (newAdj === 0) {
+                rec.status = 'Open';
+            } else if (newAdj < rec.amount) {
+                rec.status = 'Partially Adjusted';
+            } else {
+                rec.status = 'Settled';
+            }
+
+            if (note) {
+                rec.remarks = rec.remarks ? `${rec.remarks} | ${note}` : note;
+            }
+
+            saveData();
+            closeModal('adjustModal');
+            showToast(`Settlement updated for ${rec.voucherNo}`);
+        }
+
+        // --- Print Voucher Modal ---
+        function openVoucherModal(id) {
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+
+            const isCust = rec.entityType === 'Customer';
+            const remaining = rec.status === 'Refunded' ? 0 : Math.max(0, rec.amount - (rec.adjustedAmount || 0));
+
+            document.getElementById('vPrintTitle').textContent = isCust ? 'CUSTOMER ADVANCE RECEIPT' : 'SUPPLIER ADVANCE PAYMENT VOUCHER';
+            document.getElementById('vPrintVoucherNo').textContent = rec.voucherNo;
+            document.getElementById('vPrintDate').textContent = `Date: ${formatDateDisplay(rec.paymentDate)}`;
+            document.getElementById('vPrintPartyRole').textContent = isCust ? 'Received From (Customer)' : 'Paid To (Supplier)';
+            document.getElementById('vPrintPartyName').textContent = rec.partyName;
+            document.getElementById('vPrintPartyContact').textContent = rec.partyContact || '—';
+            document.getElementById('vPrintMode').textContent = rec.paymentMode;
+            document.getElementById('vPrintRef').textContent = rec.transactionRef ? `Ref: ${rec.transactionRef}` : 'Ref: N/A';
+            document.getElementById('vPrintOrderRef').textContent = rec.orderRef || 'General Advance';
+            document.getElementById('vPrintStatus').textContent = rec.status;
+            document.getElementById('vPrintAmount').textContent = formatMoney(rec.amount);
+            document.getElementById('vPrintAdjusted').textContent = formatMoney(rec.adjustedAmount || 0);
+            document.getElementById('vPrintBalance').textContent = formatMoney(remaining);
+            document.getElementById('vPrintRemarks').textContent = rec.remarks || 'No additional remarks noted.';
+
+            document.getElementById('voucherModal').classList.remove('hidden');
+        }
+
+        // --- Delete & Data Management Modals ---
+        function confirmDeleteRecord(id) {
+            const rec = records.find(r => r.id === id);
+            if (!rec) return;
+
+            document.getElementById('confirmModalTitle').textContent = 'Delete Advance Entry?';
+            document.getElementById('confirmModalMessage').textContent = `Are you sure you want to permanently delete voucher ${rec.voucherNo} (${rec.partyName})?`;
+            document.getElementById('confirmModalActions').innerHTML = `
+                <button onclick="closeModal('confirmModal')" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50">Cancel</button>
+                <button onclick="deleteRecord('${id}')" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold">Delete Entry</button>
+            `;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function deleteRecord(id) {
+            records = records.filter(r => r.id !== id);
+            saveData();
+            closeModal('confirmModal');
+            showToast('Advance entry deleted.');
+        }
+
+        function openResetModal() {
+            document.getElementById('confirmModalTitle').textContent = 'Manage Ledger Data';
+            document.getElementById('confirmModalMessage').textContent = 'Would you like to restore the default sample entries or clear all records to start fresh?';
+            document.getElementById('confirmModalActions').innerHTML = `
+                <button onclick="closeModal('confirmModal')" class="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-600 text-xs sm:text-sm font-medium hover:bg-slate-50">Cancel</button>
+                <button onclick="restoreSampleData()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold">Restore Samples</button>
+                <button onclick="clearAllData()" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold">Clear All</button>
+            `;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function restoreSampleData() {
+            records = [...sampleRecords];
+            saveData();
+            resetForm();
+            closeModal('confirmModal');
+            showToast('Sample records restored.');
+        }
+
+        function clearAllData() {
+            records = [];
+            saveData();
+            resetForm();
+            closeModal('confirmModal');
+            showToast('All records cleared.');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // --- CSV Export ---
+        function exportToCSV() {
+            const filtered = getFilteredRecords();
+            if (filtered.length === 0) {
+                showToast('No records available to export.', 'error');
+                return;
+            }
+
+            const headers = [
+                'Voucher No',
+                'Date',
+                'Party Type',
+                'Party Name',
+                'Contact',
+                'Order/PO Ref',
+                'Payment Mode',
+                'Transaction Ref ID',
+                'Advance Amount',
+                'Adjusted Amount',
+                'Remaining Balance',
+                'Status',
+                'Remarks'
+            ];
+
+            const rows = filtered.map(r => {
+                const rem = r.status === 'Refunded' ? 0 : Math.max(0, r.amount - (r.adjustedAmount || 0));
+                return [
+                    r.voucherNo,
+                    r.paymentDate,
+                    r.entityType,
+                    r.partyName,
+                    r.partyContact || '',
+                    r.orderRef || '',
+                    r.paymentMode,
+                    r.transactionRef || '',
+                    r.amount.toFixed(2),
+                    (r.adjustedAmount || 0).toFixed(2),
+                    rem.toFixed(2),
+                    r.status,
+                    r.remarks || ''
+                ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(',');
+            });
+
+            const csvContent = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Advance_Register_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showToast(`Exported ${filtered.length} records to CSV.`);
+        }
+
+        // --- Utility: Toast & HTML Escaping ---
+        let toastTimeout;
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            document.getElementById('toastMessage').textContent = message;
+
+            icon.className = type === 'error'
+                ? 'fa-solid fa-circle-exclamation text-rose-400'
+                : 'fa-solid fa-circle-check text-emerald-400';
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+
+</html>
