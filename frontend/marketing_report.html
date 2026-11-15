@@ -288,7 +288,8 @@
             </div>
             <div style="width:240px">
                 <label>Customer Name</label>
-                <input id="customerName" />
+                <input id="customerName" list="customerOptions" autocomplete="off" placeholder="Search or type customer name" />
+                <datalist id="customerOptions"></datalist>
             </div>
             <div style="width:240px">
                 <label>Address</label>
@@ -309,6 +310,13 @@
                 <button class="btn" id="exportPdfBtn">Export PDF</button>
                 <button class="btn" id="saveVisitBtn">Save Visit</button>
             </div>
+        </div>
+
+        <div style="display:flex;gap:18px;align-items:center;margin:0 0 18px;padding:12px;background:#f5f8fa;border:1px solid #d9e2e8;border-radius:6px;flex-wrap:wrap;">
+            <strong style="white-space:nowrap;">Report Maker</strong>
+            <div style="width:240px"><label for="reportMakerName">Name</label><input id="reportMakerName" autocomplete="name" placeholder="Your name"></div>
+            <div style="width:220px"><label for="reportMakerContact">Contact</label><input id="reportMakerContact" type="tel" autocomplete="tel" placeholder="Phone number"></div>
+            <div style="width:220px"><label for="visitZone">Visit Zone</label><input id="visitZone" placeholder="Area / zone covered"></div>
         </div>
 
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
@@ -534,6 +542,47 @@
         let toastTimer = null;
         let allVisits = [];
 
+        let customerRecords = [];
+
+        async function loadCustomerOptions() {
+            let records = [];
+            try {
+                if (typeof apiClient !== 'undefined' && apiClient.getCustomers) {
+                    const response = await apiClient.getCustomers();
+                    records = Array.isArray(response) ? response : (response && response.data ? response.data : []);
+                }
+            } catch (error) {
+                console.warn("Could not fetch customers; using saved customer records.", error);
+            }
+            if (!records.length) {
+                try { records = JSON.parse(localStorage.getItem('customers')) || []; } catch (_) { records = []; }
+            }
+            customerRecords = records.filter(customer => customer && customer.name);
+            const options = document.getElementById('customerOptions');
+            if (options) {
+                options.replaceChildren(...customerRecords.map(customer => {
+                    const option = document.createElement('option');
+                    option.value = customer.name;
+                    return option;
+                }));
+            }
+        }
+
+        function fillSelectedCustomer() {
+            const name = document.getElementById('customerName').value.trim().toLowerCase();
+            const customer = customerRecords.find(record => String(record.name || '').trim().toLowerCase() === name);
+            if (customer) document.getElementById('customerAddress').value = customer.address || '';
+        }
+
+        loadCustomerOptions();
+        document.getElementById('customerName').addEventListener('change', fillSelectedCustomer);
+        document.getElementById('customerName').addEventListener('input', fillSelectedCustomer);
+        ["reportMakerName", "reportMakerContact"].forEach(id => {
+            const input = document.getElementById(id);
+            input.value = localStorage.getItem('marketing_' + id) || '';
+            input.addEventListener('change', () => localStorage.setItem('marketing_' + id, input.value.trim()));
+        });
+
         /* ================= TOAST ================= */
         function showToast(msg, type = 'success') {
             const t = document.getElementById('toast');
@@ -757,6 +806,9 @@
                 visitDate: visitDate,
                 customerName: customerName,
                 customerAddress: customerAddress,
+                reportMakerName: document.getElementById("reportMakerName").value.trim(),
+                reportMakerContact: document.getElementById("reportMakerContact").value.trim(),
+                visitZone: document.getElementById("visitZone").value.trim(),
                 mainRemarks: document.getElementById("mainRemarks").value,
                 purposeVisit: document.getElementById("purposeVisit").value,
                 customerRequirement: document.getElementById("customerRequirement").value,
@@ -956,6 +1008,9 @@
                 document.getElementById("srVisitNo").value = v.visitNo;
                 document.getElementById("customerName").value = v.customerName;
                 document.getElementById("customerAddress").value = v.customerAddress || "";
+                document.getElementById("reportMakerName").value = v.reportMakerName || localStorage.getItem("marketing_reportMakerName") || "";
+                document.getElementById("reportMakerContact").value = v.reportMakerContact || localStorage.getItem("marketing_reportMakerContact") || "";
+                document.getElementById("visitZone").value = v.visitZone || "";
                 document.getElementById("srVisitDate").value = v.visitDate;
                 document.getElementById("mainRemarks").value = v.mainRemarks || "";
                 document.getElementById("purposeVisit").value = v.purposeVisit || "";
@@ -1016,6 +1071,7 @@
                 document.getElementById("srVisitNo").value = "";
                 document.getElementById("customerName").value = "";
                 document.getElementById("customerAddress").value = "";
+                document.getElementById("visitZone").value = "";
                 document.getElementById("srVisitDate").value = "";
                 document.getElementById("mainRemarks").value = "";
                 document.getElementById("purposeVisit").value = "";
@@ -1036,83 +1092,140 @@
         /* ========= PDF EXPORT ========= */
         function exportToPDF() {
             if (!window.jspdf) return showToast('jsPDF not loaded', 'warning');
-            const { jsPDF } = window.jspdf; const doc = new jsPDF("p", "mm", "a4");
-            const pageWidth = doc.internal.pageSize.getWidth();
+            const { jsPDF } = window.jspdf;
+            if (!docAutoTableAvailable()) return showToast('PDF table plugin not loaded', 'warning');
 
             const visitNo = document.getElementById('srVisitNo').value.trim();
             const visitDate = document.getElementById('srVisitDate').value;
             const customerName = document.getElementById('customerName').value.trim();
             const customerAddress = document.getElementById('customerAddress').value.trim();
-            if (!visitNo || !visitDate) return showToast('Visit No, Customer Name & Date Required', 'warning');
-
-            const totalWords = document.getElementById('totalWords').innerText;
-
-            let companyName = "Company Name";
-            if (window.BrandService) {
-                companyName = window.BrandService.getBrand().name || companyName;
-            } else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) {
-                companyName = APP_SETTINGS.COMPANY_NAME;
+            if (!visitNo || !visitDate || !customerName) {
+                return showToast('Visit No, Customer Name & Date Required', 'warning');
             }
 
-            /* Header */
-            doc.setFont('helvetica', 'bold').setFontSize(14);
-            doc.text(companyName, pageWidth / 2, 14, { align: "center" });
-            doc.setFontSize(11);
-            doc.text(`Marketing Report & Expenses No. - ${visitNo}`, pageWidth / 2, 20, { align: "center" });
-            doc.text(`Customer Name - ${customerName}`, pageWidth / 2, 26, { align: "center" });
-            let nextY = 32;
-            if (customerAddress) {
-                doc.text(`Address - ${customerAddress}`, pageWidth / 2, nextY, { align: "center" });
-                nextY += 6;
-            }
-            const d = new Date(visitDate);
-            doc.text(`Visit Date: ${("0" + d.getDate()).slice(-2)}-${("0" + (d.getMonth() + 1)).slice(-2)}-${d.getFullYear()}`, pageWidth / 2, nextY, { align: "center" });
+            const makerName = document.getElementById('reportMakerName').value.trim();
+            const makerContact = document.getElementById('reportMakerContact').value.trim();
+            const visitZone = document.getElementById('visitZone').value.trim();
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 12;
+            const usableWidth = pageWidth - margin * 2;
+            let companyName = 'Company Name';
+            try {
+                if (window.BrandService) companyName = window.BrandService.getBrand().name || companyName;
+                else if (typeof APP_SETTINGS !== 'undefined' && APP_SETTINGS.COMPANY_NAME) companyName = APP_SETTINGS.COMPANY_NAME;
+            } catch (error) { console.warn('Could not load company name for PDF.', error); }
 
-            /* Table */
-            const expRows = expenseData.map((r, i) => [i + 1, r.date, r.expense_type, r.mode, r.amount, r.remarks, '']);
-            expRows.push(['', '', '', 'Total', document.getElementById('totalExpense').value, '', '']);
+            const formatDate = value => {
+                if (!value) return '-';
+                const parts = value.split('-');
+                return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
+            };
+            const pageHeader = () => {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(15);
+                doc.text(String(companyName), pageWidth / 2, 11, { align: 'center', maxWidth: usableWidth });
+                doc.setFontSize(11);
+                doc.text('MARKETING REPORT & EXPENSES', pageWidth / 2, 17, { align: 'center' });
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text(`Visit No: ${visitNo}    Date: ${formatDate(visitDate)}    Customer: ${customerName}`, margin, 24, { maxWidth: usableWidth });
+                let line = 29;
+                if (customerAddress) {
+                    const wrapped = doc.splitTextToSize(`Address: ${customerAddress}`, usableWidth);
+                    doc.text(wrapped, margin, line);
+                    line += wrapped.length * 4;
+                }
+                return line + 4;
+            };
+            const addFooter = () => {
+                const pages = doc.internal.getNumberOfPages();
+                for (let page = 1; page <= pages; page++) {
+                    doc.setPage(page);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(8);
+                    doc.text(`Page ${page} of ${pages}`, pageWidth - margin, pageHeight - 5, { align: 'right' });
+                }
+            };
+            const startY = pageHeader();
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.text('REPORT MAKER DETAILS', margin, startY);
             doc.autoTable({
-                head: [['SL', 'Date', 'Type', 'Mode', 'Amount', 'Remarks', 'Attachments']],
-                body: expRows, startY: nextY + 6, styles: { fontSize: 9 }
+                startY: startY + 2,
+                margin: { left: margin, right: margin, top: 35, bottom: 12 },
+                head: [['Name', 'Contact', 'Visit Zone']],
+                body: [[makerName || '-', makerContact || '-', visitZone || '-']],
+                theme: 'grid',
+                headStyles: { fillColor: [52, 58, 64], textColor: 255, fontStyle: 'bold' },
+                styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, overflow: 'linebreak', valign: 'middle' },
+                columnStyles: { 0: { cellWidth: usableWidth / 3 }, 1: { cellWidth: usableWidth / 3 }, 2: { cellWidth: 'auto' } },
+                didDrawPage: pageHeader
+            });
+            const expenseStartY = doc.lastAutoTable.finalY + 5;
+            const money = value => (Number.parseFloat(value) || 0).toFixed(2);
+            const expenseRows = (expenseData || []).map((row, index) => [
+                index + 1,
+                formatDate(row.date),
+                row.expense_type || '-',
+                row.mode || '-',
+                money(row.amount),
+                row.remarks || '-',
+                (row.attachments || []).map(file => file.name || file.originalName).filter(Boolean).join(', ') || '-'
+            ]);
+            if (!expenseRows.length) expenseRows.push(['-', '-', 'No expenses recorded', '-', '-', '-', '-']);
+            const expenseTotal = (expenseData || []).reduce((sum, row) => sum + (Number.parseFloat(row.amount) || 0), 0);
+            expenseRows.push(['', '', '', 'Total', money(expenseTotal), '', '']);
+
+            doc.autoTable({
+                startY: expenseStartY,
+                margin: { left: margin, right: margin, top: 35, bottom: 12 },
+                head: [['SL', 'Date', 'Expense Type', 'Mode', 'Amount (Rs)', 'Remarks', 'Attachments']],
+                body: expenseRows,
+                theme: 'grid',
+                headStyles: { fillColor: [57, 146, 235], textColor: 255, fontStyle: 'bold' },
+                styles: { font: 'helvetica', fontSize: 8, cellPadding: 2, overflow: 'linebreak', valign: 'middle' },
+                columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 23 }, 2: { cellWidth: 34 }, 3: { cellWidth: 25 }, 4: { cellWidth: 25, halign: 'right' }, 5: { cellWidth: 68 }, 6: { cellWidth: 'auto' } },
+                didDrawPage: pageHeader
             });
 
-            let y = doc.lastAutoTable.finalY + 10;
-            doc.setFont("helvetica", "bold");
-            doc.text("Total (in words): ", 14, y);
-            doc.setFont("helvetica", "normal");
-            doc.text(totalWords, 50, y);
+            const drawSectionTitle = (title, minimumSpace = 20) => {
+                let y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : startY;
+                if (y + minimumSpace > pageHeight - 12) {
+                    doc.addPage();
+                    y = pageHeader();
+                }
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.text(title, margin, y);
+                return y + 3;
+            };
+            let y = drawSectionTitle('Expense Summary', 14);
+            doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 35, bottom: 12 }, body: [[`Total Expense: Rs ${money(expenseTotal)}`, `Total in words: ${document.getElementById('totalWords').innerText || '-'}`]], theme: 'plain', styles: { fontSize: 9, cellPadding: 2 }, columnStyles: { 0: { cellWidth: 65, fontStyle: 'bold' }, 1: { cellWidth: 'auto' } }, didDrawPage: pageHeader });
 
-            /* Contacts */
-            y += 10; doc.setFont("helvetica", "bold");
-            doc.text("Contact Details:", 14, y);
-            const contactRows = contactData.map((c, i) => [i + 1, c.name, c.designation, c.department, c.mobile, c.email, c.remarks]);
-            doc.autoTable({
-                head: [['SL', 'Name', 'Designation', 'Department', 'Mobile', 'Email', 'Remarks']],
-                body: contactRows, startY: y + 4, styles: { fontSize: 9 }
-            });
+            y = drawSectionTitle('Contact Details', 24);
+            const contacts = (contactData || []).map((contact, index) => [index + 1, contact.name || '-', contact.designation || '-', contact.department || '-', contact.mobile || '-', contact.email || '-', contact.remarks || '-']);
+            if (!contacts.length) contacts.push(['-', 'No contact details recorded', '-', '-', '-', '-', '-']);
+            doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 35, bottom: 12 }, head: [['SL', 'Name', 'Designation', 'Department', 'Mobile', 'Email', 'Remarks']], body: contacts, theme: 'grid', headStyles: { fillColor: [57, 146, 235], textColor: 255 }, styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' }, columnStyles: { 0: { cellWidth: 10 }, 1: { cellWidth: 38 }, 2: { cellWidth: 35 }, 3: { cellWidth: 32 }, 4: { cellWidth: 28 }, 5: { cellWidth: 48 }, 6: { cellWidth: 'auto' } }, didDrawPage: pageHeader });
 
-            /* Purpose of Visit */
-            y = doc.lastAutoTable.finalY + 10;
-            doc.setFont("helvetica", "bold");
-            doc.text("Purpose of Visit:", 14, y);
-            let pv = document.getElementById('purposeVisit').value.trim() || "No data";
-            doc.autoTable({ startY: y + 5, body: [{ pv }], theme: "grid", styles: { fontSize: 10, cellPadding: 4, halign: "left" }, columnStyles: { pv: { cellWidth: "auto" } } });
+            const addTextSection = (title, content) => {
+                const text = content.trim() || 'No data';
+                const lines = doc.splitTextToSize(text, usableWidth - 8);
+                y = drawSectionTitle(title, Math.min(18 + lines.length * 4, pageHeight - 24));
+                doc.autoTable({ startY: y, margin: { left: margin, right: margin, top: 35, bottom: 12 }, body: [[text]], theme: 'grid', styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'top' }, columnStyles: { 0: { cellWidth: usableWidth } }, didDrawPage: pageHeader });
+            };
+            addTextSection('Purpose of Visit', document.getElementById('purposeVisit').value);
+            addTextSection('Customer Requirement', document.getElementById('customerRequirement').value);
+            addTextSection('Main Remarks', document.getElementById('mainRemarks').value);
 
-            /* Requirement */
-            y = doc.lastAutoTable.finalY + 10;
-            doc.setFont("helvetica", "bold");
-            doc.text("Customer Requirement:", 14, y);
-            let cr = document.getElementById('customerRequirement').value.trim() || "No data";
-            doc.autoTable({ startY: y + 5, body: [{ cr }], theme: "grid", styles: { fontSize: 10, cellPadding: 4 }, columnStyles: { cr: { cellWidth: "auto" } } });
+            addFooter();
+            const safeVisitNo = visitNo.replace(/[\\/:*?"<>|]+/g, '_');
+            doc.save(`${safeVisitNo}_Marketing_Report.pdf`);
+        }
 
-            /* Remarks */
-            y = doc.lastAutoTable.finalY + 10;
-            doc.setFont("helvetica", "bold");
-            doc.text("Main Remarks:", 14, y);
-            let mr = document.getElementById('mainRemarks').value.trim() || "No remarks";
-            doc.autoTable({ startY: y + 5, body: [{ mr }], theme: "grid", styles: { fontSize: 10, cellPadding: 4 }, columnStyles: { mr: { cellWidth: "auto" } } });
-
-            doc.save(`${visitNo}_Expenses.pdf`);
+        function docAutoTableAvailable() {
+            return typeof window.jspdf.jsPDF.API.autoTable === 'function';
         }
 
         /* ================= INIT ================= */
