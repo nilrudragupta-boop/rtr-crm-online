@@ -15,6 +15,25 @@ const customerSchema = new mongoose.Schema({
     openingBalanceType: { type: String, enum: ['Dr', 'Cr'], default: 'Dr' } // Dr = Receivable, Cr = Advance
 }, { timestamps: true, strict: false });
 
+const advancePaymentSchema = new mongoose.Schema({
+    id: { type: String, required: true, index: true },
+    entityType: { type: String, enum: ['Customer', 'Supplier'], required: true },
+    partyName: { type: String, required: true },
+    voucherNo: { type: String, required: true },
+    paymentDate: { type: String, required: true },
+    amount: { type: Number, required: true },
+    deletedAt: { type: Date, default: null }
+}, { timestamps: true, strict: false });
+
+const orderSheetSchema = new mongoose.Schema({
+    id: String,
+    orderNo: { type: String, required: true },
+    orderDate: String,
+    supplierName: String,
+    grandTotal: Number,
+    deletedAt: { type: Date, default: null }
+}, { timestamps: true, strict: false });
+
 
 // --- CRM Phase 1 Schemas ---
 const crmContactSchema = new mongoose.Schema({
@@ -389,6 +408,8 @@ const customRecordSchema = new mongoose.Schema({
 
 module.exports = {
     Customer: mongoose.model('Customer', customerSchema),
+    AdvancePayment: mongoose.model('AdvancePayment', advancePaymentSchema),
+    OrderSheet: mongoose.model('OrderSheet', orderSheetSchema),
     CrmContact: mongoose.model('CrmContact', crmContactSchema),
     CrmPlant: mongoose.model('CrmPlant', crmPlantSchema),
     CrmActivity: mongoose.model('CrmActivity', crmActivitySchema),

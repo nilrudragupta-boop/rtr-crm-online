@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
-const { Customer, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, SalesRecord, Item, Supplier, Purchase, StockJournal, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
+const { Customer, AdvancePayment, OrderSheet, CrmContact, CrmPlant, CrmActivity, CrmDocument, CrmEnquiry, CrmTechnicalReview, CrmNegotiation, Invoice, SalesRecord, Item, Supplier, Purchase, StockJournal, CreditDebitNote, BankAccount, BankTransaction, JournalVoucher, Scrap, Production, Bom, Expense, Employee, CustomField, CustomRecord, Message, ChatterGroup } = require('./index');
 const nodemailer = require('nodemailer');
 const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
@@ -609,6 +609,67 @@ app.delete('/api/quotations/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+// --- Advance Payment and Order Sheet Routes ---
+app.get('/api/advance-payments', async (req, res) => {
+    try {
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        res.json({ success: true, data: await AdvancePayment.find(query).sort({ paymentDate: -1, createdAt: -1 }) });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/advance-payments', async (req, res) => {
+    try {
+        const payload = { ...req.body };
+        if (!payload.id || !payload.entityType || !payload.partyName || !payload.voucherNo || !payload.paymentDate) {
+            return res.status(400).json({ success: false, message: 'Advance ID, party, voucher number, and payment date are required.' });
+        }
+        const query = { id: payload.id };
+        if (payload.createdBy) query.createdBy = payload.createdBy;
+        const saved = await AdvancePayment.findOneAndUpdate(query, { $set: payload }, { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true });
+        res.json({ success: true, data: saved });
+    } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+});
+
+app.delete('/api/advance-payments/:id', async (req, res) => {
+    try {
+        const query = { id: req.params.id, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await AdvancePayment.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
+        if (!deleted) return res.json({ success: true, notFound: true });
+        res.json({ success: true, data: deleted });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.get('/api/order-sheets', async (req, res) => {
+    try {
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        res.json({ success: true, data: await OrderSheet.find(query).sort({ orderDate: -1, createdAt: -1 }) });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+app.post('/api/order-sheets', async (req, res) => {
+    try {
+        const payload = { ...req.body };
+        if (!payload.orderNo) return res.status(400).json({ success: false, message: 'Order number is required.' });
+        const query = { orderNo: payload.orderNo };
+        if (payload.createdBy) query.createdBy = payload.createdBy;
+        const saved = await OrderSheet.findOneAndUpdate(query, { $set: payload }, { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true });
+        res.json({ success: true, data: saved });
+    } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+});
+
+app.delete('/api/order-sheets/:orderNo', async (req, res) => {
+    try {
+        const query = { orderNo: req.params.orderNo, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await OrderSheet.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
+        if (!deleted) return res.json({ success: true, notFound: true });
+        res.json({ success: true, data: deleted });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 // --- Invoice Routes ---
