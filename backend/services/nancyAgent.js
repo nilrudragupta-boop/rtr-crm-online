@@ -259,7 +259,7 @@ async function getDirectAnswer(prompt, tools) {
     const query = String(prompt || '').trim();
     const normalized = query.toLowerCase().replace(/[?.!]+$/g, '').trim();
 
-    if (/^(unpaid invoices|unpaid bills|unpaid invoice summary|unpaid bills summary)$/.test(normalized)) {
+    if (/^(unpaid invoices|unpaid bills|unpaid invoice summary|unpaid bills summary|invoices with (?:a )?(?:balance|due)|invoices with total due|total due invoices|pending invoice dues)$/.test(normalized)) {
         const invoices = await withTimeout(tools.getUnpaidInvoices({}), 8000, 'MongoDB unpaid-invoice query');
         if (!invoices.length) return 'No unpaid invoices found.';
         const rows = invoices.slice(0, 8).map((invoice, index) =>
@@ -267,7 +267,7 @@ async function getDirectAnswer(prompt, tools) {
         return `Found ${invoices.length} unpaid invoices.\n${rows.join('\n')}`;
     }
 
-    if (/^(total sales this month|sales this month|monthly sales)$/.test(normalized)) {
+    if (/^(total sales this month|sales this month|monthly sales|invoice total this month|monthly invoice total|total invoice amount this month)$/.test(normalized)) {
         const summary = await withTimeout(tools.getSalesSummary({ period: 'month' }), 8000, 'MongoDB monthly-sales query');
         return `This month: ${formatCurrency(summary.totalSales)} across ${summary.invoiceCount} invoices.`;
     }

@@ -2,7 +2,35 @@ const { runNancyAgent } = require('../services/nancyAgent');
 const { getNancySession } = require('../services/nancyAuth');
 
 const escapeRegex = value => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+const number = value => {
+    if (typeof value === 'string') value = value.replace(/[₹,\s]/g, '');
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+const firstAmount = (...values) => values.map(number).find(value => value !== 0) || 0;
+const invoiceTotal = invoice => {
+    const savedTotal = firstAmount(invoice.invoice_total, invoice.total, invoice.invoiceTotal, invoice.grandTotal);
+    if (savedTotal) return savedTotal;
+    return Array.isArray(invoice.items)
+        ? invoice.items.reduce((sum, item) => sum + number(item.total), 0)
+        : 0;
+};
+const invoicePaid = invoice => firstAmount(invoice.total_paid, invoice.paid_amount, invoice.paid, invoice.amountPaid);
+const invoiceDate = invoice => {
+    const value = invoice.date || invoice.invoiceDate || invoice.invoice_date;
+    if (!value) return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    const text = String(value).trim();
+    const match = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+    if (match) {
+        const [, day, month, year] = match;
+        const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+        return parsed.getFullYear() === Number(year) && parsed.getMonth() === Number(month) - 1 && parsed.getDate() === Number(day)
+            ? parsed : null;
+    }
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
 function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production }) {
     const ownerQuery = userId => ({ createdBy: userId, deletedAt: null });
@@ -315,13 +343,16 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 : new Date(now.getFullYear(), now.getMonth(), 1);
             const invoices = await Invoice.find({
                 ...ownerQuery(userId),
-                date: { $gte: start, $lte: now },
                 status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
             }).lean();
+            const inPeriod = invoices.filter(invoice => {
+                const date = invoiceDate(invoice);
+                return date && date >= start && date <= now;
+            });
             return {
                 period: period === 'today' ? 'today' : 'this month',
-                invoiceCount: invoices.length,
-                totalSales: invoices.reduce((sum, invoice) => sum + (number(invoice.invoice_total) || number(invoice.invoiceTotal) || number(invoice.grandTotal) || number(invoice.total)), 0)
+                invoiceCount: inPeriod.length,
+                totalSales: inPeriod.reduce((sum, invoice) => sum + invoiceTotal(invoice), 0)
             };
         },
 
@@ -330,19 +361,20 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 ...ownerQuery(userId),
                 status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
             }).sort({ date: -1 }).lean();
-            // Match report.html's Summary bar definition of Unpaid: nothing paid,
-            // with a positive invoice total. Partial invoices are excluded.
+            // Match Invoice Reports' Total Due column: any invoice with a
+            // positive remaining balance is unpaid, including partial payments.
             return invoices.map(invoice => ({
                 invoice,
-                total: number(invoice.invoice_total) || number(invoice.invoiceTotal) || number(invoice.grandTotal) || number(invoice.total),
-                paid: number(invoice.total_paid) || number(invoice.amountPaid) || number(invoice.paid_amount) || number(invoice.paid)
+                total: invoiceTotal(invoice),
+                paid: invoicePaid(invoice)
             }))
-                .filter(({ total, paid }) => paid === 0 && total > 0).map(({ invoice, total, paid }) => ({
+                .map(({ invoice, total, paid }) => ({ invoice, total, paid, due: total - paid }))
+                .filter(({ due }) => due > 0.01).map(({ invoice, due }) => ({
                 invoiceNo: invoice.invoiceNo || invoice.invoice_no,
                 customerName: invoice.customerName || invoice.customer_name,
                 date: invoice.date,
                 status: invoice.status,
-                outstanding: Math.max(0, total - paid)
+                outstanding: Math.max(0, due)
             }));
         }
     };
