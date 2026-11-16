@@ -843,9 +843,9 @@
         function getAdvanceInvoiceAllocationRows(record) { return (record.allocations || []).filter(item => item && item.type === 'invoice_allocation'); }
         function isActiveAdvanceAllocation(item) { return item && item.status !== 'reversed'; }
         function getAdvanceRefundTotal(record) { return (record.refunds || []).filter(item => item && item.status !== 'reversed').reduce((sum, item) => sum + (Number(item.amount) || 0), 0); }
-        function getAdvanceRemaining(record) { return Math.max(0, (Number(record.amount) || 0) - (Number(record.adjustedAmount) || 0) - getAdvanceRefundTotal(record)); }
+        function getAdvanceRemaining(record) { const activeAllocations = getAdvanceInvoiceAllocationRows(record).filter(isActiveAdvanceAllocation).reduce((sum, item) => sum + (Number(item.amount) || 0), 0); const adjusted = Math.max(Number(record.adjustedAmount) || 0, activeAllocations); return Math.max(0, (Number(record.amount) || 0) - adjusted - getAdvanceRefundTotal(record)); }
         function getAdvanceAppliedToDocument(doc) {
-            return records.reduce((sum, record) => sum + getAdvanceInvoiceAllocationRows(record).filter(item => isActiveAdvanceAllocation(item) && (String(item.documentId || '') === String(doc.id || '') || (item.documentType === doc.documentType && String(item.invoiceNo || '').trim().toLowerCase() === String(doc.invoiceNo || '').trim().toLowerCase() && String(item.partyName || '').trim().toLowerCase() === String(doc.partyName || '').trim().toLowerCase()))).reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
+            return records.reduce((sum, record) => sum + getAdvanceInvoiceAllocationRows(record).filter(item => isActiveAdvanceAllocation(item) && item.documentType === doc.documentType && ((item.documentId && String(item.documentId) === String(doc.id)) || (String(item.invoiceNo || '').trim().toLowerCase() === String(doc.invoiceNo || '').trim().toLowerCase() && String(item.partyName || record.partyName || '').trim().toLowerCase() === String(doc.partyName || '').trim().toLowerCase()))).reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
         }
         function getPurchaseLineTotalForAllocation(row) {
             const base = (Number(row.qty) || 0) * (Number(row.price) || 0), discount = Number(row.discount) || 0;
@@ -853,29 +853,34 @@
             return Math.max(0, taxable + taxable * (Number(row.gst) || 0) / 100 + (Number(row.roundOff) || 0));
         }
         function getPurchaseActualPaidForAllocation(row) {
-            if (Array.isArray(row.paymentHistory) && row.paymentHistory.length) return row.paymentHistory.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-            return Number(row.paid ?? ((Number(row.paid_cash) || 0) + (Number(row.paid_bank) || 0))) || 0;
+            const historyPaid = Array.isArray(row.paymentHistory) ? row.paymentHistory.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0) : 0;
+            const splitPaid = (Number(row.paid_cash) || 0) + (Number(row.paid_bank) || 0);
+            return Math.max(historyPaid, Number(row.paid) || 0, splitPaid);
         }
         function getAllocationDocuments(record) {
             const docs = [];
             if (record.entityType === 'Customer') {
                 readLocalArray('invoices').forEach(invoice => {
                     const invoiceNo = invoice.invoice_no || invoice.invoiceNo || '', partyName = invoice.customer_name || invoice.customer?.name || '';
-                    if (!invoiceNo || partyName.trim().toLowerCase() !== String(record.partyName || '').trim().toLowerCase()) return;
-                    const party = partySources.Customer.find(item => String(item.name || '').trim().toLowerCase() === partyName.trim().toLowerCase());
-                    if (record.partyId && party?.id && String(record.partyId) !== String(party.id)) return;
-                    const doc = { documentType: 'sales_invoice', id: invoice.id || 'sales-invoice:' + String(invoiceNo).toLowerCase(), invoiceNo: String(invoiceNo), date: (invoice.invoice_date || invoice.date || '').split('T')[0], partyId: invoice.customerId || invoice.customer_id || party?.id || record.partyId || '', partyName, total: Number(invoice.invoice_total ?? invoice.total) || 0, paid: Number(invoice.total_paid ?? invoice.paid_amount ?? invoice.paid) || 0 };
+                    const party = partySources.Customer.find(item => String(item.name || '').trim().toLowerCase() === String(partyName).trim().toLowerCase());
+                    const invoicePartyId = invoice.customerId || invoice.customer_id || invoice.customer?.id || party?.id || '';
+                    const sameParty = record.partyId && invoicePartyId ? String(record.partyId) === String(invoicePartyId) : String(partyName).trim().toLowerCase() === String(record.partyName || '').trim().toLowerCase();
+                    if (!invoiceNo || !sameParty) return;
+                    const paymentHistoryPaid = Array.isArray(invoice.paymentHistory) ? invoice.paymentHistory.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0) : 0;
+                    const splitPaid = (Number(invoice.paid_cash) || 0) + (Number(invoice.paid_bank) || 0);
+                    const doc = { documentType: 'sales_invoice', id: invoice.id || 'sales-invoice:' + String(invoiceNo).toLowerCase(), invoiceNo: String(invoiceNo), date: (invoice.invoice_date || invoice.date || '').split('T')[0], partyId: invoicePartyId || record.partyId || '', partyName: partyName || record.partyName, total: Number(invoice.invoice_total ?? invoice.total) || 0, paid: Math.max(paymentHistoryPaid, Number(invoice.total_paid) || 0, Number(invoice.paid_amount) || 0, Number(invoice.paid) || 0, splitPaid) };
                     doc.applied = getAdvanceAppliedToDocument(doc); doc.due = Math.max(0, doc.total - doc.paid - doc.applied); if (doc.due > .005) docs.push(doc);
                 });
             } else {
                 const groups = new Map();
                 readLocalArray('purchases').forEach(row => {
                     const invoiceNo = String(row.supplierInv || '').trim(), partyName = String(row.supplierName || '').trim();
-                    if (!invoiceNo || partyName.toLowerCase() !== String(record.partyName || '').trim().toLowerCase()) return;
                     const party = partySources.Supplier.find(item => String(item.name || '').trim().toLowerCase() === partyName.toLowerCase());
-                    if (record.partyId && party?.id && String(record.partyId) !== String(party.id)) return;
+                    const billPartyId = row.supplierId || party?.id || '';
+                    const sameParty = record.partyId && billPartyId ? String(record.partyId) === String(billPartyId) : partyName.toLowerCase() === String(record.partyName || '').trim().toLowerCase();
+                    if (!invoiceNo || !sameParty) return;
                     const key = partyName.toLowerCase() + '|' + invoiceNo.toLowerCase();
-                    if (!groups.has(key)) groups.set(key, { documentType: 'supplier_bill', id: 'supplier-bill:' + encodeURIComponent(key), invoiceNo, date: (row.date || '').split('T')[0], partyId: row.supplierId || party?.id || record.partyId || '', partyName, rows: [] });
+                    if (!groups.has(key)) groups.set(key, { documentType: 'supplier_bill', id: 'supplier-bill:' + encodeURIComponent(key), invoiceNo, date: (row.date || '').split('T')[0], partyId: billPartyId || record.partyId || '', partyName: partyName || record.partyName, rows: [] });
                     groups.get(key).rows.push(row);
                 });
                 groups.forEach(doc => { doc.purchaseRowIds = doc.rows.map(row => String(row.id || '')).filter(Boolean); doc.total = doc.rows.reduce((sum, row) => sum + getPurchaseLineTotalForAllocation(row), 0); doc.paid = doc.rows.reduce((sum, row) => sum + getPurchaseActualPaidForAllocation(row), 0); doc.applied = getAdvanceAppliedToDocument(doc); doc.due = Math.max(0, doc.total - doc.paid - doc.applied); if (doc.due > .005) docs.push(doc); });
@@ -889,16 +894,18 @@
         }
         function populateAllocationInvoiceOptions(record) {
             const select = document.getElementById('allocationInvoiceSelect'), docs = getAllocationDocuments(record);
-            select.innerHTML = '<option value="">Choose an open document</option>' + docs.map(doc => '<option value="' + escapeHtml(doc.id) + '">' + escapeHtml(doc.invoiceNo) + ' · ' + escapeHtml(doc.date || 'No date') + ' · Due ' + formatMoney(doc.due) + '</option>').join('');
+            select.innerHTML = '<option value="">Choose an open document</option>' + docs.map(doc => '<option value="' + escapeHtml(doc.id) + '">' + escapeHtml(doc.invoiceNo) + ' · ' + escapeHtml(doc.partyName) + ' · ' + escapeHtml(doc.date || 'No date') + ' · Due ' + formatMoney(doc.due) + '</option>').join('');
             select.value = ''; updateModalRemainingPreview();
         }
         function updateModalRemainingPreview() {
             const id = document.getElementById('adjustEntryId').value, record = records.find(item => String(item.id) === String(id)); if (!record) return;
             const doc = getAllocationDocuments(record).find(item => item.id === document.getElementById('allocationInvoiceSelect').value);
-            const input = document.getElementById('modalAdjustedInput'), remaining = getAdvanceRemaining(record), cap = doc ? Math.min(remaining, doc.due) : 0, amount = Number(input.value) || 0;
-            input.max = cap.toFixed(2); document.getElementById('modalRemainingPreview').textContent = formatMoney(Math.max(0, remaining - amount));
-            document.getElementById('allocationInvoiceDetails').textContent = doc ? 'Invoice ' + doc.invoiceNo + ' · ' + doc.partyName + ' · Date ' + (doc.date || '-') + ' · Outstanding ' + formatMoney(doc.due) + ' · Advance available ' + formatMoney(remaining) + ' · Can apply up to ' + formatMoney(cap) : 'Choose an open bill to view its balance.';
-            if (doc && amount > cap) input.value = cap.toFixed(2);
+            const input = document.getElementById('modalAdjustedInput'), remaining = getAdvanceRemaining(record), cap = doc ? Math.floor((Math.min(remaining, doc.due) + 1e-8) * 100) / 100 : 0;
+            input.max = cap.toFixed(2);
+            if (doc && Number(input.value) > cap) input.value = cap.toFixed(2);
+            const amount = Math.max(0, Number(input.value) || 0);
+            document.getElementById('modalRemainingPreview').textContent = formatMoney(Math.max(0, remaining - amount));
+            document.getElementById('allocationInvoiceDetails').textContent = doc ? (doc.documentType === 'sales_invoice' ? 'Invoice ' : 'Supplier bill ') + doc.invoiceNo + ' · ' + doc.partyName + ' · Date ' + (doc.date || '-') + ' · Outstanding ' + formatMoney(doc.due) + ' · Advance available ' + formatMoney(remaining) + ' · Can apply up to ' + formatMoney(cap) : 'Choose an open bill to view its balance.';
         }
         function reverseAdvanceAllocation(advanceId, allocationId) {
             const record = records.find(item => String(item.id) === String(advanceId)), allocation = record && getAdvanceInvoiceAllocationRows(record).find(item => String(item.id) === String(allocationId));
@@ -1938,21 +1945,22 @@
         function setFullSettlementInModal() {
             const id = document.getElementById('adjustEntryId').value, rec = records.find(item => String(item.id) === String(id));
             const doc = rec && getAllocationDocuments(rec).find(item => item.id === document.getElementById('allocationInvoiceSelect').value); if (!rec || !doc) return;
-            document.getElementById('modalAdjustedInput').value = Math.min(getAdvanceRemaining(rec), doc.due).toFixed(2); updateModalRemainingPreview();
+            document.getElementById('modalAdjustedInput').value = (Math.floor((Math.min(getAdvanceRemaining(rec), doc.due) + 1e-8) * 100) / 100).toFixed(2); updateModalRemainingPreview();
         }
         function submitQuickAdjust(event) {
             event.preventDefault(); const id = document.getElementById('adjustEntryId').value, rec = records.find(item => String(item.id) === String(id)); if (!rec) return;
             const doc = getAllocationDocuments(rec).find(item => item.id === document.getElementById('allocationInvoiceSelect').value), amount = Number(document.getElementById('modalAdjustedInput').value);
-            const limit = doc ? Math.min(getAdvanceRemaining(rec), doc.due) : 0;
+            const limit = doc ? Math.floor((Math.min(getAdvanceRemaining(rec), doc.due) + 1e-8) * 100) / 100 : 0;
             if (!doc) return showToast('Choose an open invoice or supplier bill.', 'error');
-            if (!Number.isFinite(amount) || amount <= 0 || amount > limit + .005) return showToast('Allocation cannot exceed the invoice due or remaining advance.', 'error');
+            const roundedAmount = Math.round(amount * 100) / 100;
+            if (!Number.isFinite(amount) || roundedAmount <= 0 || roundedAmount > limit) return showToast('Enter a positive amount within the invoice due and remaining advance.', 'error');
             const before = JSON.parse(JSON.stringify(rec));
-            const allocation = { id: 'adv-alloc-' + rec.id + '-' + Date.now(), type: 'invoice_allocation', advanceId: String(rec.id), documentType: doc.documentType, documentId: doc.id, invoiceId: doc.documentType === 'sales_invoice' ? doc.id : '', purchaseRowIds: doc.purchaseRowIds || [], invoiceNo: doc.invoiceNo, partyId: doc.partyId || rec.partyId || '', partyName: doc.partyName || rec.partyName, amount: Math.round(amount * 100) / 100, date: toLocalDateInput(new Date()), status: 'active', note: document.getElementById('modalAdjustNote').value.trim(), createdAt: new Date().toISOString(), createdBy: localStorage.getItem('currentUser') || 'System' };
+            const allocation = { id: 'adv-alloc-' + rec.id + '-' + Date.now(), type: 'invoice_allocation', advanceId: String(rec.id), documentType: doc.documentType, documentId: doc.id, invoiceId: doc.documentType === 'sales_invoice' ? doc.id : '', purchaseRowIds: doc.purchaseRowIds || [], invoiceNo: doc.invoiceNo, partyId: doc.partyId || rec.partyId || '', partyName: doc.partyName || rec.partyName, amount: roundedAmount, date: toLocalDateInput(new Date()), status: 'active', note: document.getElementById('modalAdjustNote').value.trim(), createdAt: new Date().toISOString(), createdBy: localStorage.getItem('currentUser') || 'System' };
             rec.allocations = [...(rec.allocations || []), allocation]; rec.adjustedAmount = Math.min(Number(rec.amount) || 0, (Number(rec.adjustedAmount) || 0) + allocation.amount);
             rec.status = getAdvanceRemaining(rec) <= 0 ? 'Settled' : 'Partially Adjusted';
             logAuditEvent('Invoice Allocation Created', rec, before, rec); saveData(); queueAdvanceSync('save', rec.id, rec); refreshUI();
             document.getElementById('modalAdjustedInput').value = ''; document.getElementById('modalAdjustNote').value = ''; populateAllocationInvoiceOptions(rec); renderInvoiceAllocationHistory(rec);
-            showToast('Applied ' + formatMoney(allocation.amount) + ' to invoice ' + allocation.invoiceNo + '. No cash entry was created.');
+            showToast('Applied ' + formatMoney(allocation.amount) + ' to ' + (allocation.documentType === 'sales_invoice' ? 'invoice ' : 'supplier bill ') + allocation.invoiceNo + '. No cash entry was created.');
         }
         // --- Print Voucher Modal ---
         function openVoucherModal(id) {
