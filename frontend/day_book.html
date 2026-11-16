@@ -502,19 +502,23 @@
             advances.forEach(advance => {
                 const date = (advance.paymentDate || '').split('T')[0], customer = advance.entityType === 'Customer';
                 const cashMode = String(advance.paymentMode || '').toLowerCase() === 'cash', amount = Number(advance.amount) || 0;
-                if (date && isInRange(date) && amount > 0) transactions.push({ date, type: customer ? 'Receipt' : 'Payment', no: advance.voucherNo || advance.id,
+                if (date && isInRange(date) && amount > 0) transactions.push({
+                    date, type: customer ? 'Receipt' : 'Payment', no: advance.voucherNo || advance.id,
                     particulars: (customer ? 'Customer Advance Receipt - ' : 'Supplier Advance Payment - ') + (advance.partyName || 'Party'), debit: 0, credit: 0,
                     cash: cashMode ? (customer ? amount : -amount) : 0, bank: cashMode ? 0 : (customer ? amount : -amount),
                     bankDetails: advance.accountId ? getBankInfoById(advance.accountId) : (cashMode ? '' : (advance.paymentMode || 'Bank')),
-                    sourceType: 'advance', sourceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || '' });
+                    sourceType: 'advance', sourceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || ''
+                });
                 (advance.refunds || []).forEach(refund => {
                     const refundDate = (refund.date || refund.paymentDate || '').split('T')[0], refundCash = String(refund.paymentMode || '').toLowerCase() === 'cash', refundAmount = Number(refund.amount) || 0;
                     if (!refundDate || !isInRange(refundDate) || refundAmount <= 0) return;
-                    transactions.push({ date: refundDate, type: customer ? 'Payment' : 'Receipt', no: refund.id || advance.voucherNo || advance.id,
+                    transactions.push({
+                        date: refundDate, type: customer ? 'Payment' : 'Receipt', no: refund.id || advance.voucherNo || advance.id,
                         particulars: (customer ? 'Customer Advance Refund - ' : 'Supplier Advance Refund Received - ') + (advance.partyName || 'Party'), debit: 0, credit: 0,
                         cash: refundCash ? (customer ? -refundAmount : refundAmount) : 0, bank: refundCash ? 0 : (customer ? -refundAmount : refundAmount),
                         bankDetails: refund.accountId ? getBankInfoById(refund.accountId) : (refundCash ? '' : (refund.paymentMode || 'Bank')),
-                        sourceType: 'advance_refund', sourceId: String(refund.id || advance.id), advanceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || '' });
+                        sourceType: 'advance_refund', sourceId: String(refund.id || advance.id), advanceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || ''
+                    });
                 });
             });
 

@@ -1034,6 +1034,38 @@
             }
         }
 
+        function getSupplierBillAdvanceApplied(supplierName, invoiceNo) {
+            if (!invoiceNo) return 0;
+            return JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]').reduce((sum, record) => sum + (record.allocations || []).filter(item => item.type === 'invoice_allocation' && item.documentType === 'supplier_bill' && item.status !== 'reversed' && String(item.invoiceNo || '').trim().toLowerCase() === String(invoiceNo).trim().toLowerCase() && String(item.partyName || record.partyName || '').trim().toLowerCase() === String(supplierName || '').trim().toLowerCase()).reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
+        }
+        function getSupplierBillLineTotal(row) {
+            const base = (Number(row.qty) || 0) * (Number(row.price) || 0), discount = Number(row.discount) || 0;
+            const taxable = base - (row.discType === 'flat' ? discount : base * discount / 100) + (Number(row.freightCharges) || 0) + (Number(row.packingCharges) || 0) + (Number(row.loadingCharges) || 0);
+            return Math.max(0, taxable + taxable * (Number(row.gst) || 0) / 100 + (Number(row.roundOff) || 0));
+        }
+        function getSupplierBillPaid(row) {
+            if (Array.isArray(row.paymentHistory) && row.paymentHistory.length) return row.paymentHistory.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            return Number(row.paid ?? ((Number(row.paid_cash) || 0) + (Number(row.paid_bank) || 0))) || 0;
+        }
+        function calculateSupplierDues(purchases) {
+            const groups = new Map();
+            purchases.forEach((row, index) => {
+                const name = String(row.supplierName || '').trim(), keyName = name.toLowerCase();
+                if (!keyName) return;
+                const invoice = String(row.supplierInv || '').trim(), key = keyName + '|' + (invoice ? invoice.toLowerCase() : 'row:' + String(row.id || index));
+                if (!groups.has(key)) groups.set(key, { name: keyName, invoice, rows: [] });
+                groups.get(key).rows.push(row);
+            });
+            const dues = {};
+            groups.forEach(group => {
+                const total = group.rows.reduce((sum, row) => sum + getSupplierBillLineTotal(row), 0);
+                const paid = group.rows.reduce((sum, row) => sum + getSupplierBillPaid(row), 0);
+                const advance = getSupplierBillAdvanceApplied(group.rows[0].supplierName, group.invoice);
+                dues[group.name] = (dues[group.name] || 0) + total - paid - advance;
+            });
+            return dues;
+        }
+
         let suppliers = [];
 
         async function syncAdvancePaymentLedgerData() {
@@ -2219,7 +2251,7 @@
             const rows = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]').filter(record => record.entityType === 'Supplier' && (record.partyId && supplier.id ? String(record.partyId) === String(supplier.id) : String(record.partyName || '').trim().toLowerCase() === String(supplier.name || '').trim().toLowerCase()));
             return rows.map(record => ({ id: record.id, voucher: record.voucherNo || record.id, date: record.paymentDate || '', kind: 'Advance paid', amount: Number(record.amount) || 0, reference: record.referenceType && record.orderRef ? record.referenceType + ': ' + record.orderRef : (record.orderRef || 'General advance') }))
                 .concat(rows.filter(record => !(record.allocations || []).length && Number(record.adjustedAmount) > 0).map(record => ({ id: record.id + '-legacy-adjustment', voucher: record.voucherNo || record.id, date: record.paymentDate || '', kind: 'Applied to bill/order', amount: -(Number(record.adjustedAmount) || 0), reference: record.orderRef || 'Legacy adjustment' })))
-                .concat(rows.flatMap(record => (record.allocations || []).map(item => ({ id: item.id, voucher: record.voucherNo || record.id, date: item.date || '', kind: Number(item.amount) < 0 ? 'Allocation reversed' : 'Applied to bill/order', amount: -(Number(item.amount) || 0), reference: item.reference || record.orderRef || 'Adjustment' }))))
+                .concat(rows.flatMap(record => (record.allocations || []).map(item => { const reversed = item.status === 'reversed'; const label = item.type === 'invoice_allocation' ? ((item.documentType === 'supplier_bill' ? 'Bill ' : 'Invoice ') + (item.invoiceNo || '')) : (item.reference || record.orderRef || 'Adjustment'); return { id: item.id, voucher: record.voucherNo || record.id, date: (reversed && item.reversedAt ? String(item.reversedAt).slice(0, 10) : item.date) || '', kind: reversed ? 'Allocation reversed' : 'Applied to bill/order', amount: (reversed ? 1 : -1) * (Number(item.amount) || 0), reference: label + (reversed && item.reversalReason ? ' · ' + item.reversalReason : '') }; })))
                 .concat(rows.flatMap(record => (record.refunds || []).map(item => ({ id: item.id, voucher: record.voucherNo || record.id, date: item.date || '', kind: 'Supplier refund received', amount: -(Number(item.amount) || 0), reference: item.paymentMode || 'Refund' }))));
         }
 
@@ -2440,18 +2472,7 @@
 
             // Calculate Total Due for all suppliers
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            const supplierDues = {};
-            purchases.forEach(p => {
-                const name = (p.supplierName || "").trim().toLowerCase();
-                if (name) {
-                    const qty = parseFloat(p.qty) || 0;
-                    const price = parseFloat(p.price) || 0;
-                    const gst = parseFloat(p.gst) || 0;
-                    const total = (qty * price) * (1 + gst / 100);
-                    const paid = parseFloat(p.paid) || 0;
-                    supplierDues[name] = (supplierDues[name] || 0) + (total - paid);
-                }
-            });
+            const supplierDues = calculateSupplierDues(purchases);
             suppliers.forEach(s => {
                 s.totalDue = supplierDues[(s.name || "").trim().toLowerCase()] || 0;
             });
@@ -2613,18 +2634,7 @@
             const customFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive);
 
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
-            const supplierDues = {};
-            purchases.forEach(p => {
-                const name = (p.supplierName || "").trim().toLowerCase();
-                if (name) {
-                    const qty = parseFloat(p.qty) || 0;
-                    const price = parseFloat(p.price) || 0;
-                    const gst = parseFloat(p.gst) || 0;
-                    const total = (qty * price) * (1 + gst / 100);
-                    const paid = parseFloat(p.paid) || 0;
-                    supplierDues[name] = (supplierDues[name] || 0) + (total - paid);
-                }
-            });
+            const supplierDues = calculateSupplierDues(purchases);
 
             const headers = ["Name", "Contact", "Email", "GSTIN", "Address", "PIN", "District", "State", "Type", "Description", "Total Due", "State Code", ...customFields.map(cf => cf.fieldLabel)];
             const rows = suppliers.map(s => {

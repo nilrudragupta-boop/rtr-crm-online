@@ -710,7 +710,8 @@
                 </div>
                 <h3 style="margin: 0 0 0 10px;">Grand Total: ₹ <span id="Total">0.00</span></h3>
             </div>
-            <div style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:10px; padding:8px; background:#f7f9fb; border-radius:5px;">
+            <div
+                style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:10px; padding:8px; background:#f7f9fb; border-radius:5px;">
                 <label for="amountReceivedNow" style="font-weight:600; color:#444;">Amount Received Now (₹):</label>
                 <input type="number" id="amountReceivedNow" min="0" step="0.01" value="0"
                     oninput="updatePaymentPreview()" style="width:130px; padding:6px; text-align:right; margin:0;">
@@ -720,9 +721,13 @@
                     <option value="Bank">Bank / UPI</option>
                     <option value="Other">Other</option>
                 </select>
-                <button type="button" onclick="setInvoicePaidInFull()" style="padding:6px 9px; background:#198754;">Paid in full</button>
+                <button type="button" onclick="setInvoicePaidInFull()" style="padding:6px 9px; background:#198754;">Paid
+                    in full</button>
                 <strong id="invoiceDuePreview" style="color:#c0392b;">Balance Due: ₹0.00</strong>
-                <small id="invoicePaymentHint" style="width:100%; text-align:right; color:#666;">Enter only what the customer pays now. Leave at ₹0 to save the invoice as unpaid / customer debt.</small>
+                <div id="invoiceAdvanceAllocationHistory"
+                    style="width:100%;text-align:right;font-size:12px;color:#475569;"></div>
+                <small id="invoicePaymentHint" style="width:100%; text-align:right; color:#666;">Enter only what the
+                    customer pays now. Leave at ₹0 to save the invoice as unpaid / customer debt.</small>
             </div>
         </div>
 
@@ -1943,6 +1948,7 @@
             const invoiceType = document.getElementById("invoiceType").value;
             const gstType = document.getElementById("gstType").value;
             const invoice_total = parseFloat(document.getElementById("Total").innerText.replace(/,/g, "")) || 0;
+            const advanceAppliedToCurrent = getSalesInvoiceAdvanceApplied(invoice_no, customer_name);
             const receivedRaw = document.getElementById("amountReceivedNow").value;
             const amountReceivedNow = Math.round((receivedRaw === "" ? 0 : Number(receivedRaw)) * 100) / 100;
             const initialPaymentMode = document.getElementById("initialPaymentMode").value || "Cash";
@@ -1957,7 +1963,7 @@
                 return;
             }
 
-            if (!Number.isFinite(amountReceivedNow) || amountReceivedNow < 0 || amountReceivedNow > invoice_total + 0.005) {
+            if (!Number.isFinite(amountReceivedNow) || amountReceivedNow < 0 || amountReceivedNow > Math.max(0, invoice_total - advanceAppliedToCurrent) + 0.005) {
                 showToast("Amount received must be between ₹0 and the invoice total.", "#e74c3c");
                 return;
             }
@@ -1990,7 +1996,7 @@
                     if (cName.toLowerCase() === customer_name.toLowerCase()) {
                         const total = parseFloat(inv.invoice_total || inv.total || 0);
                         const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
-                        currentOutstanding += (total - paid);
+                        currentOutstanding += (total - paid - getSalesInvoiceAdvanceApplied(inv.invoice_no || inv.invoiceNo, cName));
                     }
                 });
 
@@ -2002,7 +2008,7 @@
                     }
                 });
 
-                const newInvoiceDue = Math.max(0, invoice_total - amountReceivedNow);
+                const newInvoiceDue = Math.max(0, invoice_total - amountReceivedNow - advanceAppliedToCurrent);
                 if ((currentOutstanding + newInvoiceDue) > creditLimit) {
                     showToast(`⚠️ Credit Limit Exceeded! Limit: ₹${creditLimit}, Balance: ₹${currentOutstanding.toFixed(2)}`, "#dc3545");
                     return;
@@ -2171,7 +2177,7 @@
                 invoice_no, invoice_date, invoice_time, customer_name, address, contact, pin, district, state, stateCode, gst_no,
                 shipName, shipAddress, shipContact, shipPin, shipDistrict, shipState, shipStateCode, shipGST, isShipSame, printShipTo, lrNo, lrDate,
                 ewayBillNo, deliveryChallanNo, buyersOrderNo, buyersOrderDate, dispatchedThrough, dispatchedDetails, items, invoice_total,
-                total_paid: amountReceivedNow, total_due: Math.max(0, Math.round((invoice_total - amountReceivedNow) * 100) / 100),
+                total_paid: amountReceivedNow, total_due: Math.max(0, Math.round((invoice_total - amountReceivedNow - advanceAppliedToCurrent) * 100) / 100),
                 payment_date: amountReceivedNow > 0 ? invoice_date : "", paymentHistory: initialPaymentHistory,
                 paid_cash: initialPaymentMode === "Cash" ? amountReceivedNow : 0,
                 paid_bank: initialPaymentMode === "Bank" ? amountReceivedNow : 0,
@@ -2190,7 +2196,7 @@
                     if (existing.createdBy) audit.createdBy = existing.createdBy;
                     if (existing.createdDate) audit.createdDate = existing.createdDate;
 
-                    const updatedInvoice = { ...payload, ...audit };
+                    const updatedInvoice = { ...payload, ...audit, id: existing.id || payload.id };
                     ["total_paid", "total_due", "payment_date", "payment_date_cash", "payment_date_bank", "paid_cash", "paid_bank", "paid_amount", "paid", "paymentHistory", "paymentAuditTrail"]
                         .forEach(key => {
                             if (existing[key] !== undefined) updatedInvoice[key] = existing[key];
@@ -2724,26 +2730,60 @@
             updatePaymentPreview();
         }
 
+        async function syncAdvanceAllocationsForInvoicePage() {
+            if (!window.apiClient || typeof apiClient.getAdvancePayments !== 'function') return;
+            try {
+                const remote = await apiClient.getAdvancePayments(); if (!Array.isArray(remote)) return;
+                const local = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]'), pending = JSON.parse(localStorage.getItem('advanceflow_pending_sync') || '[]');
+                const pendingSaves = new Set(pending.filter(item => item.type !== 'delete').map(item => String(item.id))), pendingDeletes = new Set(pending.filter(item => item.type === 'delete').map(item => String(item.id)));
+                const merged = new Map(remote.filter(item => !pendingDeletes.has(String(item.id))).map((item, index) => [String(item.id || 'remote-' + index), item]));
+                local.filter(item => pendingSaves.has(String(item.id))).forEach(item => merged.set(String(item.id), item));
+                localStorage.setItem('advanceflow_records_v1', JSON.stringify(Array.from(merged.values())));
+            } catch (error) { console.warn('Could not refresh advance allocations from server.', error); }
+        }
+        function getSalesInvoiceAdvanceAllocations(invoiceNo, customerName) {
+            const records = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]');
+            return records.flatMap(record => (record.allocations || []).filter(item => item.type === 'invoice_allocation' && item.documentType === 'sales_invoice' && item.status !== 'reversed' && String(item.invoiceNo || '').trim().toLowerCase() === String(invoiceNo || '').trim().toLowerCase() && String(item.partyName || record.partyName || '').trim().toLowerCase() === String(customerName || '').trim().toLowerCase()).map(item => ({ ...item, advanceVoucher: record.voucherNo || record.id })));
+        }
+        function getAllSalesInvoiceAdvanceAllocations(invoiceNo, customerName) {
+            return JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]').flatMap(record => (record.allocations || []).filter(item => item.type === 'invoice_allocation' && item.documentType === 'sales_invoice' && String(item.invoiceNo || '').trim().toLowerCase() === String(invoiceNo || '').trim().toLowerCase() && String(item.partyName || record.partyName || '').trim().toLowerCase() === String(customerName || '').trim().toLowerCase()).map(item => ({ ...item, advanceVoucher: record.voucherNo || record.id })));
+        }
+        function getSalesInvoiceAdvanceApplied(invoiceNo, customerName) {
+            return getSalesInvoiceAdvanceAllocations(invoiceNo, customerName).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        }
+        function renderSalesInvoiceAdvanceHistory() {
+            const container = document.getElementById('invoiceAdvanceAllocationHistory');
+            if (!container) return;
+            const rows = getAllSalesInvoiceAdvanceAllocations(document.getElementById('invoiceNo').value, document.getElementById('custName').value);
+            const active = rows.filter(item => item.status !== 'reversed');
+            container.innerHTML = rows.length ? 'Advance applied: ₹' + active.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' · ' + rows.map(item => escapeHtml(item.advanceVoucher) + (item.status === 'reversed' ? ' reversal of ' : ' applied ') + '₹' + (Number(item.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' on ' + escapeHtml(item.date || '-') + (item.reversalReason ? ' · ' + escapeHtml(item.reversalReason) : '')).join(' · ') : 'No advance allocations against this invoice.';
+        }
+
         function updatePaymentPreview() {
             const total = parseFloat(document.getElementById("Total").innerText.replace(/,/g, "")) || 0;
             const amountInput = document.getElementById("amountReceivedNow");
             const amount = amountInput.value === "" ? 0 : Number(amountInput.value);
+            const invoiceNo = document.getElementById('invoiceNo').value.trim();
+            const customerName = document.getElementById('custName').value.trim();
+            const advanceApplied = getSalesInvoiceAdvanceApplied(invoiceNo, customerName);
+            const availableForCash = Math.max(0, total - advanceApplied);
             const duePreview = document.getElementById("invoiceDuePreview");
             const hint = document.getElementById("invoicePaymentHint");
-            if (!Number.isFinite(amount) || amount < 0 || amount > total + 0.005) {
+            if (!Number.isFinite(amount) || amount < 0 || amount > availableForCash + 0.005) {
                 duePreview.textContent = "Balance Due: Check amount received";
                 duePreview.style.color = "#c0392b";
                 hint.textContent = "Amount received cannot be greater than the invoice total.";
                 hint.style.color = "#c0392b";
                 return;
             }
-            const due = Math.max(0, Math.round((total - amount) * 100) / 100);
+            const due = Math.max(0, Math.round((total - amount - advanceApplied) * 100) / 100);
             duePreview.textContent = `Balance Due: ₹${due.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             duePreview.style.color = due > 0.005 ? "#c0392b" : "#198754";
             hint.textContent = isExistingInvoiceEdit
                 ? "Payment records for an existing invoice are managed from the Invoice Report."
                 : "Enter only what the customer pays now. Leave at ₹0 to save the invoice as unpaid / customer debt.";
             hint.style.color = "#666";
+            renderSalesInvoiceAdvanceHistory();
         }
 
         function setInvoicePaidInFull() {
@@ -3123,7 +3163,8 @@
         }
 
         // 🔸 Initialize page
-        window.onload = () => {
+        window.onload = async () => {
+            await syncAdvanceAllocationsForInvoicePage();
             window.currentBalanceCredit = Infinity;
             document.getElementById("invoice").style.display = "block";
             document.getElementById("invoiceDate").valueAsDate = new Date();

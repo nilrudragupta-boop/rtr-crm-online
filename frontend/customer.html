@@ -1996,7 +1996,7 @@
             const rows = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]').filter(record => record.entityType === 'Customer' && (record.partyId && customer.id ? String(record.partyId) === String(customer.id) : String(record.partyName || '').trim().toLowerCase() === String(customer.name || '').trim().toLowerCase()));
             return rows.map(record => ({ id: record.id, voucher: record.voucherNo || record.id, date: record.paymentDate || '', kind: 'Advance received', amount: Number(record.amount) || 0, reference: record.referenceType && record.orderRef ? record.referenceType + ': ' + record.orderRef : (record.orderRef || 'General advance') }))
                 .concat(rows.filter(record => !(record.allocations || []).length && Number(record.adjustedAmount) > 0).map(record => ({ id: record.id + '-legacy-adjustment', voucher: record.voucherNo || record.id, date: record.paymentDate || '', kind: 'Applied to bill/order', amount: -(Number(record.adjustedAmount) || 0), reference: record.orderRef || 'Legacy adjustment' })))
-                .concat(rows.flatMap(record => (record.allocations || []).map(item => ({ id: item.id, voucher: record.voucherNo || record.id, date: item.date || '', kind: Number(item.amount) < 0 ? 'Allocation reversed' : 'Applied to bill/order', amount: -(Number(item.amount) || 0), reference: item.reference || record.orderRef || 'Adjustment' }))))
+                .concat(rows.flatMap(record => (record.allocations || []).map(item => { const reversed = item.status === 'reversed'; const label = item.type === 'invoice_allocation' ? ((item.documentType === 'supplier_bill' ? 'Bill ' : 'Invoice ') + (item.invoiceNo || '')) : (item.reference || record.orderRef || 'Adjustment'); return { id: item.id, voucher: record.voucherNo || record.id, date: (reversed && item.reversedAt ? String(item.reversedAt).slice(0, 10) : item.date) || '', kind: reversed ? 'Allocation reversed' : 'Applied to bill/order', amount: (reversed ? 1 : -1) * (Number(item.amount) || 0), reference: label + (reversed && item.reversalReason ? ' · ' + item.reversalReason : '') }; })))
                 .concat(rows.flatMap(record => (record.refunds || []).map(item => ({ id: item.id, voucher: record.voucherNo || record.id, date: item.date || '', kind: 'Advance refunded', amount: -(Number(item.amount) || 0), reference: item.paymentMode || 'Refund' }))));
         }
 
@@ -2624,6 +2624,12 @@
             tfoot.appendChild(tr);
         }
 
+        function getCustomerInvoiceAdvanceApplied(invoice) {
+            const invoiceNo = invoice.invoice_no || invoice.invoiceNo || '';
+            const partyName = invoice.customer_name || invoice.customer?.name || '';
+            return JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]').reduce((sum, record) => sum + (record.allocations || []).filter(item => item.type === 'invoice_allocation' && item.documentType === 'sales_invoice' && item.status !== 'reversed' && String(item.invoiceNo || '').trim().toLowerCase() === String(invoiceNo).trim().toLowerCase() && String(item.partyName || record.partyName || '').trim().toLowerCase() === String(partyName).trim().toLowerCase()).reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
+        }
+
         function calculateOutstanding(c) {
             let balance = parseFloat(c.openingBalance) || 0;
             if (c.openingBalanceType === 'Cr') balance = -balance;
@@ -2633,7 +2639,7 @@
                 if (cName.toLowerCase() === (c.name || "").toLowerCase()) {
                     const total = parseFloat(inv.invoice_total || inv.total || 0);
                     const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
-                    balance += (total - paid);
+                    balance += (total - paid - getCustomerInvoiceAdvanceApplied(inv));
                 }
             });
 
