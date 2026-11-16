@@ -433,7 +433,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_factory_reset', label: 'Settings: Factory Reset' },
     { id: 'perm_tally_gateway', label: 'Tally Gateway', defaultValue: false },
     { id: 'perm_banking', label: 'Banking Module' },
-    { id: 'perm_journal_voucher', label: 'Journal Voucher' },
+    { id: 'perm_journal_voucher', label: 'Journal Voucher', defaultValue: false },
     { id: 'perm_day_book', label: 'Day Book' },
     { id: 'perm_cash_flow', label: 'Cash Flow' },
     { id: 'perm_custom_fields', label: 'Custom Field Settings' },

@@ -207,6 +207,7 @@
             <option value="Sales">Sales</option>
             <option value="Purchase">Purchase</option>
             <option value="Payment">Payment</option>
+            <option value="Receipt">Receipt</option>
             <option value="Journal">Journal</option>
             <option value="Credit Note">Credit Note</option>
             <option value="Debit Note">Debit Note</option>
@@ -291,6 +292,7 @@
                 ['expenses', 'getExpenses', r => r.id || r.expense_id],
                 ['bank_transactions', 'getBankTransactions', r => r.id],
                 ['bank_accounts', 'getBankAccounts', r => r.id],
+                ['advanceflow_records_v1', 'getAdvancePayments', r => r.id],
                 ['journal_vouchers', 'getJournalVouchers', r => r.id || r.voucherNo || r.voucher_no],
                 ['credit_debit_notes', 'getCreditDebitNotes', r => r.id || r.noteNo || r.note_no]
             ];
@@ -304,8 +306,13 @@
                     if (Array.isArray(parsed)) localRows = parsed;
                 } catch (_) { }
                 const merged = new Map();
-                localRows.forEach((row, index) => merged.set(getId(row) || `local-${index}`, row));
-                remoteRows.forEach((row, index) => merged.set(getId(row) || `remote-${index}`, row));
+                const pending = storageKey === 'advanceflow_records_v1' ? JSON.parse(localStorage.getItem('advanceflow_pending_sync') || '[]') : [];
+                const pendingDeletes = new Set(pending.filter(item => item.type === 'delete').map(item => String(item.id)));
+                remoteRows.filter(row => !pendingDeletes.has(String(getId(row)))).forEach((row, index) => merged.set(getId(row) || 'remote-' + index, row));
+                if (storageKey === 'advanceflow_records_v1') {
+                    const pendingSaves = new Set(pending.filter(item => item.type !== 'delete').map(item => String(item.id)));
+                    localRows.filter(row => pendingSaves.has(String(getId(row)))).forEach(row => merged.set(String(getId(row)), row));
+                } else localRows.forEach((row, index) => merged.set(getId(row) || 'local-' + index, row));
                 localStorage.setItem(storageKey, JSON.stringify(Array.from(merged.values())));
             }));
         }
@@ -385,7 +392,7 @@
             };
 
             const getBankInfoById = (accId) => {
-                const acc = bankAccounts.find(a => a.id === accId);
+                const acc = bankAccounts.find(a => String(a.id) === String(accId));
                 return acc ? `${acc.name} (${acc.number})` : '';
             };
 
@@ -490,6 +497,27 @@
             });
 
             // 3. Expenses
+            // Advance money movements are posted once; applications are non-cash.
+            const advances = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]');
+            advances.forEach(advance => {
+                const date = (advance.paymentDate || '').split('T')[0], customer = advance.entityType === 'Customer';
+                const cashMode = String(advance.paymentMode || '').toLowerCase() === 'cash', amount = Number(advance.amount) || 0;
+                if (date && isInRange(date) && amount > 0) transactions.push({ date, type: customer ? 'Receipt' : 'Payment', no: advance.voucherNo || advance.id,
+                    particulars: (customer ? 'Customer Advance Receipt - ' : 'Supplier Advance Payment - ') + (advance.partyName || 'Party'), debit: 0, credit: 0,
+                    cash: cashMode ? (customer ? amount : -amount) : 0, bank: cashMode ? 0 : (customer ? amount : -amount),
+                    bankDetails: advance.accountId ? getBankInfoById(advance.accountId) : (cashMode ? '' : (advance.paymentMode || 'Bank')),
+                    sourceType: 'advance', sourceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || '' });
+                (advance.refunds || []).forEach(refund => {
+                    const refundDate = (refund.date || refund.paymentDate || '').split('T')[0], refundCash = String(refund.paymentMode || '').toLowerCase() === 'cash', refundAmount = Number(refund.amount) || 0;
+                    if (!refundDate || !isInRange(refundDate) || refundAmount <= 0) return;
+                    transactions.push({ date: refundDate, type: customer ? 'Payment' : 'Receipt', no: refund.id || advance.voucherNo || advance.id,
+                        particulars: (customer ? 'Customer Advance Refund - ' : 'Supplier Advance Refund Received - ') + (advance.partyName || 'Party'), debit: 0, credit: 0,
+                        cash: refundCash ? (customer ? -refundAmount : refundAmount) : 0, bank: refundCash ? 0 : (customer ? -refundAmount : refundAmount),
+                        bankDetails: refund.accountId ? getBankInfoById(refund.accountId) : (refundCash ? '' : (refund.paymentMode || 'Bank')),
+                        sourceType: 'advance_refund', sourceId: String(refund.id || advance.id), advanceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || '' });
+                });
+            });
+
             const expenses = JSON.parse(localStorage.getItem("expenses")) || [];
             expenses.forEach(e => {
                 const d = (e.expense_date || e.date || "").split('T')[0];

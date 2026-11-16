@@ -311,7 +311,7 @@
                         <div>
                             <label for="paymentMode" class="block text-xs font-semibold text-slate-700 mb-1">Payment
                                 Mode <span class="text-rose-500">*</span></label>
-                            <select id="paymentMode" required
+                            <select id="paymentMode" required onchange="updateAdvanceAccountRequirement()"
                                 class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition">
                                 <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
                                 <option value="UPI">UPI / QR Transfer</option>
@@ -321,6 +321,10 @@
                             </select>
                         </div>
 
+                        <div>
+                            <label for="advanceAccountId" class="block text-xs font-semibold text-slate-700 mb-1">Cash / Bank Account</label>
+                            <select id="advanceAccountId" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white"><option value="">Cash in Hand (Cash mode)</option></select>
+                        </div>
                         <div>
                             <label for="transactionRef" class="block text-xs font-semibold text-slate-700 mb-1">UTR /
                                 Cheque / Ref ID</label>
@@ -348,7 +352,7 @@
                                 <option value="Open">Unadjusted / Open</option>
                                 <option value="Partially Adjusted">Partially Adjusted</option>
                                 <option value="Settled">Fully Adjusted / Settled</option>
-                                <option value="Refunded">Refunded / Cancelled</option>
+                                <option value="Refunded">Refunded (record via refund action)</option>
                             </select>
                         </div>
                     </div>
@@ -515,8 +519,29 @@
         </div>
     </main>
 
+    <div id="refundModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 p-4">
+        <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div class="flex items-center justify-between bg-slate-900 px-5 py-4 text-white">
+                <h3 class="font-semibold"><i class="fa-solid fa-arrow-rotate-left mr-2 text-rose-300"></i>Record Advance Refund</h3>
+                <button type="button" onclick="closeModal('refundModal')" class="text-slate-300 hover:text-white" aria-label="Close refund form"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="submitAdvanceRefund(event)" class="space-y-4 p-5">
+                <input type="hidden" id="refundEntryId">
+                <p id="refundPartySummary" class="rounded-lg bg-slate-50 p-3 text-sm text-slate-600"></p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div><label for="refundAmount" class="mb-1 block text-xs font-semibold text-slate-700">Refund Amount</label><input id="refundAmount" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></div>
+                    <div><label for="refundDate" class="mb-1 block text-xs font-semibold text-slate-700">Refund Date</label><input id="refundDate" type="date" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></div>
+                    <div><label for="refundPaymentMode" class="mb-1 block text-xs font-semibold text-slate-700">Payment Mode</label><select id="refundPaymentMode" onchange="updateRefundAccountRequirement()" required class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option>Bank Transfer</option><option>UPI</option><option>Cheque</option><option>Cash</option><option>Card</option></select></div>
+                    <div><label for="refundAccountId" class="mb-1 block text-xs font-semibold text-slate-700">Cash / Bank Account</label><select id="refundAccountId" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select></div>
+                </div>
+                <div><label for="refundTransactionRef" class="mb-1 block text-xs font-semibold text-slate-700">Transaction Reference</label><input id="refundTransactionRef" type="text" placeholder="UTR / cheque number" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></div>
+                <div class="flex justify-end gap-2 pt-1"><button type="button" onclick="closeModal('refundModal')" class="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600">Cancel</button><button type="submit" class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Save Refund</button></div>
+            </form>
+        </div>
+    </div>
     <div id="rowActionMenu" class="hidden fixed z-50 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
         <button onclick="runRowAction('adjust')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-amber-50 hover:text-amber-700"><i class="fa-solid fa-sliders w-4"></i>Adjust / Settle</button>
+        <button onclick="runRowAction('refund')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"><i class="fa-solid fa-arrow-rotate-left w-4"></i>Record Refund</button>
         <button onclick="runRowAction('voucher')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"><i class="fa-solid fa-print w-4"></i>View Voucher</button>
         <button onclick="runRowAction('edit')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"><i class="fa-solid fa-pen w-4"></i>Edit Entry</button>
         <button onclick="runRowAction('audit')" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-sky-50 hover:text-sky-700"><i class="fa-solid fa-clock-rotate-left w-4"></i>Audit Log</button>
@@ -735,6 +760,75 @@
         let advanceSyncRunning = false;
         let auditSyncRunning = false;
 
+        function loadAdvanceAccounts(selectedId = '') {
+            const select = document.getElementById('advanceAccountId');
+            if (!select) return;
+            const accounts = readLocalArray('bank_accounts');
+            select.innerHTML = '<option value="">Cash in Hand (Cash mode)</option>' + accounts.map(account => '<option value="' + escapeHtml(account.id) + '">' + escapeHtml(account.name || account.bankName || 'Bank Account') + (account.number ? ' (' + escapeHtml(account.number) + ')' : '') + '</option>').join('');
+            select.value = selectedId || '';
+        }
+        function updateAdvanceAccountRequirement() { const mode = document.getElementById('paymentMode')?.value; const select = document.getElementById('advanceAccountId'); if (select) select.required = mode !== 'Cash'; }
+        function getAdvanceRefundTotal(record) { return (record.refunds || []).reduce((sum, refund) => sum + (Number(refund.amount) || 0), 0); }
+        function getAdvanceRemaining(record) { return Math.max(0, (Number(record.amount) || 0) - (Number(record.adjustedAmount) || 0) - getAdvanceRefundTotal(record)); }
+
+        function loadRefundAccounts(selectedId = '') {
+            const select = document.getElementById('refundAccountId');
+            const accounts = readLocalArray('bank_accounts');
+            select.innerHTML = '<option value="">Cash in Hand (Cash mode)</option>' + accounts.map(account => '<option value="' + escapeHtml(account.id) + '">' + escapeHtml(account.name || account.bankName || 'Bank Account') + (account.number ? ' (' + escapeHtml(account.number) + ')' : '') + '</option>').join('');
+            select.value = selectedId || '';
+        }
+
+        function updateRefundAccountRequirement() {
+            const mode = document.getElementById('refundPaymentMode').value;
+            const select = document.getElementById('refundAccountId');
+            select.required = mode !== 'Cash';
+        }
+
+        function openRefundModal(id) {
+            const record = records.find(item => String(item.id) === String(id));
+            if (!record) return;
+            const remaining = getAdvanceRemaining(record);
+            if (remaining <= 0) return showToast('There is no refundable advance balance.', 'error');
+            document.getElementById('refundEntryId').value = record.id;
+            document.getElementById('refundPartySummary').textContent = record.voucherNo + ' · ' + record.entityType + ' · ' + record.partyName + ' · Available ' + formatMoney(remaining);
+            document.getElementById('refundAmount').max = remaining.toFixed(2);
+            document.getElementById('refundAmount').value = remaining.toFixed(2);
+            document.getElementById('refundDate').value = toLocalDateInput(new Date());
+            document.getElementById('refundPaymentMode').value = record.paymentMode || 'Bank Transfer';
+            document.getElementById('refundTransactionRef').value = '';
+            loadRefundAccounts(record.accountId || '');
+            updateRefundAccountRequirement();
+            const modal = document.getElementById('refundModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function submitAdvanceRefund(event) {
+            event.preventDefault();
+            const id = document.getElementById('refundEntryId').value;
+            const record = records.find(item => String(item.id) === String(id));
+            if (!record) return;
+            const remaining = getAdvanceRemaining(record);
+            const amount = Number(document.getElementById('refundAmount').value);
+            const date = document.getElementById('refundDate').value;
+            const paymentMode = document.getElementById('refundPaymentMode').value;
+            const accountId = paymentMode === 'Cash' ? '' : document.getElementById('refundAccountId').value;
+            const transactionRef = document.getElementById('refundTransactionRef').value.trim();
+            const parsedDate = new Date(date + 'T00:00:00');
+            if (!Number.isFinite(amount) || amount <= 0 || amount > remaining) return showToast('Refund amount must be within the available advance balance.', 'error');
+            if (!date || Number.isNaN(parsedDate.getTime()) || toLocalDateInput(parsedDate) !== date) return showToast('Enter a valid refund date.', 'error');
+            if (paymentMode !== 'Cash' && !accountId) return showToast('Choose the bank account used for this refund.', 'error');
+            const before = JSON.parse(JSON.stringify(record));
+            record.refunds = [...(record.refunds || []), { id: 'refund-' + record.id + '-' + Date.now(), amount, date, paymentMode, accountId, transactionRef, createdAt: new Date().toISOString() }];
+            if (getAdvanceRemaining(record) <= 0) record.status = 'Refunded';
+            logAuditEvent('Refund Recorded', record, before, record);
+            saveData();
+            queueAdvanceSync('save', record.id, record);
+            refreshUI();
+            closeModal('refundModal');
+            showToast('Refund of ' + formatMoney(amount) + ' recorded.');
+        }
+
         // Sample realistic data for first-time initialization
         const sampleRecords = [
             {
@@ -809,6 +903,8 @@
             updateAuditCount();
             ensureBrandNameVisible();
             updateCurrencyPrefixes();
+            loadAdvanceAccounts();
+            updateAdvanceAccountRequirement();
             loadData();
             resetForm();
             refreshUI();
@@ -875,9 +971,9 @@
         async function syncRemoteData() {
             if (typeof apiClient === 'undefined') return;
             try {
-                const [remoteAdvances, remoteCustomers, remoteSuppliers, remoteQuotes, remoteOrders, settings, remoteAudit] = await Promise.all([
+                const [remoteAdvances, remoteCustomers, remoteSuppliers, remoteQuotes, remoteOrders, settings, remoteAudit, remoteBankAccounts] = await Promise.all([
                     apiClient.getAdvancePayments(), apiClient.getCustomers(), apiClient.getSuppliers(),
-                    apiClient.getQuotations(), apiClient.getOrderSheets(), apiClient.getSettings(), apiClient.getAdvanceAudit()
+                    apiClient.getQuotations(), apiClient.getOrderSheets(), apiClient.getSettings(), apiClient.getAdvanceAudit(), apiClient.getBankAccounts().catch(() => null)
                 ]);
 
                 if (Array.isArray(remoteAdvances)) {
@@ -918,8 +1014,19 @@
                     localStorage.setItem('order_sheets', JSON.stringify([...remoteOrders, ...localOnlyOrders]));
                 }
 
+                if (Array.isArray(remoteBankAccounts)) { localStorage.setItem('bank_accounts', JSON.stringify(remoteBankAccounts)); loadAdvanceAccounts(document.getElementById('advanceAccountId')?.value || ''); updateAdvanceAccountRequirement(); }
                 if (Array.isArray(remoteAudit)) mergeRemoteAuditEvents(remoteAudit);
 
+                const relinkedIds = new Set();
+                records = records.map(record => {
+                    if (record.partyId) return record;
+                    const directory = partySources[record.entityType] || [];
+                    const matches = directory.filter(party => String(party.name || party.partyName || '').trim().toLocaleLowerCase() === String(record.partyName || '').trim().toLocaleLowerCase());
+                    if (matches.length !== 1 || !matches[0].id) return record;
+                    relinkedIds.add(String(record.id));
+                    return { ...record, partyId: matches[0].id };
+                });
+                if (relinkedIds.size) { saveData(); records.filter(record => relinkedIds.has(String(record.id))).forEach(record => queueAdvanceSync('save', record.id, record)); }
                 applyRemoteBrandSettings(settings);
                 updatePartyDatalist();
                 updateReferenceOptions();
@@ -992,6 +1099,7 @@
             if (!record) return null;
             return {
                 entityType: record.entityType || '',
+                partyId: record.partyId || '',
                 partyName: record.partyName || '',
                 partyContact: record.partyContact || '',
                 voucherNo: record.voucherNo || '',
@@ -999,6 +1107,9 @@
                 amount: Number(record.amount) || 0,
                 adjustedAmount: Number(record.adjustedAmount) || 0,
                 paymentMode: record.paymentMode || '',
+                accountId: record.accountId || '',
+                refunds: JSON.stringify(record.refunds || []),
+                allocations: JSON.stringify(record.allocations || []),
                 transactionRef: record.transactionRef || '',
                 reference: record.orderRef ? [record.referenceType, record.orderRef].filter(Boolean).join(': ') : '',
                 status: record.status || '',
@@ -1254,12 +1365,14 @@
             const amount = parseFloat(document.getElementById('amount').value) || 0;
             let adjusted = parseFloat(document.getElementById('adjustedAmount').value) || 0;
 
-            if (adjusted > amount && amount > 0) {
-                adjusted = amount;
-                document.getElementById('adjustedAmount').value = amount;
+            const formRecord = records.find(record => String(record.id) === String(document.getElementById('entryId').value));
+            const maxAdjusted = Math.max(0, amount - getAdvanceRefundTotal(formRecord || {}));
+            if (adjusted > maxAdjusted && amount > 0) {
+                adjusted = maxAdjusted;
+                document.getElementById('adjustedAmount').value = maxAdjusted;
             }
 
-            const remaining = Math.max(0, amount - adjusted);
+            const remaining = Math.max(0, amount - adjusted - getAdvanceRefundTotal(formRecord || {}));
             document.getElementById('formRemainingBalance').textContent = formatMoney(remaining);
 
             if (autoUpdateStatus && amount > 0) {
@@ -1278,9 +1391,16 @@
 
         function onStatusDropdownChange() {
             const status = document.getElementById('status').value;
+            if (status === 'Refunded') {
+                const existing = records.find(record => String(record.id) === String(document.getElementById('entryId').value));
+                if (!getAdvanceRefundTotal(existing || {})) { showToast('Record the refund using the Refund action so it is dated and linked.', 'error'); document.getElementById('status').value = existing?.status || 'Open'; }
+                recalculateFormBalance(false);
+                return;
+            }
             const amount = parseFloat(document.getElementById('amount').value) || 0;
             if (status === 'Settled' && amount > 0) {
-                document.getElementById('adjustedAmount').value = amount;
+                const formRecord = records.find(record => String(record.id) === String(document.getElementById('entryId').value));
+                document.getElementById('adjustedAmount').value = Math.max(0, amount - getAdvanceRefundTotal(formRecord || {}));
             } else if (status === 'Open') {
                 document.getElementById('adjustedAmount').value = 0;
             }
@@ -1294,6 +1414,7 @@
             const entityType = document.querySelector('input[name="entityType"]:checked').value;
             const partyName = document.getElementById('partyName').value.trim();
             const partyContact = document.getElementById('partyContact').value.trim();
+            const matchedParty = partySources[entityType].find(item => String(item.name || item.partyName || '').trim().toLocaleLowerCase() === partyName.toLocaleLowerCase());
             const voucherNo = document.getElementById('voucherNo').value.trim();
             const paymentDate = document.getElementById('paymentDate').value;
             const amount = parseFloat(document.getElementById('amount').value) || 0;
@@ -1305,29 +1426,45 @@
             const orderRef = linkedReference ? linkedReference.id : referenceText;
             const status = document.getElementById('status').value;
             const remarks = document.getElementById('remarks').value.trim();
+            const advanceId = id || 'adv-' + Date.now();
+            const selectedAccountId = document.getElementById('advanceAccountId').value || '';
 
             if (!partyName || !voucherNo || !paymentDate || amount <= 0) {
                 showToast('Please fill all required fields with valid amounts.', 'error');
                 return;
             }
 
+            if (paymentMode !== 'Cash' && !selectedAccountId) { showToast('Choose the bank account used for this advance.', 'error'); return; }
+
+            const refundedTotal = getAdvanceRefundTotal(existingRecord || {});
+            if (amount < adjustedAmount + refundedTotal) { showToast('Advance amount cannot be below the amount already adjusted and refunded.', 'error'); return; }
+            const effectiveAdjustment = Math.min(Math.max(0, amount - refundedTotal), adjustedAmount);
+            const priorAdjustment = Number(existingRecord?.adjustedAmount) || 0;
+            const priorAllocations = existingRecord?.allocations || (priorAdjustment > 0 ? [{ id: 'alloc-' + (existingRecord.id) + '-legacy', amount: priorAdjustment, reference: existingRecord.orderRef || 'Legacy adjustment', date: existingRecord.paymentDate || '', note: 'Migrated adjustment history' }] : []);
+            const effectiveStatus = getAdvanceRemaining({ amount, adjustedAmount: effectiveAdjustment, refunds: existingRecord?.refunds || [] }) <= 0 ? (refundedTotal > 0 ? 'Refunded' : 'Settled') : (effectiveAdjustment > 0 ? 'Partially Adjusted' : 'Open');
+            const adjustmentDelta = effectiveAdjustment - priorAdjustment;
+            const allocationHistory = adjustmentDelta ? [...priorAllocations, { id: 'alloc-' + (id || 'new') + '-' + Date.now(), amount: adjustmentDelta, referenceType: linkedReference?.type || existingRecord?.referenceType || '', referenceId: linkedReference?.id || existingRecord?.referenceId || '', reference: orderRef || remarks || 'General adjustment', date: paymentDate, note: remarks, createdAt: new Date().toISOString() }] : priorAllocations;
             const entryObj = {
-                id: id || 'adv-' + Date.now(),
+                id: advanceId,
                 entityType,
+                partyId: matchedParty?.id || existingRecord?.partyId || '',
                 partyName,
                 partyContact,
                 voucherNo,
                 paymentDate,
                 amount,
-                adjustedAmount: Math.min(amount, adjustedAmount),
+                adjustedAmount: effectiveAdjustment,
                 paymentMode,
+                accountId: paymentMode === 'Cash' ? '' : selectedAccountId,
+                refunds: existingRecord?.refunds || [],
+                allocations: allocationHistory,
                 transactionRef,
                 orderRef,
                 referenceType: linkedReference?.type || '',
                 referenceId: linkedReference?.id || '',
                 referenceDate: linkedReference?.date || '',
                 referenceAmount: linkedReference?.amount || '',
-                status,
+                status: effectiveStatus,
                 remarks
             };
 
@@ -1357,6 +1494,8 @@
 
         function resetForm() {
             document.getElementById('advanceForm').reset();
+            loadAdvanceAccounts('');
+            updateAdvanceAccountRequirement();
             document.getElementById('entryId').value = '';
             document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('voucherNo').value = generateNextVoucherNo();
@@ -1389,6 +1528,8 @@
             document.getElementById('amount').value = rec.amount;
             document.getElementById('adjustedAmount').value = rec.adjustedAmount || 0;
             document.getElementById('paymentMode').value = rec.paymentMode;
+            loadAdvanceAccounts(rec.accountId || '');
+            updateAdvanceAccountRequirement();
             document.getElementById('transactionRef').value = rec.transactionRef || '';
             document.getElementById('orderRef').value = rec.orderRef || '';
             const linkedReference = referenceOptions.find(option => option.type === rec.referenceType && option.id === rec.referenceId);
@@ -1417,7 +1558,7 @@
             records.forEach(r => {
                 const amt = parseFloat(r.amount) || 0;
                 const adj = parseFloat(r.adjustedAmount) || 0;
-                const rem = r.status === 'Refunded' ? 0 : Math.max(0, amt - adj);
+                const rem = getAdvanceRemaining(r);
 
                 if (r.entityType === 'Customer') {
                     custTotal += amt;
@@ -1535,7 +1676,7 @@
             emptyState.classList.add('hidden');
             tbody.innerHTML = pageRecords.map(r => {
                 const isCustomer = r.entityType === 'Customer';
-                const remaining = r.status === 'Refunded' ? 0 : Math.max(0, r.amount - (r.adjustedAmount || 0));
+                const remaining = getAdvanceRemaining(r);
 
                 const entityBadge = isCustomer
                     ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70"><i class="fa-solid fa-arrow-down-left text-[9px]"></i> Customer</span>`
@@ -1626,6 +1767,7 @@
             closeRowActionMenu();
             if (!id) return;
             if (action === 'adjust') openAdjustModal(id);
+            else if (action === 'refund') openRefundModal(id);
             else if (action === 'voucher') openVoucherModal(id);
             else if (action === 'edit') editRecord(id);
             else if (action === 'audit') openAuditTrail(id);
@@ -1666,7 +1808,7 @@
             const rec = records.find(r => r.id === id);
             if (!rec) return;
             const adj = parseFloat(document.getElementById('modalAdjustedInput').value) || 0;
-            const rem = Math.max(0, rec.amount - adj);
+            const rem = Math.max(0, rec.amount - adj - getAdvanceRefundTotal(rec));
             document.getElementById('modalRemainingPreview').textContent = formatMoney(rem);
         }
 
@@ -1678,9 +1820,13 @@
             const auditBefore = { ...rec };
 
             let newAdj = parseFloat(document.getElementById('modalAdjustedInput').value) || 0;
-            newAdj = Math.min(rec.amount, Math.max(0, newAdj));
+            newAdj = Math.min(Math.max(0, rec.amount - getAdvanceRefundTotal(rec)), Math.max(0, newAdj));
             const note = document.getElementById('modalAdjustNote').value.trim();
 
+            const priorAdjusted = Number(rec.adjustedAmount) || 0;
+            if (!(rec.allocations || []).length && priorAdjusted > 0) rec.allocations = [{ id: 'alloc-' + rec.id + '-legacy', amount: priorAdjusted, reference: rec.orderRef || 'Legacy adjustment', date: rec.paymentDate || '', note: 'Migrated adjustment history' }];
+            const adjustmentDelta = newAdj - priorAdjusted;
+            if (adjustmentDelta !== 0) rec.allocations = [...(rec.allocations || []), { id: 'alloc-' + rec.id + '-' + Date.now(), amount: adjustmentDelta, referenceType: rec.referenceType || '', referenceId: rec.referenceId || '', reference: rec.orderRef || note || 'General adjustment', date: toLocalDateInput(new Date()), note, createdAt: new Date().toISOString() }];
             rec.adjustedAmount = newAdj;
             if (newAdj === 0) {
                 rec.status = 'Open';
@@ -1708,7 +1854,7 @@
             if (!rec) return;
 
             const isCust = rec.entityType === 'Customer';
-            const remaining = rec.status === 'Refunded' ? 0 : Math.max(0, rec.amount - (rec.adjustedAmount || 0));
+            const remaining = getAdvanceRemaining(rec);
 
             document.getElementById('vPrintTitle').textContent = isCust ? 'CUSTOMER ADVANCE RECEIPT' : 'SUPPLIER ADVANCE PAYMENT VOUCHER';
             document.getElementById('vPrintVoucherNo').textContent = rec.voucherNo;
@@ -1781,7 +1927,7 @@
             ];
 
             const rows = filtered.map(r => {
-                const rem = r.status === 'Refunded' ? 0 : Math.max(0, r.amount - (r.adjustedAmount || 0));
+                const rem = getAdvanceRemaining(r);
                 return [
                     r.voucherNo,
                     r.paymentDate,

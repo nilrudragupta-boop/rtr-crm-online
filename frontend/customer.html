@@ -1977,6 +1977,29 @@
             else if (action === "receipt") handleCustomerReceipt(id);
         });
 
+        async function syncAdvancePaymentLedgerData() {
+            if (!window.apiClient || typeof apiClient.getAdvancePayments !== 'function') return;
+            try {
+                const remote = await apiClient.getAdvancePayments();
+                if (!Array.isArray(remote)) return;
+                const local = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]');
+                const pending = JSON.parse(localStorage.getItem('advanceflow_pending_sync') || '[]');
+                const pendingSaves = new Set(pending.filter(item => item.type !== 'delete').map(item => String(item.id)));
+                const pendingDeletes = new Set(pending.filter(item => item.type === 'delete').map(item => String(item.id)));
+                const merged = new Map(remote.filter(item => !pendingDeletes.has(String(item.id))).map((item,index) => [String(item.id || 'remote-' + index), item]));
+                local.filter(item => pendingSaves.has(String(item.id))).forEach(item => merged.set(String(item.id), item));
+                localStorage.setItem('advanceflow_records_v1', JSON.stringify(Array.from(merged.values())));
+            } catch (error) { console.warn('Advance ledger data remains available from local storage.', error); }
+        }
+
+        function getCustomerAdvanceLedger(customer) {
+            const rows = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]').filter(record => record.entityType === 'Customer' && (record.partyId && customer.id ? String(record.partyId) === String(customer.id) : String(record.partyName || '').trim().toLowerCase() === String(customer.name || '').trim().toLowerCase()));
+            return rows.map(record => ({ id: record.id, voucher: record.voucherNo || record.id, date: record.paymentDate || '', kind: 'Advance received', amount: Number(record.amount) || 0, reference: record.referenceType && record.orderRef ? record.referenceType + ': ' + record.orderRef : (record.orderRef || 'General advance') }))
+              .concat(rows.filter(record => !(record.allocations || []).length && Number(record.adjustedAmount) > 0).map(record => ({ id: record.id + '-legacy-adjustment', voucher: record.voucherNo || record.id, date: record.paymentDate || '', kind: 'Applied to bill/order', amount: -(Number(record.adjustedAmount) || 0), reference: record.orderRef || 'Legacy adjustment' })))
+              .concat(rows.flatMap(record => (record.allocations || []).map(item => ({ id: item.id, voucher: record.voucherNo || record.id, date: item.date || '', kind: Number(item.amount) < 0 ? 'Allocation reversed' : 'Applied to bill/order', amount: -(Number(item.amount) || 0), reference: item.reference || record.orderRef || 'Adjustment' }))))
+              .concat(rows.flatMap(record => (record.refunds || []).map(item => ({ id: item.id, voucher: record.voucherNo || record.id, date: item.date || '', kind: 'Advance refunded', amount: -(Number(item.amount) || 0), reference: item.paymentMode || 'Refund' })));
+        }
+
         function viewCustomer(id) {
             const cust = customers.find(c => String(c.id) === String(id));
             if (!cust) return showToast("Customer not found", "toast-warning");
@@ -1995,6 +2018,7 @@
                     <tr><th style="padding:8px; background:#f8f9fa;">Credit Limit</th><td style="padding:8px;">${cust.creditLimit ? '₹ ' + parseFloat(cust.creditLimit).toFixed(2) : 'Unlimited'}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Opening Balance</th><td style="padding:8px;">${cust.openingBalance ? ('₹ ' + cust.openingBalance + ' ' + (cust.openingBalanceType || 'Dr')) : '-'}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Total Outstanding</th><td style="padding:8px; font-weight:bold; color:${(cust.outstanding || calculateOutstanding(cust) || 0) > 0.01 ? '#dc3545' : '#28a745'};">₹ ${(cust.outstanding || calculateOutstanding(cust) || 0).toFixed(2)}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Unallocated Advances</th><td style="padding:8px; font-weight:bold;">₹ ${Math.max(0, getCustomerAdvanceLedger(cust).reduce((sum,item)=>sum+item.amount,0)).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>
                 </table>
             `;
 
@@ -2009,6 +2033,8 @@
                 html += `</table>`;
             }
 
+            const advanceRows = getCustomerAdvanceLedger(cust);
+            if (advanceRows.length) html += '<h4 style="margin-top:16px; border-bottom:1px solid #eee; padding-bottom:5px;">Advance Ledger</h4><table style="width:100%; border-collapse:collapse; font-size:13px;"><tr><th style="text-align:left; padding:6px;">Date / Voucher</th><th style="text-align:left; padding:6px;">Entry</th><th style="text-align:left; padding:6px;">Reference</th><th style="text-align:right; padding:6px;">Amount</th></tr>' + advanceRows.map(item => '<tr><td style="padding:6px;">' + escapeHtml(item.date || '-') + ' / ' + escapeHtml(item.voucher) + '</td><td style="padding:6px;">' + escapeHtml(item.kind) + '</td><td style="padding:6px;">' + escapeHtml(item.reference || '-') + '</td><td style="padding:6px; text-align:right;">₹ ' + item.amount.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</td></tr>').join('') + '</table>';
             document.getElementById('viewContent').innerHTML = html;
             document.getElementById('btnEditFromView').onclick = () => { closeViewModal(); pendingEditId = id; openEditModal(); };
             document.getElementById('viewModal').style.display = 'flex';
@@ -3102,6 +3128,7 @@ function openLedger(name) {
             loadDynamicFieldsConfig();
             renderDynamicFields();
             await fetchCustomersData();
+            await syncAdvancePaymentLedgerData();
             initFirebase();
             applyTheme();
             applyCompactView();
