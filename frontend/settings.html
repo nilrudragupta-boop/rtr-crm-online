@@ -513,13 +513,17 @@
                         </div>
                         <div style="background: #fff5f5; border: 1px solid #fed7d7; padding: 20px; border-radius: 8px;">
                             <h3 style="margin-top: 0; color: #c53030; font-size: 16px;">Factory Reset</h3>
-                            <p class="info-text" style="color: #c53030;">This action will permanently delete all local
-                                data
-                                including invoices, customers, items, and settings. This cannot be undone.</p>
-                            <button class="btn-danger" onclick="confirmFactoryReset()" style="width: 100%;">🗑️ Clear
-                                All
-                                Data
-                                (Factory Reset)</button>
+                        <p class="info-text" style="color: #c53030;">Reset data for signed-in user: <strong id="factoryResetUserLabel">Loading...</strong></p>
+                        <div style="padding:14px; margin-bottom:12px; background:#fff; border:1px solid #fed7d7; border-radius:6px;">
+                            <h4 style="margin:0 0 8px; color:#c53030;">1. Reset operational data</h4>
+                            <p class="info-text" style="margin:0 0 10px; color:#555;">Permanently deletes this user's data except Items, Customers, Suppliers, Contacts, Advance Payments, Banking, Employees, Expenses, Custom Fields, and Custom Sheets.</p>
+                            <button class="btn-danger" onclick="confirmPreservingFactoryReset()" style="width:100%;">🗑️ Reset Data (Keep Listed Areas)</button>
+                        </div>
+                        <div style="padding:14px; background:#fff; border:1px solid #fed7d7; border-radius:6px;">
+                            <h4 style="margin:0 0 8px; color:#c53030;">2. Full user reset</h4>
+                            <p class="info-text" style="margin:0 0 10px; color:#555;">Permanently deletes all data owned by this user, including the listed areas above. Login accounts and shared application settings are kept.</p>
+                            <button class="btn-danger" onclick="confirmFullFactoryReset()" style="width:100%;">🗑️ Delete All User Data (Full Reset)</button>
+                        </div>
                         </div>
                     </div>
 
@@ -2770,19 +2774,97 @@ function createResponse(obj) {
                     }
                 }
 
-                function confirmFactoryReset() {
-                    if (confirm("⚠️ CRITICAL WARNING: You are about to DELETE ALL DATA.\n\nThis includes all invoices, customers, items, and settings.\nThis action cannot be undone.\n\nAre you sure you want to proceed?")) {
-                        const confirmation = prompt("Type 'DELETE' to confirm factory reset:");
-                        if (confirmation === "DELETE") {
-                            localStorage.clear();
-                            sessionStorage.clear();
-                            alert("Factory Reset Complete. The application will now restart.");
-                            window.location.href = 'login.html';
-                        } else {
-                            if (confirmation !== null) alert("Reset cancelled. Verification failed.");
+                function getFactoryResetUser() {
+                    return String(localStorage.getItem('currentUser') || '').trim();
+                }
+
+                function isFactoryResetProtectedKey(key) {
+                    const normalized = String(key || '').toLowerCase();
+                    const protectedKeys = new Set([
+                        'items', 'customers', 'suppliers', 'contacts', 'crm_contacts', 'crmcontacts',
+                        'advance_payments', 'advancepayments', 'advancepayments', 'advanceaudit', 'advance_audit', 'advance_audit_events',
+                        'bank_accounts', 'bankaccounts', 'bank_transactions', 'banktransactions', 'beneficiaries', 'vendors', 'employees', 'employee', 'expenses',
+                        'custom_fields', 'customfields', 'custom_fields_cache', 'custom_fields_data', 'custompages', 'crmcustompages',
+                        'customrecords', 'custom_records'
+                    ]);
+                    return protectedKeys.has(normalized) || normalized.startsWith('custom_records_') || normalized.startsWith('custom_sheet_') || normalized.startsWith('custom_module_') || normalized.startsWith('custom_fields_');
+                }
+
+                function clearCurrentUserLocalFactoryData(user, mode) {
+                    const protectedMode = mode === 'preserve';
+                    const normalizedUser = user.toLowerCase();
+                    const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter(Boolean);
+                    keys.forEach(key => {
+                        if (protectedMode && isFactoryResetProtectedKey(key)) return;
+                        const normalizedKey = key.toLowerCase();
+                        if (normalizedKey.includes(normalizedUser) && /queue|pending|sync/i.test(normalizedKey)) {
+                            localStorage.removeItem(key);
+                            return;
                         }
+                        let value;
+                        try { value = JSON.parse(localStorage.getItem(key)); } catch (error) { return; }
+                        const belongsToUser = record => {
+                            if (!record || typeof record !== 'object') return false;
+                            const owner = record.createdBy || record.created_by || record.ownerUsername || record.sender || '';
+                            return String(owner).trim().toLowerCase() === normalizedUser;
+                        };
+                        if (Array.isArray(value)) {
+                            const remaining = value.filter(record => !belongsToUser(record));
+                            if (remaining.length !== value.length) localStorage.setItem(key, JSON.stringify(remaining));
+                        } else if (belongsToUser(value)) {
+                            localStorage.removeItem(key);
+                        }
+                    });
+                }
+
+                async function runFactoryReset(mode) {
+                    const user = getFactoryResetUser();
+                    if (!user || user.toLowerCase() === 'system') {
+                        alert('A signed-in user ID is required. Please sign in again before running a factory reset.');
+                        return;
+                    }
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/factory-reset${apiClient._getAuthQuery()}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user, mode })
+                        });
+                        const result = await response.json();
+                        if (!response.ok || result.success !== true) {
+                            throw new Error(result.message || `Factory reset failed (HTTP ${response.status}).`);
+                        }
+                        clearCurrentUserLocalFactoryData(user, mode);
+                        localStorage.removeItem('currentUser');
+                        sessionStorage.clear();
+                        alert(mode === 'preserve'
+                            ? `Operational data reset completed for ${user}. The listed areas were preserved.`
+                            : `Full data reset completed for ${user}.`);
+                        window.location.href = 'login.html';
+                    } catch (error) {
+                        console.error('Factory reset failed:', error);
+                        alert(`Factory reset did not complete: ${error.message}`);
                     }
                 }
+
+                function confirmPreservingFactoryReset() {
+                    const user = getFactoryResetUser();
+                    if (!user || user.toLowerCase() === 'system') return runFactoryReset('preserve');
+                    if (confirm(`Permanently delete operational data for ${user}? Items, Customers, Suppliers, Contacts, Advance Payments, Banking, Employees, Expenses, Custom Fields, and Custom Sheets will be preserved.`)) {
+                        runFactoryReset('preserve');
+                    }
+                }
+
+                function confirmFullFactoryReset() {
+                    const user = getFactoryResetUser();
+                    if (!user || user.toLowerCase() === 'system') return runFactoryReset('full');
+                    if (!confirm(`FULL RESET WARNING: Permanently delete all data owned by ${user}, including Items, Customers, Suppliers, Contacts, Advance Payments, Banking, Employees, Expenses, Custom Fields, and Custom Sheets? Login accounts and shared application settings will remain.`)) return;
+                    const confirmation = prompt(`Type DELETE ALL to permanently erase all data for ${user}:`);
+                    if (confirmation === 'DELETE ALL') runFactoryReset('full');
+                    else if (confirmation !== null) alert('Full reset cancelled. Verification failed.');
+                }
+
+                const factoryResetUserLabel = document.getElementById('factoryResetUserLabel');
+                if (factoryResetUserLabel) factoryResetUserLabel.textContent = getFactoryResetUser() || 'Not signed in';
 
                 // ═══════════════════════════════════════════════════════════════
                 //  CUSTOM FIELDS ENGINE — Dynamic Schema  (full rewrite)
