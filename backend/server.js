@@ -612,6 +612,13 @@ app.delete('/api/quotations/:id', async (req, res) => {
 });
 
 // --- Advance Payment and Order Sheet Routes ---
+app.get('/api/advance-payments/deleted', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        res.json({ success: true, data: await AdvancePayment.find(query).sort({ deletedAt: -1 }) });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 app.get('/api/advance-payments', async (req, res) => {
     try {
         const query = { deletedAt: null };
