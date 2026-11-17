@@ -760,8 +760,9 @@
                 <div class="input-group">
                     <label>Supplier</label>
                     <input type="text" id="supplierInput" list="supplierList" placeholder="Search Supplier"
-                        style="margin:0;">
+                        style="margin:0;" oninput="updatePurchaseSupplierOpeningBalance()" onchange="updatePurchaseSupplierOpeningBalance()">
                     <datalist id="supplierList"></datalist>
+                    <div id="purchaseSupplierOpeningBalance" style="margin-top:5px;font-size:12px;color:#495057;">Supplier opening balance: —</div>
                 </div>
                 <div class="input-group">
                     <label>Supplier Inv No</label>
@@ -3499,6 +3500,7 @@
                     $("itemInput").value = p.itemName || "";
                     await loadUOMs(p.uom || "");
                     $("supplierInput").value = p.supplierName || "";
+                    updatePurchaseSupplierOpeningBalance();
                     $("supplierInv").value = p.supplierInv || "";
                     $("purchaseDate").value = p.date || "";
                     $("quantity").value = p.qty || "";
@@ -4152,6 +4154,7 @@
         function clearFields() {
             $("itemInput").value = "";
             $("supplierInput").value = "";
+            updatePurchaseSupplierOpeningBalance();
             $("supplierInv").value = "";
             $("uomSelect").value = "";
             $("purchaseDate").value = "";
@@ -4188,6 +4191,19 @@
             renderDraftTable();
             $("addDraftBtn").style.display = "inline-block";
             $("updateBtn").style.display = "none";
+        }
+
+        function updatePurchaseSupplierOpeningBalance() {
+            const display = document.getElementById('purchaseSupplierOpeningBalance');
+            if (!display) return;
+            const name = String(document.getElementById('supplierInput')?.value || '').trim();
+            let suppliers = [];
+            try { suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]') || []; } catch (error) { suppliers = []; }
+            const supplier = suppliers.find(item => String(item.name || '').trim().toLowerCase() === name.toLowerCase());
+            if (!supplier) { display.textContent = name ? 'Supplier opening balance: select a listed supplier' : 'Supplier opening balance: —'; return; }
+            const amount = Number(supplier.openingBalance) || 0;
+            const type = supplier.openingBalanceType || 'Cr';
+            display.textContent = `Supplier opening balance: ₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${type}`;
         }
 
         function showToast(msg, bg = "#333") {
@@ -4861,6 +4877,7 @@
                     $("itemInput").value = p.itemName || "";
                     await loadUOMs(p.uom || "");
                     $("supplierInput").value = p.supplierName || "";
+                    updatePurchaseSupplierOpeningBalance();
                     $("supplierInv").value = p.supplierInv || "";
                     $("purchaseDate").value = p.date || "";
                     $("quantity").value = p.qty || "";

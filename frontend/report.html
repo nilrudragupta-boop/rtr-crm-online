@@ -2419,10 +2419,12 @@
 
                     const invIdx = invoices.findIndex(x => String(x.id || x.invoice_no) === String(id));
                     if (invIdx > -1) {
+                        const invoiceTotal = Number(invoices[invIdx].invoice_total || invoices[invIdx].invoiceTotal || invoices[invIdx].total) || 0;
+                        const advanceApplied = invoiceAdvanceApplied(invoices[invIdx]);
+                        if (!Number.isFinite(paid) || paid < 0 || paid + advanceApplied > invoiceTotal + 0.005) return showToast('Payments and advance allocations cannot exceed the invoice total.', '#c0392b');
                         invoices[invIdx].total_paid = paid;
                         invoices[invIdx].payment_date = paymentDate;
-                        // Update due amount in object if needed, though usually calculated
-                        invoices[invIdx].total_due = (parseFloat(invoices[invIdx].invoice_total) || 0) - paid;
+                        invoices[invIdx].total_due = Math.max(0, invoiceTotal - paid - advanceApplied);
 
                         localStorage.setItem("invoices", JSON.stringify(invoices));
                         if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
@@ -2430,7 +2432,7 @@
 
                         // update row due
                         const total = parseFloat(tr.querySelector(".row-invoice-total").textContent.replace(/,/g, '')) || 0;
-                        tr.querySelector(".due").textContent = (total - paid).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        tr.querySelector(".due").textContent = Math.max(0, total - paid - advanceApplied).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         renderFooter();
                     } else {
                         showToast("❌ Invoice not found", "#c0392b");
@@ -2565,16 +2567,18 @@
                     const id = tr.dataset.invoiceId;
                     const paid = parseFloat(e.target.value) || 0;
                     const total = parseFloat(tr.querySelector(".row-invoice-total").textContent.replace(/,/g, '')) || 0;
-                    const due = total - paid;
+                    const invIdx = invoices.findIndex(x => String(x.id || x.invoice_no) === String(id));
+                    const advanceApplied = invIdx > -1 ? invoiceAdvanceApplied(invoices[invIdx]) : 0;
+                    if (!Number.isFinite(paid) || paid < 0 || paid + advanceApplied > total + 0.005) { e.target.value = invIdx > -1 ? invoiceCashPaid(invoices[invIdx]) : 0; return showToast('Payments and advance allocations cannot exceed the invoice total.', '#c0392b'); }
+                    const due = Math.max(0, total - paid - advanceApplied);
                     tr.querySelector(".due").textContent = due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                     // recalc footer
                     renderFooter();
 
-                    const invIdx = invoices.findIndex(x => String(x.id || x.invoice_no) === String(id));
                     if (invIdx > -1) {
                         invoices[invIdx].total_paid = paid;
-                        invoices[invIdx].total_due = (parseFloat(invoices[invIdx].invoice_total) || 0) - paid;
+                        invoices[invIdx].total_due = Math.max(0, total - paid - advanceApplied);
                         // keep existing payment date if not changed here
                         localStorage.setItem("invoices", JSON.stringify(invoices));
                         if (typeof apiClient !== 'undefined' && apiClient.saveInvoice) apiClient.saveInvoice(invoices[invIdx]).catch(console.warn);
@@ -5243,6 +5247,23 @@
             if (!legacy.length) { const paid = Number(invoice.total_paid || invoice.paid_amount || invoice.paid) || 0; if (paid > 0) legacy.push({ id: 'legacy-' + (invoice.id || invoice.invoice_no), amount: paid, date, mode: 'Cash', reference: 'Legacy payment (installment details unavailable)' }); }
             return legacy;
         }
+        function invoiceAdvanceAllocations(invoice) {
+            const invoiceNo = String(invoice.invoice_no || invoice.invoiceNo || '').trim().toLowerCase();
+            const partyName = String(invoice.customer_name || invoice.customer?.name || '').trim().toLowerCase();
+            if (!invoiceNo || !partyName) return [];
+            try {
+                return (JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]') || []).flatMap(record =>
+                    (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.documentType === 'sales_invoice' && item.status !== 'reversed' && String(item.invoiceNo || '').trim().toLowerCase() === invoiceNo && String(item.partyName || record.partyName || '').trim().toLowerCase() === partyName)
+                    .map(item => ({ ...item, advanceVoucher: record.voucherNo || record.id }))
+                );
+            } catch (error) { return []; }
+        }
+        function invoiceAdvanceApplied(invoice) {
+            return invoiceAdvanceAllocations(invoice).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        }
+        function invoiceCashPaid(invoice) {
+            return invoicePaymentHistory(invoice).reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+        }
         let currentInvoicePaymentHistoryId = null;
         function formatInvoicePaymentAmount(value) {
             return (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -5255,7 +5276,8 @@
             document.getElementById('invoicePaymentAuditPanel').style.display = 'none';
             const rows = invoicePaymentHistory(invoice).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
             const invoiceTotal = Number(invoice.invoice_total || invoice.invoiceTotal || invoice.total) || 0;
-            const totalPaid = rows.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+            const advanceRows = invoiceAdvanceAllocations(invoice);
+            const totalPaid = rows.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0) + advanceRows.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             const balanceDue = invoiceTotal - totalPaid;
             document.getElementById('invoicePaymentHistoryTitle').textContent = `Invoice ${invoice.invoice_no || invoice.invoiceNo || '-'}`;
             document.getElementById('invoiceHistoryTotal').textContent = formatInvoicePaymentAmount(invoiceTotal);
@@ -5266,18 +5288,20 @@
                 ? `Overpaid: ₹<span id="invoiceHistoryBalance">${formatInvoicePaymentAmount(Math.abs(balanceDue))}</span>`
                 : `Balance Due: ₹<span id="invoiceHistoryBalance">${formatInvoicePaymentAmount(Math.max(0, balanceDue))}</span>`;
             let cumulativePaid = 0;
-            document.getElementById('invoicePaymentHistoryBody').innerHTML = rows.length ? rows.map((payment, index) => {
+            const historyRows = rows.map(payment => ({ ...payment, rowType: 'payment' })).concat(advanceRows.map(item => ({ id: item.id, amount: Number(item.amount) || 0, date: item.date || '', mode: 'Advance allocation', reference: `Advance Adjusted Against Invoice ${invoice.invoice_no || invoice.invoiceNo || ''} | Voucher ${item.advanceVoucher}`, rowType: 'advance' }))).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+            document.getElementById('invoicePaymentHistoryBody').innerHTML = historyRows.length ? historyRows.map((payment, index) => {
                 const amount = Number(payment.amount) || 0; cumulativePaid += amount;
                 const remaining = invoiceTotal - cumulativePaid;
                 const balanceText = remaining < -0.01 ? `Overpaid ₹${formatInvoicePaymentAmount(Math.abs(remaining))}` : `₹${formatInvoicePaymentAmount(Math.max(0, remaining))}`;
                 const balanceColor = remaining < -0.01 ? '#e67e22' : remaining <= 0.01 ? '#198754' : '#c0392b';
+                const editable = payment.rowType !== 'advance';
                 return `<tr>
                     <td style="text-align:center;">${index + 1}</td>
-                    <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-amount" type="number" min="0.01" step="0.01" value="${amount.toFixed(2)}" style="width:100px;text-align:right;"><button class="secondary small" onclick="saveInvoicePaymentEntry('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
+                    <td>${editable ? `<div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-amount" type="number" min="0.01" step="0.01" value="${amount.toFixed(2)}" style="width:100px;text-align:right;"><button class="secondary small" onclick="saveInvoicePaymentEntry('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div>` : `₹${formatInvoicePaymentAmount(amount)} (allocated)`}</td>
                     <td style="text-align:right;white-space:nowrap;">₹${formatInvoicePaymentAmount(cumulativePaid)}</td>
                     <td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
                     <td style="text-align:right;color:${balanceColor};font-weight:bold;white-space:nowrap;">${balanceText}</td>
-                    <td><div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-reference" maxlength="100" value="${escapeHtml(payment.reference || '')}" style="width:150px;"><button class="secondary small" onclick="saveInvoicePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div></td>
+                    <td>${editable ? `<div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-reference" maxlength="100" value="${escapeHtml(payment.reference || '')}" style="width:150px;"><button class="secondary small" onclick="saveInvoicePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div>` : escapeHtml(payment.reference)}</td>
                 </tr>`;
             }).join('') : '<tr><td colspan="7" style="text-align:center;padding:14px;">No payments recorded.</td></tr>';
             document.getElementById('invoicePaymentHistoryModal').style.display = 'block';
@@ -5292,14 +5316,14 @@
             if (!Number.isFinite(amount) || amount <= 0) return showToast('Enter a payment amount greater than zero.', '#c0392b');
             const newTotalPaid = invoice.paymentHistory.reduce((sum, item) => sum + (item === payment ? amount : (Number(item.amount) || 0)), 0);
             const invoiceTotal = Number(invoice.invoice_total || invoice.invoiceTotal || invoice.total) || 0;
-            if (newTotalPaid > invoiceTotal + 0.01) return showToast('Edited payments cannot exceed the invoice total.', '#c0392b');
+            if (newTotalPaid + invoiceAdvanceApplied(invoice) > invoiceTotal + 0.005) return showToast('Edited payments and advance allocations cannot exceed the invoice total.', '#c0392b');
             const previousAmount = Number(payment.amount) || 0;
             if (previousAmount !== amount) recordInvoicePaymentAudit(invoice, 'Amount edited', payment, { amount: { from: previousAmount, to: amount } });
             payment.amount = amount;
             invoice.paid_cash = invoice.paymentHistory.filter(item => item.mode === 'Cash').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             invoice.paid_bank = invoice.paymentHistory.filter(item => item.mode === 'Bank').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             invoice.total_paid = invoice.paymentHistory.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-            invoice.total_due = invoiceTotal - invoice.total_paid;
+            invoice.total_due = Math.max(0, invoiceTotal - invoice.total_paid - invoiceAdvanceApplied(invoice));
             const transactions = JSON.parse(localStorage.getItem('bank_transactions') || '[]');
             const transaction = transactions.find(item => String(item.paymentId) === String(payment.id));
             if (transaction) { transaction.amount = amount; localStorage.setItem('bank_transactions', JSON.stringify(transactions)); }
@@ -5333,8 +5357,8 @@
             document.getElementById('payCashReference').value = ''; document.getElementById('payBankReference').value = '';
             const now = new Date(), today = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
             document.getElementById('payCashDate').value = today; document.getElementById('payBankDate').value = today;
-            const paid = invoicePaymentHistory(invoice).reduce((sum,p)=>sum+(Number(p.amount)||0),0);
-            document.getElementById('paymentSplitBalance').dataset.currentDue = String(currentPaymentTotal-paid);
+            const paid = invoiceCashPaid(invoice) + invoiceAdvanceApplied(invoice);
+            document.getElementById('paymentSplitBalance').dataset.currentDue = String(Math.max(0, currentPaymentTotal-paid));
             const accounts = JSON.parse(localStorage.getItem('bank_accounts')) || [], select = document.getElementById('payBankAccount');
             select.innerHTML = '<option value="">-- Select Bank --</option>';
             accounts.filter(a=>a.type==='Bank').forEach(acc=>{const opt=document.createElement('option');opt.value=acc.id;opt.textContent=acc.name+(acc.number?` (${acc.number})`:'');if(acc.isPrimary)opt.selected=true;select.appendChild(opt);});
@@ -5353,11 +5377,12 @@
             const limit=Number(localStorage.getItem('cashLimit'))||0;
             if(cash+bank<=0)return showToast('Enter a positive cash or bank installment.','#c0392b');
             const due=Number(document.getElementById('paymentSplitBalance').dataset.currentDue)||0;
-            if(cash+bank>due+0.01)return showToast('Payment cannot exceed the outstanding due.','#c0392b');
             if(limit>0&&cash>limit)return showToast(`Cash amount exceeds limit of ₹${limit}`,'#c0392b');
             if((cash&&!cashDate)||(bank&&!bankDate))return showToast('Select a date for each payment.','#c0392b');
             const idx=invoices.findIndex(x=>String(x.id||x.invoice_no)===String(currentPaymentInvoiceId)); if(idx<0)return showToast('Invoice not found.','#c0392b');
             const invoice=invoices[idx], accounts=JSON.parse(localStorage.getItem('bank_accounts'))||[];
+            const currentCashPaid = invoiceCashPaid(invoice), currentAdvanceApplied = invoiceAdvanceApplied(invoice), invoiceTotal = Number(invoice.invoice_total || invoice.invoiceTotal || invoice.total) || 0;
+            if (currentCashPaid + currentAdvanceApplied + cash + bank > invoiceTotal + 0.005) return showToast('Payment cannot exceed the outstanding due after advance allocations.', '#c0392b');
             let accountId=document.getElementById('payBankAccount').value; if(!accountId&&accounts.length)accountId=(accounts.find(a=>a.isPrimary)||accounts[0]).id;
             if(bank&&!accountId)return showToast('Select a bank account before recording a bank payment.','#c0392b');
             if(!Array.isArray(invoice.paymentHistory))invoice.paymentHistory=invoicePaymentHistory(invoice).map(p=>({...p}));
@@ -5368,7 +5393,7 @@
             added.forEach(payment => recordInvoicePaymentAudit(invoice, 'Installment recorded', payment, { amount: { from: 0, to: Number(payment.amount) || 0 }, reference: { from: '', to: payment.reference || '' }, date: { from: '', to: payment.date || '' } }));
             invoice.paid_cash=invoice.paymentHistory.filter(p=>p.mode==='Cash').reduce((a,p)=>a+(Number(p.amount)||0),0);
             invoice.paid_bank=invoice.paymentHistory.filter(p=>p.mode==='Bank').reduce((a,p)=>a+(Number(p.amount)||0),0);
-            invoice.total_paid=invoice.paymentHistory.reduce((a,p)=>a+(Number(p.amount)||0),0); invoice.total_due=currentPaymentTotal-invoice.total_paid;
+            invoice.total_paid=invoice.paymentHistory.reduce((a,p)=>a+(Number(p.amount)||0),0); invoice.total_due=Math.max(0, currentPaymentTotal-invoice.total_paid-invoiceAdvanceApplied(invoice));
             invoice.payment_date=added[added.length-1].date;
             const bankTx=JSON.parse(localStorage.getItem('bank_transactions')||'[]');
             for(const payment of added.filter(p=>p.mode==='Bank')) { const tx={id:'tx_'+payment.id,date:payment.date,type:'Deposit',amount:payment.amount,accountId:payment.bankAccountId,ref:payment.reference,remarks:`Payment Received: ${invoice.customer_name||'Customer'}`,cleared:false,invoiceId:invoice.id,paymentId:payment.id}; if(!bankTx.some(x=>String(x.id)===String(tx.id)))bankTx.push(tx); if(typeof apiClient!=='undefined'&&apiClient.saveBankTransaction)await apiClient.saveBankTransaction(tx); }
