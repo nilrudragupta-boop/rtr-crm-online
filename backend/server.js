@@ -793,6 +793,24 @@ app.post('/api/invoices', async (req, res) => {
             // only invoice_no; otherwise MongoDB stores a null index value.
             payload.invoiceNo = invoiceNumber;
             payload.invoice_no = invoiceNumber;
+            const invoiceTotal = Number(payload.invoice_total ?? payload.invoiceTotal ?? payload.total) || 0;
+            const paymentRows = Array.isArray(payload.paymentHistory) ? payload.paymentHistory : null;
+            const cashPaid = paymentRows && paymentRows.length
+                ? paymentRows.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
+                : Math.max(Number(payload.total_paid) || 0, Number(payload.paid_amount) || 0, Number(payload.paid) || 0, (Number(payload.paid_cash) || 0) + (Number(payload.paid_bank) || 0));
+            const customerName = String(payload.customer_name || payload.customer?.name || '').trim().toLowerCase();
+            let allocatedAdvance = 0;
+            if (customerName) {
+                const advances = await AdvancePayment.find({ entityType: 'Customer', deletedAt: null }).lean();
+                allocatedAdvance = advances.reduce((sum, advance) => sum + (advance.allocations || [])
+                    .filter(item => item && item.type === 'invoice_allocation' && item.documentType === 'sales_invoice' && item.status !== 'reversed'
+                        && String(item.invoiceNo || '').trim().toLowerCase() === invoiceNumber.toLowerCase()
+                        && String(item.partyName || advance.partyName || '').trim().toLowerCase() === customerName)
+                    .reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
+            }
+            if (cashPaid + allocatedAdvance > invoiceTotal + 0.005) {
+                return res.status(400).json({ success: false, message: 'Invoice payments and advance allocations cannot exceed the invoice total.' });
+            }
             const owner = req.query.user || payload.createdBy || 'System';
             payload.createdBy = owner;
             const identity = [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }];
