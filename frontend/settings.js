@@ -368,7 +368,7 @@ var EXPENSE_LEDGER_SCHEMA = {
 var UI_PERMISSION_REGISTRY = [
     { id: 'perm_quick_entry', label: 'Quick Daily Entry', feature: 'invoice' },
     { id: 'perm_make_invoice', label: 'Smart Invoice', feature: 'invoice' },
-    { id: 'perm_print_smart', label: 'Print Invoice (Smart Format)', feature: 'invoice' },
+    { id: 'perm_print_smart', label: 'Print Invoice (Smart Format)', feature: 'invoice', defaultValue: false },
     { id: 'perm_edit_invoice', label: 'Edit Existing Invoice', feature: 'invoice' },
     { id: 'perm_delete_invoice', label: 'Delete Invoices', feature: 'invoice' },
     { id: 'perm_regular_invoice', label: 'Regular Invoice', feature: 'invoice' },

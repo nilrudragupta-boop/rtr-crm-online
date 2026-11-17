@@ -195,6 +195,10 @@
                 print-color-adjust: exact;
                 background: #ddd !important;
             }
+
+            .screen-only-quantity {
+                display: none !important;
+            }
         }
 
         /* attachment modal */
@@ -1097,6 +1101,9 @@
                 <input type="checkbox" id="compactViewToggle" onchange="toggleCompactView()"> Compact View
             </label>
             <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
+                <input type="checkbox" id="showTotalQtyScreenToggle" onchange="toggleShowTotalQtyScreen()"> Show Total Quantity in Screen
+            </label>
+            <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-weight:bold; margin-top:5px;">
                 <input type="checkbox" id="stickyHeaderToggle" onchange="toggleStickyHeader()"> Sticky Table Header
             </label>
             <div style="margin-top:5px; display:flex; align-items:center; gap:5px;">
@@ -1474,6 +1481,7 @@
         let showTimestampInPdf = localStorage.getItem("reportShowTimestampInPdf") === "true";
         let showPaidStampInPdf = localStorage.getItem("reportShowPaidStampInPdf") === "true";
         let showTermsInPdf = localStorage.getItem("reportShowTermsInPdf") !== "false";
+        let showTotalQtyScreen = localStorage.getItem("reportShowTotalQtyScreen") !== "false";
         let isGreyButtons = localStorage.getItem("reportGreyButtons") === "true";
         let currentViewMode = 'table';
         let currentExportType = 'json';
@@ -2845,6 +2853,37 @@
 
             html += '</tr>';
             tfoot.innerHTML = html;
+
+            if (showTotalQtyScreen) {
+                const quantityTotals = {};
+                data.forEach(inv => {
+                    if (!Array.isArray(inv.items)) return;
+                    inv.items.forEach(item => {
+                        const unit = String(item.uom || 'Qty').trim() || 'Qty';
+                        quantityTotals[unit] = (quantityTotals[unit] || 0) + (parseFloat(item.qty) || 0);
+                    });
+                });
+
+                const quantitySummary = Object.entries(quantityTotals)
+                    .map(([unit, quantity]) => `${quantity.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${escapeHtml(unit)}`)
+                    .join(' | ');
+
+                if (quantitySummary) {
+                    let labelSpan = 0;
+                    let valueSpan = 0;
+                    for (let i = 0; i <= 11; i++) if (columnVisibility[i]) labelSpan++;
+                    for (let i = 12; i < columnVisibility.length; i++) if (columnVisibility[i]) valueSpan++;
+
+                    const quantityRow = document.createElement('tr');
+                    quantityRow.className = 'total-quantity-row screen-only-quantity';
+                    if (labelSpan > 0 && valueSpan > 0) {
+                        quantityRow.innerHTML = `<td colspan="${labelSpan}" style="text-align:right;font-weight:bold;">Total Quantity:</td><td colspan="${valueSpan}" style="text-align:left;font-weight:bold;color:#28a745;">${quantitySummary}</td>`;
+                    } else {
+                        quantityRow.innerHTML = `<td colspan="${Math.max(1, labelSpan + valueSpan)}" style="text-align:left;font-weight:bold;color:#28a745;">Total Quantity: ${quantitySummary}</td>`;
+                    }
+                    tfoot.appendChild(quantityRow);
+                }
+            }
 
             document.getElementById("cntPaid").textContent = cPaid;
             document.getElementById("cntUnpaid").textContent = cUnpaid;
@@ -5994,6 +6033,8 @@
             document.getElementById("settingsModal").style.display = "block";
             const calendarSelect = document.getElementById("reportCalendarMode");
             if (calendarSelect) calendarSelect.value = reportCalendarMode;
+            const quantityToggle = document.getElementById("showTotalQtyScreenToggle");
+            if (quantityToggle) quantityToggle.checked = showTotalQtyScreen;
 
             const container = document.getElementById("columnToggles");
             if (container.children.length === 0) {
@@ -6158,6 +6199,12 @@
             isCompactView = document.getElementById("compactViewToggle").checked;
             localStorage.setItem("reportCompactView", isCompactView);
             applyCompactView();
+        }
+
+        function toggleShowTotalQtyScreen() {
+            showTotalQtyScreen = document.getElementById("showTotalQtyScreenToggle").checked;
+            localStorage.setItem("reportShowTotalQtyScreen", showTotalQtyScreen);
+            renderFooter();
         }
 
         function applyCompactView() {
@@ -6418,6 +6465,10 @@
             [13, 14, 15, 16, 17].forEach(i => columnVisibility[i] = false);
             localStorage.removeItem("reportColumnVisibility");
             updateColumnStyles();
+
+            showTotalQtyScreen = true;
+            localStorage.removeItem("reportShowTotalQtyScreen");
+            if (document.getElementById("showTotalQtyScreenToggle")) document.getElementById("showTotalQtyScreenToggle").checked = true;
             renderFooter();
 
             // Update checkboxes
