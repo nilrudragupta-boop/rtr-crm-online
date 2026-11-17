@@ -1043,7 +1043,10 @@
             try { records = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]') || []; } catch (error) { records = []; }
             const supplierId = String(supplier.id || '');
             const supplierName = String(supplier.name || '').trim().toLowerCase();
-            return records.filter(record => record.entityType === 'Supplier' && (supplierId && record.partyId ? String(record.partyId) === supplierId : String(record.partyName || '').trim().toLowerCase() === supplierName))
+            return records.filter(record => String(record.entityType || '').trim().toLowerCase() === 'supplier' && (
+                (supplierId && String(record.partyId || '') === supplierId) ||
+                String(record.partyName || '').trim().toLowerCase() === supplierName
+            ))
                 .reduce((sum, record) => {
                     const allocations = (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
                     const refunds = (record.refunds || []).filter(item => item && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
@@ -1134,7 +1137,7 @@
             if (overlay) overlay.style.display = 'none';
         }
 
-        // Column visibility state (14 standard columns total including checkbox and actions)
+        // Column visibility state (15 standard columns total including checkbox and actions)
         let columnVisibility = JSON.parse(localStorage.getItem("supplierColumnVisibility")) || [];
         let columnOrder = JSON.parse(localStorage.getItem("supplierColumnOrder")) || [];
         let columnAlignment = JSON.parse(localStorage.getItem('supplierColumnAlignment')) || {};
@@ -1162,8 +1165,21 @@
                 columnOrder = previousOrder.length === oldExpectedCols
                     ? [0, ...previousOrder.filter(i => i > 0 && i < oldExpectedCols - 1).map(i => i >= 13 ? i + 1 : i), totalExpectedCols - 1]
                     : Array.from({ length: totalExpectedCols }, (_, i) => i);
-                localStorage.setItem("supplierColumnOrder", JSON.stringify(columnOrder));
             }
+            // Repair saved orders that have the right length but omit a logical
+            // column, which can otherwise make Unallocated Advances disappear.
+            const validOrder = columnOrder.length === totalExpectedCols &&
+                new Set(columnOrder).size === totalExpectedCols &&
+                columnOrder[0] === 0 && columnOrder[totalExpectedCols - 1] === totalExpectedCols - 1 &&
+                columnOrder.every(index => Number.isInteger(index) && index >= 0 && index < totalExpectedCols);
+            if (!validOrder) {
+                const lastIndex = totalExpectedCols - 1;
+                const interior = [...new Set(columnOrder)].filter(index => Number.isInteger(index) && index > 0 && index < lastIndex);
+                const missingInterior = Array.from({ length: totalExpectedCols }, (_, index) => index)
+                    .filter(index => index > 0 && index < lastIndex && !interior.includes(index));
+                columnOrder = [0, ...interior, ...missingInterior, lastIndex];
+            }
+            localStorage.setItem("supplierColumnOrder", JSON.stringify(columnOrder));
         }
         initColumnVisibility();
         let isGreyButtons = localStorage.getItem("supplierGreyButtons") === "true";
