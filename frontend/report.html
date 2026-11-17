@@ -2855,18 +2855,30 @@
             tfoot.innerHTML = html;
 
             if (showTotalQtyScreen) {
-                const quantityTotals = {};
+                const quantityTotals = new Map();
+                const itemFilter = (document.getElementById("search_items")?.value || "").trim().toLowerCase();
                 data.forEach(inv => {
                     if (!Array.isArray(inv.items)) return;
                     inv.items.forEach(item => {
-                        const unit = String(item.uom || 'Qty').trim() || 'Qty';
-                        quantityTotals[unit] = (quantityTotals[unit] || 0) + (parseFloat(item.qty) || 0);
+                        const itemName = String(item.item || item.itemName || item.name || 'Unnamed item').trim();
+                        const itemCode = String(item.itemCode || item.item_code || item.code || '').trim();
+                        const unit = String(item.uom || item.unit || item.unitOfMeasure || 'Qty').trim() || 'Qty';
+                        const searchableItem = `${itemName} ${itemCode}`.toLowerCase();
+                        if (itemFilter && !searchableItem.includes(itemFilter)) return;
+
+                        const key = `${itemName.toLowerCase()}|${itemCode.toLowerCase()}|${unit.toLowerCase()}`;
+                        const rawQuantity = String(item.qty ?? item.quantity ?? 0).replace(/,/g, '');
+                        const quantity = parseFloat(rawQuantity) || 0;
+                        const existing = quantityTotals.get(key);
+                        if (existing) existing.quantity += quantity;
+                        else quantityTotals.set(key, { itemName, itemCode, unit, quantity });
                     });
                 });
 
-                const quantitySummary = Object.entries(quantityTotals)
-                    .map(([unit, quantity]) => `${quantity.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${escapeHtml(unit)}`)
-                    .join(' | ');
+                const quantitySummary = Array.from(quantityTotals.values())
+                    .map(({ itemName, itemCode, unit, quantity }) =>
+                        `<div>${escapeHtml(itemName)}${itemCode ? ` (${escapeHtml(itemCode)})` : ''}: ${quantity.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${escapeHtml(unit)}</div>`
+                    ).join('');
 
                 if (quantitySummary) {
                     let labelSpan = 0;
@@ -2877,9 +2889,9 @@
                     const quantityRow = document.createElement('tr');
                     quantityRow.className = 'total-quantity-row screen-only-quantity';
                     if (labelSpan > 0 && valueSpan > 0) {
-                        quantityRow.innerHTML = `<td colspan="${labelSpan}" style="text-align:right;font-weight:bold;">Total Quantity:</td><td colspan="${valueSpan}" style="text-align:left;font-weight:bold;color:#28a745;">${quantitySummary}</td>`;
+                        quantityRow.innerHTML = `<td colspan="${labelSpan}" style="text-align:right;font-weight:bold;white-space:nowrap;">Total Quantity:</td><td colspan="${valueSpan}" style="text-align:left;font-weight:bold;color:#28a745;white-space:normal;overflow-wrap:anywhere;min-width:180px;">${quantitySummary}</td>`;
                     } else {
-                        quantityRow.innerHTML = `<td colspan="${Math.max(1, labelSpan + valueSpan)}" style="text-align:left;font-weight:bold;color:#28a745;">Total Quantity: ${quantitySummary}</td>`;
+                        quantityRow.innerHTML = `<td colspan="${Math.max(1, labelSpan + valueSpan)}" style="text-align:left;font-weight:bold;color:#28a745;white-space:normal;overflow-wrap:anywhere;">Total Quantity: ${quantitySummary}</td>`;
                     }
                     tfoot.appendChild(quantityRow);
                 }
