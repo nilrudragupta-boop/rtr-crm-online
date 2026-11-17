@@ -270,6 +270,82 @@ app.get('/api/status', (req, res) => {
     res.json({ success: true, message: 'RTR Backend API is running successfully!' });
 });
 
+// Keep the refresh service URL on the server instead of exposing it in the page.
+const GOOGLE_SCRIPT_TARGET_URL = process.env.GOOGLE_SCRIPT_URL || process.env.CLIENT_REFRESH_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbxnbOTetUcmv22txVFGCb8pHkZI3snpimqMtcdZWvVRv-z2x4bHfVC0K2AxlOXvz8C4/exec';
+app.get('/api/client-refresh', async (req, res) => {
+    const identifier = typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '';
+    const scriptUrl = GOOGLE_SCRIPT_TARGET_URL;
+
+    if (!identifier || identifier.length > 200) {
+        return res.status(400).json({ success: false, message: 'A valid user identifier is required.' });
+    }
+    if (!scriptUrl || !scriptUrl.startsWith('https://')) {
+        return res.status(503).json({ success: false, message: 'Refresh service is not configured.' });
+    }
+
+    try {
+        const target = new URL(scriptUrl);
+        target.searchParams.set('identifier', identifier);
+        target.searchParams.set('_', String(Date.now()));
+
+        const upstream = await fetch(target);
+        if (!upstream.ok) {
+            return res.status(502).json({ success: false, message: 'Refresh service request failed.' });
+        }
+        const data = await upstream.json();
+        res.set('Cache-Control', 'no-store');
+        return res.json({ success: true, data });
+    } catch (error) {
+        console.error('Client refresh request failed:', error.message);
+        return res.status(502).json({ success: false, message: 'Refresh service is temporarily unavailable.' });
+    }
+});
+
+// Proxy the browser's Apps Script calls through the backend so the deployment URL
+// remains in the server environment instead of appearing in browser source/network URLs.
+app.all('/api/google-script', express.text({ type: 'text/plain', limit: '50mb' }), async (req, res) => {
+    const configuredUrl = GOOGLE_SCRIPT_TARGET_URL;
+    if (!configuredUrl) {
+        return res.status(503).json({ success: false, message: 'Apps Script service is not configured on the server.' });
+    }
+
+    let target;
+    try {
+        target = new URL(configuredUrl);
+        if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !target.pathname.startsWith('/macros/s/')) {
+            return res.status(503).json({ success: false, message: 'Apps Script service configuration is invalid.' });
+        }
+    } catch (_) {
+        return res.status(503).json({ success: false, message: 'Apps Script service configuration is invalid.' });
+    }
+
+    try {
+        const incomingUrl = new URL(req.originalUrl, 'http://localhost');
+        incomingUrl.searchParams.forEach((value, key) => target.searchParams.append(key, value));
+
+        const headers = {};
+        const contentType = req.get('content-type');
+        if (contentType) headers['Content-Type'] = contentType;
+
+        let body;
+        if (req.method !== 'GET' && req.method !== 'HEAD' && req.body !== undefined) {
+            if (typeof req.body === 'string') body = req.body;
+            else if (contentType && contentType.includes('application/x-www-form-urlencoded')) body = new URLSearchParams(req.body).toString();
+            else body = JSON.stringify(req.body);
+        }
+
+        const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'follow' });
+        const responseBody = await upstream.text();
+        res.set('Cache-Control', 'no-store');
+        const responseType = upstream.headers.get('content-type');
+        if (responseType) res.set('Content-Type', responseType);
+        return res.status(upstream.status).send(responseBody);
+    } catch (error) {
+        console.error('Apps Script proxy request failed:', error.message);
+        return res.status(502).json({ success: false, message: 'Apps Script service is temporarily unavailable.' });
+    }
+});
+
 // --- Admin Creds Routes (Login Validation) ---
 app.get('/api/admin-creds', async (req, res) => {
     try {
@@ -315,10 +391,15 @@ customPageSchema.index({ pageId: 1, createdBy: 1 }, { unique: true });
 const CustomPage = mongoose.model('CustomPage', customPageSchema);
 
 // --- General App Settings Routes ---
+function maskGoogleScriptSettings(data, req) {
+    const proxyUrl = `${req.protocol}://${req.get('host')}/api/google-script`;
+    return { ...(data || {}), cloudBackupUrl: proxyUrl, updateServerUrl: proxyUrl, googleScriptUrl: proxyUrl };
+}
+
 app.get('/api/settings', async (req, res) => {
     try {
         const settings = await Setting.findOne({ id: 'global_settings' });
-        res.json({ success: true, data: settings ? settings.data : {} });
+        res.json({ success: true, data: maskGoogleScriptSettings(settings ? settings.data : {}, req) });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -333,7 +414,7 @@ app.post('/api/settings', async (req, res) => {
             { data: mergedData },
             { new: true, upsert: true }
         );
-        res.json({ success: true, data: updated.data });
+        res.json({ success: true, data: maskGoogleScriptSettings(updated.data, req) });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -615,11 +696,37 @@ app.post('/api/advance-audit', async (req, res) => {
 
 // --- Invoice Routes ---
 // Direct sales use their own collection so they never mix with formal invoices.
+const getSalesOwnerScope = (user) => {
+    if (!user) return null;
+    const escapedUser = String(user).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const scope = [{ createdBy: 'System' }, { createdBy: null }];
+    if (user !== 'System') {
+        scope.unshift({ createdBy: { $regex: `^${escapedUser}$`, $options: 'i' } });
+    }
+    return scope;
+};
+
 app.get('/api/sales-records', async (req, res) => {
     try {
         const query = { deletedAt: null };
-        if (req.query.user) query.createdBy = req.query.user;
+        // Older direct-sale records were created before account ownership was
+        // attached and are stored as System (or without createdBy). Keep those
+        // legacy records visible alongside the signed-in user's sales.
+        const ownerScope = getSalesOwnerScope(req.query.user);
+        if (ownerScope) query.$or = ownerScope;
         const sales = await SalesRecord.find(query).sort({ date: -1, createdAt: -1 });
+        res.json({ success: true, data: sales });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/sales-records/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        const ownerScope = getSalesOwnerScope(req.query.user);
+        if (ownerScope) query.$or = ownerScope;
+        const sales = await SalesRecord.find(query).sort({ deletedAt: -1, createdAt: -1 });
         res.json({ success: true, data: sales });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -636,8 +743,9 @@ app.post('/api/sales-records', async (req, res) => {
         payload.invoiceNo = invoiceNo;
         payload.invoice_no = payload.invoice_no || invoiceNo;
         payload.id = payload.id || invoiceNo;
+        const ownerScope = getSalesOwnerScope(user);
         const sale = await SalesRecord.findOneAndUpdate(
-            { createdBy: user, invoiceNo },
+            { invoiceNo, $or: ownerScope },
             { $set: payload },
             { new: true, upsert: true, setDefaultsOnInsert: true }
         );
@@ -651,7 +759,8 @@ app.delete('/api/sales-records/:id', async (req, res) => {
     try {
         const id = decodeURIComponent(req.params.id);
         const query = { deletedAt: null, $or: [{ id }, { invoiceNo: id }, { invoice_no: id }] };
-        if (req.query.user) query.createdBy = req.query.user;
+        const ownerScope = getSalesOwnerScope(req.query.user);
+        if (ownerScope) query.$and = [{ $or: ownerScope }];
         const deleted = await SalesRecord.findOneAndUpdate(query, { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } }, { new: true, strict: false });
         if (!deleted) return res.status(404).json({ success: false, message: 'Sales record not found.' });
         res.json({ success: true, data: deleted });
@@ -676,8 +785,32 @@ app.get('/api/invoices', async (req, res) => {
 app.post('/api/invoices', async (req, res) => {
     try {
         const payload = { ...req.body };
-        const invoiceNumber = payload.invoiceNo || payload.invoice_no;
+        const rawInvoiceNumber = payload.invoiceNo ?? payload.invoice_no;
+        const invoiceNumber = String(rawInvoiceNumber ?? '').trim();
         if (invoiceNumber) {
+            // The invoices collection has a unique index on invoiceNo. Always
+            // populate its canonical field even when older frontend pages send
+            // only invoice_no; otherwise MongoDB stores a null index value.
+            payload.invoiceNo = invoiceNumber;
+            payload.invoice_no = invoiceNumber;
+            const invoiceTotal = Number(payload.invoice_total ?? payload.invoiceTotal ?? payload.total) || 0;
+            const paymentRows = Array.isArray(payload.paymentHistory) ? payload.paymentHistory : null;
+            const cashPaid = paymentRows && paymentRows.length
+                ? paymentRows.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
+                : Math.max(Number(payload.total_paid) || 0, Number(payload.paid_amount) || 0, Number(payload.paid) || 0, (Number(payload.paid_cash) || 0) + (Number(payload.paid_bank) || 0));
+            const customerName = String(payload.customer_name || payload.customer?.name || '').trim().toLowerCase();
+            let allocatedAdvance = 0;
+            if (customerName) {
+                const advances = await AdvancePayment.find({ entityType: 'Customer', deletedAt: null }).lean();
+                allocatedAdvance = advances.reduce((sum, advance) => sum + (advance.allocations || [])
+                    .filter(item => item && item.type === 'invoice_allocation' && item.documentType === 'sales_invoice' && item.status !== 'reversed'
+                        && String(item.invoiceNo || '').trim().toLowerCase() === invoiceNumber.toLowerCase()
+                        && String(item.partyName || advance.partyName || '').trim().toLowerCase() === customerName)
+                    .reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
+            }
+            if (cashPaid + allocatedAdvance > invoiceTotal + 0.005) {
+                return res.status(400).json({ success: false, message: 'Invoice payments and advance allocations cannot exceed the invoice total.' });
+            }
             const owner = req.query.user || payload.createdBy || 'System';
             payload.createdBy = owner;
             const identity = [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }];
@@ -689,10 +822,7 @@ app.post('/api/invoices', async (req, res) => {
             }, { $set: payload }, { new: true, upsert: true, setDefaultsOnInsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
-            if (!payload.createdBy) payload.createdBy = req.query.user || 'System';
-            const newInvoice = new Invoice(payload);
-            await newInvoice.save();
-            res.status(201).json({ success: true, data: newInvoice });
+            res.status(400).json({ success: false, message: 'Invoice number is required.' });
         }
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -1024,6 +1154,23 @@ app.post('/api/stock-journal', async (req, res) => {
     }
 });
 
+app.delete('/api/stock-journal/:id', async (req, res) => {
+    try {
+        const id = decodeURIComponent(req.params.id);
+        const query = { id, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+        const deleted = await StockJournal.findOneAndUpdate(
+            query,
+            { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } },
+            { new: true, strict: false }
+        );
+        if (!deleted) return res.status(404).json({ success: false, message: 'Stock journal record not found.' });
+        res.json({ success: true, data: deleted });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- Credit/Debit Note Routes ---
 app.get('/api/credit-debit-notes', async (req, res) => {
     try {
@@ -1135,8 +1282,20 @@ app.delete('/api/bank-transactions/:id', async (req, res) => {
 // --- Journal Voucher Routes ---
 app.get('/api/journal-vouchers', async (req, res) => {
     try {
-        const query = req.query.user ? { createdBy: req.query.user } : {};
+        const query = { deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
         const vouchers = await JournalVoucher.find(query).sort({ date: -1 });
+        res.json({ success: true, data: vouchers });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/journal-vouchers/recycle-bin', async (req, res) => {
+    try {
+        const query = { deletedAt: { $ne: null } };
+        if (req.query.user) query.createdBy = req.query.user;
+        const vouchers = await JournalVoucher.find(query).sort({ deletedAt: -1 });
         res.json({ success: true, data: vouchers });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -1145,12 +1304,30 @@ app.get('/api/journal-vouchers', async (req, res) => {
 
 app.post('/api/journal-vouchers', async (req, res) => {
     try {
-        const payload = req.body;
+        const payload = { ...req.body };
+        const owner = req.query.user || payload.createdBy || 'System';
+        payload.createdBy = owner;
         if (payload.id) {
-            const updated = await JournalVoucher.findOneAndUpdate({ id: payload.id }, payload, { new: true, upsert: true });
+            const voucherNo = payload.voucherNo || payload.voucher_no;
+            const identityClauses = [{ id: payload.id }];
+            if (voucherNo) identityClauses.push({ voucherNo }, { voucher_no: voucherNo });
+            const identity = { $or: identityClauses };
+            const deletedRecord = await JournalVoucher.findOne({
+                ...identity,
+                deletedAt: { $ne: null },
+                createdBy: owner
+            });
+            if (deletedRecord) {
+                return res.status(409).json({ success: false, message: 'This voucher was deleted and cannot be saved again.' });
+            }
+            const updated = await JournalVoucher.findOneAndUpdate({
+                id: payload.id,
+                deletedAt: null,
+                createdBy: owner
+            }, { $set: payload }, { new: true, upsert: true, setDefaultsOnInsert: true });
             res.status(200).json({ success: true, data: updated });
         } else {
-            const newVoucher = new JournalVoucher(payload);
+            const newVoucher = new JournalVoucher({ ...payload, deletedAt: null });
             await newVoucher.save();
             res.status(201).json({ success: true, data: newVoucher });
         }
@@ -1161,8 +1338,30 @@ app.post('/api/journal-vouchers', async (req, res) => {
 
 app.delete('/api/journal-vouchers/:id', async (req, res) => {
     try {
-        await JournalVoucher.findOneAndDelete({ $or: [{ id: req.params.id }, { voucher_no: req.params.id }] });
-        res.json({ success: true });
+        const voucherId = decodeURIComponent(req.params.id);
+        const identity = {
+            $or: [
+                { id: voucherId },
+                { voucherNo: voucherId },
+                { voucher_no: voucherId }
+            ]
+        };
+        const query = { ...identity, deletedAt: null };
+        if (req.query.user) query.createdBy = req.query.user;
+
+        const deleted = await JournalVoucher.findOneAndUpdate(
+            query,
+            { $set: { deletedAt: new Date(), deletedBy: req.query.user || 'System' } },
+            { new: true }
+        );
+        if (deleted) return res.json({ success: true, data: deleted });
+
+        const alreadyDeletedQuery = { ...identity, deletedAt: { $ne: null } };
+        if (req.query.user) alreadyDeletedQuery.createdBy = req.query.user;
+        const alreadyDeleted = await JournalVoucher.exists(alreadyDeletedQuery);
+        if (alreadyDeleted) return res.json({ success: true, alreadyDeleted: true });
+
+        return res.status(404).json({ success: false, message: 'Journal voucher not found.' });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
