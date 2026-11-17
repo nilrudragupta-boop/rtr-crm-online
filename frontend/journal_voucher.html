@@ -758,15 +758,19 @@
             const queue = readVoucherDeleteQueue();
             if (!queue.length || typeof apiClient === 'undefined' || !apiClient.deleteJournalVoucher) return queue;
 
-            const pending = [];
             for (const voucher of queue) {
                 const identifier = voucher.id || voucher.voucher_no || voucher.voucherNo;
                 if (!identifier) continue;
-                const result = await apiClient.deleteJournalVoucher(identifier);
-                if (!result || result.success !== true) pending.push(voucher);
+                try {
+                    // Keep the local tombstone until the server recycle bin confirms it.
+                    // A successful DELETE response alone does not prove other devices
+                    // have fetched the deletion marker yet.
+                    await apiClient.deleteJournalVoucher(identifier);
+                } catch (error) {
+                    console.warn('Journal voucher deletion will retry during the next sync.', error);
+                }
             }
-            writeVoucherDeleteQueue(pending);
-            return pending;
+            return queue;
         }
 
         async function fetchVouchersData() {
@@ -782,9 +786,20 @@
                 ]);
                 if (Array.isArray(remoteData)) {
                     const deletedAliases = new Set();
-                    (Array.isArray(deletedRemoteData) ? deletedRemoteData : [])
+                    const confirmedDeletes = Array.isArray(deletedRemoteData) ? deletedRemoteData : [];
+                    confirmedDeletes
                         .forEach(voucher => getVoucherAliases(voucher).forEach(alias => deletedAliases.add(alias)));
                     queuedDeletes.forEach(voucher => getVoucherAliases(voucher).forEach(alias => deletedAliases.add(alias)));
+
+                    // Once the server has the tombstone, it is safe to clear this
+                    // device's retry queue. Until then, retain it for offline sync.
+                    if (Array.isArray(deletedRemoteData)) {
+                        const confirmedAliases = new Set();
+                        confirmedDeletes.forEach(voucher => getVoucherAliases(voucher).forEach(alias => confirmedAliases.add(alias)));
+                        writeVoucherDeleteQueue(queuedDeletes.filter(voucher =>
+                            !getVoucherAliases(voucher).some(alias => confirmedAliases.has(alias))
+                        ));
+                    }
 
                     const mergedVouchers = [];
                     const activeIndexes = new Map();
@@ -833,7 +848,8 @@
                     }
                 } else {
                     vouchers = localVouchers.filter(voucher =>
-                        !queuedDeletes.some(deleted => getVoucherAliases(voucher).some(alias => getVoucherAliases(deleted).includes(alias)))
+                        ![...queuedDeletes, ...(Array.isArray(deletedRemoteData) ? deletedRemoteData : [])]
+                            .some(deleted => getVoucherAliases(voucher).some(alias => getVoucherAliases(deleted).includes(alias)))
                     );
                 }
             } catch (e) {
@@ -2558,20 +2574,11 @@
 
                 if (typeof apiClient !== 'undefined' && apiClient.deleteJournalVoucher) {
                     const result = await apiClient.deleteJournalVoucher(id);
-                    if (result && result.success) {
-                        const remainingQueue = readVoucherDeleteQueue().filter(voucher =>
-                            !getVoucherAliases(voucher).some(alias => deletedAliases.includes(alias))
-                        );
-                        writeVoucherDeleteQueue(remainingQueue);
-                        showSuccess("Voucher deleted successfully on all devices.");
-                        return;
+                    if (!result || result.success !== true) {
+                        console.warn("Journal voucher deletion is queued for retry:", result?.message || "Backend unavailable");
                     }
-                    console.warn("Journal voucher deletion is queued for retry:", result?.message || "Backend unavailable");
-                    showWarning("Voucher was removed on this device. Server sync is pending; it will retry automatically.");
-                    return;
                 }
-
-                showWarning("Voucher was removed on this device. Server sync is pending; it will retry when the backend is available.");
+                showWarning("Voucher was removed on this device. Deletion sync will retry until the server confirms it for all devices.");
             });
         }
 
