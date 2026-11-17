@@ -934,6 +934,7 @@
             data: {
                 invoices: [],
                 purchases: [],
+                advancePayments: [],
                 expenses: [],
                 customers: [],
                 suppliers: [],
@@ -1050,6 +1051,9 @@
                     ['purchases', apiClient.getPurchases, record => [
                         record.id || record._id ? `id:${record.id || record._id}` : ''
                     ]],
+                    ['advancePayments', apiClient.getAdvancePayments, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : ''
+                    ]],
                     ['expenses', apiClient.getExpenses, record => [
                         record.expense_id || record.id || record._id
                             ? `id:${record.expense_id || record.id || record._id}` : ''
@@ -1164,6 +1168,9 @@
                     ['purchases', apiClient.getPurchases, record => [
                         record.id || record._id ? `id:${record.id || record._id}` : ''
                     ]],
+                    ['advancePayments', apiClient.getAdvancePayments, record => [
+                        record.id || record._id ? `id:${record.id || record._id}` : ''
+                    ]],
                     ['expenses', apiClient.getExpenses, record => [
                         record.expense_id || record.id || record._id
                             ? `id:${record.expense_id || record.id || record._id}` : ''
@@ -1223,7 +1230,13 @@
                     if (index >= requests.length) return;
                     if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
                     const [dataKey, , getAliases] = requests[index];
+                    const advancePending = dataKey === 'advancePayments'
+                        ? (JSON.parse(localStorage.getItem('advanceflow_pending_sync') || '[]') || [])
+                        : [];
+                    const pendingAdvanceSaves = new Set(advancePending.filter(item => item.type !== 'delete').map(item => String(item.id)));
+                    const pendingAdvanceDeletes = new Set(advancePending.filter(item => item.type === 'delete').map(item => String(item.id)));
                     const localRecords = (this.data[dataKey] || []).filter(record => {
+                        if (dataKey === 'advancePayments') return pendingAdvanceSaves.has(String(record.id));
                         if (dataKey !== 'journalVouchers') return true;
                         if (!deletedVouchersConfirmed) return false;
                         const id = String(record.id || record._id || '').trim().toLowerCase();
@@ -1238,6 +1251,8 @@
                             return !(id && deletedVoucherAliases.has(`id:${id}`)) &&
                                 !(number && deletedVoucherAliases.has(`voucher:${number}`));
                         })
+                        : dataKey === 'advancePayments'
+                            ? result.value.filter(record => !pendingAdvanceDeletes.has(String(record.id || record._id || '')))
                         : result.value;
                     const remoteRecords = dataKey === 'invoices'
                         ? fetchedRecords.map(record => this.normalizeInvoice(record))
@@ -1247,7 +1262,8 @@
                     this.data[dataKey] = merged;
                     try {
                         const storageKey = dataKey === 'journalVouchers' ? 'journal_vouchers'
-                            : dataKey === 'creditDebitNotes' ? 'credit_debit_notes' : dataKey;
+                            : dataKey === 'creditDebitNotes' ? 'credit_debit_notes'
+                                : dataKey === 'advancePayments' ? 'advanceflow_records_v1' : dataKey;
                         localStorage.setItem(storageKey, JSON.stringify(merged));
                     } catch (error) {
                         console.warn(`Could not cache refreshed ledger ${dataKey}.`, error);
@@ -1272,11 +1288,43 @@
                     }
                 }
                 this.data.purchases = JSON.parse(localStorage.getItem("purchases")) || [];
+                this.data.advancePayments = JSON.parse(localStorage.getItem("advanceflow_records_v1")) || [];
                 this.data.expenses = JSON.parse(localStorage.getItem("expenses")) || [];
                 this.data.customers = JSON.parse(localStorage.getItem("customers")) || [];
                 this.data.suppliers = JSON.parse(localStorage.getItem("suppliers")) || [];
                 this.data.journalVouchers = JSON.parse(localStorage.getItem("journal_vouchers")) || [];
                 this.data.creditDebitNotes = JSON.parse(localStorage.getItem("credit_debit_notes")) || [];
+            },
+
+            getAdvanceRemaining(record) {
+                const allocations = (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed')
+                    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                const adjusted = Math.max(Number(record.adjustedAmount) || 0, allocations);
+                const refunds = (record.refunds || []).filter(item => item && item.status !== 'reversed')
+                    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                return Math.max(0, (Number(record.amount) || 0) - adjusted - refunds);
+            },
+
+            getInvoiceAdvanceApplied(invoice) {
+                const invoiceNo = String(invoice.invoice_no || invoice.invoiceNo || '').trim().toLowerCase();
+                const customerName = String(invoice.customer_name || invoice.customer?.name || '').trim().toLowerCase();
+                if (!invoiceNo || !customerName) return 0;
+                return this.data.advancePayments.reduce((sum, record) => sum + (record.allocations || [])
+                    .filter(item => item && item.type === 'invoice_allocation' && item.documentType === 'sales_invoice' && item.status !== 'reversed'
+                        && String(item.invoiceNo || '').trim().toLowerCase() === invoiceNo
+                        && String(item.partyName || record.partyName || '').trim().toLowerCase() === customerName)
+                    .reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
+            },
+
+            getPurchaseAdvanceApplied(purchase) {
+                const invoiceNo = String(purchase.supplierInv || purchase.supplierInvoiceNo || '').trim().toLowerCase();
+                const supplierName = String(purchase.supplierName || purchase.supplier?.name || '').trim().toLowerCase();
+                if (!invoiceNo || !supplierName) return 0;
+                return this.data.advancePayments.reduce((sum, record) => sum + (record.allocations || [])
+                    .filter(item => item && item.type === 'invoice_allocation' && item.documentType === 'supplier_bill' && item.status !== 'reversed'
+                        && String(item.invoiceNo || '').trim().toLowerCase() === invoiceNo
+                        && String(item.partyName || record.partyName || '').trim().toLowerCase() === supplierName)
+                    .reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
             },
 
             getTransactions(type, name, fromDate, toDate) {
@@ -1366,7 +1414,9 @@
                                 });
                             }
                             // Payment (Debit)
-                            const paid = parseFloat(p.paid) || 0;
+                            const historyPaid = Array.isArray(p.paymentHistory) ? p.paymentHistory.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0) : 0;
+                            const splitPaid = (Number(p.paid_cash) || 0) + (Number(p.paid_bank) || 0);
+                            const paid = Math.max(historyPaid, Number(p.paid) || 0, splitPaid);
                             if (paid > 0) {
                                 transactions.push({
                                     date: p.paymentDate || p.date,
@@ -1383,6 +1433,57 @@
                             }
                         }
                     });
+                }
+
+                if (type === 'Customer' || type === 'Supplier') {
+                    const expectedEntity = type;
+                    this.data.advancePayments.filter(record => record.entityType === expectedEntity && String(record.partyName || '').trim().toLowerCase() === String(name || '').trim().toLowerCase())
+                        .forEach(record => {
+                            const customer = type === 'Customer';
+                            const voucher = record.voucherNo || record.id || '-';
+                            const amount = Number(record.amount) || 0;
+                            const date = record.paymentDate || record.date || '';
+                            if (amount > 0) transactions.push({
+                                date, desc: `${customer ? 'Customer Advance Received' : 'Supplier Advance Paid'} | Voucher ${voucher}`,
+                                type: 'Advance', debit: customer ? 0 : amount, credit: customer ? amount : 0,
+                                ref: voucher, remarks: [record.transactionRef, record.remarks].filter(Boolean).join(' · '),
+                                id: `advance-${record.id}`, createdBy: record.createdBy, editedBy: record.editedBy
+                            });
+
+                            (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed').forEach(item => {
+                                const allocationAmount = Number(item.amount) || 0;
+                                if (allocationAmount <= 0) return;
+                                const documentType = item.documentType === 'supplier_bill' ? 'Purchase Bill' : 'Invoice';
+                                const invoiceNo = item.invoiceNo || item.documentId || '-';
+                                transactions.push({
+                                    date: item.date || date,
+                                    desc: `${customer ? 'Advance Adjusted Against' : 'Supplier Advance Adjusted Against'} ${documentType} ${invoiceNo} | Voucher ${voucher} | ₹${allocationAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                                    type: 'Advance Adjustment', debit: 0, credit: 0, ref: invoiceNo,
+                                    remarks: `Memo only; the advance receipt/payment is already posted under Voucher ${voucher}.`,
+                                    id: `advance-allocation-${item.id || record.id}`, createdBy: item.createdBy || record.createdBy
+                                });
+                            });
+
+                            const remaining = this.getAdvanceRemaining(record);
+                            if (remaining > 0.005) transactions.push({
+                                date, desc: `Unallocated ${customer ? 'Customer' : 'Supplier'} Advance Balance | Voucher ${voucher} | ₹${remaining.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                                type: 'Advance Balance', debit: 0, credit: 0, ref: voucher,
+                                remarks: 'Memo only; the original advance transaction is already posted.',
+                                id: `advance-balance-${record.id}`, createdBy: record.createdBy
+                            });
+
+                            (record.refunds || []).filter(refund => refund && refund.status !== 'reversed').forEach(refund => {
+                                const refundAmount = Number(refund.amount) || 0;
+                                if (refundAmount <= 0) return;
+                                transactions.push({
+                                    date: refund.date || refund.paymentDate || date,
+                                    desc: `${customer ? 'Customer Advance Refunded' : 'Supplier Advance Refund Received'} | Voucher ${voucher}`,
+                                    type: 'Advance Refund', debit: customer ? refundAmount : 0, credit: customer ? 0 : refundAmount,
+                                    ref: refund.id || voucher, remarks: refund.transactionRef || refund.paymentMode || '',
+                                    id: `advance-refund-${refund.id || record.id}`, createdBy: refund.createdBy || record.createdBy
+                                });
+                            });
+                        });
                 }
 
                 // Pull entries from Journal Vouchers
@@ -1509,7 +1610,7 @@
                             if (cName.toLowerCase() === p.name.toLowerCase()) {
                                 const total = parseFloat(inv.invoice_total || inv.total || 0);
                                 const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
-                                const due = total - paid;
+                                const due = Math.max(0, total - paid - this.getInvoiceAdvanceApplied(inv));
                                 if (due > 1) {
                                     const invDate = new Date(inv.invoice_date || inv.date);
                                     const diffTime = Math.abs(today - invDate);
@@ -2188,7 +2289,7 @@
 
                     const total = parseFloat(inv.invoice_total || inv.total || 0);
                     const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
-                    const due = total - paid;
+                    const due = Math.max(0, total - paid - ledgerService.getInvoiceAdvanceApplied(inv));
 
                     if (due > 0.5) {
                         const invDate = new Date(inv.invoice_date || inv.date);
@@ -2762,7 +2863,7 @@
                 const customerName = invoice.customer_name || (invoice.customer && invoice.customer.name) || '';
                 const total = parseFloat(invoice.invoice_total || invoice.total || 0);
                 const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid || 0);
-                const dueAmount = total - paid;
+                const dueAmount = Math.max(0, total - paid - ledgerService.getInvoiceAdvanceApplied(invoice));
                 const invoiceNo = invoice.invoice_no || invoice.invoiceNo;
 
                 const url = `reminder.html?customer=${encodeURIComponent(customerName)}&due=${dueAmount.toFixed(2)}&invoiceNo=${encodeURIComponent(invoiceNo)}`;
@@ -2936,7 +3037,8 @@
 
             const total = parseFloat(inv.invoice_total || inv.total || 0);
             const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
-            const due = total - paid;
+            const advanceApplied = ledgerService.getInvoiceAdvanceApplied(inv);
+            const due = Math.max(0, total - paid - advanceApplied);
 
             return `
                     <div style="font-size:14px;">
@@ -2964,6 +3066,7 @@
                         <p style="margin:2px 0; color:#555; font-size:13px;"><strong>Total GST:</strong> ₹ ${totalGst.toFixed(2)}</p>
                         <p style="margin:2px 0; font-size:15px;"><strong>Grand Total:</strong> ₹ ${total.toFixed(2)}</p>
                         <p style="margin:2px 0; color:var(--success-color);"><strong>Paid:</strong> ₹ ${paid.toFixed(2)}</p>
+                        ${advanceApplied > 0.005 ? `<p style="margin:2px 0; color:#087f8c;"><strong>Adjusted from advance:</strong> ₹ ${advanceApplied.toFixed(2)}</p>` : ''}
                         <p style="margin:2px 0; color:var(--danger-color);"><strong>Due:</strong> ₹ ${due.toFixed(2)}</p>
                     </div>
                     ${inv.remarks ? `<div style="margin-top:10px; padding:10px; background:#f9f9f9; border-radius:4px;"><strong>Remarks:</strong> ${inv.remarks}</div>` : ''}
@@ -2979,8 +3082,10 @@
             const taxable = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
             const taxAmt = taxable * ((parseFloat(p.gst) || 0) / 100);
             const totalVal = taxable + taxAmt;
-            const paid = parseFloat(p.paid) || 0;
-            const due = totalVal - paid;
+            const historyPaid = Array.isArray(p.paymentHistory) ? p.paymentHistory.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0) : 0;
+            const paid = Math.max(historyPaid, Number(p.paid) || 0, (Number(p.paid_cash) || 0) + (Number(p.paid_bank) || 0));
+            const advanceApplied = ledgerService.getPurchaseAdvanceApplied(p);
+            const due = Math.max(0, totalVal - paid - advanceApplied);
 
             return `
                 <div style="font-size:14px;">
@@ -3004,6 +3109,7 @@
                     <div style="text-align:right;">
                         <p style="margin:2px 0;"><strong>Total Amount:</strong> ₹ ${totalVal.toFixed(2)}</p>
                         <p style="margin:2px 0; color:var(--success-color);"><strong>Paid:</strong> ₹ ${paid.toFixed(2)}</p>
+                        ${advanceApplied > 0.005 ? `<p style="margin:2px 0; color:#087f8c;"><strong>Adjusted from advance:</strong> ₹ ${advanceApplied.toFixed(2)}</p>` : ''}
                         <p style="margin:2px 0; color:var(--danger-color);"><strong>Due:</strong> ₹ ${due.toFixed(2)}</p>
                     </div>
                     ${p.paymentDate ? `<p style="text-align:right; font-size:12px; color:#666;">Payment Date: ${new Date(p.paymentDate).toLocaleDateString('en-GB')}</p>` : ''}

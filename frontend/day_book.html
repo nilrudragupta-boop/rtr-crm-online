@@ -502,12 +502,36 @@
             advances.forEach(advance => {
                 const date = (advance.paymentDate || '').split('T')[0], customer = advance.entityType === 'Customer';
                 const cashMode = String(advance.paymentMode || '').toLowerCase() === 'cash', amount = Number(advance.amount) || 0;
+                const activeAllocations = (advance.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed');
+                const allocatedAmount = activeAllocations.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                const adjustedAmount = Math.max(Number(advance.adjustedAmount) || 0, allocatedAmount);
+                const refundedAmount = (advance.refunds || []).filter(item => item && item.status !== 'reversed').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                const unallocatedAmount = Math.max(0, amount - adjustedAmount - refundedAmount);
                 if (date && isInRange(date) && amount > 0) transactions.push({
                     date, type: customer ? 'Receipt' : 'Payment', no: advance.voucherNo || advance.id,
                     particulars: (customer ? 'Customer Advance Receipt - ' : 'Supplier Advance Payment - ') + (advance.partyName || 'Party'), debit: 0, credit: 0,
                     cash: cashMode ? (customer ? amount : -amount) : 0, bank: cashMode ? 0 : (customer ? amount : -amount),
                     bankDetails: advance.accountId ? getBankInfoById(advance.accountId) : (cashMode ? '' : (advance.paymentMode || 'Bank')),
                     sourceType: 'advance', sourceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || ''
+                });
+                activeAllocations.forEach(allocation => {
+                    const allocationDate = (allocation.date || advance.paymentDate || '').split('T')[0], allocationAmount = Number(allocation.amount) || 0;
+                    if (!allocationDate || !isInRange(allocationDate) || allocationAmount <= 0) return;
+                    const documentLabel = allocation.documentType === 'supplier_bill' ? 'Purchase Bill' : 'Invoice';
+                    const reference = allocation.invoiceNo || allocation.documentId || 'Bill';
+                    transactions.push({
+                        date: allocationDate, type: 'Adjustment', no: reference,
+                        particulars: `${customer ? 'Customer' : 'Supplier'} Advance Adjusted Against ${documentLabel} ${reference} | Voucher ${advance.voucherNo || advance.id} | ${formatCurrency(allocationAmount)}`,
+                        debit: 0, credit: 0, cash: 0, bank: 0, bankDetails: '',
+                        sourceType: 'advance_allocation', sourceId: String(allocation.id || advance.id), advanceId: String(advance.id),
+                        voucherNo: advance.voucherNo || advance.id, invoiceNo: reference, partyId: String(advance.partyId || ''), partyName: advance.partyName || ''
+                    });
+                });
+                if (date && isInRange(date) && unallocatedAmount > 0.005) transactions.push({
+                    date, type: 'Advance Balance', no: advance.voucherNo || advance.id,
+                    particulars: `Unallocated ${customer ? 'Customer' : 'Supplier'} Advance Balance | Voucher ${advance.voucherNo || advance.id} | ${formatCurrency(unallocatedAmount)}`,
+                    debit: 0, credit: 0, cash: 0, bank: 0, bankDetails: '',
+                    sourceType: 'advance_balance', sourceId: String(advance.id), partyId: String(advance.partyId || ''), partyName: advance.partyName || ''
                 });
                 (advance.refunds || []).forEach(refund => {
                     const refundDate = (refund.date || refund.paymentDate || '').split('T')[0], refundCash = String(refund.paymentMode || '').toLowerCase() === 'cash', refundAmount = Number(refund.amount) || 0;
