@@ -1817,9 +1817,33 @@
                     total = inv.items.reduce((acc, it) => acc + (parseFloat(String(it.total).replace(/,/g, '')) || 0), 0);
                 }
             }
-            const paid = parseFloat(String(inv.total_paid || inv.paid_amount || inv.paid || 0).replace(/,/g, '')) || 0;
-            const due = total - paid;
-            return { total, paid, due };
+            const cashPaid = Math.max(
+                invoiceCashPaid(inv),
+                parseFloat(String(inv.total_paid || inv.paid_amount || inv.paid || 0).replace(/,/g, '')) || 0,
+                (Number(inv.paid_cash) || 0) + (Number(inv.paid_bank) || 0)
+            );
+            const advanceApplied = invoiceAdvanceApplied(inv);
+            const paid = cashPaid + advanceApplied;
+            const due = Math.max(0, total - paid);
+            return { total, paid, cashPaid, advanceApplied, due };
+        }
+
+        async function syncReportAdvanceAllocations() {
+            if (typeof apiClient === 'undefined' || typeof apiClient.getAdvancePayments !== 'function') return;
+            try {
+                const response = await apiClient.getAdvancePayments();
+                const remoteRecords = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : null);
+                if (!remoteRecords) return;
+                const localRecords = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]') || [];
+                const pending = JSON.parse(localStorage.getItem('advanceflow_pending_sync') || '[]') || [];
+                const pendingSaves = new Set(pending.filter(item => item.type !== 'delete').map(item => String(item.id)));
+                const pendingDeletes = new Set(pending.filter(item => item.type === 'delete').map(item => String(item.id)));
+                const merged = new Map(remoteRecords.filter(item => !pendingDeletes.has(String(item.id))).map((item, index) => [String(item.id || 'remote-' + index), item]));
+                localRecords.filter(item => pendingSaves.has(String(item.id))).forEach(item => merged.set(String(item.id), item));
+                localStorage.setItem('advanceflow_records_v1', JSON.stringify(Array.from(merged.values())));
+            } catch (error) {
+                console.warn('Could not refresh advance allocations for invoice balances.', error);
+            }
         }
 
         function populateDistrictFilter() {
@@ -2046,6 +2070,7 @@
 
             invoices = localInvoices;
             await refreshReportCustomerDetails();
+            await syncReportAdvanceAllocations();
             populateDistrictFilter();
             populateInvoiceTypeFilter();
             populateStateFilter();
@@ -2084,7 +2109,7 @@
             let grossTotalSum = 0;
 
             data.forEach((inv, i) => {
-                const { total, paid, due } = getInvoiceTotals(inv);
+                const { total, paid, cashPaid, advanceApplied, due } = getInvoiceTotals(inv);
 
                 totalSum += total;
                 paidSum += paid;
@@ -2169,7 +2194,7 @@
                 const district = inv.district || getCustomerField(inv, 'district');
                 const state = inv.state || getCustomerField(inv, 'state');
                 const gst = inv.gst_no || inv.gst || getCustomerField(inv, 'gst');
-                const { total, paid, due } = getInvoiceTotals(inv);
+                const { total, paid, cashPaid, advanceApplied, due } = getInvoiceTotals(inv);
                 const paidCash = parseFloat(inv.paid_cash || 0);
                 const paidBank = parseFloat(inv.paid_bank || 0);
                 const paymentDate = inv.payment_date || "";
@@ -2261,7 +2286,9 @@
         <td style="text-align:right;">${highlightMatch(paidCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), searchTerm)}</td>
         <td style="text-align:right;">${highlightMatch(paidBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), searchTerm)}</td>
         <td style="text-align:right; white-space:nowrap;" title="Cash: ₹${paidCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nBank: ₹${paidBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}">
-        <input class="paid-input" type="number" min="0" step="0.01" value="${paid.toFixed(2)}" style="width:90px; color:#27ae60; font-weight:bold; cursor:help;" readonly>
+        <span style="display:inline-block;min-width:78px;color:#198754;font-weight:bold;text-align:right;">${paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <input class="paid-input" type="number" min="0" step="0.01" value="${cashPaid.toFixed(2)}" style="display:none;" readonly>
+        ${advanceApplied > 0.005 ? `<small style="display:block;color:#087f5b;white-space:nowrap;">Cash/Bank ₹${cashPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + Advance ₹${advanceApplied.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</small>` : ''}
         <button class="small invoice-history-btn" onclick="showInvoicePaymentHistory('${id}')" title="Installment history" style="padding:3px 5px;">History</button><button class="small edit-paid-btn" style="background:#FFFFFF; color:#fff; padding:4px 6px; margin-left:4px; border:none; cursor:pointer;" title="Edit Amount">✏️</button>
         
         <button class="small print-receipt-btn" style="background:none; color:#27ae60; padding:4px 6px; border:none; cursor:pointer;" title="Download Payment Receipt Against Individual Invoice Basis"><i class="fas fa-print"></i></button>
@@ -2338,6 +2365,7 @@
                 const invoice = invoices.find(x => String(x.id || x.invoice_no) === String(id));
                 if (invoice) {
                     const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid || 0);
+                    const currentDue = getInvoiceTotals(invoice).due;
                     if (paid <= 0) return showToast("No payment received yet.", "#e67e22");
 
                     const customers = JSON.parse(localStorage.getItem('customers')) || [];
@@ -2370,7 +2398,7 @@
                                 receiptNo: "REC-" + Date.now().toString().slice(-6),
                                 date: invoice.payment_date ? formatDate(invoice.payment_date) : new Date().toLocaleDateString('en-GB'),
                                 amount: paid, paymentMode: (parseFloat(invoice.paid_bank || 0) > 0 && parseFloat(invoice.paid_cash || 0) > 0) ? 'Mixed' : (parseFloat(invoice.paid_bank || 0) > 0 ? 'Bank' : 'Cash'),
-                                descriptions: [customDesc], previousBalance: parseFloat(invoice.invoice_total || invoice.total || 0), currentBalance: parseFloat(invoice.total_due || 0)
+                                descriptions: [customDesc], previousBalance: parseFloat(invoice.invoice_total || invoice.total || 0), currentBalance: currentDue
                             };
 
                             if (isWhatsApp) {
@@ -2387,7 +2415,7 @@
                                 }
 
                                 let companyName = document.querySelector('[data-brand="name"]')?.innerText || "Our Company";
-                                const message = `Dear ${custName},\n\nGreetings from ${companyName}!\n\nWe have successfully received your payment of Rs. ${paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })} via ${paymentData.paymentMode}.\n\nYour current outstanding balance is Rs. ${parseFloat(invoice.total_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}.\n\nThank you!`;
+                                const message = `Dear ${custName},\n\nGreetings from ${companyName}!\n\nWe have successfully received your payment of Rs. ${paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })} via ${paymentData.paymentMode}.\n\nYour current outstanding balance is Rs. ${currentDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}.\n\nThank you!`;
                                 const waUrl = `https://wa.me/91${cleanContact}?text=${encodeURIComponent(message)}`;
                                 window.open(waUrl, '_blank');
                             } else {
@@ -3593,8 +3621,7 @@
                 if (invoice.invoice_total !== undefined) {
                     total = parseFloat(invoice.invoice_total);
                 }
-                const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid) || 0;
-                const due = total - paid;
+                const { paid, due, advanceApplied } = getInvoiceTotals(invoice);
 
                 // Amount in Words
                 doc.setFontSize(10);
@@ -3746,9 +3773,15 @@
                 rightY += 4;
 
                 doc.setFont(undefined, 'normal');
-                doc.text("Paid Amount:", 140, rightY);
+                doc.text("Paid / Adjusted:", 140, rightY);
                 doc.text(paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
                 rightY += 5;
+                if (advanceApplied > 0.005) {
+                    doc.setFont(undefined, 'normal');
+                    doc.text("Advance Adjusted:", 140, rightY);
+                    doc.text(advanceApplied.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
+                    rightY += 5;
+                }
                 doc.setFont(undefined, 'bold');
                 doc.text("Balance Due:", 140, rightY);
                 doc.text(due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, rightY, { align: "right" });
@@ -4422,15 +4455,20 @@
 
                 doc.line(startX, currentRightY + 2, startX + width, currentRightY + 2); // Bottom line of total
 
-                const paid = parseFloat(invoice.total_paid || invoice.paid_amount || invoice.paid || 0);
-                const due = totalVal - paid;
+                const { paid, due, advanceApplied } = getInvoiceTotals(invoice);
 
                 currentRightY += 6;
                 doc.setFont("helvetica", "normal");
-                doc.text("Paid Amount", startX + 125, currentRightY);
+                doc.text("Paid / Adjusted", startX + 125, currentRightY);
                 doc.text(paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
 
                 currentRightY += 6;
+                if (advanceApplied > 0.005) {
+                    doc.setFont("helvetica", "normal");
+                    doc.text("Advance Adjusted", startX + 125, currentRightY);
+                    doc.text(advanceApplied.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
+                    currentRightY += 6;
+                }
                 doc.setFont("helvetica", "bold");
                 doc.text("Balance Due", startX + 125, currentRightY);
                 doc.text(due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 195, currentRightY, { align: "right" });
@@ -5071,8 +5109,9 @@
                     return roundOffVal !== 0 ? `<div style="margin-bottom: 5px;"><strong>Round Off:</strong> ₹${roundOffVal.toFixed(2)}</div>` : '';
                 })()}
         <div style="margin-bottom: 5px;"><strong>Total:</strong> ₹${parseFloat(inv.invoice_total || inv.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <div style="margin-bottom: 5px;"><strong>Paid:</strong> ₹${parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <div style="color:${((parseFloat(inv.invoice_total || inv.total || 0) - parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0)) > 0.01) ? 'red' : 'green'}"><strong>Due:</strong> ₹${parseFloat((inv.invoice_total || inv.total || 0) - (inv.total_paid || inv.paid_amount || inv.paid || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        <div style="margin-bottom: 5px;"><strong>Paid / Adjusted:</strong> ₹${getInvoiceTotals(inv).paid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        ${getInvoiceTotals(inv).advanceApplied > 0.005 ? `<div style="margin-bottom:5px;color:#087f5b;"><strong>Advance Adjusted:</strong> ₹${getInvoiceTotals(inv).advanceApplied.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
+        <div style="color:${getInvoiceTotals(inv).due > 0.01 ? 'red' : 'green'}"><strong>Due:</strong> ₹${getInvoiceTotals(inv).due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
         </div>
     </div>
     `;
@@ -5609,6 +5648,7 @@
         applyInvoiceRecycleBinVisibility();
         window.addEventListener('storage', event => {
             if (event.key === 'showRecycleBinButtons') applyInvoiceRecycleBinVisibility();
+            if (event.key === 'advanceflow_records_v1') applySearch();
         });
 
         async function openPurchasePaymentHistoryReport() {

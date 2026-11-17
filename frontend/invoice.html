@@ -1458,7 +1458,7 @@
                         if (cName.toLowerCase() === c.name.toLowerCase()) {
                             const total = parseFloat(inv.invoice_total || inv.total || 0);
                             const paid = parseFloat(inv.total_paid || inv.paid_amount || inv.paid || 0);
-                            balance += (total - paid);
+                            balance += (total - paid - getSalesInvoiceAdvanceApplied(inv.invoice_no || inv.invoiceNo, cName));
                         }
                     });
 
@@ -3178,6 +3178,11 @@
         // 🔸 Initialize page
         window.onload = async () => {
             await syncAdvanceAllocationsForInvoicePage();
+            window.addEventListener('storage', event => {
+                if (event.key !== 'advanceflow_records_v1') return;
+                const customerInput = document.getElementById('custName');
+                if (customerInput && customerInput.value && typeof customerInput.onchange === 'function') customerInput.onchange();
+            });
             window.currentBalanceCredit = Infinity;
             document.getElementById("invoice").style.display = "block";
             document.getElementById("invoiceDate").valueAsDate = new Date();
