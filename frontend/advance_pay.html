@@ -121,6 +121,11 @@
                     <option value="₹">INR (₹)</option>
                 </select>
 
+                <button id="refreshAdvanceButton" onclick="refreshAdvanceData()" title="Refresh advance data from the server"
+                    class="inline-flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium text-xs sm:text-sm px-3 py-2 rounded-lg transition">
+                    <i id="refreshAdvanceIcon" class="fa-solid fa-rotate"></i>
+                    <span>Refresh</span>
+                </button>
                 <button onclick="exportToCSV()"
                     class="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium text-xs sm:text-sm px-3 py-2 rounded-lg transition shadow-xs">
                     <i class="fa-solid fa-download text-slate-500"></i>
@@ -1059,6 +1064,7 @@
             resetForm();
             refreshUI();
             syncRemoteData();
+            setInterval(() => { flushAdvanceSyncQueue(); syncRemoteAdvancePayments(); }, 30000); // Retry advance writes and refresh remote advances every 30 seconds
             window.addEventListener('online', flushAdvanceSyncQueue);
             window.addEventListener('online', flushAuditSyncQueue);
             document.addEventListener('click', closeRowActionMenuOnOutsideClick);
@@ -1118,24 +1124,131 @@
             }
         }
 
+        async function getRemoteDeletedAdvancePayments() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/advance-payments/deleted${apiClient._getAuthQuery()}`, { cache: 'no-store' });
+                if (!response.ok) return null;
+                const result = await response.json();
+                return result.success && Array.isArray(result.data) ? result.data : null;
+            } catch (error) {
+                console.warn('Could not retrieve deleted remote advance payments.', error);
+                return null;
+            }
+        }
+        let advanceRemoteRefreshRunning = false;
+
+        async function syncRemoteAdvancePayments() {
+            if (advanceRemoteRefreshRunning || typeof apiClient === 'undefined' || !apiClient.getAdvancePayments) return false;
+            advanceRemoteRefreshRunning = true;
+            const localSnapshot = records.map(record => JSON.parse(JSON.stringify(record)));
+            try {
+                const pendingAtStart = readLocalArray('advanceflow_pending_sync');
+                const [remoteAdvances, remoteDeletedAdvances] = await Promise.all([
+                    apiClient.getAdvancePayments(), getRemoteDeletedAdvancePayments()
+                ]);
+                if (!Array.isArray(remoteAdvances) || !Array.isArray(remoteDeletedAdvances)) return false;
+
+                const localById = new Map(records.map(record => [String(record.id), record]));
+                const snapshotById = new Map(localSnapshot.map(record => [String(record.id), record]));
+                const changedDuringFetch = new Set();
+                localById.forEach((record, id) => {
+                    if (JSON.stringify(record) !== JSON.stringify(snapshotById.get(id))) changedDuringFetch.add(id);
+                });
+                snapshotById.forEach((record, id) => {
+                    if (!localById.has(id)) changedDuringFetch.add(id);
+                });
+
+                const pending = readLocalArray('advanceflow_pending_sync');
+                const protectedIds = new Set([
+                    ...pendingAtStart.map(operation => String(operation.id)),
+                    ...pending.map(operation => String(operation.id)),
+                    ...changedDuringFetch
+                ]);
+                const remoteDeletedIds = new Set((Array.isArray(remoteDeletedAdvances) ? remoteDeletedAdvances : []).map(record => String(record.id)));
+                const removedIds = new Set(pending.filter(operation => operation.type === 'delete').map(operation => String(operation.id)));
+                remoteDeletedIds.forEach(id => removedIds.add(id));
+                if (remoteDeletedIds.size) {
+                    const remainingPending = readLocalArray('advanceflow_pending_sync').filter(operation => !remoteDeletedIds.has(String(operation.id)));
+                    localStorage.setItem('advanceflow_pending_sync', JSON.stringify(remainingPending));
+                }
+                snapshotById.forEach((record, id) => {
+                    if (!localById.has(id)) removedIds.add(id);
+                });
+
+                const remoteIds = new Set(remoteAdvances.map(record => String(record.id)));
+                const localOnly = records.filter(record => !remoteIds.has(String(record.id)) || protectedIds.has(String(record.id)));
+                records = [
+                    ...remoteAdvances.filter(record => !removedIds.has(String(record.id))),
+                    ...localOnly.filter(record => !removedIds.has(String(record.id)))
+                ];
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+                localOnly.filter(record => !removedIds.has(String(record.id)))
+                    .forEach(record => queueAdvanceSync('save', record.id, record));
+                refreshUI();
+                return true;
+            } catch (error) {
+                console.warn('Could not refresh remote advance payments.', error);
+                return false;
+            } finally {
+                advanceRemoteRefreshRunning = false;
+            }
+        }
+        async function refreshAdvanceData() {
+            const button = document.getElementById('refreshAdvanceButton');
+            const icon = document.getElementById('refreshAdvanceIcon');
+            if (button?.disabled) return;
+            if (button) button.disabled = true;
+            if (icon) icon.classList.add('fa-spin');
+            try {
+                const refreshed = await syncRemoteAdvancePayments();
+                if (refreshed) {
+                    await flushAdvanceSyncQueue();
+                    showToast('Advance data refreshed from the server.');
+                } else {
+                    showToast('Could not refresh advance data. Check your connection and try again.', 'error');
+                }
+            } finally {
+                if (button) button.disabled = false;
+                if (icon) icon.classList.remove('fa-spin');
+            }
+        }
         async function syncRemoteData() {
+            const localAdvanceSnapshot = records.map(record => JSON.parse(JSON.stringify(record)));
+
             if (typeof apiClient === 'undefined') return;
             try {
-                const [remoteAdvances, remoteCustomers, remoteSuppliers, remoteQuotes, remoteOrders, settings, remoteAudit, remoteBankAccounts, remoteInvoices, remotePurchases] = await Promise.all([
-                    apiClient.getAdvancePayments(), apiClient.getCustomers(), apiClient.getSuppliers(),
+                const [remoteAdvances, remoteDeletedAdvances, remoteCustomers, remoteSuppliers, remoteQuotes, remoteOrders, settings, remoteAudit, remoteBankAccounts, remoteInvoices, remotePurchases] = await Promise.all([
+                    apiClient.getAdvancePayments(), getRemoteDeletedAdvancePayments(), apiClient.getCustomers(), apiClient.getSuppliers(),
                     apiClient.getQuotations(), apiClient.getOrderSheets(), apiClient.getSettings(), apiClient.getAdvanceAudit(), apiClient.getBankAccounts().catch(() => null), apiClient.getInvoices().catch(() => null), apiClient.getPurchases().catch(() => null)
                 ]);
 
-                if (Array.isArray(remoteAdvances)) {
+                if (Array.isArray(remoteAdvances) && Array.isArray(remoteDeletedAdvances)) {
                     const localRecords = records.slice();
                     const remoteIds = new Set(remoteAdvances.map(record => String(record.id)));
                     const pending = readLocalArray('advanceflow_pending_sync');
                     const pendingIds = new Set(pending.map(operation => String(operation.id)));
+                    const snapshotById = new Map(localAdvanceSnapshot.map(record => [String(record.id), record]));
+                    const currentById = new Map(localRecords.map(record => [String(record.id), record]));
+                    snapshotById.forEach((record, id) => {
+                        if (!currentById.has(id)) pendingIds.add(id);
+                    });
+                    currentById.forEach((record, id) => {
+                        if (JSON.stringify(record) !== JSON.stringify(snapshotById.get(id))) pendingIds.add(id);
+                    });
                     const localOnly = localRecords.filter(record => !remoteIds.has(String(record.id)) || pendingIds.has(String(record.id)));
+                    const remoteDeletedIds = new Set(remoteDeletedAdvances.map(record => String(record.id)));
                     const removedIds = new Set(pending.filter(operation => operation.type === 'delete').map(operation => String(operation.id)));
+                    remoteDeletedIds.forEach(id => removedIds.add(id));
+                    if (remoteDeletedIds.size) {
+                        const remainingPending = readLocalArray('advanceflow_pending_sync').filter(operation => !remoteDeletedIds.has(String(operation.id)));
+                        localStorage.setItem('advanceflow_pending_sync', JSON.stringify(remainingPending));
+                    }
+                    snapshotById.forEach((record, id) => {
+                        if (!currentById.has(id)) removedIds.add(id);
+                    });
                     records = [...remoteAdvances.filter(record => !removedIds.has(String(record.id))), ...localOnly.filter(record => !removedIds.has(String(record.id)))];
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-                    localOnly.forEach(record => queueAdvanceSync('save', record.id, record));
+                    localOnly.filter(record => !removedIds.has(String(record.id))).forEach(record => queueAdvanceSync('save', record.id, record));
                 }
 
                 if (Array.isArray(remoteCustomers)) {
