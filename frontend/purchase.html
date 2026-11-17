@@ -4200,10 +4200,47 @@
             let suppliers = [];
             try { suppliers = JSON.parse(localStorage.getItem('suppliers') || '[]') || []; } catch (error) { suppliers = []; }
             const supplier = suppliers.find(item => String(item.name || '').trim().toLowerCase() === name.toLowerCase());
-            if (!supplier) { display.textContent = name ? 'Supplier opening balance: select a listed supplier' : 'Supplier opening balance: —'; return; }
+            if (!supplier) { display.innerHTML = name ? 'Supplier balance: select a listed supplier' : 'Supplier balance: —'; return; }
             const amount = Number(supplier.openingBalance) || 0;
             const type = supplier.openingBalanceType || 'Cr';
-            display.textContent = `Supplier opening balance: ₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${type}`;
+            const outstanding = getCurrentSupplierPurchaseOutstanding(supplier.name);
+            const unallocated = getPurchaseSupplierUnallocatedAdvances(supplier);
+            display.innerHTML = `Total Outstanding (purchase bills): ₹${outstanding.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<br>Opening Balance: ₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(type)}<br><span style="color:#087f5b;font-weight:600;">Unallocated Advances: ₹${unallocated.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+        }
+
+        function getPurchaseSupplierUnallocatedAdvances(supplier) {
+            let records = [];
+            try { records = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]') || []; } catch (error) { records = []; }
+            const supplierId = String(supplier.id || ''), supplierName = String(supplier.name || '').trim().toLowerCase();
+            return records.filter(record => record.entityType === 'Supplier' && (supplierId && record.partyId ? String(record.partyId) === supplierId : String(record.partyName || '').trim().toLowerCase() === supplierName))
+                .reduce((sum, record) => {
+                    const allocations = (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    const refunds = (record.refunds || []).filter(item => item && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    return sum + Math.max(0, (Number(record.amount) || 0) - Math.max(Number(record.adjustedAmount) || 0, allocations) - refunds);
+                }, 0);
+        }
+
+        function getCurrentSupplierPurchaseOutstanding(supplierName) {
+            let purchases = [];
+            try { purchases = JSON.parse(localStorage.getItem('purchases') || '[]') || []; } catch (error) { purchases = []; }
+            const matching = purchases.filter(row => String(row.supplierName || '').trim().toLowerCase() === String(supplierName || '').trim().toLowerCase());
+            const groups = new Map();
+            matching.forEach((row, index) => {
+                const invoice = String(row.supplierInv || '').trim().toLowerCase();
+                const key = invoice ? 'bill:' + invoice : 'row:' + String(row.id || index);
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(row);
+            });
+            let outstanding = 0;
+            groups.forEach(rows => {
+                const total = rows.reduce((sum, row) => sum + getPurchaseBillRowTotal(row), 0);
+                const paid = rows.reduce((sum, row) => sum + (Array.isArray(row.paymentHistory) && row.paymentHistory.length
+                    ? row.paymentHistory.reduce((part, payment) => part + (Number(payment.amount) || 0), 0)
+                    : Number(row.paid ?? ((Number(row.paid_cash) || 0) + (Number(row.paid_bank) || 0))) || 0), 0);
+                const advance = rows[0] ? getPurchaseBillAdvanceApplied(rows[0]) : 0;
+                outstanding += total - paid - advance;
+            });
+            return outstanding;
         }
 
         function showToast(msg, bg = "#333") {

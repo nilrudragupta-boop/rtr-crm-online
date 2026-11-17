@@ -1410,7 +1410,8 @@
                 { id: 'gst', label: 'GST' },
                 { id: 'creditLimit', label: 'Credit Limit' },
                 { id: 'openingBalance', label: 'Opening Bal' },
-                { id: 'outstanding', label: 'Total Outstanding' }
+                { id: 'outstanding', label: 'Total Outstanding' },
+                { id: 'unallocatedAdvances', label: 'Unallocated Advances' }
             ];
             dynamicFieldsList.forEach(f => {
                 if (f.showInGrid !== false) {
@@ -1919,6 +1920,9 @@
                             ${(c.outstanding || 0).toFixed(2)}
                             <button class="action-btn btn-action-receipt" data-action="receipt" data-id="${c.id}" title="Download Payment Receipt Against Total Outstanding Balance" style="background:none; color:#27ae60; padding:0; border:none; cursor:pointer; font-size:16px; vertical-align:middle; margin-left:8px;"><i class="fas fa-print"></i></button>
                         </td>`;
+                    } else if (col.id === 'unallocatedAdvances') {
+                        const unallocated = getCustomerUnallocatedAdvances(c);
+                        trHtml += `<td data-col="${col.id}" style="font-weight:bold; color:${unallocated > 0.005 ? '#087f5b' : '#6c757d'}; white-space:nowrap;">₹${unallocated.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                     } else if (col.isDynamic) {
                         let val = c[col.id];
                         if (col.fieldDef.fieldType === 'boolean') val = val ? 'Yes' : 'No';
@@ -2000,6 +2004,19 @@
                 .concat(rows.flatMap(record => (record.refunds || []).map(item => ({ id: item.id, voucher: record.voucherNo || record.id, date: item.date || '', kind: 'Advance refunded', amount: -(Number(item.amount) || 0), reference: item.paymentMode || 'Refund' }))));
         }
 
+        function getCustomerUnallocatedAdvances(customer) {
+            let records = [];
+            try { records = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]') || []; } catch (error) { records = []; }
+            const customerId = String(customer.id || '');
+            const customerName = String(customer.name || '').trim().toLowerCase();
+            return records.filter(record => record.entityType === 'Customer' && (customerId && record.partyId ? String(record.partyId) === customerId : String(record.partyName || '').trim().toLowerCase() === customerName))
+                .reduce((sum, record) => {
+                    const allocations = (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    const refunds = (record.refunds || []).filter(item => item && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    return sum + Math.max(0, (Number(record.amount) || 0) - Math.max(Number(record.adjustedAmount) || 0, allocations) - refunds);
+                }, 0);
+        }
+
         function viewCustomer(id) {
             const cust = customers.find(c => String(c.id) === String(id));
             if (!cust) return showToast("Customer not found", "toast-warning");
@@ -2018,7 +2035,7 @@
                     <tr><th style="padding:8px; background:#f8f9fa;">Credit Limit</th><td style="padding:8px;">${cust.creditLimit ? '₹ ' + parseFloat(cust.creditLimit).toFixed(2) : 'Unlimited'}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Opening Balance</th><td style="padding:8px;">${cust.openingBalance ? ('₹ ' + cust.openingBalance + ' ' + (cust.openingBalanceType || 'Dr')) : '-'}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Total Outstanding</th><td style="padding:8px; font-weight:bold; color:${(cust.outstanding || calculateOutstanding(cust) || 0) > 0.01 ? '#dc3545' : '#28a745'};">₹ ${(cust.outstanding || calculateOutstanding(cust) || 0).toFixed(2)}</td></tr>
-                    <tr><th style="padding:8px; background:#f8f9fa;">Unallocated Advances</th><td style="padding:8px; font-weight:bold;">₹ ${Math.max(0, getCustomerAdvanceLedger(cust).reduce((sum, item) => sum + item.amount, 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Unallocated Advances</th><td style="padding:8px; font-weight:bold;">₹ ${getCustomerUnallocatedAdvances(cust).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
                 </table>
             `;
 
@@ -2518,6 +2535,10 @@
 
             // 2. Sort
             filtered.sort((a, b) => {
+                if (currentSortColumn === 'unallocatedAdvances') {
+                    const valA = getCustomerUnallocatedAdvances(a), valB = getCustomerUnallocatedAdvances(b);
+                    return currentSortDirection === 'asc' ? valA - valB : valB - valA;
+                }
                 let valA = (a[currentSortColumn] || "").toString().toLowerCase();
                 let valB = (b[currentSortColumn] || "").toString().toLowerCase();
                 return currentSortDirection === 'asc' ? valA.localeCompare(valB, undefined, { numeric: true }) : valB.localeCompare(valA, undefined, { numeric: true });
@@ -2585,7 +2606,8 @@
                 });
             }
 
-            let firstTotalColIdx = orderedCols.findIndex(c => c.id === 'openingBalance' || c.id === 'outstanding' || (c.isDynamic && c.fieldDef && c.fieldDef.showGrandTotal));
+            const totalUnallocated = filteredList.reduce((sum, customer) => sum + getCustomerUnallocatedAdvances(customer), 0);
+            let firstTotalColIdx = orderedCols.findIndex(c => c.id === 'openingBalance' || c.id === 'outstanding' || c.id === 'unallocatedAdvances' || (c.isDynamic && c.fieldDef && c.fieldDef.showGrandTotal));
             if (firstTotalColIdx === -1) firstTotalColIdx = orderedCols.length;
 
             let startCols = 2 + firstTotalColIdx; // Checkbox + Sl No
@@ -2608,6 +2630,10 @@
                     td.style.fontWeight = 'bold';
                     td.style.color = totalOut > 0.01 ? '#dc3545' : '#28a745';
                     td.innerText = totalOut.toFixed(2);
+                } else if (col.id === 'unallocatedAdvances') {
+                    td.style.fontWeight = 'bold';
+                    td.style.color = '#087f5b';
+                    td.innerText = '₹' + totalUnallocated.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 } else if (col.isDynamic && col.fieldDef && col.fieldDef.showGrandTotal) {
                     let val = grandTotals[col.id] || 0;
                     let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: col.fieldDef.currencyDecimals ?? 2, maximumFractionDigits: col.fieldDef.currencyDecimals ?? 2 });

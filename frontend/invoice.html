@@ -1483,7 +1483,8 @@
                         } else {
                             window.currentBalanceCredit = Infinity;
                         }
-                        outEl.innerHTML = "Total Outstanding: ₹ " + balance.toFixed(2) + limitText;
+                        const unallocatedAdvances = getCustomerUnallocatedAdvanceBalance(c);
+                        outEl.innerHTML = "Total Outstanding: ₹ " + balance.toFixed(2) + limitText + `<br><span style="color:#087f5b;">Unallocated Advances: ₹${unallocatedAdvances.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
                         outEl.style.color = balance > 0.01 ? "#dc3545" : "#28a745";
 
                         if (c.creditLimit && balance > parseFloat(c.creditLimit)) {
@@ -2750,6 +2751,18 @@
         }
         function getSalesInvoiceAdvanceApplied(invoiceNo, customerName) {
             return getSalesInvoiceAdvanceAllocations(invoiceNo, customerName).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        }
+        function getCustomerUnallocatedAdvanceBalance(customer) {
+            let records = [];
+            try { records = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]') || []; } catch (error) { records = []; }
+            const customerId = String(customer?.id || '');
+            const customerName = String(customer?.name || '').trim().toLowerCase();
+            return records.filter(record => record.entityType === 'Customer' && (customerId && record.partyId ? String(record.partyId) === customerId : String(record.partyName || '').trim().toLowerCase() === customerName))
+                .reduce((sum, record) => {
+                    const allocations = (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    const refunds = (record.refunds || []).filter(item => item && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    return sum + Math.max(0, (Number(record.amount) || 0) - Math.max(Number(record.adjustedAmount) || 0, allocations) - refunds);
+                }, 0);
         }
         function renderSalesInvoiceAdvanceHistory() {
             const container = document.getElementById('invoiceAdvanceAllocationHistory');

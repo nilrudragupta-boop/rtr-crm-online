@@ -1038,6 +1038,18 @@
             if (!invoiceNo) return 0;
             return JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]').reduce((sum, record) => sum + (record.allocations || []).filter(item => item.type === 'invoice_allocation' && item.documentType === 'supplier_bill' && item.status !== 'reversed' && String(item.invoiceNo || '').trim().toLowerCase() === String(invoiceNo).trim().toLowerCase() && String(item.partyName || record.partyName || '').trim().toLowerCase() === String(supplierName || '').trim().toLowerCase()).reduce((part, item) => part + (Number(item.amount) || 0), 0), 0);
         }
+        function getSupplierUnallocatedAdvances(supplier) {
+            let records = [];
+            try { records = JSON.parse(localStorage.getItem('advanceflow_records_v1') || '[]') || []; } catch (error) { records = []; }
+            const supplierId = String(supplier.id || '');
+            const supplierName = String(supplier.name || '').trim().toLowerCase();
+            return records.filter(record => record.entityType === 'Supplier' && (supplierId && record.partyId ? String(record.partyId) === supplierId : String(record.partyName || '').trim().toLowerCase() === supplierName))
+                .reduce((sum, record) => {
+                    const allocations = (record.allocations || []).filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    const refunds = (record.refunds || []).filter(item => item && item.status !== 'reversed').reduce((value, item) => value + (Number(item.amount) || 0), 0);
+                    return sum + Math.max(0, (Number(record.amount) || 0) - Math.max(Number(record.adjustedAmount) || 0, allocations) - refunds);
+                }, 0);
+        }
         function getSupplierBillLineTotal(row) {
             const base = (Number(row.qty) || 0) * (Number(row.price) || 0), discount = Number(row.discount) || 0;
             const taxable = base - (row.discType === 'flat' ? discount : base * discount / 100) + (Number(row.freightCharges) || 0) + (Number(row.packingCharges) || 0) + (Number(row.loadingCharges) || 0);
@@ -1129,17 +1141,27 @@
         function initColumnVisibility() {
             const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
             const customFieldsCount = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive && f.showInGrid !== false).length;
-            const totalExpectedCols = 14 + customFieldsCount;
+            const oldExpectedCols = 14 + customFieldsCount;
+            const totalExpectedCols = 15 + customFieldsCount;
             if (columnVisibility.length !== totalExpectedCols) {
+                const previousVisibility = columnVisibility.slice();
                 let newVis = new Array(totalExpectedCols).fill(true);
-                if (columnVisibility.length > 0) {
-                    columnVisibility.forEach((v, i) => { if (i < newVis.length) newVis[i] = v; });
+                if (previousVisibility.length === oldExpectedCols) {
+                    for (let i = 0; i <= 12; i++) newVis[i] = previousVisibility[i] !== false;
+                    for (let i = 0; i < customFieldsCount; i++) newVis[14 + i] = previousVisibility[13 + i] !== false;
+                    newVis[totalExpectedCols - 1] = true;
+                } else if (previousVisibility.length > 0) {
+                    previousVisibility.slice(0, 13).forEach((v, i) => { newVis[i] = v !== false; });
+                    newVis[13] = true;
                 }
                 columnVisibility = newVis;
                 localStorage.setItem("supplierColumnVisibility", JSON.stringify(columnVisibility));
             }
             if (columnOrder.length !== totalExpectedCols) {
-                columnOrder = Array.from({ length: totalExpectedCols }, (_, i) => i);
+                const previousOrder = columnOrder.slice();
+                columnOrder = previousOrder.length === oldExpectedCols
+                    ? [0, ...previousOrder.filter(i => i > 0 && i < oldExpectedCols - 1).map(i => i >= 13 ? i + 1 : i), totalExpectedCols - 1]
+                    : Array.from({ length: totalExpectedCols }, (_, i) => i);
                 localStorage.setItem("supplierColumnOrder", JSON.stringify(columnOrder));
             }
         }
@@ -1906,7 +1928,9 @@
             colDefinitions[11] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('description')">Description <span id="sort-icon-description"></span></th>`, td: (s) => `<td>${highlightMatch(s.description, searchTerm)}</td>` };
             colDefinitions[12] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('totalDue')">Total Due <span id="sort-icon-totalDue"></span></th>`, td: (s) => `<td style="font-weight:bold; color:${(s.totalDue || 0) > 0 ? '#dc3545' : '#28a745'}">₹${(s.totalDue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>` };
 
-            let curIdx = 13;
+            colDefinitions[13] = { th: `<th style="cursor:pointer;" onclick="handleHeaderClick('unallocatedAdvances')">Unallocated Advances <span id="sort-icon-unallocatedAdvances"></span></th>`, td: (s) => { const amount = getSupplierUnallocatedAdvances(s); return `<td style="font-weight:bold;color:${amount > 0.005 ? '#087f5b' : '#6c757d'};white-space:nowrap;">₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`; } };
+
+            let curIdx = 14;
             customFields.forEach(cf => {
                 colDefinitions[curIdx] = {
                     isCustom: true,
@@ -1977,6 +2001,7 @@
             let hasGrandTotals = false;
             let grandTotals = {};
             let totalDueSum = 0;
+            let totalUnallocatedAdvances = 0;
             customFields.forEach(cf => {
                 if (cf.showGrandTotal) {
                     hasGrandTotals = true;
@@ -1987,6 +2012,7 @@
             if (fullFilteredList.length > 0) {
                 fullFilteredList.forEach(s => {
                     totalDueSum += (s.totalDue || 0);
+                    totalUnallocatedAdvances += getSupplierUnallocatedAdvances(s);
                     if (hasGrandTotals) {
                         customFields.forEach(cf => {
                             if (cf.showGrandTotal && grandTotals[cf.fieldName] !== undefined) {
@@ -2004,7 +2030,7 @@
                 if (fullFilteredList.length > 0) {
                     let tfootHtml = `<tr style="font-weight: bold; background: #f8f9fa;">`;
 
-                    let firstTotalLogical = columnOrder.find(idx => (idx === 12 || (colDefinitions[idx] && colDefinitions[idx].isCustom && colDefinitions[idx].fieldDef && colDefinitions[idx].fieldDef.showGrandTotal)) && columnVisibility[idx]);
+                    let firstTotalLogical = columnOrder.find(idx => (idx === 12 || idx === 13 || (colDefinitions[idx] && colDefinitions[idx].isCustom && colDefinitions[idx].fieldDef && colDefinitions[idx].fieldDef.showGrandTotal)) && columnVisibility[idx]);
                     let lastVisibleBeforeTotal = -1;
 
                     if (firstTotalLogical !== undefined) {
@@ -2020,6 +2046,8 @@
                     columnOrder.forEach(idx => {
                         if (idx === 12) {
                             tfootHtml += `<td style="font-weight:bold; color:${totalDueSum > 0 ? '#dc3545' : '#28a745'}">₹${totalDueSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+                        } else if (idx === 13) {
+                            tfootHtml += `<td style="font-weight:bold;color:#087f5b;">₹${totalUnallocatedAdvances.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                         } else if (colDefinitions[idx] && colDefinitions[idx].isCustom && colDefinitions[idx].fieldDef && colDefinitions[idx].fieldDef.showGrandTotal) {
                             let val = grandTotals[colDefinitions[idx].fieldDef.fieldName] || 0;
                             let formattedVal = val.toLocaleString('en-IN', { minimumFractionDigits: colDefinitions[idx].fieldDef.currencyDecimals ?? 2, maximumFractionDigits: colDefinitions[idx].fieldDef.currencyDecimals ?? 2 });
@@ -2288,7 +2316,7 @@
                     <tr><th style="padding:8px; background:#f8f9fa;">Type</th><td style="padding:8px;">${escapeHtml(s.supplierType || '-')}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Description</th><td style="padding:8px;">${escapeHtml(s.description || '-')}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Total Due</th><td style="padding:8px; font-weight:bold; color:${(s.totalDue || 0) > 0.01 ? '#dc3545' : '#28a745'};">₹ ${(s.totalDue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
-                    <tr><th style="padding:8px; background:#f8f9fa;">Unallocated Advances</th><td style="padding:8px; font-weight:bold;">₹ ${Math.max(0, getSupplierAdvanceLedger(s).reduce((sum, item) => sum + item.amount, 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Unallocated Advances</th><td style="padding:8px; font-weight:bold;">₹ ${getSupplierUnallocatedAdvances(s).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
                 </table>
             `;
 
@@ -2518,6 +2546,11 @@
                 filtered.sort((a, b) => {
                     return currentSortDirection === 'asc' ? (a.totalDue - b.totalDue) : (b.totalDue - a.totalDue);
                 });
+            } else if (currentSortColumn === 'unallocatedAdvances') {
+                filtered.sort((a, b) => {
+                    const difference = getSupplierUnallocatedAdvances(a) - getSupplierUnallocatedAdvances(b);
+                    return currentSortDirection === 'asc' ? difference : -difference;
+                });
             } else if (currentSortColumn) {
                 // Generic sort for other columns
                 filtered.sort((a, b) => {
@@ -2559,7 +2592,7 @@
         function updateHeaderIcons() {
             const allFields = JSON.parse(localStorage.getItem('CUSTOM_FIELDS')) || [];
             const customFields = allFields.filter(f => f.moduleName === 'Supplier' && f.isActive && f.showInGrid !== false);
-            const cols = ['name', 'contact', 'email', 'gstin', 'address', 'pin', 'district', 'state', 'supplierType', 'description', 'totalDue', ...customFields.map(cf => cf.fieldName)];
+            const cols = ['name', 'contact', 'email', 'gstin', 'address', 'pin', 'district', 'state', 'supplierType', 'description', 'totalDue', 'unallocatedAdvances', ...customFields.map(cf => cf.fieldName)];
             cols.forEach(col => {
                 const icon = document.getElementById(`sort-icon-${col}`);
                 if (icon) {
