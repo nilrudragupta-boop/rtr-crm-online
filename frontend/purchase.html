@@ -3138,6 +3138,7 @@
             let grandTotalDue = 0;
             const uomTotals = {};
 
+
             data.forEach((p, i) => {
                 const baseAmt = (parseFloat(p.qty) || 0) * (parseFloat(p.price) || 0);
                 const discVal = parseFloat(p.discount) || 0;
@@ -3374,11 +3375,27 @@
             const uomSummaryPrint = Object.entries(uomTotals)
                 .map(([u, q]) => `<div>${q.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${u}</div>`)
                 .join("");
+            const screenItemUomTotals = new Map();
+            (Array.isArray(averageData) ? averageData : data).forEach(purchase => {
+                const itemName = String(purchase.itemName || 'Unnamed Item').trim();
+                const resolvedItemCode = itemCodesById.get(String(purchase.itemId)) || purchase.itemCode || '-';
+                const itemCode = resolvedItemCode === '-' ? '' : String(resolvedItemCode).trim();
+                const unit = String(purchase.uom || 'N/A').trim() || 'N/A';
+                const key = `${itemName.toLowerCase()}|${itemCode.toLowerCase()}|${unit.toLowerCase()}`;
+                const quantity = parseFloat(String(purchase.qty ?? 0).replace(/,/g, '')) || 0;
+                const existing = screenItemUomTotals.get(key);
+                if (existing) existing.quantity += quantity;
+                else screenItemUomTotals.set(key, { itemName, itemCode, unit, quantity });
+            });
+            const screenItemUomSummary = Array.from(screenItemUomTotals.values())
+                .map(({ itemName, itemCode, unit, quantity }) =>
+                    `<div>${escapeHtml(itemName)}${itemCode ? ` (${escapeHtml(itemCode)})` : ''}: ${quantity.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${escapeHtml(unit)}</div>`
+                ).join('');
 
-            if (uomSummary) {
+            if (uomSummary || screenItemUomSummary) {
                 // Screen UOM Row
-                if (showTotalQtyScreen) {
-                    let spanUom1 = span1; // 0-8
+                if (showTotalQtyScreen && screenItemUomSummary) {
+                    let spanUom1 = span1; // Checkbox through Sale Price
                     let spanUom2 = 0;
                     for (let i = 21; i <= 35; i++) if (columnVisibility[i]) spanUom2++;
 
@@ -3386,10 +3403,15 @@
                     trUom.className = "no-print";
                     let uomHtml = '';
                     if (spanUom1 > 0) {
-                        uomHtml += `<td colspan="${spanUom1}" style="text-align:right">Total Quantity:</td>`;
+                        const labelText = spanUom2 > 0 ? 'Total Quantity:' : `Total Quantity: ${screenItemUomSummary}`;
+                        uomHtml += `<td colspan="${spanUom1}" style="text-align:${spanUom2 > 0 ? 'right' : 'left'}; font-weight:bold; white-space:normal;">${labelText}</td>`;
                     }
                     if (spanUom2 > 0) {
-                        uomHtml += `<td colspan="${spanUom2}" style="text-align:left; font-weight:bold; color:#28a745;">${uomSummary}</td>`;
+                        const quantityContent = spanUom1 > 0 ? screenItemUomSummary : `Total Quantity: ${screenItemUomSummary}`;
+                        uomHtml += `<td colspan="${spanUom2}" style="text-align:left; font-weight:bold; color:#28a745; white-space:normal; overflow-wrap:anywhere; min-width:180px;">${quantityContent}</td>`;
+                    }
+                    if (!spanUom1 && !spanUom2) {
+                        uomHtml = `<td colspan="1" style="text-align:left; font-weight:bold; color:#28a745; white-space:normal;">Total Quantity: ${screenItemUomSummary}</td>`;
                     }
                     trUom.innerHTML = uomHtml;
                     tfoot.appendChild(trUom);
