@@ -1031,6 +1031,61 @@ app.post('/api/cleanup-anonymous', async (req, res) => {
     }
 });
 
+// --- Per-user Factory Reset ---
+const factoryResetPreservedCollections = new Set([
+    'items', 'customers', 'suppliers', 'contacts', 'contact', 'crmcontacts',
+    'advancepayments', 'advanceauditevents',
+    'bankaccounts', 'banktransactions', 'employees', 'expenses',
+    'customfields', 'custompages', 'customrecords'
+]);
+
+app.post('/api/factory-reset', async (req, res) => {
+    const user = String(req.query.user || '').trim();
+    const mode = String(req.body?.mode || '');
+    if (!user || user.toLowerCase() === 'system' || req.body?.user !== user) {
+        return res.status(400).json({ success: false, message: 'A valid matching user ID is required for a scoped reset.' });
+    }
+    if (!['preserve', 'full'].includes(mode)) {
+        return res.status(400).json({ success: false, message: 'Reset mode must be preserve or full.' });
+    }
+
+    try {
+        const escapedUser = user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const ownerFilter = { createdBy: { $regex: `^${escapedUser}$`, $options: 'i' } };
+        const deletedByCollection = {};
+
+        for (const [name, collection] of Object.entries(mongoose.connection.collections)) {
+            const collectionName = String(collection.collectionName || name).toLowerCase();
+            if (['admincreds', 'settings'].includes(collectionName)) continue;
+            if (mode === 'preserve' && factoryResetPreservedCollections.has(collectionName)) continue;
+
+            const result = await collection.deleteMany(ownerFilter);
+            if (result.deletedCount) deletedByCollection[collectionName] = result.deletedCount;
+
+            if (mode === 'full' && collectionName === 'messages') {
+                const sentMessages = await collection.deleteMany({ sender: { $regex: `^${escapedUser}$`, $options: 'i' } });
+                if (sentMessages.deletedCount) deletedByCollection[collectionName] = (deletedByCollection[collectionName] || 0) + sentMessages.deletedCount;
+            }
+        }
+
+        // These per-user settings share the Settings collection with global app settings.
+        const privateSettings = await Setting.collection.deleteMany({
+            id: { $in: [`quick_notes_${user}`, `shadow_ledger_${user}`] }
+        });
+        if (privateSettings.deletedCount) deletedByCollection.settings = privateSettings.deletedCount;
+
+        res.json({
+            success: true,
+            mode,
+            user,
+            deletedByCollection,
+            deletedCount: Object.values(deletedByCollection).reduce((total, count) => total + count, 0),
+            preservedCollections: mode === 'preserve' ? Array.from(factoryResetPreservedCollections) : []
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 // --- Item Routes ---
 app.get('/api/items', async (req, res) => {
     try {
