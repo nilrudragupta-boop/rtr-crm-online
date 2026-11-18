@@ -3669,37 +3669,72 @@
                     y = Math.max(y, shipY);
                 }
 
-                const printInvoiceDetail = (label, value) => {
-                    if (value === undefined || value === null || String(value).trim() === '') return;
-                    const lines = doc.splitTextToSize(`${label}: ${String(value).trim()}`, 175);
-                    doc.text(lines, 14, y);
-                    y += lines.length * 5;
-                };
-
-                // Show optional dispatch/reference fields only when the invoice contains a value.
-                // Aliases support both invoice entry screens without changing their saved data.
-                printInvoiceDetail('Reference No. & Date', invoice.refNoDate || invoice.referenceNoDate);
-                printInvoiceDetail('E-Way Bill No.', invoice.ewayBillNo || invoice.eWayBillNo);
-                printInvoiceDetail('Mode / Terms of Payment', invoice.paymentTerms || invoice.remarks);
-                const deliveryChallanNo = invoice.deliveryChallanNo || invoice.dispatchDocNo;
-                let deliveryNote = deliveryChallanNo || '';
-                if (invoice.deliveryNoteDate) {
-                    deliveryNote += `${deliveryNote ? '  ' : ''}Date: ${formatDate(invoice.deliveryNoteDate)}`;
-                }
-                printInvoiceDetail('Delivery Challan / Dispatch Doc No.', deliveryNote);
-
-                let lrDetails = invoice.lrNo || invoice.billOfLadingNo || '';
+                // Keep optional invoice references and dispatch details together in a compact,
+                // bordered two-column block. Empty values are omitted so unused rows disappear.
+                const detailValue = value => value === undefined || value === null ? '' : String(value).trim();
+                const deliveryChallanNo = detailValue(invoice.deliveryChallanNo || invoice.dispatchDocNo);
+                const deliveryNoteDate = detailValue(invoice.deliveryNoteDate);
+                const buyersOrderNo = detailValue(invoice.buyersOrderNo);
+                const buyersOrderDate = detailValue(invoice.buyersOrderDate);
+                let lrDetails = detailValue(invoice.lrNo || invoice.billOfLadingNo);
                 if (invoice.lrDate) lrDetails += `${lrDetails ? '  ' : ''}Date: ${formatDate(invoice.lrDate)}`;
-                printInvoiceDetail('Bill of Lading / LR No.', lrDetails);
 
-                let orderDetails = invoice.buyersOrderNo || '';
-                if (invoice.buyersOrderDate) orderDetails += `${orderDetails ? '  ' : ''}Date: ${formatDate(invoice.buyersOrderDate)}`;
-                printInvoiceDetail("Buyer's Order No.", orderDetails);
-                printInvoiceDetail('Dispatched Through', invoice.dispatchedThrough);
-                printInvoiceDetail('Vehicle No.', invoice.vehicleNo);
-                printInvoiceDetail('Destination', invoice.destination);
-                printInvoiceDetail('Dispatched Details', invoice.dispatchedDetails);
-                printInvoiceDetail('Terms of Delivery', invoice.termsOfDelivery);
+                const makeDetail = (label, value) => value ? { label, value } : null;
+                const detailRows = [
+                    [makeDetail('Reference No. & Date', detailValue(invoice.refNoDate || invoice.referenceNoDate)), makeDetail('E-Way Bill No.', detailValue(invoice.ewayBillNo || invoice.eWayBillNo))],
+                    [makeDetail("Buyer's Order No.", buyersOrderNo), makeDetail('Dated', buyersOrderDate ? formatDate(buyersOrderDate) : '')],
+                    [makeDetail('Delivery Challan / Dispatch Doc No.', deliveryChallanNo), makeDetail('Delivery Note Date', deliveryNoteDate ? formatDate(deliveryNoteDate) : '')],
+                    [makeDetail('Dispatched Through', detailValue(invoice.dispatchedThrough)), makeDetail('Vehicle No.', detailValue(invoice.vehicleNo))],
+                    [makeDetail('Destination', detailValue(invoice.destination)), makeDetail('Bill of Lading / LR No.', lrDetails)],
+                    [makeDetail('Mode / Terms of Payment', detailValue(invoice.paymentTerms || invoice.remarks)), makeDetail('Dispatched Details', detailValue(invoice.dispatchedDetails))],
+                    [makeDetail('Terms of Delivery', detailValue(invoice.termsOfDelivery))]
+                ].map(row => row.filter(Boolean)).filter(row => row.length);
+
+                if (detailRows.length) {
+                    const blockX = 14;
+                    const blockWidth = 182;
+                    const cellWidth = blockWidth / 2;
+                    const textPadding = 2.5;
+                    const lineHeight = 4.2;
+                    const blockTop = y + 1;
+                    let blockY = blockTop;
+
+                    doc.setFontSize(8);
+                    doc.setFont(undefined, 'bold');
+                    doc.text('REFERENCE & DISPATCH DETAILS', blockX + 1, blockY + 3.2);
+                    doc.setFont(undefined, 'normal');
+                    blockY += 5;
+                    doc.setDrawColor(165);
+                    doc.setLineWidth(0.2);
+                    doc.line(blockX, blockY, blockX + blockWidth, blockY);
+
+                    detailRows.forEach(row => {
+                        const fullWidth = row.length === 1;
+                        const rowHeight = Math.max(7, ...row.map((detail, cellIndex) => {
+                            const width = fullWidth ? blockWidth : cellWidth;
+                            const lines = doc.splitTextToSize(`${detail.label}: ${detail.value}`, width - textPadding * 2);
+                            detail.lines = lines;
+                            detail.x = blockX + (fullWidth ? 0 : cellIndex * cellWidth);
+                            return lines.length * lineHeight + 2.5;
+                        }));
+
+                        if (fullWidth) {
+                            doc.rect(blockX, blockY, blockWidth, rowHeight);
+                        } else {
+                            doc.rect(blockX, blockY, cellWidth, rowHeight);
+                            doc.rect(blockX + cellWidth, blockY, cellWidth, rowHeight);
+                        }
+                        row.forEach(detail => {
+                            doc.text(detail.lines, detail.x + textPadding, blockY + 4.5);
+                        });
+                        blockY += rowHeight;
+                    });
+
+                    y = blockY + 3;
+                    doc.setDrawColor(0);
+                    doc.setLineWidth(0.2);
+                    doc.setFontSize(11);
+                }
 
                 // Table
                 const items = invoice.items || [];
