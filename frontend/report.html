@@ -953,7 +953,7 @@
             <strong>Line items</strong><button type="button" class="small secondary" id="btnExcelAddItem">Add item</button>
         </div>
         <div class="excel-item-wrap"><table class="excel-item-table"><thead><tr>
-            <th>Item</th><th>Item code</th><th>HSN/SAC</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Discount</th><th>Disc type</th><th>GST %</th><th></th>
+            <th>Sl No</th><th>Item</th><th>Sub details</th><th>Item code</th><th>HSN/SAC</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Discount</th><th>Disc type</th><th>GST %</th><th></th>
         </tr></thead><tbody id="excelItemsBody"></tbody></table></div>
         <div class="modal-btns" style="justify-content:flex-end;">
             <button type="button" id="btnCommitExcelImport" class="small" style="background:#198754;">Review complete — Import invoice</button>
@@ -3518,7 +3518,7 @@
 
                 const tableData = items.map((it, i) => {
 
-                    const row = [i + 1];
+                    const row = [it.slNo || it.sl_no || (i + 1)];
 
 
                     // Item Name + Sub Details
@@ -4318,7 +4318,7 @@
                 let totalTaxable = 0;
 
                 const tableData = items.map((item, i) => {
-                    const row = [i + 1, (item.item || "") + (showItemCodeInPdf && item.itemCode ? ` (${item.itemCode})` : "") + (item.subDetails ? "\n" + item.subDetails : "")];
+                    const row = [item.slNo || item.sl_no || (i + 1), (item.item || "") + (showItemCodeInPdf && item.itemCode ? ` (${item.itemCode})` : "") + (item.subDetails ? "\n" + item.subDetails : "")];
                     if (invColVis[7]) row.push(item.hsn || "");
                     if (invColVis[3]) row.push(item.imei || "");
                     if (invColVis[4]) row.push(item.batch || "");
@@ -5074,14 +5074,14 @@
 
                 const discDisplay = disc > 0 ? `${disc}${discType === 'flat' ? '₹' : '%'}` : '-';
 
-                let itemDisplay = val(item.item) + (showItemCodeInPdf && item.itemCode ? ` <small style="color:#666;">(${escapeHtml(item.itemCode)})</small>` : '');
+                let itemDisplay = escapeHtml(val(item.item)) + (showItemCodeInPdf && item.itemCode ? ` <small style="color:#666;">(${escapeHtml(item.itemCode)})</small>` : '');
                 if (item.subDetails) {
-                    itemDisplay += `<br><small style="color:#666;">${item.subDetails.replace(/\n/g, '<br>')}</small>`;
+                    itemDisplay += `<br><small style="color:#666;">${escapeHtml(item.subDetails).replace(/\n/g, '<br>')}</small>`;
                 }
 
                 itemsHtml += `
         <tr>
-          <td style="border:1px solid #ddd; padding:5px; text-align:center;">${index + 1}</td>
+          <td style="border:1px solid #ddd; padding:5px; text-align:center;">${escapeHtml(item.slNo || item.sl_no || String(index + 1))}</td>
           <td style="border:1px solid #ddd; padding:5px;">${val(item.supplier)}</td>
           <td style="border:1px solid #ddd; padding:5px;">${itemDisplay}</td>
           <td style="border:1px solid #ddd; padding:5px;">${val(item.hsn)}</td>
@@ -5393,7 +5393,7 @@
         document.getElementById("btnExcelAddItem").addEventListener("click", () => {
             if (!pendingExcelInvoice) pendingExcelInvoice = createBlankExcelInvoice();
             readExcelReviewFields();
-            pendingExcelInvoice.items.push({ item: "", itemCode: "", hsn: "", qty: 1, uom: "", price: 0, disc: 0, discType: "%", gst: 0, total: 0 });
+            pendingExcelInvoice.items.push({ slNo: String(pendingExcelInvoice.items.length + 1), item: "", subDetails: "", itemCode: "", hsn: "", qty: 1, uom: "", price: 0, disc: 0, discType: "%", gst: 0, total: 0 });
             renderExcelReview();
         });
         document.getElementById("excelItemsBody").addEventListener("click", event => {
@@ -5409,7 +5409,7 @@
         function createBlankExcelInvoice() {
             return { invoice_no: "", invoice_date: "", invoiceType: "TAX INVOICE", customer_name: "", gst_no: "", contact: "", address: "", state: "", stateCode: "", pin: "", district: "", roundOffAmount: 0, invoice_total: 0, items: [] };
         }
-        function excelText(value) { return String(value == null ? "" : value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
+        function excelText(value) { return String(value == null ? "" : value).replace(/\u00a0/g, " ").replace(/\r\n?/g, "\n").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim(); }
         function excelKey(value) { return excelText(value).toLowerCase().replace(/[^a-z0-9]/g, ""); }
         function excelNumber(value) {
             if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -5557,6 +5557,7 @@
             if (taxLabels.has("IGST")) inferredGst = taxLabels.get("IGST");
             else if (taxLabels.size) inferredGst = [...taxLabels.values()].reduce((sum, rate) => sum + rate, 0);
             const synonyms = {
+                slNo: key => /^(sl|slno|sno|srno|serialno|itemno|linenumber)$/.test(key),
                 item: key => /^(descriptionofgoods|description|itemname|productname|particulars|goods|item)$/.test(key),
                 qty: key => /^(quantity|qty)$/.test(key),
                 price: key => /^(rate|price|unitprice|unitrate)$/.test(key),
@@ -5580,7 +5581,9 @@
                 for (let r = header.row + 1; r < rows.length; r++) {
                     const row = rows[r] || [];
                     const get = field => header.map[field] === undefined ? "" : row[header.map[field]] || "";
-                    const name = excelText(get("item"));
+                    const descriptionLines = excelText(get("item")).split("\n").map(line => line.trim()).filter(Boolean);
+                    const name = descriptionLines[0] || "";
+                    const embeddedSubDetails = descriptionLines.slice(1).join("\n");
                     const qtyText = get("qty");
                     const priceText = get("price");
                     const amountText = get("amount");
@@ -5592,16 +5595,19 @@
                         const gstText = get("gst");
                         const gst = gstText ? excelNumber(gstText) : inferredGst;
                         invoice.items.push({
-                            item: name, itemCode: excelText(get("itemCode")), hsn: excelText(get("hsn")),
+                            slNo: excelText(get("slNo")) || String(invoice.items.length + 1),
+                            item: name, itemCode: excelText(get("itemCode")), hsn: excelText(get("hsn")), subDetails: embeddedSubDetails,
                             qty, uom: excelText(get("uom")), price,
                             disc: excelNumber(get("disc")), discType: excelText(get("discType")) || "%", gst,
                             total: qty * price
                         });
                     } else if (name && invoice.items.length && !qtyText && !priceText && !amountText) {
                         const last = invoice.items[invoice.items.length - 1];
-                        const codeMatch = name.match(/material\s*code\s*:?\s*(\S+)/i);
-                        if (codeMatch && !last.itemCode) last.itemCode = codeMatch[1];
-                        else last.subDetails = [last.subDetails, name].filter(Boolean).join("; ");
+                        descriptionLines.forEach(detailLine => {
+                            const codeMatch = detailLine.match(/material\s*code\s*:?\s*(\S+)/i);
+                            if (codeMatch && !last.itemCode) last.itemCode = codeMatch[1];
+                            last.subDetails = [last.subDetails, detailLine].filter(Boolean).join("\n");
+                        });
                     }
                 }
             }
@@ -5633,7 +5639,9 @@
             });
             const body = document.getElementById("excelItemsBody");
             body.innerHTML = pendingExcelInvoice.items.map((item, index) => `<tr>
+                <td><input data-excel-item="${index}" data-excel-field="slNo" value="${escapeHtml(item.slNo || String(index + 1))}"></td>
                 <td><input data-excel-item="${index}" data-excel-field="item" value="${escapeHtml(item.item || "")}"></td>
+                <td><textarea data-excel-item="${index}" data-excel-field="subDetails" rows="2" style="width:100%;min-width:150px;box-sizing:border-box;">${escapeHtml(item.subDetails || "")}</textarea></td>
                 <td><input data-excel-item="${index}" data-excel-field="itemCode" value="${escapeHtml(item.itemCode || "")}"></td>
                 <td><input data-excel-item="${index}" data-excel-field="hsn" value="${escapeHtml(item.hsn || "")}"></td>
                 <td><input data-excel-item="${index}" data-excel-field="qty" type="number" step="any" value="${Number(item.qty) || 0}"></td>
@@ -5866,7 +5874,7 @@
                 const balanceColor = remaining < -0.01 ? '#e67e22' : remaining <= 0.01 ? '#198754' : '#c0392b';
                 const editable = payment.rowType !== 'advance';
                 return `<tr>
-                    <td style="text-align:center;">${index + 1}</td>
+                    <td style="text-align:center;">${escapeHtml(item.slNo || item.sl_no || String(index + 1))}</td>
                     <td>${editable ? `<div style="display:flex;gap:4px;align-items:center;"><input class="invoice-payment-amount" type="number" min="0.01" step="0.01" value="${amount.toFixed(2)}" style="width:100px;text-align:right;"><button class="secondary small" onclick="saveInvoicePaymentEntry('${escapeHtml(id)}','${escapeHtml(payment.id)}',this)">Save</button></div>` : `₹${formatInvoicePaymentAmount(amount)} (allocated)`}</td>
                     <td style="text-align:right;white-space:nowrap;">₹${formatInvoicePaymentAmount(cumulativePaid)}</td>
                     <td>${escapeHtml(payment.date || '-')}</td><td>${escapeHtml(payment.mode || '-')}</td>
@@ -6254,7 +6262,7 @@
             body.innerHTML = filtered.length ? filtered.map((payment, index) => {
                 const purchase = payment.purchase || {};
                 return `<tr>
-                    <td style="padding:7px;border:1px solid #ddd;text-align:center;">${index + 1}</td>
+                    <td style="padding:7px;border:1px solid #ddd;text-align:center;">${escapeHtml(item.slNo || item.sl_no || String(index + 1))}</td>
                     <td style="padding:7px;border:1px solid #ddd;text-align:right;white-space:nowrap;">₹${format(payment.amount)}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(payment.date || '-')}</td>
                     <td style="padding:7px;border:1px solid #ddd;">${escapeHtml(purchase.supplierName || '-')}</td>
