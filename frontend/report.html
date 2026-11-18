@@ -933,6 +933,7 @@
         <label for="excelSheetSelect"><strong>Worksheet:</strong></label>
         <select id="excelSheetSelect" style="min-width:220px;margin-left:6px;"></select>
         <div id="excelImportStatus" role="status">Select an Excel workbook to begin.</div>
+        <button type="button" id="btnRetryExcelSync" class="small secondary" style="display:none;margin:0 0 12px;">Retry server sync</button>
         <div class="excel-field-grid">
             <label>Invoice number<input id="excelInvoiceNo" type="text"></label>
             <label>Invoice date<input id="excelInvoiceDate" type="date"></label>
@@ -5368,6 +5369,7 @@
         // --- Excel invoice import: detect common spreadsheet layouts, then let the user review before saving. ---
         let pendingExcelWorkbook = null;
         let pendingExcelInvoice = null;
+        let pendingExcelSyncInvoice = null;
         const excelFieldIds = {
             invoice_no: "excelInvoiceNo", invoice_date: "excelInvoiceDate", invoiceType: "excelInvoiceType",
             customer_name: "excelCustomerName", gst_no: "excelCustomerGst", contact: "excelContact",
@@ -5376,6 +5378,13 @@
         };
 
         document.getElementById("btnImportExcel").addEventListener("click", () => {
+            if (pendingExcelSyncInvoice) {
+                document.getElementById("overlay").style.display = "block";
+                document.getElementById("excelImportModal").style.display = "block";
+                document.getElementById("btnRetryExcelSync").style.display = "inline-block";
+                setExcelImportStatus("A previous invoice is saved on this device and still needs server sync. Retry it before starting another import.", true);
+                return;
+            }
             document.getElementById("importExcelInput").click();
         });
         document.getElementById("importExcelInput").addEventListener("change", handleExcelInvoiceFile);
@@ -5395,6 +5404,7 @@
             renderExcelReview();
         });
         document.getElementById("btnCommitExcelImport").addEventListener("click", importReviewedExcelInvoice);
+        document.getElementById("btnRetryExcelSync").addEventListener("click", retryExcelInvoiceSync);
 
         function createBlankExcelInvoice() {
             return { invoice_no: "", invoice_date: "", invoiceType: "TAX INVOICE", customer_name: "", gst_no: "", contact: "", address: "", state: "", stateCode: "", pin: "", district: "", roundOffAmount: 0, invoice_total: 0, items: [] };
@@ -5655,6 +5665,40 @@
             pendingExcelWorkbook = null;
             pendingExcelInvoice = null;
         }
+        async function saveExcelInvoiceWithRetry(invoice) {
+            if (typeof apiClient?.saveInvoice !== "function") return { success: false, message: "Invoice server API is not available." };
+            let message = "Server did not confirm the save.";
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const response = await apiClient.saveInvoice(invoice);
+                    if (response && response.success !== false) return { success: true, attempts: attempt };
+                    message = response?.message || message;
+                } catch (error) {
+                    message = error?.message || message;
+                }
+                const isTransient = /failed to fetch|network|timeout|load failed|http 5\d\d|502|503|504|server did not respond/i.test(message);
+                if (!isTransient || attempt === 3) break;
+                await new Promise(resolve => setTimeout(resolve, 800 * attempt));
+            }
+            return { success: false, message, attempts: 3 };
+        }
+        async function retryExcelInvoiceSync() {
+            if (!pendingExcelSyncInvoice) return;
+            const button = document.getElementById("btnRetryExcelSync");
+            button.disabled = true;
+            setExcelImportStatus("Retrying server sync…");
+            const result = await saveExcelInvoiceWithRetry(pendingExcelSyncInvoice);
+            button.disabled = false;
+            if (!result.success) {
+                setExcelImportStatus(`Saved on this device, but server sync still failed: ${result.message}`, true);
+                return;
+            }
+            pendingExcelSyncInvoice = null;
+            button.style.display = "none";
+            applySearch();
+            closeExcelInvoiceImport();
+            showToast("Invoice synced to the server", "#198754");
+        }
         async function importReviewedExcelInvoice() {
             readExcelReviewFields();
             const imported = pendingExcelInvoice;
@@ -5697,16 +5741,16 @@
             } else invoices.push(savedInvoice);
 
             localStorage.setItem("invoices", JSON.stringify(invoices));
-            try {
-                if (typeof apiClient?.saveInvoice === "function") {
-                    const response = await apiClient.saveInvoice(savedInvoice);
-                    if (response && response.success === false) throw new Error(response.message || "Remote save failed");
-                }
-            } catch (error) {
-                console.warn("Excel invoice was saved on this device but remote sync failed:", error);
-                setExcelImportStatus("Saved on this device, but server sync failed. Keep this page open and contact your administrator before using another device.", true);
+            pendingExcelSyncInvoice = savedInvoice;
+            const syncResult = await saveExcelInvoiceWithRetry(savedInvoice);
+            if (!syncResult.success) {
+                console.warn("Excel invoice was saved locally but server sync failed:", syncResult.message);
+                setExcelImportStatus(`Saved on this device, but server sync failed: ${syncResult.message}. You can retry without importing again.`, true);
+                document.getElementById("btnRetryExcelSync").style.display = "inline-block";
+                applySearch();
                 return;
             }
+            pendingExcelSyncInvoice = null;
             applySearch();
             closeExcelInvoiceImport();
             showToast(updated ? "Invoice updated from Excel" : "Invoice imported from Excel", "#198754");

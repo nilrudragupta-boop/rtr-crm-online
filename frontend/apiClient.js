@@ -277,14 +277,16 @@ const apiClient = {
                 keepalive: true,
                 body: JSON.stringify(invoiceData)
             });
-            const result = await response.json();
+            const responseText = await response.text();
+            let result = null;
+            try { result = responseText ? JSON.parse(responseText) : null; } catch (parseError) { /* Preserve HTTP status below. */ }
             if (!response.ok || result?.success === false) {
                 throw new Error(result?.message || `Invoice save failed (HTTP ${response.status}).`);
             }
-            return result;
+            return result || { success: true };
         } catch (error) {
             console.error('Error saving invoice:', error);
-            return { success: false, message: error.message };
+            return { success: false, message: error.message || 'Invoice save failed.' };
         }
     },
 
