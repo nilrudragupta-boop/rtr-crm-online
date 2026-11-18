@@ -3669,39 +3669,37 @@
                     y = Math.max(y, shipY);
                 }
 
-                if (invoice.ewayBillNo) {
-                    doc.text(`E-Way Bill: ${invoice.ewayBillNo}`, 14, y);
-                    y += 5;
-                }
+                const printInvoiceDetail = (label, value) => {
+                    if (value === undefined || value === null || String(value).trim() === '') return;
+                    const lines = doc.splitTextToSize(`${label}: ${String(value).trim()}`, 175);
+                    doc.text(lines, 14, y);
+                    y += lines.length * 5;
+                };
 
-                if (invoice.deliveryChallanNo) {
-                    doc.text(`Delivery Challan: ${invoice.deliveryChallanNo}`, 14, y);
-                    y += 5;
+                // Show optional dispatch/reference fields only when the invoice contains a value.
+                // Aliases support both invoice entry screens without changing their saved data.
+                printInvoiceDetail('Reference No. & Date', invoice.refNoDate || invoice.referenceNoDate);
+                printInvoiceDetail('E-Way Bill No.', invoice.ewayBillNo || invoice.eWayBillNo);
+                printInvoiceDetail('Mode / Terms of Payment', invoice.paymentTerms || invoice.remarks);
+                const deliveryChallanNo = invoice.deliveryChallanNo || invoice.dispatchDocNo;
+                let deliveryNote = deliveryChallanNo || '';
+                if (invoice.deliveryNoteDate) {
+                    deliveryNote += `${deliveryNote ? '  ' : ''}Date: ${formatDate(invoice.deliveryNoteDate)}`;
                 }
+                printInvoiceDetail('Delivery Challan / Dispatch Doc No.', deliveryNote);
 
-                if (invoice.lrNo) {
-                    let lrText = `LR No: ${invoice.lrNo}`;
-                    if (invoice.lrDate) lrText += `  Dt: ${formatDate(invoice.lrDate)}`;
-                    doc.text(lrText, 14, y);
-                    y += 5;
-                }
+                let lrDetails = invoice.lrNo || invoice.billOfLadingNo || '';
+                if (invoice.lrDate) lrDetails += `${lrDetails ? '  ' : ''}Date: ${formatDate(invoice.lrDate)}`;
+                printInvoiceDetail('Bill of Lading / LR No.', lrDetails);
 
-                if (invoice.buyersOrderNo) {
-                    let orderText = `Buyers Order No: ${invoice.buyersOrderNo}`;
-                    if (invoice.buyersOrderDate) orderText += `  Dt: ${formatDate(invoice.buyersOrderDate)}`;
-                    doc.text(orderText, 14, y);
-                    y += 5;
-                }
-
-                if (invoice.dispatchedThrough) {
-                    doc.text(`Dispatched Through: ${invoice.dispatchedThrough}`, 14, y);
-                    y += 5;
-                }
-
-                if (invoice.dispatchedDetails) {
-                    doc.text(`Dispatched Details: ${invoice.dispatchedDetails}`, 14, y);
-                    y += 5;
-                }
+                let orderDetails = invoice.buyersOrderNo || '';
+                if (invoice.buyersOrderDate) orderDetails += `${orderDetails ? '  ' : ''}Date: ${formatDate(invoice.buyersOrderDate)}`;
+                printInvoiceDetail("Buyer's Order No.", orderDetails);
+                printInvoiceDetail('Dispatched Through', invoice.dispatchedThrough);
+                printInvoiceDetail('Vehicle No.', invoice.vehicleNo);
+                printInvoiceDetail('Destination', invoice.destination);
+                printInvoiceDetail('Dispatched Details', invoice.dispatchedDetails);
+                printInvoiceDetail('Terms of Delivery', invoice.termsOfDelivery);
 
                 // Table
                 const items = invoice.items || [];
