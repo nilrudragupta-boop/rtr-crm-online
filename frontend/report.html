@@ -9,6 +9,7 @@
     <script src="anti-debug.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="apiClient.js"></script>
     <script src="settings.js"></script>
@@ -180,6 +181,24 @@
             box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
         }
 
+
+        #excelImportModal {
+            display: none; position: fixed; top: 3%; left: 50%; transform: translateX(-50%);
+            width: min(1100px, 96vw); max-height: 94vh; overflow: auto; box-sizing: border-box;
+            background: #fff; padding: 20px; border-radius: 10px; z-index: 10020;
+            box-shadow: 0 10px 40px rgba(0,0,0,.35);
+        }
+        #excelImportModal input, #excelImportModal select { box-sizing: border-box; max-width: 100%; }
+        .excel-field-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .excel-field-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #475569; }
+        .excel-field-grid input { width: 100%; }
+        .excel-item-wrap { overflow-x: auto; margin-top: 10px; }
+        .excel-item-table { width: 100%; min-width: 900px; border-collapse: collapse; }
+        .excel-item-table th, .excel-item-table td { border: 1px solid #d7dee7; padding: 5px; }
+        .excel-item-table th { position: static; background: #eef3f8; color: #263238; }
+        .excel-item-table input { width: 100%; min-width: 60px; }
+        #excelImportStatus { padding: 9px 11px; margin: 10px 0; border-radius: 5px; background: #eef6ff; color: #164a7b; }
+        @media (max-width: 700px) { .excel-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } #excelImportModal { padding: 14px; } }
         @media print {
 
             #controls,
@@ -715,6 +734,8 @@
             <button id="btnImportCsv" class="small" style="background:#16a085;"
                 data-permission-id="perm_restore_data">Import CSV</button>
             <input type="file" id="importCsvInput" accept=".csv" style="display:none">
+            <button id="btnImportExcel" class="small" style="background:#0d6efd;" data-permission-id="perm_restore_data">Import Excel</button>
+            <input type="file" id="importExcelInput" accept=".xlsx,.xls,.xlsm" style="display:none">
 
             <button id="btnReceiptLog" class="small secondary" style="background:rgb(28, 14, 219);"
                 onclick="openReceiptLogModal()" data-permission-id="perm_payment_receipt_log">Receipt Log</button>
@@ -902,6 +923,41 @@
         </div>
     </div>
 
+
+    <div id="excelImportModal" role="dialog" aria-modal="true" aria-labelledby="excelImportTitle">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h3 id="excelImportTitle" style="margin:0;color:#174a7e;">Import invoice from Excel</h3>
+            <button type="button" class="danger small" id="btnCloseExcelImport">Close</button>
+        </div>
+        <p style="margin:8px 0;color:#555;">Choose a worksheet, review the detected invoice details and items, correct anything unclear, then import.</p>
+        <label for="excelSheetSelect"><strong>Worksheet:</strong></label>
+        <select id="excelSheetSelect" style="min-width:220px;margin-left:6px;"></select>
+        <div id="excelImportStatus" role="status">Select an Excel workbook to begin.</div>
+        <div class="excel-field-grid">
+            <label>Invoice number<input id="excelInvoiceNo" type="text"></label>
+            <label>Invoice date<input id="excelInvoiceDate" type="date"></label>
+            <label>Invoice type<input id="excelInvoiceType" type="text"></label>
+            <label>Customer name<input id="excelCustomerName" type="text"></label>
+            <label>Customer GSTIN<input id="excelCustomerGst" type="text"></label>
+            <label>Contact<input id="excelContact" type="text"></label>
+            <label>Address<input id="excelAddress" type="text"></label>
+            <label>State<input id="excelState" type="text"></label>
+            <label>State code<input id="excelStateCode" type="text"></label>
+            <label>PIN<input id="excelPin" type="text"></label>
+            <label>District<input id="excelDistrict" type="text"></label>
+            <label>Round off<input id="excelRoundOff" type="number" step="0.01"></label>
+            <label>Invoice total<input id="excelInvoiceTotal" type="number" step="0.01"></label>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:18px;flex-wrap:wrap;">
+            <strong>Line items</strong><button type="button" class="small secondary" id="btnExcelAddItem">Add item</button>
+        </div>
+        <div class="excel-item-wrap"><table class="excel-item-table"><thead><tr>
+            <th>Item</th><th>Item code</th><th>HSN/SAC</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Discount</th><th>Disc type</th><th>GST %</th><th></th>
+        </tr></thead><tbody id="excelItemsBody"></tbody></table></div>
+        <div class="modal-btns" style="justify-content:flex-end;">
+            <button type="button" id="btnCommitExcelImport" class="small" style="background:#198754;">Review complete — Import invoice</button>
+        </div>
+    </div>
     <!-- Import Success Modal -->
     <div id="importSuccessModal" aria-hidden="true">
         <h3 style="margin-top:0; color:#27ae60;">✅ Import Successful</h3>
@@ -1190,6 +1246,9 @@
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
                         <input type="checkbox" id="showBtnImportCsv" onchange="toggleToolbarBtn('importCsv')"> Import
                         CSV
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                        <input type="checkbox" id="showBtnImportExcel" onchange="toggleToolbarBtn('importExcel')"> Import Excel
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
                         <input type="checkbox" id="showBtnReceiptLog" onchange="toggleToolbarBtn('receiptLog')"> Receipt
@@ -1728,6 +1787,7 @@
         let toolbarBtnState = JSON.parse(localStorage.getItem("reportToolbarBtnState")) || {
             exportCsv: true,
             importCsv: true,
+            importExcel: true,
             receiptLog: true,
             purchasePaymentHistory: true,
             print: true,
@@ -1735,6 +1795,7 @@
         };
 
         if (!Object.prototype.hasOwnProperty.call(toolbarBtnState, "purchasePaymentHistory")) toolbarBtnState.purchasePaymentHistory = true;
+        if (!Object.prototype.hasOwnProperty.call(toolbarBtnState, "importExcel")) toolbarBtnState.importExcel = true;
 
         function toggleToolbarBtn(type) {
             const isChecked = document.getElementById(`showBtn${type.charAt(0).toUpperCase() + type.slice(1)}`).checked;
@@ -1747,6 +1808,7 @@
             const map = {
                 exportCsv: '#btnExportCsv',
                 importCsv: '#btnImportCsv',
+                importExcel: '#btnImportExcel',
                 receiptLog: '#btnReceiptLog',
                 purchasePaymentHistory: '#btnPurchasePaymentHistory',
                 print: '#btnPrintReport',
@@ -5303,6 +5365,353 @@
         }
 
         document.getElementById("importCsvInput").addEventListener("change", handleImportCsvFile);
+        // --- Excel invoice import: detect common spreadsheet layouts, then let the user review before saving. ---
+        let pendingExcelWorkbook = null;
+        let pendingExcelInvoice = null;
+        const excelFieldIds = {
+            invoice_no: "excelInvoiceNo", invoice_date: "excelInvoiceDate", invoiceType: "excelInvoiceType",
+            customer_name: "excelCustomerName", gst_no: "excelCustomerGst", contact: "excelContact",
+            address: "excelAddress", state: "excelState", stateCode: "excelStateCode", pin: "excelPin",
+            district: "excelDistrict", roundOffAmount: "excelRoundOff", invoice_total: "excelInvoiceTotal"
+        };
+
+        document.getElementById("btnImportExcel").addEventListener("click", () => {
+            document.getElementById("importExcelInput").click();
+        });
+        document.getElementById("importExcelInput").addEventListener("change", handleExcelInvoiceFile);
+        document.getElementById("excelSheetSelect").addEventListener("change", () => parseSelectedExcelSheet());
+        document.getElementById("btnCloseExcelImport").addEventListener("click", closeExcelInvoiceImport);
+        document.getElementById("btnExcelAddItem").addEventListener("click", () => {
+            if (!pendingExcelInvoice) pendingExcelInvoice = createBlankExcelInvoice();
+            readExcelReviewFields();
+            pendingExcelInvoice.items.push({ item: "", itemCode: "", hsn: "", qty: 1, uom: "", price: 0, disc: 0, discType: "%", gst: 0, total: 0 });
+            renderExcelReview();
+        });
+        document.getElementById("excelItemsBody").addEventListener("click", event => {
+            const button = event.target.closest("[data-excel-remove-item]");
+            if (!button || !pendingExcelInvoice) return;
+            readExcelReviewFields();
+            pendingExcelInvoice.items.splice(Number(button.dataset.excelRemoveItem), 1);
+            renderExcelReview();
+        });
+        document.getElementById("btnCommitExcelImport").addEventListener("click", importReviewedExcelInvoice);
+
+        function createBlankExcelInvoice() {
+            return { invoice_no: "", invoice_date: "", invoiceType: "TAX INVOICE", customer_name: "", gst_no: "", contact: "", address: "", state: "", stateCode: "", pin: "", district: "", roundOffAmount: 0, invoice_total: 0, items: [] };
+        }
+        function excelText(value) { return String(value == null ? "" : value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
+        function excelKey(value) { return excelText(value).toLowerCase().replace(/[^a-z0-9]/g, ""); }
+        function excelNumber(value) {
+            if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+            const text = excelText(value).replace(/[₹,$%\s]/g, "").replace(/,/g, "");
+            if (!text) return 0;
+            const negative = /^\(.*\)$/.test(text);
+            const parsed = parseFloat(text.replace(/[()]/g, ""));
+            return Number.isFinite(parsed) ? (negative ? -parsed : parsed) : 0;
+        }
+        function normalizeExcelDate(value) {
+            const text = excelText(value);
+            if (!text) return "";
+            if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+            const date = new Date(text);
+            if (Number.isNaN(date.getTime())) return "";
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+        }
+        async function handleExcelInvoiceFile(event) {
+            const file = event.target.files && event.target.files[0];
+            event.target.value = "";
+            if (!file) return;
+            if (typeof XLSX === "undefined") return alert("The Excel reader could not be loaded. Check the app installation and try again.");
+            try {
+                document.getElementById("overlay").style.display = "block";
+                document.getElementById("excelImportModal").style.display = "block";
+                setExcelImportStatus(`Reading ${file.name}…`);
+                const buffer = await file.arrayBuffer();
+                pendingExcelWorkbook = XLSX.read(buffer, { type: "array", cellDates: true, cellNF: false, cellText: true });
+                const select = document.getElementById("excelSheetSelect");
+                select.innerHTML = pendingExcelWorkbook.SheetNames.map((name, index) => `<option value="${index}">${escapeHtml(name)}</option>`).join("");
+                parseSelectedExcelSheet();
+            } catch (error) {
+                setExcelImportStatus(`Could not read this workbook: ${error.message || error}`, true);
+            }
+        }
+        function setExcelImportStatus(message, isError = false) {
+            const status = document.getElementById("excelImportStatus");
+            status.textContent = message;
+            status.style.background = isError ? "#fff0f0" : "#eef6ff";
+            status.style.color = isError ? "#a12622" : "#164a7b";
+        }
+        function parseSelectedExcelSheet() {
+            if (!pendingExcelWorkbook) return;
+            try {
+                const index = Number(document.getElementById("excelSheetSelect").value) || 0;
+                const sheetName = pendingExcelWorkbook.SheetNames[index];
+                const sheet = pendingExcelWorkbook.Sheets[sheetName];
+                const grid = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "", blankrows: false });
+                pendingExcelInvoice = detectExcelInvoice(grid);
+                renderExcelReview();
+                const itemCount = pendingExcelInvoice.items.length;
+                const commitButton = document.getElementById("btnCommitExcelImport");
+                commitButton.disabled = !!pendingExcelInvoice.multipleInvoiceNumbers?.length;
+                commitButton.style.opacity = commitButton.disabled ? "0.55" : "1";
+                if (pendingExcelInvoice.multipleInvoiceNumbers?.length) {
+                    setExcelImportStatus("This worksheet appears to contain multiple invoice numbers. Import one invoice per worksheet, or use the existing bulk CSV import for multi-invoice data.", true);
+                    return;
+                }
+                setExcelImportStatus(itemCount
+                    ? `Detected ${itemCount} line item${itemCount === 1 ? "" : "s"} from “${sheetName}”. Review the fields and correct any uncertain values before importing.`
+                    : `No line-item table was detected in “${sheetName}”. Enter the invoice details and use Add item to complete it.`);
+            } catch (error) {
+                pendingExcelInvoice = createBlankExcelInvoice();
+                renderExcelReview();
+                setExcelImportStatus(`Could not analyze this worksheet: ${error.message || error}`, true);
+            }
+        }
+        function detectExcelInvoice(grid) {
+            const invoice = createBlankExcelInvoice();
+            const rows = grid.map(row => Array.isArray(row) ? row.map(excelText) : []);
+            const nonEmptyRight = (rowIndex, colIndex) => {
+                const row = rows[rowIndex] || [];
+                for (let col = colIndex + 1; col < row.length; col++) if (row[col]) return row[col];
+                return "";
+            };
+            const findLabel = (matcher, chooseLast = false) => {
+                let found = null;
+                const labelLike = /^(dated|invoiceno|invoicenumber|referenceno|otherreferences|buyersorderno|billno|voucherno|documentno|state|statename|placeofsupply|gstin|gstinuin)$/;
+                rows.forEach((row, r) => row.forEach((cell, c) => {
+                    if (!cell || !matcher(excelKey(cell))) return;
+                    let value = nonEmptyRight(r, c);
+                    if (!value || labelLike.test(excelKey(value))) {
+                        for (let below = r + 1; below < Math.min(rows.length, r + 5); below++) {
+                            const candidate = rows[below]?.[c] || "";
+                            if (candidate && !labelLike.test(excelKey(candidate))) { value = candidate; break; }
+                        }
+                    }
+                    if (value && (!found || chooseLast)) found = { value, row: r, col: c };
+                }));
+                return found;
+            };
+            const labelValue = matcher => findLabel(matcher)?.value || "";
+            const invoiceNo = labelValue(key => /^(invoiceno|invoicenumber|billno|voucherno|documentno)$/.test(key));
+            const invoiceNumberPattern = /\b[A-Z]{2,}[A-Z0-9-]*\/\d{2,4}-\d{2,4}\/\d+\b/ig;
+            const detectedInvoiceNumbers = [...new Set(rows.flat().flatMap(value => value.match(invoiceNumberPattern) || []))];
+            invoice.invoice_no = invoiceNo || detectedInvoiceNumbers[0] || "";
+            invoice.multipleInvoiceNumbers = detectedInvoiceNumbers.filter(value => value.toLowerCase() !== String(invoice.invoice_no).toLowerCase());
+            const dateValue = labelValue(key => /^(dated|invoicedate|billdate|documentdate|date)$/.test(key));
+            invoice.invoice_date = normalizeExcelDate(dateValue);
+            invoice.invoiceType = rows.flat().find(value => /tax\s*invoice/i.test(value)) || "TAX INVOICE";
+
+            let buyerLabel = null;
+            rows.forEach((row, r) => row.forEach((cell, col) => {
+                if (!cell || !/^(buyerbillto|billto)$/.test(excelKey(cell))) return;
+                buyerLabel = { value: nonEmptyRight(r, col), row: r, col };
+            }));
+            if (buyerLabel) {
+                invoice.customer_name = buyerLabel.value;
+                if (!invoice.customer_name) {
+                    const below = [];
+                    for (let r = buyerLabel.row + 1; r < Math.min(rows.length, buyerLabel.row + 8); r++) {
+                        const value = rows[r]?.[buyerLabel.col] || "";
+                        if (!value) continue;
+                        if (/^(gstin|gstinuin|state|statename|placeofsupply|email|phone|contact)/i.test(excelKey(value))) break;
+                        below.push(value);
+                    }
+                    if (below.length) invoice.customer_name = below[0];
+                    if (below.length > 1) invoice.address = below[1];
+                }
+            }
+            if (!invoice.customer_name) invoice.customer_name = labelValue(key => /^(customername|partyname|buyername|customer|party|buyer)$/.test(key));
+            if (!invoice.address) invoice.address = labelValue(key => /^(customeraddress|billingaddress|billtoaddress|address)$/.test(key));
+            const gst = labelValue(key => /^(gstinuin|gstin|customergstin|buyergstin|gstno)$/.test(key));
+            invoice.gst_no = gst;
+            invoice.contact = labelValue(key => /^(mobile|mobileno|phone|contact|contactno)$/.test(key));
+            invoice.pin = labelValue(key => /^(pin|pincode|postalcode)$/.test(key));
+            invoice.district = labelValue(key => /^district$/.test(key));
+            const stateEntry = findLabel(key => /^statename$/.test(key), true);
+            if (stateEntry) {
+                const match = stateEntry.value.match(/^\s*([^,]+?)(?:\s*,\s*code\s*:?\s*(\d+))?\s*$/i);
+                invoice.state = match ? match[1].trim() : stateEntry.value;
+                if (match && match[2]) invoice.stateCode = match[2];
+            }
+            const stateCode = labelValue(key => /^(statecode|code)$/.test(key));
+            if (!invoice.stateCode && stateCode) invoice.stateCode = stateCode;
+            const roundOff = labelValue(key => key.includes("roundoff"));
+            invoice.roundOffAmount = roundOff ? excelNumber(roundOff) : 0;
+            let inferredGst = 0;
+            const taxLabels = new Map();
+            rows.flat().forEach(value => {
+                const re = /\b(IGST|CGST|SGST)\s*@?\s*(\d+(?:\.\d+)?)\s*%/ig;
+                let match;
+                while ((match = re.exec(value))) taxLabels.set(match[1].toUpperCase(), Number(match[2]));
+            });
+            if (taxLabels.has("IGST")) inferredGst = taxLabels.get("IGST");
+            else if (taxLabels.size) inferredGst = [...taxLabels.values()].reduce((sum, rate) => sum + rate, 0);
+            const synonyms = {
+                item: key => /^(descriptionofgoods|description|itemname|productname|particulars|goods|item)$/.test(key),
+                qty: key => /^(quantity|qty)$/.test(key),
+                price: key => /^(rate|price|unitprice|unitrate)$/.test(key),
+                amount: key => /^(amount|value|linetotal)$/.test(key),
+                uom: key => /^(per|unit|uom|units)$/.test(key),
+                hsn: key => /^(hsnsac|hsn|sac|hsncode)$/.test(key),
+                itemCode: key => /^(itemcode|materialcode|productcode|sku|code)$/.test(key),
+                gst: key => /^(gst|gstpercent|taxpercent|taxrate)$/.test(key),
+                disc: key => /^(discount|disc|discountamount)$/.test(key),
+                discType: key => /^(discounttype|disctype)$/.test(key)
+            };
+            let header = null;
+            rows.forEach((row, r) => {
+                const map = {};
+                row.forEach((cell, c) => Object.keys(synonyms).forEach(field => {
+                    if (cell && synonyms[field](excelKey(cell)) && map[field] === undefined) map[field] = c;
+                }));
+                if (map.item !== undefined && map.qty !== undefined && (map.price !== undefined || map.amount !== undefined)) header = { row: r, map };
+            });
+            if (header) {
+                for (let r = header.row + 1; r < rows.length; r++) {
+                    const row = rows[r] || [];
+                    const get = field => header.map[field] === undefined ? "" : row[header.map[field]] || "";
+                    const name = excelText(get("item"));
+                    const qtyText = get("qty");
+                    const priceText = get("price");
+                    const amountText = get("amount");
+                    const qty = excelNumber(qtyText);
+                    const amount = excelNumber(amountText);
+                    if (name && /^(total|grand total|subtotal|taxable value|amount chargeable)/i.test(name)) break;
+                    if (name && qtyText && (priceText || amountText) && qty > 0) {
+                        const price = priceText ? excelNumber(priceText) : amount / qty;
+                        const gstText = get("gst");
+                        const gst = gstText ? excelNumber(gstText) : inferredGst;
+                        invoice.items.push({
+                            item: name, itemCode: excelText(get("itemCode")), hsn: excelText(get("hsn")),
+                            qty, uom: excelText(get("uom")), price,
+                            disc: excelNumber(get("disc")), discType: excelText(get("discType")) || "%", gst,
+                            total: qty * price
+                        });
+                    } else if (name && invoice.items.length && !qtyText && !priceText && !amountText) {
+                        const last = invoice.items[invoice.items.length - 1];
+                        const codeMatch = name.match(/material\s*code\s*:?\s*(\S+)/i);
+                        if (codeMatch && !last.itemCode) last.itemCode = codeMatch[1];
+                        else last.subDetails = [last.subDetails, name].filter(Boolean).join("; ");
+                    }
+                }
+            }
+            const totalCandidates = [];
+            rows.forEach((row, r) => row.forEach((cell, c) => {
+                const key = excelKey(cell);
+                if (!/^(total|grandtotal|invoicetotal|netamount|amountpayable)$/.test(key)) return;
+                const rowValues = (rows[r] || []).slice(c + 1).filter(Boolean);
+                const value = rowValues.length ? rowValues[rowValues.length - 1] : "";
+                if (value && excelNumber(value) > 0) totalCandidates.push({ value, key });
+            }));
+            const totalEntry = totalCandidates.find(entry => /^(grandtotal|invoicetotal|amountpayable|netamount)$/.test(entry.key)) || totalCandidates.sort((a, b) => excelNumber(b.value) - excelNumber(a.value))[0];
+            if (totalEntry) invoice.invoice_total = excelNumber(totalEntry.value);
+            const calcTotal = invoice.items.reduce((sum, item) => {
+                const base = item.qty * item.price;
+                const discount = item.discType.toLowerCase() === "flat" ? item.disc : base * item.disc / 100;
+                const taxable = Math.max(0, base - discount);
+                item.total = taxable + taxable * item.gst / 100;
+                return sum + item.total;
+            }, 0);
+            if (!invoice.invoice_total) invoice.invoice_total = Math.round((calcTotal + invoice.roundOffAmount) * 100) / 100;
+            return invoice;
+        }
+        function renderExcelReview() {
+            if (!pendingExcelInvoice) return;
+            Object.entries(excelFieldIds).forEach(([key, id]) => {
+                const field = document.getElementById(id);
+                if (field) field.value = pendingExcelInvoice[key] == null ? "" : pendingExcelInvoice[key];
+            });
+            const body = document.getElementById("excelItemsBody");
+            body.innerHTML = pendingExcelInvoice.items.map((item, index) => `<tr>
+                <td><input data-excel-item="${index}" data-excel-field="item" value="${escapeHtml(item.item || "")}"></td>
+                <td><input data-excel-item="${index}" data-excel-field="itemCode" value="${escapeHtml(item.itemCode || "")}"></td>
+                <td><input data-excel-item="${index}" data-excel-field="hsn" value="${escapeHtml(item.hsn || "")}"></td>
+                <td><input data-excel-item="${index}" data-excel-field="qty" type="number" step="any" value="${Number(item.qty) || 0}"></td>
+                <td><input data-excel-item="${index}" data-excel-field="uom" value="${escapeHtml(item.uom || "")}"></td>
+                <td><input data-excel-item="${index}" data-excel-field="price" type="number" step="any" value="${Number(item.price) || 0}"></td>
+                <td><input data-excel-item="${index}" data-excel-field="disc" type="number" step="any" value="${Number(item.disc) || 0}"></td>
+                <td><select data-excel-item="${index}" data-excel-field="discType"><option value="%" ${item.discType === "%" ? "selected" : ""}>%</option><option value="flat" ${item.discType === "flat" ? "selected" : ""}>Flat</option></select></td>
+                <td><input data-excel-item="${index}" data-excel-field="gst" type="number" step="any" value="${Number(item.gst) || 0}"></td>
+                <td><button type="button" class="danger small" data-excel-remove-item="${index}" title="Remove item">×</button></td>
+            </tr>`).join("");
+        }
+        function readExcelReviewFields() {
+            if (!pendingExcelInvoice) return;
+            Object.entries(excelFieldIds).forEach(([key, id]) => {
+                const field = document.getElementById(id);
+                if (!field) return;
+                pendingExcelInvoice[key] = ["roundOffAmount", "invoice_total"].includes(key) ? excelNumber(field.value) : excelText(field.value);
+            });
+            document.querySelectorAll("#excelItemsBody [data-excel-item]").forEach(field => {
+                const item = pendingExcelInvoice.items[Number(field.dataset.excelItem)];
+                if (!item) return;
+                const key = field.dataset.excelField;
+                item[key] = ["qty", "price", "disc", "gst"].includes(key) ? excelNumber(field.value) : excelText(field.value);
+            });
+        }
+        function closeExcelInvoiceImport() {
+            document.getElementById("excelImportModal").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+            pendingExcelWorkbook = null;
+            pendingExcelInvoice = null;
+        }
+        async function importReviewedExcelInvoice() {
+            readExcelReviewFields();
+            const imported = pendingExcelInvoice;
+            if (!imported) return;
+            if (imported?.multipleInvoiceNumbers?.length) return setExcelImportStatus("This worksheet contains more than one invoice. Select a worksheet with a single invoice or use bulk CSV import.", true);
+            delete imported.multipleInvoiceNumbers;
+            if (!imported.invoice_no) return setExcelImportStatus("Enter an invoice number before importing.", true);
+            imported.items = (imported.items || []).filter(item => item.item && item.qty > 0);
+            if (!imported.items.length) return setExcelImportStatus("Add at least one item with a description and quantity before importing.", true);
+            imported.items.forEach(item => {
+                const base = (Number(item.qty) || 0) * (Number(item.price) || 0);
+                const disc = item.discType === "flat" ? Number(item.disc) || 0 : base * (Number(item.disc) || 0) / 100;
+                const taxable = Math.max(0, base - disc);
+                item.total = Math.round((taxable + taxable * (Number(item.gst) || 0) / 100) * 100) / 100;
+            });
+            const computedTotal = imported.items.reduce((sum, item) => sum + item.total, 0) + (Number(imported.roundOffAmount) || 0);
+            if (!Number(imported.invoice_total)) imported.invoice_total = Math.round(computedTotal * 100) / 100;
+            const currentUser = localStorage.getItem("currentUser") || "System";
+            imported.id = Date.now().toString() + Math.random().toString(36).slice(2, 8);
+            imported.total_paid = 0;
+            imported.paid_cash = 0;
+            imported.paid_bank = 0;
+            imported.total_due = Math.max(0, Number(imported.invoice_total) || 0);
+            imported.createdBy = currentUser;
+            imported.editedBy = "";
+            imported.importSource = "excel";
+            imported.importedAt = new Date().toISOString();
+
+            const existingIndex = invoices.findIndex(invoice => String(invoice.invoice_no || invoice.invoiceNo || "").trim().toLowerCase() === imported.invoice_no.trim().toLowerCase());
+            let savedInvoice = imported;
+            let updated = existingIndex >= 0;
+            if (updated) {
+                const existing = invoices[existingIndex];
+                savedInvoice = { ...existing, ...imported, id: existing.id || imported.id,
+                    total_paid: existing.total_paid || existing.paid_amount || existing.paid || (Number(existing.paid_cash) || 0) + (Number(existing.paid_bank) || 0),
+                    paid_cash: existing.paid_cash || 0, paid_bank: existing.paid_bank || 0,
+                    paymentHistory: existing.paymentHistory || [], paymentAuditTrail: existing.paymentAuditTrail || [],
+                    total_due: Math.max(0, (Number(imported.invoice_total) || 0) - (Number(existing.total_paid || existing.paid_amount || existing.paid || ((Number(existing.paid_cash) || 0) + (Number(existing.paid_bank) || 0))) || 0)) };
+                invoices[existingIndex] = savedInvoice;
+            } else invoices.push(savedInvoice);
+
+            localStorage.setItem("invoices", JSON.stringify(invoices));
+            try {
+                if (typeof apiClient?.saveInvoice === "function") {
+                    const response = await apiClient.saveInvoice(savedInvoice);
+                    if (response && response.success === false) throw new Error(response.message || "Remote save failed");
+                }
+            } catch (error) {
+                console.warn("Excel invoice was saved on this device but remote sync failed:", error);
+                setExcelImportStatus("Saved on this device, but server sync failed. Keep this page open and contact your administrator before using another device.", true);
+                return;
+            }
+            applySearch();
+            closeExcelInvoiceImport();
+            showToast(updated ? "Invoice updated from Excel" : "Invoice imported from Excel", "#198754");
+        }
+
         document.getElementById("btnCloseSuccess").addEventListener("click", closeImportSuccess);
         document.getElementById("btnClosePdfSuccess").addEventListener("click", closePdfSuccessModal);
 
