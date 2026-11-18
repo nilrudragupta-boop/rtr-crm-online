@@ -1917,7 +1917,7 @@
                         trHtml += `<td data-col="${col.id}">${c.openingBalance ? (c.openingBalance + ' ' + (c.openingBalanceType || 'Dr')) : '-'}</td>`;
                     } else if (col.id === 'outstanding') {
                         trHtml += `<td data-col="${col.id}" style="font-weight:bold; color:${(c.outstanding || 0) > 0.01 ? '#dc3545' : '#28a745'}; white-space: nowrap;">
-                            ${(c.outstanding || 0).toFixed(2)}
+                            ${formatCustomerAmount(c.outstanding)}
                             <button class="action-btn btn-action-receipt" data-action="receipt" data-id="${c.id}" title="Download Payment Receipt Against Total Outstanding Balance" style="background:none; color:#27ae60; padding:0; border:none; cursor:pointer; font-size:16px; vertical-align:middle; margin-left:8px;"><i class="fas fa-print"></i></button>
                         </td>`;
                     } else if (col.id === 'unallocatedAdvances') {
@@ -2034,7 +2034,7 @@
                     <tr><th style="padding:8px; background:#f8f9fa;">GSTIN</th><td style="padding:8px;">${escapeHtml(cust.gst || '-')}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Credit Limit</th><td style="padding:8px;">${cust.creditLimit ? '₹ ' + parseFloat(cust.creditLimit).toFixed(2) : 'Unlimited'}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Opening Balance</th><td style="padding:8px;">${cust.openingBalance ? ('₹ ' + cust.openingBalance + ' ' + (cust.openingBalanceType || 'Dr')) : '-'}</td></tr>
-                    <tr><th style="padding:8px; background:#f8f9fa;">Total Outstanding</th><td style="padding:8px; font-weight:bold; color:${(cust.outstanding || calculateOutstanding(cust) || 0) > 0.01 ? '#dc3545' : '#28a745'};">₹ ${(cust.outstanding || calculateOutstanding(cust) || 0).toFixed(2)}</td></tr>
+                    <tr><th style="padding:8px; background:#f8f9fa;">Total Outstanding</th><td style="padding:8px; font-weight:bold; color:${(cust.outstanding || calculateOutstanding(cust) || 0) > 0.01 ? '#dc3545' : '#28a745'};">₹ ${formatCustomerAmount(cust.outstanding || calculateOutstanding(cust) || 0)}</td></tr>
                     <tr><th style="padding:8px; background:#f8f9fa;">Unallocated Advances</th><td style="padding:8px; font-weight:bold;">₹ ${getCustomerUnallocatedAdvances(cust).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
                 </table>
             `;
@@ -2629,7 +2629,7 @@
                 } else if (col.id === 'outstanding') {
                     td.style.fontWeight = 'bold';
                     td.style.color = totalOut > 0.01 ? '#dc3545' : '#28a745';
-                    td.innerText = totalOut.toFixed(2);
+                    td.innerText = formatCustomerAmount(totalOut);
                 } else if (col.id === 'unallocatedAdvances') {
                     td.style.fontWeight = 'bold';
                     td.style.color = '#087f5b';
@@ -2677,6 +2677,14 @@
                 }
             });
             return balance;
+        }
+
+        function formatCustomerAmount(value) {
+            const amount = Number(value);
+            return (Number.isFinite(amount) ? amount : 0).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
         }
 
         function renderPagination(totalItems, start, end, totalPages) {
@@ -2907,7 +2915,7 @@
                         val = c[col.id];
                         if (col.fieldDef.fieldType === 'boolean') val = val ? 'Yes' : 'No';
                     } else if (col.id === 'outstanding') {
-                        val = (c.outstanding || outstanding || 0).toFixed(2);
+                        val = formatCustomerAmount(c.outstanding || outstanding || 0);
                     } else if (col.id === 'openingBalance') {
                         val = c.openingBalance ? (c.openingBalance + ' ' + (c.openingBalanceType || 'Dr')) : '-';
                     } else if (col.id === 'creditLimit') {
