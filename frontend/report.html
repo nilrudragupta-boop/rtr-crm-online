@@ -2641,14 +2641,20 @@
                         if (mergePdf) {
                             try {
                                 await generateTallyInvoicePDF(invoice, false, null, null);
-                            } catch (err) { console.error(err); }
+                            } catch (err) {
+                                console.error('Smart invoice PDF failed:', err);
+                                showToast(`Could not create the invoice PDF: ${err.message || err}`, "#c0392b");
+                            }
                         } else {
                             openPrintCopyModal(async (selectedCopies) => {
                                 try {
                                     for (const copy of selectedCopies) {
                                         await generateTallyInvoicePDF(invoice, false, copy.label, copy.suffix);
                                     }
-                                } catch (err) { console.error(err); }
+                                } catch (err) {
+                                    console.error('Smart invoice PDF failed:', err);
+                                    showToast(`Could not create the invoice PDF: ${err.message || err}`, "#c0392b");
+                                }
                             });
                         }
                     }
@@ -2666,14 +2672,20 @@
                         if (mergePdf) {
                             try {
                                 await generateAndSavePDF(invoice, null, null, false, false);
-                            } catch (err) { console.error(err); }
+                            } catch (err) {
+                                console.error('Standard invoice PDF failed:', err);
+                                showToast(`Could not create the invoice PDF: ${err.message || err}`, "#c0392b");
+                            }
                         } else {
                             openPrintCopyModal(async (selectedCopies) => {
                                 try {
                                     for (const copy of selectedCopies) {
                                         await generateAndSavePDF(invoice, copy.label, copy.suffix, false, false);
                                     }
-                                } catch (err) { console.error(err); }
+                                } catch (err) {
+                                    console.error('Standard invoice PDF failed:', err);
+                                    showToast(`Could not create the invoice PDF: ${err.message || err}`, "#c0392b");
+                                }
                             });
                         }
                     }
@@ -3526,8 +3538,9 @@
 
                     // Item Name + Sub Details
                     let itemPdfDisplay = (it.item || "") + (showItemCodeInPdf && it.itemCode ? ` (${it.itemCode})` : "");
-                    if (showSubDetailsInPdf && it.subDetails && it.subDetails.trim()) {
-                        itemPdfDisplay += "\n" + it.subDetails;
+                    const itemSubDetails = typeof it.subDetails === 'string' ? it.subDetails.trim() : '';
+                    if (showSubDetailsInPdf && itemSubDetails) {
+                        itemPdfDisplay += "\n" + itemSubDetails;
                     }
 
 
@@ -3669,6 +3682,7 @@
                     headStyles: { fillColor: [255, 255, 255], textColor: 0 },
                     styles: {
                         fontSize: 9,
+                        overflow: 'linebreak',
                         cellPadding: 2,
                         lineColor: 200,
                         lineWidth: 0.2
@@ -3677,74 +3691,7 @@
                         minCellHeight: 6
                     },
                     rowPageBreak: 'avoid', // Keep rows together on page breaks
-                    columnStyles: styles,
-                    willDrawCell: (data) => {
-                        if (data.section === 'body' && data.column.index === 1) {
-                            const item = items[data.row.index];
-                            if (showSubDetailsInPdf && item && item.subDetails && item.subDetails.trim()) {
-                                const cell = data.cell;
-
-                                // Extract padding (handle both number and object formats)
-                                const pad = cell.padding || 3;
-                                const padLeft = (typeof pad === 'object') ? (pad.left || 3) : pad;
-                                const padTop = (typeof pad === 'object') ? (pad.top || 3) : pad;
-                                const padRight = (typeof pad === 'object') ? (pad.right || 3) : pad;
-                                const padBottom = (typeof pad === 'object') ? (pad.bottom || 3) : pad;
-
-                                // Calculate text positioning
-                                const textX = cell.x + padLeft;
-                                const colWidth = cell.width - padLeft - padRight;
-
-                                // Professional invoice header style layout:
-                                // Main heading at top, sub-details below with tight spacing
-                                const mainHeadingY = cell.y + padTop;
-                                const mainHeadingFontSize = 10;
-                                const subDetailsFontSize = 7;
-                                const subDetailsGrey = [80, 80, 80]; // Slightly darker grey
-
-                                // Draw main heading (Item Name)
-                                doc.setFontSize(mainHeadingFontSize);
-                                doc.setFont(undefined, 'bold');
-                                doc.setTextColor(0, 0, 0);
-
-                                const itemText = (item.item || "") + (item.itemCode ? ` (${item.itemCode})` : "");
-                                const itemLines = doc.splitTextToSize(itemText, colWidth);
-
-                                doc.text(itemLines, textX, mainHeadingY, {
-                                    baseline: 'top',
-                                    align: 'left'
-                                });
-
-                                // Calculate height of the item text block to position sub-details correctly.
-                                // doc.getLineHeight() returns the height in document units (mm by default).
-                                const itemBlockHeight = itemLines.length * doc.getLineHeight();
-
-                                // Calculate Y position for sub-details with minimal vertical gap
-                                // A small negative offset pulls the sub-details up, closer to the heading.
-                                const subDetailsY = mainHeadingY + itemBlockHeight - 0.5;
-
-                                // Draw sub-details with reduced line spacing
-                                doc.setFontSize(subDetailsFontSize);
-                                doc.setFont(undefined, 'normal');
-                                doc.setTextColor(...subDetailsGrey);
-
-                                const subText = item.subDetails;
-                                const subLines = doc.splitTextToSize(subText, colWidth);
-                                doc.text(subLines, textX, subDetailsY, {
-                                    baseline: 'top',
-                                    align: 'left',
-                                    lineHeightFactor: 0.85 // Use a specific line height factor for tight spacing
-                                });
-
-                                // Restore original styles
-                                doc.setFontSize(10);
-                                doc.setFont(undefined, 'normal');
-                                doc.setTextColor(0, 0, 0);
-
-                                return false; // Prevent default cell drawing
-                            }
-                        }
-                    }
+                    columnStyles: styles
                 });
 
                 // Estimate footer height to prevent overlapping with Authorized Signatory at the bottom
@@ -4321,7 +4268,9 @@
                 let totalTaxable = 0;
 
                 const tableData = items.map((item, i) => {
-                    const row = [item.slNo || item.sl_no || (i + 1), (item.item || "") + (showItemCodeInPdf && item.itemCode ? ` (${item.itemCode})` : "") + (showSubDetailsInPdf && item.subDetails ? "\n" + item.subDetails : "")];
+                    const itemSubDetails = typeof item.subDetails === 'string' ? item.subDetails.trim() : '';
+                    const itemLabel = (item.item || "") + (showItemCodeInPdf && item.itemCode ? ` (${item.itemCode})` : "") + (showSubDetailsInPdf && itemSubDetails ? "\n" + itemSubDetails : "");
+                    const row = [item.slNo || item.sl_no || (i + 1), itemLabel];
                     if (invColVis[7]) row.push(item.hsn || "");
                     if (invColVis[3]) row.push(item.imei || "");
                     if (invColVis[4]) row.push(item.batch || "");
@@ -4435,7 +4384,7 @@
                     head: [headers],
                     body: tableData,
                     theme: 'grid',
-                    styles: { fontSize: 8, cellPadding: 2, lineColor: 0, lineWidth: 0.1 },
+                    styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 2, lineColor: 0, lineWidth: 0.1 },
                     headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', halign: 'center' },
                     didDrawPage: drawHeader,
                     columnStyles: styles,
