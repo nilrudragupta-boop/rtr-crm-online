@@ -743,6 +743,9 @@
 
             <button id="btnPrintReport" onclick="window.print()" class="small"
                 data-permission-id="perm_print">Print</button>
+            <label class="small" style="display:inline-flex;align-items:center;gap:5px;background:#eef3f8;color:#263238;border:1px solid #cbd5df;border-radius:6px;">
+                <input type="checkbox" id="toggleStdPrintHsn" onchange="setStdPrintHsnVisibility(this.checked)"> HSN/SAC in Standard Print
+            </label>
         </div>
     </div>
 
@@ -3212,6 +3215,9 @@
                 invColVis = new Array(18).fill(true);
                 [3, 4, 5, 6, 7].forEach(i => invColVis[i] = false);
             }
+            const showHsnInStandardPrint = localStorage.getItem('reportStdPrintHsn') === null
+                ? Boolean(invColVis[7])
+                : localStorage.getItem('reportStdPrintHsn') === 'true';
 
             for (let copyIdx = 0; copyIdx < copies.length; copyIdx++) {
                 const copy = copies[copyIdx];
@@ -3524,7 +3530,7 @@
 
                 // Dynamic Headers
                 let headers = ['Sl', 'Item'];
-                if (invColVis[7]) headers.push('HSN/SAC');
+                if (showHsnInStandardPrint) headers.push('HSN/SAC');
                 if (invColVis[3]) headers.push('IMEI');
                 if (invColVis[4]) headers.push('Batch');
                 if (invColVis[5]) headers.push('Lot');
@@ -3546,7 +3552,7 @@
 
                     row.push(itemPdfDisplay);
 
-                    if (invColVis[7]) row.push(it.hsn || "");
+                    if (showHsnInStandardPrint) row.push(it.hsn || "");
                     if (invColVis[3]) row.push(it.imei || "");
                     if (invColVis[4]) row.push(it.batch || "");
                     if (invColVis[5]) row.push(it.lot || "");
@@ -3638,7 +3644,7 @@
 
                 // Column Styles
                 let optionalCount = 0;
-                if (invColVis[7]) optionalCount++;
+                if (showHsnInStandardPrint) optionalCount++;
                 if (invColVis[3]) optionalCount++;
                 if (invColVis[4]) optionalCount++;
                 if (invColVis[5]) optionalCount++;
@@ -7248,6 +7254,10 @@
             catch(error){console.error('Godown authorization sync failed:',error);showToast('Saved on this device, but not synced. Godown access may not update on other devices until sync succeeds.','#c0392b');}
         }
 
+        function setStdPrintHsnVisibility(isVisible) {
+            localStorage.setItem('reportStdPrintHsn', String(Boolean(isVisible)));
+        }
+
         // --- init ---
         document.addEventListener("DOMContentLoaded", () => {
             // Load Brand Name
@@ -7259,6 +7269,20 @@
             applyGreyButtons();
             applyFreezePanes();
             applyStickyHeader();
+
+            const stdPrintHsnToggle = document.getElementById('toggleStdPrintHsn');
+            if (stdPrintHsnToggle) {
+                let defaultHsnVisibility = false;
+                try {
+                    const invoiceColumnVisibility = JSON.parse(localStorage.getItem('invoiceColumnVisibility'));
+                    defaultHsnVisibility = Array.isArray(invoiceColumnVisibility) && invoiceColumnVisibility.length === 18
+                        ? Boolean(invoiceColumnVisibility[7])
+                        : false;
+                } catch (error) { /* Keep the optional column hidden when settings are unavailable. */ }
+                stdPrintHsnToggle.checked = localStorage.getItem('reportStdPrintHsn') === null
+                    ? defaultHsnVisibility
+                    : localStorage.getItem('reportStdPrintHsn') === 'true';
+            }
 
             const freezeToggle = document.getElementById("freezePanesToggle");
             if (freezeToggle) freezeToggle.checked = isFreezePanes;
