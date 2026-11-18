@@ -2451,9 +2451,16 @@
             try {
                 const remoteRecords = await apiClient.getPurchases();
                 if (Array.isArray(remoteRecords)) {
-                    const byId = new Map(records.map(record => [String(record.id), record]));
-                    remoteRecords.forEach(record => byId.set(String(record.id), { ...byId.get(String(record.id)), ...record }));
-                    records = Array.from(byId.values());
+                    const byId = new Map(records.filter(record => record && record.id).map(record => [String(record.id), record]));
+                    const recordsWithoutId = records.filter(record => record && !record.id);
+                    remoteRecords.forEach(record => {
+                        if (!record || !record.id) {
+                            if (record) recordsWithoutId.push(record);
+                            return;
+                        }
+                        byId.set(String(record.id), { ...byId.get(String(record.id)), ...record });
+                    });
+                    records = [...byId.values(), ...recordsWithoutId];
                 }
             } catch (error) {
                 console.warn('Could not check server purchases for duplicate supplier invoice number.', error);
@@ -2467,8 +2474,8 @@
         }
 
         async function saveAllDraft() {
-            const supplierName = $("supplierInput").value;
-            const supplierInv = $("supplierInv").value;
+            const supplierName = $("supplierInput").value.trim();
+            const supplierInv = $("supplierInv").value.trim();
             const date = $("purchaseDate").value;
 
             if (draftItems.some(item => item.priceFromMrp && calculatePriceFromMrp(
@@ -2597,8 +2604,8 @@
             const items = JSON.parse(localStorage.getItem("items")) || [];
             const selectedItem = items.find(i => i.name === itemName && (i.itemCode || "") === itemCode);
             const itemId = selectedItem ? selectedItem.id : null;
-            const supplierName = $("supplierInput").value;
-            const supplierInv = $("supplierInv").value;
+            const supplierName = $("supplierInput").value.trim();
+            const supplierInv = $("supplierInv").value.trim();
             const uom = $("uomSelect").value;
             const date = $("purchaseDate").value;
             const qty = Number($("quantity").value);
@@ -3690,13 +3697,14 @@
             const p = purchases.find(x => String(x.id) === String(id));
             if (!p) return showToast("Purchase not found ⚠️");
 
-            askConfirm("Confirm Duplicate", "Create a copy of this purchase entry?", async () => {
+            askConfirm("Confirm Duplicate", "Create a new copy of this purchase entry? Its Supplier Invoice No. will be cleared to prevent recording the same supplier bill twice.", async () => {
                 const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(false) : {};
                 const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                 const newEntry = {
                     ...p,
                     id: newId,
                     date: new Date().toISOString().slice(0, 10),
+                    supplierInv: "",
                     paid: 0,
                     paid_cash: 0,
                     paid_bank: 0,
