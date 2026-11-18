@@ -451,6 +451,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_intro_rtr', label: 'System Intro' },
     { id: 'perm_godown_live', label: 'Godown Live' },
     { id: 'perm_godown_terminal', label: 'Godown Terminal' },
+    { id: 'perm_godown_auth', label: 'Godown Authorization' },
     { id: 'perm_business360', label: 'Business 360' }
 ];
 
@@ -486,6 +487,7 @@ function getUIPermissions() {
         console.error("Error applying global remote permissions:", e);
     }
 
+    if (permissions.perm_godown_terminal === false) permissions.perm_godown_auth = false;
     return permissions;
 }
 

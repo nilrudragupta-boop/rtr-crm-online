@@ -589,6 +589,10 @@
             display: none !important;
         }
 
+        table.hide-godownAuth .godown-auth-btn {
+            display: none !important;
+        }
+
         /* Freeze Panes */
         .freeze-panes th.frozen,
         .freeze-panes td.frozen {
@@ -1226,6 +1230,9 @@
                     <input type="checkbox" id="showActionPrintStd" onchange="toggleActionBtn('printStd')"> Print
                     (Standard Format)
                 </label>
+                <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size:13px;">
+                    <input type="checkbox" id="showActionGodownAuth" onchange="toggleActionBtn('godownAuth')"> Godown authorization
+                </label>
             </div>
         </div>
         <p style="font-size:14px; color:#666;">Select columns to display:</p>
@@ -1607,16 +1614,25 @@
             });
         }
 
-        let actionBtnState = JSON.parse(localStorage.getItem("reportActionBtnState"));
-        // If settings don't exist, or the new printStd setting is missing (for users upgrading)
-        if (!actionBtnState || actionBtnState.printStd === undefined) {
-            // Set defaults, but preserve existing user settings by spreading them over the defaults
-            actionBtnState = { view: true, edit: true, delete: true, copy: true, printSmart: true, printStd: false, ...actionBtnState };
-            localStorage.setItem("reportActionBtnState", JSON.stringify(actionBtnState));
-        }
-        if (actionBtnState && actionBtnState.printSmart && actionBtnState.printStd) {
-            actionBtnState.printStd = false;
-            localStorage.setItem("reportActionBtnState", JSON.stringify(actionBtnState));
+        let actionBtnState = JSON.parse(localStorage.getItem("reportActionBtnState") || "{}");
+        actionBtnState = { view: true, edit: true, delete: true, copy: true, printSmart: true, printStd: false, godownAuth: true, ...actionBtnState };
+        if (actionBtnState.printSmart && actionBtnState.printStd) actionBtnState.printStd = false;
+        localStorage.setItem("reportActionBtnState", JSON.stringify(actionBtnState));
+
+        function hasGodownAuthorizationPermission() {
+            try {
+                if (typeof getUIPermissions === "function") {
+                    const permissions = getUIPermissions();
+                    return permissions.perm_godown_auth !== false && permissions.perm_godown_terminal !== false;
+                }
+                const user = localStorage.getItem("currentUser") || "admin";
+                const raw = localStorage.getItem("remotePermissions_" + user);
+                if (!raw) return true;
+                const permissions = JSON.parse(raw);
+                return permissions.perm_godown_auth !== false && permissions.perm_godown_terminal !== false;
+            } catch (error) {
+                return false;
+            }
         }
 
         function hasMakeInvoicePermission() {
@@ -1703,6 +1719,7 @@
             table.classList.toggle("hide-edit", !actionBtnState.edit || !hasEditInvoicePermission());
             table.classList.toggle("hide-delete", !actionBtnState.delete || !hasDeleteInvoicePermission());
             table.classList.toggle("hide-printSmart", !actionBtnState.printSmart || !hasSmartPrintPermission());
+            table.classList.toggle("hide-godownAuth", !actionBtnState.godownAuth || !hasGodownAuthorizationPermission());
             document.body.classList.toggle("invoice-delete-disabled", !hasDeleteInvoicePermission());
         }
 
@@ -2332,7 +2349,7 @@
           <button class="edit-btn">✏️ Edit</button>
           <button class="copy-btn">📋 Copy</button>
           <button class="delete-btn" style="color: #dc3545 !important;">🗑️ Delete</button>
-          <button class="godown-auth-btn" style="background:#b45309;color:white;" onclick="openGodownAuthorization('${escapeHtml(id)}')">Godown authorization</button>
+          <button class="godown-auth-btn" data-permission-id="perm_godown_auth" style="background:#b45309;color:white;" onclick="openGodownAuthorization('${escapeHtml(id)}')">Godown authorization</button>
           <button class="print-smart-btn">📄 Print (Smart Format)</button>
           <button class="print-std-btn">📄 Print (Standard Format)</button>
       </div>
@@ -6136,6 +6153,11 @@
                 const cb = document.getElementById(`showAction${key.charAt(0).toUpperCase() + key.slice(1)}`);
                 if (cb) cb.checked = actionBtnState[key];
             });
+            const godownAuthToggle = document.getElementById("showActionGodownAuth");
+            if (godownAuthToggle) {
+                godownAuthToggle.disabled = !hasGodownAuthorizationPermission();
+                godownAuthToggle.title = godownAuthToggle.disabled ? "Requires perm_godown_auth and perm_godown_terminal" : "";
+            }
             const editToggle = document.getElementById("showActionEdit");
             if (editToggle) {
                 editToggle.disabled = !hasEditInvoicePermission();
@@ -6717,6 +6739,7 @@
             }).join('') : '<span style="color:#666">No authorization changes recorded yet.</span>';
         }
         async function openGodownAuthorization(invoiceId) {
+            if (!hasGodownAuthorizationPermission()) return showToast('You do not have permission to authorize godown delivery.','#c0392b');
             const invoice=invoices.find(item=>String(item.id||item.invoice_no||item.invoiceNo)===String(invoiceId));
             if(!invoice||!Array.isArray(invoice.items)) return showToast('Invoice items could not be found.','#c0392b');
             let godownProfiles=JSON.parse(localStorage.getItem('godown_profiles')||'[]');
@@ -6831,6 +6854,11 @@
                 if (event.key === 'customers') refreshReportCustomerDetails();
                 if (event.key && (event.key.startsWith('remotePermissions_') || event.key.startsWith('ui_permissions_'))) {
                     applyActionBtnVisibility();
+                    const godownAuthToggle = document.getElementById("showActionGodownAuth");
+                    if (godownAuthToggle) {
+                        godownAuthToggle.disabled = !hasGodownAuthorizationPermission();
+                        godownAuthToggle.title = godownAuthToggle.disabled ? "Requires perm_godown_auth and perm_godown_terminal" : "";
+                    }
                     const editToggle = document.getElementById("showActionEdit");
                     if (editToggle) editToggle.disabled = !hasEditInvoicePermission();
                     const deleteToggle = document.getElementById("showActionDelete");
