@@ -41,11 +41,50 @@ app.get('/', (req, res) => {
 // Create a .env file in your root folder and add your MongoDB Atlas connection string:
 // MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/rtr_database
 
+let invoiceOwnerIndexReady = false;
+
+async function ensureInvoiceOwnerScopedIndex() {
+    const collection = Invoice.collection;
+    const ownerIndexName = 'createdBy_1_invoiceNo_1';
+
+    // Build the safer tenant-scoped index before removing the legacy global
+    // invoice-number index. The partial filter keeps older records without an
+    // owner or invoice number usable during migration.
+    await collection.createIndex(
+        { createdBy: 1, invoiceNo: 1 },
+        {
+            name: ownerIndexName,
+            unique: true,
+            partialFilterExpression: {
+                createdBy: { $type: 'string' },
+                invoiceNo: { $type: 'string' }
+            }
+        }
+    );
+
+    const indexes = await collection.indexes();
+    const legacyIndex = indexes.find(index => index.name === 'invoiceNo_1'
+        && index.unique
+        && index.key && index.key.invoiceNo === 1
+        && Object.keys(index.key).length === 1);
+    if (legacyIndex) await collection.dropIndex(legacyIndex.name);
+
+    invoiceOwnerIndexReady = true;
+}
+
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => {
+    .then(async () => {
         console.log('✅ Successfully connected to MongoDB');
+        try {
+            await ensureInvoiceOwnerScopedIndex();
+            console.log('✅ Invoice numbers are unique within each account');
+        } catch (err) {
+            invoiceOwnerIndexReady = false;
+            console.error('❌ Invoice index migration failed; invoice saves are paused:', err);
+        }
     })
     .catch(err => {
+        invoiceOwnerIndexReady = false;
         console.error('❌ MongoDB Connection Error:', err);
     });
 
@@ -791,13 +830,15 @@ app.get('/api/invoices', async (req, res) => {
 // Create a new invoice
 app.post('/api/invoices', async (req, res) => {
     try {
+        if (!invoiceOwnerIndexReady) {
+            return res.status(503).json({ success: false, message: 'Invoice saving is temporarily unavailable while invoice numbering is being prepared. Please retry shortly.' });
+        }
         const payload = { ...req.body };
         const rawInvoiceNumber = payload.invoiceNo ?? payload.invoice_no;
         const invoiceNumber = String(rawInvoiceNumber ?? '').trim();
         if (invoiceNumber) {
-            // The invoices collection has a unique index on invoiceNo. Always
-            // populate its canonical field even when older frontend pages send
-            // only invoice_no; otherwise MongoDB stores a null index value.
+            // Always populate both invoice number fields so older frontend
+            // pages and the canonical account-scoped index stay in sync.
             payload.invoiceNo = invoiceNumber;
             payload.invoice_no = invoiceNumber;
             const invoiceTotal = Number(payload.invoice_total ?? payload.invoiceTotal ?? payload.total) || 0;
@@ -820,6 +861,14 @@ app.post('/api/invoices', async (req, res) => {
             }
             const owner = req.query.user || payload.createdBy || 'System';
             payload.createdBy = owner;
+            const recycledInvoice = await Invoice.findOne({
+                createdBy: owner,
+                deletedAt: { $ne: null },
+                $or: [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }]
+            }).lean();
+            if (recycledInvoice) {
+                return res.status(409).json({ success: false, message: 'This invoice number is already in the recycle bin for this account. Restore it before importing or saving it again.' });
+            }
             const identity = [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }];
             if (payload.id) identity.push({ id: payload.id });
             const updated = await Invoice.findOneAndUpdate({
@@ -832,6 +881,34 @@ app.post('/api/invoices', async (req, res) => {
             res.status(400).json({ success: false, message: 'Invoice number is required.' });
         }
     } catch (err) {
+        if (err && err.code === 11000) {
+            const owner = String(req.query.user || req.body.createdBy || 'System');
+            const invoiceNumber = String(req.body.invoiceNo ?? req.body.invoice_no ?? '').trim();
+            if (invoiceNumber) {
+                try {
+                    const existing = await Invoice.findOne({
+                        createdBy: owner,
+                        deletedAt: null,
+                        $or: [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }]
+                    });
+                    if (existing) {
+                        const updated = await Invoice.findByIdAndUpdate(existing._id, { $set: { ...req.body, invoiceNo: invoiceNumber, invoice_no: invoiceNumber, createdBy: owner } }, { new: true, strict: false });
+                        return res.status(200).json({ success: true, data: updated });
+                    }
+                    const recycled = await Invoice.findOne({
+                        createdBy: owner,
+                        deletedAt: { $ne: null },
+                        $or: [{ invoiceNo: invoiceNumber }, { invoice_no: invoiceNumber }]
+                    }).lean();
+                    if (recycled) {
+                        return res.status(409).json({ success: false, message: 'This invoice number is already in the recycle bin for this account. Restore it before importing or saving it again.' });
+                    }
+                } catch (lookupError) {
+                    console.error('Could not resolve duplicate invoice number:', lookupError);
+                }
+            }
+            return res.status(409).json({ success: false, message: 'This invoice number conflicts with an existing record. Refresh the invoice list and try again.' });
+        }
         res.status(400).json({ success: false, message: err.message });
     }
 });
@@ -1987,7 +2064,10 @@ app.post('/api/restore', async (req, res) => {
                 const records = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
                 for (const record of records) {
                     const query = {};
-                    if (idField === 'invoiceNo') query['invoiceNo'] = record.invoiceNo || record.invoice_no;
+                    if (idField === 'invoiceNo') {
+                        query.invoiceNo = record.invoiceNo || record.invoice_no;
+                        if (record.createdBy) query.createdBy = record.createdBy;
+                    }
                     else if (idField === 'noteNo') query['noteNo'] = record.noteNo || record.note_no;
                     else if (idField === 'voucher_no') query['voucher_no'] = record.voucher_no || record.voucherNo;
                     else query[idField] = record[idField] || record._id;
