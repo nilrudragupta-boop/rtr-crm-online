@@ -5816,52 +5816,65 @@
         function exportInvoicesCSV() {
             if (!invoices.length) return showToast("No data to export", "#e67e22");
 
-            const headers = [
-                "ID", "Invoice No", "Date", "Type", "Customer Name", "Address", "Contact", "PIN", "District", "State", "State Code", "GST No",
-                "Payment Date", "Remarks", "Created By", "Edited By", "Cash", "Bank", "Total Paid",
-                "Item Name", "Sub Details", "Qty", "UOM", "Price", "Disc", "Disc Type", "Item GST"
+            // Table indexes 0, 1, and 32 are selection, row number, and action controls.
+            // Export the data columns in their table order when enabled in Table Settings.
+            const columnHeaders = [
+                "Select", "Sl No", "Invoice No", "Invoice Type", "Invoice Date", "Customer Name", "Address", "Contact", "PIN", "District", "State", "GST No",
+                "Items", "HSN/SAC", "IMEI", "Batch", "Lot", "Serial", "Unit Price", "GST %", "Gross Total", "Total Discount", "Total GST", "Invoice Total",
+                "Cash", "Bank", "Total Paid (₹)", "Total Due (₹)", "Payment Date", "Remarks", "Created By", "Edited By", "Actions"
             ];
+            const exportColumns = columnHeaders
+                .map((header, index) => ({ header, index }))
+                .filter(column => column.index >= 2 && column.index <= 31 && columnVisibility[column.index]);
 
-            const rows = [];
-            rows.push(headers.join(","));
+            if (!exportColumns.length) return showToast("No visible data columns to export", "#e67e22");
+
+            const csvEscape = value => `"${String(value ?? "").replace(/"/g, '""')}"`;
+            const formatAmount = value => (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const rows = [exportColumns.map(column => csvEscape(column.header)).join(",")];
 
             invoices.forEach(inv => {
-                const items = inv.items && inv.items.length > 0 ? inv.items : [{}];
+                const { total, paid, cashPaid, advanceApplied, due } = getInvoiceTotals(inv);
+                const items = Array.isArray(inv.items) ? inv.items : [];
+                let gross = 0, discount = 0, gstTotal = 0, taxableTotal = 0;
                 items.forEach(item => {
-                    const row = [
-                        inv.id || "",
-                        inv.invoice_no || inv.invoiceNo || "",
-                        inv.invoice_date || inv.date || "",
-                        inv.invoiceType || "TAX INVOICE",
-                        inv.customer_name || getCustomerNameFrom(inv) || "",
-                        inv.address || getCustomerField(inv, 'address') || "",
-                        inv.contact || getCustomerField(inv, 'contact') || "",
-                        inv.pin || getCustomerField(inv, 'pin') || "",
-                        inv.district || getCustomerField(inv, 'district') || "",
-                        inv.state || getCustomerField(inv, 'state') || "",
-                        inv.stateCode || getCustomerField(inv, 'stateCode') || "",
-                        inv.gst_no || inv.gst || getCustomerField(inv, 'gst') || "",
-                        inv.payment_date || "",
-                        inv.remarks || "",
-                        inv.createdBy || "",
-                        inv.editedBy || "",
-                        inv.paid_cash || 0,
-                        inv.paid_bank || 0,
-                        inv.total_paid || inv.paid_amount || inv.paid || 0,
-                        (item.item || "") + (item.itemCode ? ` (${item.itemCode})` : ""),
-                        item.subDetails || "",
-                        item.qty || "",
-                        item.uom || "",
-                        item.price || "",
-                        item.disc || "",
-                        item.discType || "",
-                        item.gst || ""
-                    ];
-                    rows.push(row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","));
+                    const base = (parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0);
+                    const disc = parseFloat(item.disc) || 0;
+                    const discAmount = (item.discType || '%') === 'flat' ? disc : base * disc / 100;
+                    const taxable = Math.max(0, base - discAmount);
+                    gross += base;
+                    discount += discAmount;
+                    taxableTotal += taxable;
+                    gstTotal += taxable * (parseFloat(item.gst) || 0) / 100;
                 });
+                const overallDiscount = parseFloat(inv.overallDiscountAmount || inv.overallDiscount || 0);
+                if (overallDiscount > 0 && taxableTotal > 0) {
+                    gstTotal -= gstTotal * (overallDiscount / taxableTotal);
+                    discount += overallDiscount;
+                }
+
+                const values = [
+                    "", "", inv.invoice_no || inv.invoiceNo || "", inv.invoiceType || "TAX INVOICE", formatDate(inv.invoice_date || inv.date),
+                    inv.customer_name || getCustomerNameFrom(inv) || "", inv.address || getCustomerField(inv, 'address') || "",
+                    inv.contact || getCustomerField(inv, 'contact') || "", inv.pin || getCustomerField(inv, 'pin') || "",
+                    inv.district || getCustomerField(inv, 'district') || "", inv.state || getCustomerField(inv, 'state') || "",
+                    inv.gst_no || inv.gst || getCustomerField(inv, 'gst') || "",
+                    items.map(item => `${(item.item || '')}${item.itemCode ? ` (${item.itemCode})` : ''} (${item.qty || 0}${item.uom ? ` ${item.uom}` : ''})`).join(", "),
+                    items.map(item => item.hsn || "").filter(Boolean).join(", "),
+                    items.map(item => item.imei || "").filter(Boolean).join(", "),
+                    items.map(item => item.batch || "").filter(Boolean).join(", "),
+                    items.map(item => item.lot || "").filter(Boolean).join(", "),
+                    items.map(item => item.serial || "").filter(Boolean).join(", "),
+                    items.map(item => formatAmount(item.price)).join(", "),
+                    items.map(item => `${parseFloat(item.gst) || 0}%`).join(", "),
+                    formatAmount(gross), formatAmount(discount), formatAmount(gstTotal), formatAmount(total),
+                    formatAmount(cashPaid), formatAmount(parseFloat(inv.paid_bank) || 0), formatAmount(paid), formatAmount(due),
+                    inv.payment_date || "", inv.remarks || "", inv.createdBy || "-", inv.editedBy || "-", ""
+                ];
+                rows.push(exportColumns.map(column => csvEscape(values[column.index])).join(","));
             });
 
-            const csvContent = rows.join("\n");
+            const csvContent = "\uFEFF" + rows.join("\r\n");
             const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -5870,9 +5883,9 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
             showToast("Export successful", "#27ae60");
         }
-
 
         function handleImportCsvFile(event) {
             const file = event.target.files[0];
