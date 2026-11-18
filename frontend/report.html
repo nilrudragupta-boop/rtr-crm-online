@@ -5079,7 +5079,7 @@
 
                 let itemDisplay = escapeHtml(val(item.item)) + (showItemCodeInPdf && item.itemCode ? ` <small style="color:#666;">(${escapeHtml(item.itemCode)})</small>` : '');
                 if (item.subDetails) {
-                    itemDisplay += `<br><small style="color:#666;">${escapeHtml(item.subDetails).replace(/\n/g, '<br>')}</small>`;
+                    itemDisplay += `<br><small class="invoice-sub-details" style="color:#666;">${escapeHtml(item.subDetails).replace(/\n/g, '<br>')}</small>`;
                 }
 
                 itemsHtml += `
@@ -5284,11 +5284,20 @@
 
         document.getElementById("btnPrintView").addEventListener("click", () => {
             const content = document.getElementById("viewContent").innerHTML;
+            const printableContent = document.createElement('div');
+            printableContent.innerHTML = content;
+            if (!showSubDetailsInPdf) {
+                printableContent.querySelectorAll('.invoice-sub-details').forEach(node => node.remove());
+            }
             const printWindow = window.open('', '', 'height=800,width=900');
+            if (!printWindow) {
+                showToast("Please allow pop-ups to print the invoice.", "#e67e22");
+                return;
+            }
             printWindow.document.write('<html><head><title>Invoice View</title>');
             printWindow.document.write('<style>body{font-family: "Segoe UI", sans-serif; padding: 20px; color: #333;} table{width:100%; border-collapse:collapse;} th, td{border:1px solid #ddd; padding:5px; text-align:left;} @media print { body { -webkit-print-color-adjust: exact; } }</style>');
             printWindow.document.write('</head><body>');
-            printWindow.document.write(content);
+            printWindow.document.write(printableContent.innerHTML);
             printWindow.document.write('</body></html>');
             printWindow.document.close();
             printWindow.focus();
