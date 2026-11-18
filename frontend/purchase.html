@@ -1043,10 +1043,10 @@
             Selected date range: All dates
         </span>
         <button class="btn-search" id="refreshBtn">Refresh</button>
-        <button class="btn-save" onclick="exportToExcel()" style="background:#217346;"
+        <button class="btn-save" id="btnExportPurchasesExcel" onclick="exportToExcel()" style="background:#217346;"
             data-permission-id="perm_export_excel">Export Excel</button>
-        <button class="btn-search" onclick="toggleChart()" style="background:#6f42c1;">📊 Show Chart</button>
-        <button class="btn-search" onclick="openWindow('purchase_dashboard.html', 1400, 800)"
+        <button class="btn-search" id="btnPurchaseChart" onclick="toggleChart()" style="background:#6f42c1;">📊 Show Chart</button>
+        <button class="btn-search" id="btnPurchaseAnalytics" onclick="openWindow('purchase_dashboard.html', 1400, 800)"
             style="background:#e83e8c;">📈 Purchase Analytics</button>
         <div style="display:inline-flex; gap:0; margin-left:10px;">
             <button id="btnTableView" class="btn-search" style="border-radius:4px 0 0 4px; opacity:1;"
@@ -1265,6 +1265,18 @@
                     </label>
                     <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
                         <input type="checkbox" id="showViewBtn" onchange="toggleActionButton('view')"> View
+                    </label>
+                </div>
+                <div style="margin-top: 10px; font-weight: bold; font-size: 14px;">Toolbar Buttons:</div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
+                        <input type="checkbox" id="showExportExcelToolbarBtn" onchange="togglePurchaseToolbarButton('exportExcel')"> Export Excel
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
+                        <input type="checkbox" id="showPurchaseChartToolbarBtn" onchange="togglePurchaseToolbarButton('chart')"> 📊 Show Chart
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px; font-size: 13px;">
+                        <input type="checkbox" id="showPurchaseAnalyticsToolbarBtn" onchange="togglePurchaseToolbarButton('analytics')"> 📈 Purchase Analytics
                     </label>
                 </div>
             </div>
@@ -1604,6 +1616,12 @@
             delete: true,
             view: true
         };
+        let purchaseToolbarButtonVisibility = { exportExcel: true, chart: true, analytics: true };
+        try {
+            Object.assign(purchaseToolbarButtonVisibility, JSON.parse(localStorage.getItem("purchaseToolbarButtonVisibility") || "{}"));
+        } catch (error) {
+            localStorage.removeItem("purchaseToolbarButtonVisibility");
+        }
 
         const STATIC_UOMS = ["Bag", "Box", "Bucket", "Bundle", "Carton", "Case", "Cm", "Dozen", "Each", "Foot",
             "Gm", "Inches", "Kg", "Kit", "Lot", "Ltr", "Mtr", "Nos", "Pack", "Pair", "Pcs",
@@ -1650,6 +1668,49 @@
             document.body.classList.toggle("purchase-delete-disabled", !canDelete);
             const updateButton = $("updateBtn");
             if (updateButton && editingId) updateButton.style.display = canEdit ? "inline-block" : "none";
+            applyPurchaseToolbarButtonVisibility();
+        }
+
+        function applyPurchaseToolbarButtonVisibility() {
+            const exportExcelButton = $("btnExportPurchasesExcel");
+            const chartButton = $("btnPurchaseChart");
+            const analyticsButton = $("btnPurchaseAnalytics");
+            const exportExcelToggle = $("showExportExcelToolbarBtn");
+            const chartToggle = $("showPurchaseChartToolbarBtn");
+            const analyticsToggle = $("showPurchaseAnalyticsToolbarBtn");
+            const canExportExcel = hasPurchasePermission("perm_export_excel");
+
+            if (exportExcelButton) {
+                exportExcelButton.style.display = purchaseToolbarButtonVisibility.exportExcel && canExportExcel ? "" : "none";
+            }
+            if (chartButton) chartButton.style.display = purchaseToolbarButtonVisibility.chart ? "" : "none";
+            if (analyticsButton) analyticsButton.style.display = purchaseToolbarButtonVisibility.analytics ? "" : "none";
+            if (exportExcelToggle) exportExcelToggle.checked = Boolean(purchaseToolbarButtonVisibility.exportExcel);
+            if (chartToggle) chartToggle.checked = Boolean(purchaseToolbarButtonVisibility.chart);
+            if (analyticsToggle) analyticsToggle.checked = Boolean(purchaseToolbarButtonVisibility.analytics);
+            if (exportExcelToggle) {
+                exportExcelToggle.disabled = !canExportExcel;
+                exportExcelToggle.title = canExportExcel ? "" : "Disabled by Remote Permissions: perm_export_excel";
+            }
+
+            if (!purchaseToolbarButtonVisibility.chart) {
+                const chartContainer = $("chartContainer");
+                if (chartContainer) chartContainer.style.display = "none";
+            }
+        }
+
+        function togglePurchaseToolbarButton(key) {
+            const checkboxIds = {
+                exportExcel: "showExportExcelToolbarBtn",
+                chart: "showPurchaseChartToolbarBtn",
+                analytics: "showPurchaseAnalyticsToolbarBtn"
+            };
+            const checkbox = $(checkboxIds[key]);
+            if (!checkbox || !Object.prototype.hasOwnProperty.call(purchaseToolbarButtonVisibility, key)) return;
+
+            purchaseToolbarButtonVisibility[key] = checkbox.checked;
+            localStorage.setItem("purchaseToolbarButtonVisibility", JSON.stringify(purchaseToolbarButtonVisibility));
+            applyPurchaseToolbarButtonVisibility();
         }
 
         // Dark Mode Logic
@@ -2368,6 +2429,43 @@
             }, "btn-delete");
         }
 
+        function normalizeSupplierInvoiceKey(value) {
+            return String(value || '').trim().toLocaleUpperCase();
+        }
+
+        async function hasDuplicateSupplierInvoice(supplierName, supplierInv, excludeId = null) {
+            const invoiceKey = normalizeSupplierInvoiceKey(supplierInv);
+            const supplierKey = String(supplierName || '').trim().toLocaleLowerCase();
+            if (!invoiceKey || !supplierKey) return false;
+
+            let records = [];
+            try {
+                records = JSON.parse(localStorage.getItem('purchases') || '[]');
+                if (!Array.isArray(records)) records = [];
+            } catch (error) {
+                records = [];
+            }
+
+            // Include server records so a stale browser cache also detects a
+            // supplier invoice saved from another device.
+            try {
+                const remoteRecords = await apiClient.getPurchases();
+                if (Array.isArray(remoteRecords)) {
+                    const byId = new Map(records.map(record => [String(record.id), record]));
+                    remoteRecords.forEach(record => byId.set(String(record.id), { ...byId.get(String(record.id)), ...record }));
+                    records = Array.from(byId.values());
+                }
+            } catch (error) {
+                console.warn('Could not check server purchases for duplicate supplier invoice number.', error);
+            }
+
+            return records.some(record => record
+                && String(record.id) !== String(excludeId)
+                && !record.deletedAt
+                && normalizeSupplierInvoiceKey(record.supplierInv) === invoiceKey
+                && String(record.supplierName || '').trim().toLocaleLowerCase() === supplierKey);
+        }
+
         async function saveAllDraft() {
             const supplierName = $("supplierInput").value;
             const supplierInv = $("supplierInv").value;
@@ -2406,7 +2504,11 @@
             await new Promise(resolve => setTimeout(resolve, 10));
 
             try {
-
+                if (await hasDuplicateSupplierInvoice(supplierName, supplierInv)) {
+                    showToast(`Invoice number ${String(supplierInv).trim()} is already recorded for ${supplierName}.`, '#c0392b');
+                    $('supplierInv').focus();
+                    return;
+                }
 
                 let totalTaxable = 0;
                 draftItems.forEach(i => {
@@ -2531,6 +2633,16 @@
 
             // Check Back Date Limit
             if (!validateBackDate(date)) {
+                return;
+            }
+
+            const existingPurchases = JSON.parse(localStorage.getItem('purchases') || '[]');
+            const currentPurchase = existingPurchases.find(p => String(p.id) === String(editingId));
+            const invoiceKeyChanged = normalizeSupplierInvoiceKey(currentPurchase?.supplierInv) !== normalizeSupplierInvoiceKey(supplierInv)
+                || String(currentPurchase?.supplierName || '').trim().toLocaleLowerCase() !== String(supplierName || '').trim().toLocaleLowerCase();
+            if (invoiceKeyChanged && await hasDuplicateSupplierInvoice(supplierName, supplierInv, editingId)) {
+                showToast(`Invoice number ${String(supplierInv).trim()} is already recorded for ${supplierName}.`, '#c0392b');
+                $('supplierInv').focus();
                 return;
             }
 
@@ -4399,6 +4511,7 @@
             document.getElementById("showDeleteBtn").checked = actionButtonVisibility.delete;
             document.getElementById("showViewBtn").checked = actionButtonVisibility.view;
             applyPurchaseActionPermissions();
+            applyPurchaseToolbarButtonVisibility();
 
             const searchInput = document.getElementById("columnSearchInput");
             if (searchInput) {
@@ -4559,6 +4672,10 @@
             document.getElementById("showCopyBtn").checked = true;
             document.getElementById("showDeleteBtn").checked = true;
             document.getElementById("showViewBtn").checked = true;
+
+            purchaseToolbarButtonVisibility = { exportExcel: true, chart: true, analytics: true };
+            localStorage.removeItem("purchaseToolbarButtonVisibility");
+            applyPurchaseToolbarButtonVisibility();
 
             showExtraFields = false;
             localStorage.removeItem("purchaseShowExtraFields");
