@@ -640,6 +640,16 @@
             margin-left: 5px;
         }
     </style>
+<style>
+@media print {
+  body > * { visibility: hidden !important; }
+  #godownAuthorizationModal, #godownAuthorizationModal * { visibility: visible !important; }
+  #godownAuthorizationModal { display:flex !important; position:absolute !important; inset:0 !important; padding:0 !important; background:white !important; }
+  #godownAuthorizationModal > div { width:100% !important; max-height:none !important; overflow:visible !important; box-shadow:none !important; border-radius:0 !important; padding:8mm !important; }
+  #godownAuthorizationModal button { display:none !important; }
+  #godownAuthorizationModal tr { page-break-inside:avoid; }
+}
+</style>
 </head>
 
 <body>
@@ -6689,6 +6699,23 @@
         }
 
         
+        function getGodownItemIdentifiers(line) {
+            const master = JSON.parse(localStorage.getItem('items') || '[]');
+            const code = line.itemCode || line.item_code || line.code || '';
+            const indexNo = line.indexNo || line.index_no || '';
+            const identity = line.itemId || line.id || '';
+            const name = String(line.item || line.itemName || '').trim().toLowerCase();
+            const match = master.find(item => (identity && String(item.id) === String(identity)) || (code && String(item.itemCode || item.item_code || item.code || '').toLowerCase() === String(code).toLowerCase()) || (indexNo && String(item.indexNo || item.index_no || '').toLowerCase() === String(indexNo).toLowerCase()) || (name && String(item.name || item.itemName || '').trim().toLowerCase() === name));
+            return { code: code || match?.itemCode || match?.item_code || match?.code || '', indexNo: indexNo || match?.indexNo || match?.index_no || '' };
+        }
+        function renderGodownAudit(invoice) {
+            const root = document.getElementById('godownAuthorizationAudit');
+            const records = (invoice.items || []).flatMap((line, index) => (line.godownDeliveryAudit || []).map(event => ({ line, index, event })));
+            root.innerHTML = records.length ? records.slice().reverse().map(({line,index,event}) => {
+                const ident=getGodownItemIdentifiers(line), who=escapeHtml(event.user||'System'), when=escapeHtml(event.timestamp ? new Date(event.timestamp).toLocaleString() : ''), action=escapeHtml(event.action||'Updated'), godown=escapeHtml(event.godownName||'—');
+                return '<div style="padding:5px 0;border-bottom:1px solid #eee;"><strong>'+escapeHtml(line.item||line.itemName||('Item '+(index+1)))+'</strong>'+(ident.code?' · Code '+escapeHtml(ident.code):'')+(ident.indexNo?' · Index '+escapeHtml(ident.indexNo):'')+' — '+action+' to '+godown+' by '+who+' <small style="color:#666">('+when+')</small></div>';
+            }).join('') : '<span style="color:#666">No authorization changes recorded yet.</span>';
+        }
         async function openGodownAuthorization(invoiceId) {
             const invoice=invoices.find(item=>String(item.id||item.invoice_no||item.invoiceNo)===String(invoiceId));
             if(!invoice||!Array.isArray(invoice.items)) return showToast('Invoice items could not be found.','#c0392b');
@@ -6722,15 +6749,16 @@
             const renderRows=()=>{
                 const selectedId=select.value;
                 document.getElementById('godownAuthorizationRows').innerHTML=invoice.items.map((item,index)=>{
-                    const name=escapeHtml(item.item||item.itemName||'Unnamed item'),code=escapeHtml(item.itemCode||''),qty=Number(item.qty)||0;
+                    const name=escapeHtml(item.item||item.itemName||'Unnamed item'),ident=getGodownItemIdentifiers(item),code=escapeHtml(ident.code),indexNo=escapeHtml(ident.indexNo),qty=Number(item.qty)||0;
                     const assigned=String(item.godownDeliveryGodownId||''),authorized=item.godownDelivery===true||item.godownDelivery==='true';
                     const checked=authorized&&(!assigned||assigned===selectedId);
                     const assignment=authorized?(item.godownDeliveryGodownName||profileById.get(assigned)?.name||assigned||'Legacy authorization'):'—';
-                    return '<tr><td><input type="checkbox" class="godown-auth-line" data-index="'+index+'" '+(checked?'checked':'')+'></td><td>'+name+(code?' <small>('+code+')</small>':'')+'</td><td>'+qty+' '+escapeHtml(item.uom||'')+'</td><td>'+escapeHtml(assignment)+'</td></tr>';
+                    return '<tr><td><input type="checkbox" class="godown-auth-line" data-index="'+index+'" '+(checked?'checked':'')+'></td><td>'+name+'</td><td>'+(code||'—')+'</td><td>'+(indexNo||'—')+'</td><td>'+qty+' '+escapeHtml(item.uom||'')+'</td><td>'+escapeHtml(assignment)+'</td></tr>';
                 }).join('');
             };
             select.onchange=renderRows;
             renderRows();
+            renderGodownAudit(invoice);
             document.getElementById('godownAuthorizationHelp').textContent=godownProfiles.length
                 ? 'Choose the godown that will deliver the selected invoice lines. To move a line from another godown, select it here and save.'
                 : 'Set up at least one godown in Manage Godown Terminals & Fixed Operators before authorizing delivery.';
@@ -6738,26 +6766,26 @@
             document.getElementById('godownAuthorizationTitle').textContent='Godown authorization — '+(invoice.invoice_no||invoice.invoiceNo||invoice.id);
             modal.dataset.invoiceId=String(invoice.id||invoice.invoice_no||invoice.invoiceNo);modal.style.display='flex';
         }
+        function printGodownAuthorization(){window.print();}
         function closeGodownAuthorization(){document.getElementById('godownAuthorizationModal').style.display='none';}
         async function saveGodownAuthorization(){
             const id=document.getElementById('godownAuthorizationModal').dataset.invoiceId,invoice=invoices.find(item=>String(item.id||item.invoice_no||item.invoiceNo)===id);
             if(!invoice||!Array.isArray(invoice.items))return showToast('Invoice could not be found.','#c0392b');
             const selectedProfile=JSON.parse(localStorage.getItem('godown_profiles')||'[]').find(profile=>String(profile.id)===String(document.getElementById('godownAuthorizationSelect').value));
             if(!selectedProfile) return showToast('Choose a configured godown before saving authorization.','#c0392b');
+            const actor=localStorage.getItem('currentUser')||'System', timestamp=new Date().toISOString();
             document.querySelectorAll('.godown-auth-line').forEach(box=>{
                 if(box.disabled) return;
-                const item=invoice.items[Number(box.dataset.index)];
+                const item=invoice.items[Number(box.dataset.index)], wasAuthorized=item.godownDelivery===true||item.godownDelivery==='true', oldId=String(item.godownDeliveryGodownId||'');
                 if(box.checked) {
-                    item.godownDelivery=true;
-                    item.godownDeliveryGodownId=String(selectedProfile.id);
-                    item.godownDeliveryGodownName=String(selectedProfile.name||selectedProfile.id);
-                } else if(!item.godownDeliveryGodownId||String(item.godownDeliveryGodownId)===String(selectedProfile.id)) {
-                    item.godownDelivery=false;
-                    delete item.godownDeliveryGodownId;
-                    delete item.godownDeliveryGodownName;
+                    if(!wasAuthorized||oldId!==String(selectedProfile.id)) (item.godownDeliveryAudit ||= []).push({action:wasAuthorized?'Reassigned':'Authorized',timestamp,user:actor,fromGodownId:oldId,fromGodownName:item.godownDeliveryGodownName||'',godownId:String(selectedProfile.id),godownName:String(selectedProfile.name||selectedProfile.id)});
+                    item.godownDelivery=true; item.godownDeliveryGodownId=String(selectedProfile.id); item.godownDeliveryGodownName=String(selectedProfile.name||selectedProfile.id);
+                } else if(wasAuthorized&&(!oldId||oldId===String(selectedProfile.id))) {
+                    (item.godownDeliveryAudit ||= []).push({action:'Revoked',timestamp,user:actor,fromGodownId:oldId,fromGodownName:item.godownDeliveryGodownName||''});
+                    item.godownDelivery=false; delete item.godownDeliveryGodownId; delete item.godownDeliveryGodownName;
                 }
             });
-            invoice.godownDeliveryUpdatedAt=new Date().toISOString();invoice.godownDeliveryUpdatedBy=localStorage.getItem('currentUser')||'System';localStorage.setItem('invoices',JSON.stringify(invoices));
+            invoice.godownDeliveryUpdatedAt=timestamp;invoice.godownDeliveryUpdatedBy=actor;localStorage.setItem('invoices',JSON.stringify(invoices));
             try{if(typeof apiClient?.saveInvoice==='function'){const result=await apiClient.saveInvoice(invoice);if(result&&result.success===false)throw Error(result.message||'Remote save failed');}closeGodownAuthorization();applySearch();showToast('Godown authorization saved.','#198754');}
             catch(error){console.error('Godown authorization sync failed:',error);showToast('Saved on this device, but not synced. Godown access may not update on other devices until sync succeeds.','#c0392b');}
         }
@@ -7035,8 +7063,9 @@
       <div style="background:white;color:#222;border-radius:10px;padding:20px;width:min(820px,100%);max-height:85vh;overflow:auto;box-shadow:0 10px 40px #0005;">
         <h3 id="godownAuthorizationTitle" style="margin:0 0 8px;">Godown authorization</h3><p id="godownAuthorizationHelp" style="margin:0 0 14px;color:#555;"></p>
         <label for="godownAuthorizationSelect" style="display:block;font-weight:600;margin-bottom:6px;">Delivering Godown</label><select id="godownAuthorizationSelect" style="width:100%;padding:8px;margin-bottom:14px;border:1px solid #ccc;border-radius:6px;"></select>
-        <div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Authorize?</th><th style="text-align:left;">Item</th><th style="text-align:left;">Invoice quantity</th><th style="text-align:left;">Assigned Godown</th></tr></thead><tbody id="godownAuthorizationRows"></tbody></table></div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;"><button class="secondary" onclick="closeGodownAuthorization()">Cancel</button><button id="saveGodownAuthorizationButton" style="background:#198754;color:white;" onclick="saveGodownAuthorization()">Save authorization</button></div>
+        <div style="overflow:auto;"><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Authorize?</th><th style="text-align:left;">Item</th><th style="text-align:left;">Item Code</th><th style="text-align:left;">Index No.</th><th style="text-align:left;">Invoice quantity</th><th style="text-align:left;">Assigned Godown</th></tr></thead><tbody id="godownAuthorizationRows"></tbody></table></div>
+        <h4 style="font-size:15px;margin:16px 0 6px;">Authorization audit trail</h4><div id="godownAuthorizationAudit" style="font-size:13px;margin-bottom:12px;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;"><button class="secondary" onclick="printGodownAuthorization()">Print / PDF</button><button class="secondary" onclick="closeGodownAuthorization()">Cancel</button><button id="saveGodownAuthorizationButton" style="background:#198754;color:white;" onclick="saveGodownAuthorization()">Save authorization</button></div>
       </div>
     </div>
 </body>
