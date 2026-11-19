@@ -9,6 +9,8 @@ const { ImapFlow } = require('imapflow');
 const simpleParser = require('mailparser').simpleParser;
 const registerCrmV2 = require('./routes/crm_v2');
 const registerNancyRoutes = require('./routes/nancy');
+const registerPermissionRoutes = require('./routes/permissionRoutes');
+const createPermissionGuards = require('./middleware/permissionMiddleware');
 const { COOKIE_NAME, SESSION_SECONDS, createNancySession, verifyTotp } = require('./services/nancyAuth');
 
 
@@ -172,6 +174,12 @@ app.use('/api', async (req, res, next) => {
         next();
     }
 });
+
+// Centralized module enforcement uses the existing account registry and permission collection.
+const permissionGuards = createPermissionGuards(getConfiguredAdminUsers);
+app.use('/api', permissionGuards.enforceModulePermission);
+
+
 
 // --- Marketing Visit Schema ---
 const marketingVisitSchema = new mongoose.Schema({
@@ -1782,6 +1790,7 @@ crmRoutes(app, CrmDocument, '/api/crm-documents');
 crmRoutes(app, CrmEnquiry, '/api/crm-enquiries');
 crmRoutes(app, CrmTechnicalReview, '/api/crm-technical-reviews');
 crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
+registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, permissionGuards });
 registerCrmV2(app, { Customer, Supplier, CrmContact, CrmPlant, CrmEnquiry, Invoice, Purchase, FollowUp, Quotation });
 registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production });
 

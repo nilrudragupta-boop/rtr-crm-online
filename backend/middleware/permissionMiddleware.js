@@ -27,7 +27,13 @@ const ROUTE_MODULE_MAP = [
     { prefix: '/api/boms', moduleId: 'production' },
     { prefix: '/api/scraps', moduleId: 'production' },
     { prefix: '/api/journal-vouchers', moduleId: 'journal_voucher' },
-    { prefix: '/api/credit-debit-notes', moduleId: 'credit_debit_note' }
+    { prefix: '/api/credit-debit-notes', moduleId: 'credit_debit_note' },
+    { prefix: '/api/bank-accounts', moduleId: 'journal_voucher' },
+    { prefix: '/api/bank-transactions', moduleId: 'journal_voucher' },
+    { prefix: '/api/marketing-visits', moduleId: 'follow_up' },
+    { prefix: '/api/employees', moduleId: 'settings' },
+    { prefix: '/api/custom-records', moduleId: 'settings' },
+    { prefix: '/api/advance-audit', moduleId: 'advance_payment' }
 ];
 
 const PRIVILEGED_ROLES = new Set(['developer', 'super admin', 'superadmin', 'admin']);
@@ -110,13 +116,13 @@ function createPermissionGuards(getConfiguredAdminUsers) {
             if (privileged) return next();
 
             // If a sub-user is identified, verify their saved permissions in MongoDB
-            if (!actor) return next(); // Preserve legacy single-tenant fallback if user is not in sub-user registry
+            if (!actor) {
+                return res.status(401).json({ success: false, code: 'AUTH_REQUIRED', message: 'A valid CRM account is required.' });
+            }
 
             const tenantOwner = String(req.query.user || 'System').trim();
-            const permDoc = await UserPermission.findOne({
-                tenantOwner,
-                userId: { $regex: `^${username.replace(/[.*+?^${}()\vert{}[\]\\]/g, '\\$&')}$`, $options: 'i' }
-            }).lean();
+            const actorIds = [actor.userId, actor.id, actor.username].map(value => String(value || '').trim()).filter(Boolean);
+            const permDoc = await UserPermission.findOne({ tenantOwner, userId: { $in: actorIds } }).lean();
 
             // Determine required action from HTTP method, headers, or URL suffix
             const explicitAction = String(req.headers['x-rtr-action'] || req.query.permAction || '').trim();
