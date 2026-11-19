@@ -36,6 +36,52 @@ const ROUTE_MODULE_MAP = [
     { prefix: '/api/advance-audit', moduleId: 'advance_payment', modelName: 'AdvanceAuditEvent' }
 ];
 
+const SUPPORT_PERMISSION_TENANT = '7908040851';
+
+function toPermissionObject(permissionMap) {
+    if (!permissionMap) return {};
+    if (typeof permissionMap.toObject === 'function') return permissionMap.toObject({ flattenMaps: true });
+    if (permissionMap instanceof Map) return Object.fromEntries(permissionMap.entries());
+    return permissionMap;
+}
+
+function getModulePermissions(permissionMap, moduleId) {
+    if (!permissionMap || !moduleId) return null;
+    if (typeof permissionMap.get === 'function') return permissionMap.get(moduleId) || null;
+    return permissionMap[moduleId] || null;
+}
+
+async function findUserPermission(tenantOwner, actor, moduleId = '') {
+    const actorIds = [actor?.userId, actor?.id, actor?.username]
+        .map(value => String(value || '').trim())
+        .filter(Boolean);
+    if (!actorIds.length) return null;
+
+    const requestedTenant = String(tenantOwner || 'System').trim();
+    const primary = await UserPermission.findOne({ tenantOwner: requestedTenant, userId: { $in: actorIds } }).lean();
+
+    if (!moduleId) {
+        if (requestedTenant === SUPPORT_PERMISSION_TENANT) return primary;
+        const support = await UserPermission.findOne({ tenantOwner: SUPPORT_PERMISSION_TENANT, userId: { $in: actorIds } }).lean();
+        if (!primary) return support || null;
+        if (!support) return primary;
+        return {
+            ...primary,
+            permissions: {
+                ...toPermissionObject(support.permissions),
+                ...toPermissionObject(primary.permissions)
+            }
+        };
+    }
+
+    if (primary && getModulePermissions(primary.permissions, moduleId)) return primary;
+    if (requestedTenant !== SUPPORT_PERMISSION_TENANT) {
+        const support = await UserPermission.findOne({ tenantOwner: SUPPORT_PERMISSION_TENANT, userId: { $in: actorIds } }).lean();
+        if (support && getModulePermissions(support.permissions, moduleId)) return support;
+        return primary || support || null;
+    }
+    return primary || null;
+}
 const PRIVILEGED_ROLES = new Set(['developer', 'super admin', 'superadmin', 'admin']);
 
 function isPrivilegedUser(actor, username) {
@@ -140,8 +186,7 @@ function createPermissionGuards(getConfiguredAdminUsers) {
             // Resolve the actor's configured permission record in MongoDB.
 
             const tenantOwner = String(req.query.user || 'System').trim();
-            const actorIds = [actor.userId, actor.id, actor.username].map(value => String(value || '').trim()).filter(Boolean);
-            const permDoc = await UserPermission.findOne({ tenantOwner, userId: { $in: actorIds } }).lean();
+            const permDoc = await findUserPermission(tenantOwner, actor, matchedRoute.moduleId);
 
             // Determine required action from HTTP method, headers, or URL suffix
             const urlLower = String(req.path || '').toLowerCase();
@@ -176,7 +221,7 @@ function createPermissionGuards(getConfiguredAdminUsers) {
                     }
             }
 
-            const modulePerms = permDoc && permDoc.permissions ? permDoc.permissions[matchedRoute.moduleId] : null;
+            const modulePerms = permDoc ? getModulePermissions(permDoc.permissions, matchedRoute.moduleId) : null;
             if (!modulePerms || modulePerms[requiredAction] !== true) {
                 return res.status(403).json({
                     success: false,
@@ -197,7 +242,10 @@ function createPermissionGuards(getConfiguredAdminUsers) {
     return {
         requirePermissionAdmin,
         enforceModulePermission,
-        isPrivilegedUser
+        isPrivilegedUser,
+        findUserPermission,
+        getModulePermissions,
+        toPermissionObject
     };
 }
 

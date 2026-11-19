@@ -144,13 +144,14 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
             if (isPrivilegedUser(actor, actorUsername)) {
                 return res.json({ success: true, privileged: true, permissions: {} });
             }
-            const actorIds = [actor.userId, actor.id, actor.username].map(value => String(value || '').trim()).filter(Boolean);
-            const doc = await UserPermission.findOne({ tenantOwner, userId: { $in: actorIds } }).lean();
+            const requestedModule = String(req.query.module || '').trim();
+            const doc = await permissionGuards.findUserPermission(tenantOwner, actor, requestedModule);
+            const permissions = permissionGuards.toPermissionObject(doc?.permissions);
 
             res.json({
                 success: true,
                 privileged: false,
-                permissions: doc ? doc.permissions : {}
+                permissions
             });
         } catch (err) {
             res.status(500).json({ success: false, message: err.message });
