@@ -131,7 +131,7 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
     // 4. Read-only endpoint for any logged-in user to fetch their own effective permissions (for UI / URL guard)
     router.get('/my-permissions', async (req, res) => {
         try {
-            const actorUsername = String(req.actorUsername || req.headers['x-rtr-user'] || req.query.actor || req.query.user || '').trim();
+            const actorUsername = String(req.headers['x-rtr-user'] || req.query.actor || req.actorUsername || req.query.user || '').trim();
             const tenantOwner = String(req.query.user || 'System').trim();
             const users = await getConfiguredAdminUsers();
             const actor = users.find(u => String(u.username || '').trim().toLowerCase() === actorUsername.toLowerCase());

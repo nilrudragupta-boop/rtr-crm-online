@@ -59,10 +59,13 @@ function createPermissionGuards(getConfiguredAdminUsers) {
             return { username, actor, privileged: true };
         }
 
+        // Permission Manager requests include both a tenant (`user`) and the
+        // signed-in actor. Prefer the actor fields so the tenant cannot be
+        // mistaken for the person making the request.
         const actorUsername = String(
-            req.actorUsername ||
             req.headers['x-rtr-user'] ||
             req.query.actor ||
+            req.actorUsername ||
             req.query.user ||
             ''
         ).trim();
@@ -72,9 +75,16 @@ function createPermissionGuards(getConfiguredAdminUsers) {
         }
 
         const users = await getConfiguredAdminUsers();
-        const actor = users.find(
+        let actor = users.find(
             u => String(u.username || '').trim().toLowerCase() === actorUsername.toLowerCase()
         ) || null;
+
+        // The Developer account is a built-in privileged identity and may not
+        // be present in AdminCreds.adminUsers. Give it a permission-scoped
+        // identity so the manager's own admin routes can still authorize it.
+        if (!actor && isPrivilegedUser(null, actorUsername)) {
+            actor = { username: actorUsername, role: 'Developer', isLicensedAdmin: true };
+        }
 
         const privileged = isPrivilegedUser(actor, actorUsername);
         return { username: actor ? actor.username : actorUsername, actor, privileged };
