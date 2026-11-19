@@ -6,7 +6,10 @@ The browser does not contain Apps Script credentials or a reusable sheet-write s
 
 1. Deploy the updated backend. It no longer needs `REMOTE_PERMISSION_HMAC_SECRET` for Licenses permission reads or writes. Keep `GOOGLE_SCRIPT_URL` pointed at the deployed Apps Script web app (the existing default remains in use if it is not set).
 2. Copy the updated `Renewal OTP Google Apps Script.txt` into the existing Apps Script project.
-3. Deploy a new web app version using the same deployment identity and spreadsheet access as the current license script. The script calls `https://rtr-crm-online.onrender.com/api/permissions/remote-authorize` to exchange one-time grants, so authorize the added `UrlFetchApp` access when Google prompts.
+3. In the Apps Script editor, choose `authorizeRemotePermissionBridge` in the function selector and click **Run** while signed in as the account that owns the web app deployment. Review and approve Google's external request access prompt. This is a one-time Google authorization; it cannot be granted silently by backend code.
+4. Deploy a new web app version. Set **Execute as** to the deployment owner (the account that approved the prompt) and retain the current access setting and spreadsheet access. The script calls `https://rtr-crm-online.onrender.com/api/permissions/remote-authorize` to exchange one-time grants.
+
+If the Apps Script project has an `appsscript.json` manifest with an explicit `oauthScopes` list, add `https://www.googleapis.com/auth/script.external_request` to that list while preserving its existing scopes. Then repeat step 3 using the deployment owner and deploy a new web app version. The manager now reports these steps directly instead of a raw Google scope error.
 
 The backend creates a random, 60-second grant for each manager read/write. The grant is never returned to the browser, can be exchanged once, and authorizes only the operation already validated by the backend. Apps Script additionally rejects expired/replayed operations and only updates Column F after finding exactly one matching username in `Licenses`. No shared HMAC secret or credential needs to be placed in frontend code, backend settings, or Script Properties for this sheet bridge.
 
