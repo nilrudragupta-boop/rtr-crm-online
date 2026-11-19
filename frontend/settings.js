@@ -684,9 +684,11 @@ function mergePreservedUser2FA(users) {
 
 // Auto-apply on load and sync across windows
 window.addEventListener('DOMContentLoaded', async () => {
+    if (!(await enforcePageLevelPermissions())) return;
 
     // Add inside DOMContentLoaded in frontend/settings.js
 const PAGE_TO_MODULE = {
+    'dashboardB.html': 'dashboard',
     'invoice.html': 'invoice',
     'item.html': 'item_stock',
     'customer.html': 'customer',
@@ -715,10 +717,12 @@ const PAGE_TO_MODULE = {
 
 async function enforcePageLevelPermissions() {
     const currentUser = getCurrentUser();
-    if (!currentUser || window.location.pathname.includes('login.html')) return;
+    if (window.location.pathname.includes('login.html')) return true;
+    if (!currentUser) return false;
 
     const pageName = window.location.pathname.split('/').pop();
     const moduleId = PAGE_TO_MODULE[pageName];
+    if (!moduleId) return true;
     const apiBase = (localStorage.getItem('backendApiUrl') || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : `${window.location.origin}/api`)).replace(/\/+$/, '');
     const tenant = (typeof apiClient !== 'undefined' && apiClient.getTenantId) ? await apiClient.getTenantId() : currentUser;
 
@@ -727,7 +731,8 @@ async function enforcePageLevelPermissions() {
             headers: { 'x-rtr-user': currentUser }
         });
         const result = await res.json();
-        if (!result.success || result.privileged) return;
+        if (!result.success) return false;
+        if (result.privileged) return true;
 
         const modPerms = result.permissions ? result.permissions[moduleId] : null;
         if (moduleId && (!modPerms || modPerms.view !== true)) {
@@ -739,7 +744,7 @@ async function enforcePageLevelPermissions() {
                         <button onclick="window.location.href='dashboardB.html'" style="background:#0176d3;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Back to Dashboard</button>
                     </div>
                 </div>`;
-            return;
+            return false;
         }
 
         // Sync granular button permissions with existing UI_PERMISSION_REGISTRY
@@ -748,11 +753,23 @@ async function enforcePageLevelPermissions() {
             synced.perm_print = !!modPerms.print;
             synced.perm_export_excel = !!modPerms.excelDownload;
             synced.perm_delete_action = !!modPerms.delete;
+            if (moduleId === 'invoice') {
+                synced.perm_make_invoice = !!modPerms.add;
+                synced.perm_edit_invoice = !!modPerms.edit;
+                synced.perm_delete_invoice = !!modPerms.delete;
+                synced.perm_print_smart = !!modPerms.print;
+            }
+            if (moduleId === 'purchase') {
+                synced.perm_edit_purchase = !!modPerms.edit;
+                synced.perm_delete_purchase = !!modPerms.delete;
+            }
             saveUIPermissions(synced);
             applyUIPermissions();
         }
+        return true;
     } catch (e) {
-        console.warn('Permission sync check skipped:', e.message);
+        console.warn('Permission sync check failed:', e.message);
+        return false;
     }
 }
     applyUIPermissions();
