@@ -1002,7 +1002,7 @@
 
 
         <button class="action" onclick="deleteSelectedCustomers()" style="background:#dc3545;"
-            data-permission-id="perm_delete_action">Delete Selected</button>
+            data-permission-id="perm_delete_customer">Delete Selected</button>
         <button id="salesBtn" class="btn btn-outline-success"
             onclick="window.location.href = 'customer_support.html'">Customer Support</button>
     </div>
@@ -1939,7 +1939,7 @@
                     <button class="btn-action-view" data-action="view" data-id="${c.id}">👁️ View</button>
                     <button class="btn-action-invoice" data-name="${escapeHtml(c.name)}" onclick="openInvoice(this.getAttribute('data-name'))">📄 Invoice</button>
                     <button class="btn-action-ledger" data-name="${escapeHtml(c.name)}" onclick="openLedger(this.getAttribute('data-name'))">📒 Ledger</button>
-                    <button class="edit-btn btn-action-edit" data-action="edit" data-id="${c.id}" data-permission-id="perm_manage_customers">✏️ Edit</button>
+                    <button class="edit-btn btn-action-edit" data-action="edit" data-id="${c.id}" data-permission-id="perm_edit_customer">✏️ Edit</button>
                     <button class="btn-action-attach" data-action="attach" data-id="${c.id}">📎 Attach</button>
                     <button class="btn-action-receipt" data-action="receipt" data-id="${c.id}">🧾 Receipt</button>
                     <button class="delete-btn btn-action-delete" data-action="delete" data-id="${c.id}" data-permission-id="perm_delete_action" style="color: #dc3545 !important;">🗑️ Delete</button>
@@ -2148,6 +2148,7 @@
         }
 
         function editCustomer(id) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_edit_customer === false) return showToast("You do not have permission to edit customers.");
             const cust = customers.find(c => String(c.id) === String(id));
             if (!cust) return showToast("Customer not found");
             document.getElementById("custId").value = cust.id;
@@ -2218,6 +2219,9 @@
         }
 
         async function saveCustomer() {
+            const permissions = typeof getUIPermissions === "function" ? getUIPermissions() : {};
+            const isEditing = !!document.getElementById("custId").value;
+            if (permissions[isEditing ? "perm_edit_customer" : "perm_new_customer"] === false) return showToast("You do not have permission to " + (isEditing ? "edit" : "create") + " customers.");
             const id = document.getElementById("custId").value;
             const name = document.getElementById("custName").value.trim();
             const address = document.getElementById("custAddress").value.trim();
@@ -2288,6 +2292,7 @@
         }
 
         function deleteCustomer(id) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_customer === false) return showToast("You do not have permission to delete customers.");
             idsToDelete = [id];
             document.getElementById("modalMessage").innerText = "Are you sure you want to delete this customer?";
             document.getElementById("confirmationModal").style.display = "flex";
@@ -2302,6 +2307,7 @@
 
         // 🔹 Delete Selected Customers
         function deleteSelectedCustomers() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_customer === false) return showToast("You do not have permission to delete customers.");
             const checkboxes = document.querySelectorAll(".cust-checkbox:checked");
             if (checkboxes.length === 0) return showToast("Please select customers to delete.");
 
@@ -2311,6 +2317,7 @@
         }
 
         async function confirmDelete() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_customer === false) return showToast("You do not have permission to delete customers.");
             if (idsToDelete.length === 0) return;
 
             const recycleBin = JSON.parse(localStorage.getItem('recycleBin_customers') || '[]');

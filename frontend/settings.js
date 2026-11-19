@@ -381,6 +381,9 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_invoice_report', label: 'Invoice Report', feature: 'invoice' },
     { id: 'perm_invoice_analytics', label: 'Invoice Analytics', feature: 'invoice' },
     { id: 'perm_manage_customers', label: 'Manage Customers' },
+    { id: 'perm_new_customer', label: 'Create Customers', defaultValue: false },
+    { id: 'perm_edit_customer', label: 'Edit Customers', defaultValue: false },
+    { id: 'perm_delete_customer', label: 'Delete Customers', defaultValue: false },
     { id: 'perm_manage_items', label: 'Manage Items', feature: 'inventory' },
     { id: 'perm_new_item', label: 'Create Items', feature: 'inventory', defaultValue: false },
     { id: 'perm_edit_item', label: 'Edit Items', feature: 'inventory', defaultValue: false },
@@ -805,6 +808,11 @@ async function enforcePageLevelPermissions() {
                 synced.perm_record_advance_pay = !!modPerms.add;
                 synced.perm_edit_advance_pay = !!modPerms.edit;
                 synced.perm_delete_advance_pay = !!modPerms.delete;
+            }
+            if (moduleId === 'customer') {
+                synced.perm_new_customer = !!modPerms.add;
+                synced.perm_edit_customer = !!modPerms.edit;
+                synced.perm_delete_customer = !!modPerms.delete;
             }
             saveUIPermissions(synced);
             applyUIPermissions();
