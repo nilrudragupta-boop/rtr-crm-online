@@ -1,27 +1,20 @@
-# Permission Manager secure write setup
+# Permission Manager setup
 
-The browser does not contain the Apps Script URL signing secret. Admin sessions re-verify the Admin password; Developer sessions receive a fresh email OTP through the existing Apps Script mail action. The backend keeps and verifies that one-time code, then issues a short-lived permission-manager session. License-sheet permission reads and writes use a separate server-to-script signature.
+The browser does not contain Apps Script credentials or a reusable sheet-write secret. Admin sessions re-verify the Admin password; Developer sessions use a one-time email code. The backend then issues a short-lived permission-manager session.
 
-## Backend environment
+## Deployment
 
-Configure these server environment variables before deploying:
+1. Deploy the updated backend. It no longer needs `REMOTE_PERMISSION_HMAC_SECRET` for Licenses permission reads or writes. Keep `GOOGLE_SCRIPT_URL` pointed at the deployed Apps Script web app (the existing default remains in use if it is not set).
+2. Copy the updated `Renewal OTP Google Apps Script.txt` into the existing Apps Script project.
+3. Deploy a new web app version using the same deployment identity and spreadsheet access as the current license script. The script calls `https://rtr-crm-online.onrender.com/api/permissions/remote-authorize` to exchange one-time grants, so authorize the added `UrlFetchApp` access when Google prompts.
 
-- `REMOTE_PERMISSION_HMAC_SECRET`: a random secret of at least 32 characters, shared with the Apps Script property below. This is required for License-sheet permission reads and writes, not for Developer OTP delivery.
-- `GOOGLE_SCRIPT_URL`: the deployed Apps Script web app URL. The existing default is retained if this value is not configured.
+The backend creates a random, 60-second grant for each manager read/write. The grant is never returned to the browser, can be exchanged once, and authorizes only the operation already validated by the backend. Apps Script additionally rejects expired/replayed operations and only updates Column F after finding exactly one matching username in `Licenses`. No shared HMAC secret or credential needs to be placed in frontend code, backend settings, or Script Properties for this sheet bridge.
 
-The backend signs 30-minute manager sessions using `PERMISSION_MANAGER_SESSION_SECRET` if set, otherwise its existing `NANCY_AUTH_SECRET`, or a server-side derivation from `MONGO_URI`. No new session secret is needed for Developer OTP delivery. Do not put server secrets in frontend files, query strings, or browser storage. The manager stores only the short-lived session token in `sessionStorage`; it does not store the password.
-
-## Apps Script
-
-1. Add the updated `Renewal OTP Google Apps Script.txt` content to the Apps Script project.
-2. In **Project Settings → Script Properties**, add `REMOTE_PERMISSION_HMAC_SECRET` with the same value as the backend environment variable of that name.
-3. Deploy a new web app version using the same deployment identity and spreadsheet access as the current license script.
-4. Set the backend `GOOGLE_SCRIPT_URL` to the deployment URL if it changed.
-
-The script rejects unsigned, expired, or replayed License-sheet permission requests. Developer OTPs use the existing `send_dev_login_otp` Apps Script method; the backend generates and verifies the code without exposing it to the browser. The script updates Column F only after finding exactly one `Licenses` row with the target username. If existing JSON is malformed, the manager opens with all buttons off and identifies the bad value; saving the reviewed checkbox selection replaces it. Runtime permission loading also fails closed for malformed values.
+Developer OTP delivery uses the existing `send_dev_login_otp` Apps Script action; the backend generates and verifies the code. The manager stores only its short-lived session token in `sessionStorage`, not the password.
 
 ## Account behavior
 
-- The licensed Admin’s flags are written directly to that Admin’s `Licenses` row.
-- Sub-user permissions continue to save to the existing backend permission store. If a matching username row also exists in `Licenses`, the manager additionally updates that row’s Column F. When there is no matching row, the backend save still succeeds and the manager reports that the sheet cell was not updated.
-- Backend permission records and sheet writes are limited to the signed-in Admin’s tenant. A Developer session can manage the accounts available to Developer.
+- Licensed Admin permissions are written directly to that Admin's `Licenses` row.
+- Sub-user permissions are saved to the secure backend permission store. If that sub-user also has a matching username row in `Licenses`, the manager additionally writes the flags to Column F; without a matching row, the secure backend save still succeeds and the manager reports that no sheet row was updated.
+- Backend permission records and sheet writes remain limited to the signed-in Admin's tenant. A Developer session can manage accounts available to Developer.
+- Malformed existing JSON is reported and loads as all buttons off; saving a reviewed selection replaces the malformed value. Runtime permission loading fails closed for malformed values.
