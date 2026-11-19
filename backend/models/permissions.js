@@ -47,20 +47,6 @@ const permissionAuditSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-// One-time backend-to-Apps-Script capabilities. TTL cleanup is eventual;
-// redemption also checks expiresAt atomically before returning any payload.
-const permissionGrantSchema = new mongoose.Schema({
-    grantId: { type: String, required: true, unique: true },
-    method: { type: String, required: true, enum: ['get_remote_permissions', 'set_remote_permissions'] },
-    actor: { type: String, required: true },
-    targetUsername: { type: String, required: true },
-    permissionFlags: { type: mongoose.Schema.Types.Mixed, default: {} },
-    timestamp: { type: Number, required: true },
-    nonce: { type: String, required: true },
-    expiresAt: { type: Date, required: true }
-}, { timestamps: true });
-permissionGrantSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
 // Prevent modification or deletion of audit logs at the Mongoose layer
 permissionAuditSchema.pre(['updateOne', 'findOneAndUpdate', 'deleteOne', 'findOneAndDelete', 'deleteMany'], function () {
     throw new Error('Security Violation: Permission audit logs are immutable.');
@@ -68,10 +54,8 @@ permissionAuditSchema.pre(['updateOne', 'findOneAndUpdate', 'deleteOne', 'findOn
 
 const UserPermission = mongoose.model('UserPermission', userPermissionSchema);
 const PermissionAudit = mongoose.model('PermissionAudit', permissionAuditSchema);
-const PermissionGrant = mongoose.model('PermissionGrant', permissionGrantSchema);
 
 module.exports = {
     UserPermission,
-    PermissionAudit,
-    PermissionGrant
+    PermissionAudit
 };

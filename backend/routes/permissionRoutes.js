@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { UserPermission, PermissionAudit, PermissionGrant } = require('../models/permissions');
+const { UserPermission, PermissionAudit } = require('../models/permissions');
 
 const permissionLoginAttempts = new Map();
 
@@ -16,6 +16,11 @@ function canonicalFlags(input) {
         result[key] = input[key];
     });
     return result;
+}
+
+function createRemotePermissionSignature(method, actor, target, timestamp, nonce, flags, secret) {
+    const canonical = `${method}\n${actor}\n${target}\n${timestamp}\n${nonce}\n${JSON.stringify(flags)}`;
+    return crypto.createHmac('sha256', secret).update(canonical).digest('hex');
 }
 
 // Canonical CRM Module Registry aligned with existing HTML pages and UI_PERMISSION_REGISTRY
@@ -136,49 +141,27 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
     }
 
     async function callSignedRemotePermissions(method, actor, targetUsername, flags = {}) {
+        const secret = String(process.env.REMOTE_PERMISSION_HMAC_SECRET || '');
+        if (secret.length < 32) throw new Error('Remote permission signing is not configured on the backend. Set REMOTE_PERMISSION_HMAC_SECRET before using the Licenses sync.');
         let target;
         try { target = new URL(googleScriptTargetUrl || ''); }
         catch (_) { throw new Error('Google Apps Script service is not configured.'); }
         if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !target.pathname.startsWith('/macros/s/')) {
             throw new Error('Google Apps Script service configuration is invalid.');
         }
-        const grantId = crypto.randomBytes(36).toString('hex');
-        const now = Date.now();
-        await PermissionGrant.create({
-            grantId,
-            method, actor, targetUsername, permissionFlags: flags,
-            timestamp: now, nonce: crypto.randomBytes(18).toString('hex'),
-            expiresAt: new Date(now + 60 * 1000)
-        });
+        const timestamp = Date.now();
+        const nonce = crypto.randomBytes(18).toString('hex');
+        const signature = createRemotePermissionSignature(method, actor, targetUsername, timestamp, nonce, flags, secret);
         const response = await fetch(target, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ method: 'permission_manager_remote_grant', grantId }),
+            body: JSON.stringify({ method, actor, targetUsername, timestamp, nonce, permissionFlags: flags, signature }),
             redirect: 'follow'
         });
         const data = await response.json();
         if (!response.ok || data.success !== true) throw new Error(data.message || 'Google Sheet permission update failed.');
         return data;
     }
-
-    // Apps Script exchanges a random, short-lived one-time grant for the
-    // approved operation. This endpoint is intentionally public; possession
-    // of the unguessable grant is its sole authorization and it is single-use.
-    router.post('/remote-authorize', async (req, res) => {
-        const grantId = String(req.body?.grantId || '');
-        if (!/^[a-f0-9]{72}$/.test(grantId)) return res.status(400).json({ success: false, message: 'Invalid permission authorization grant.' });
-        try {
-            const grant = await PermissionGrant.findOneAndDelete({ grantId, expiresAt: { $gt: new Date() } }).lean();
-            if (!grant) return res.status(401).json({ success: false, message: 'Permission authorization expired or was already used.' });
-            return res.set('Cache-Control', 'no-store').json({
-                success: true, method: grant.method, actor: grant.actor,
-                targetUsername: grant.targetUsername, timestamp: grant.timestamp,
-                nonce: grant.nonce, permissionFlags: grant.permissionFlags
-            });
-        } catch (_) {
-            return res.status(503).json({ success: false, message: 'Permission authorization service is unavailable.' });
-        }
-    });
 
     router.get('/remote/:userId', requirePermissionAdmin, async (req, res) => {
         try {
