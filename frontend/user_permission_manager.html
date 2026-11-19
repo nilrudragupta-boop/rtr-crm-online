@@ -1226,7 +1226,9 @@
         const headers = {
             'Content-Type': 'application/json',
             'x-rtr-user': state.actorUsername,
-            ...(sessionStorage.getItem('permissionManagerSession') ? { 'Authorization': `Bearer ${sessionStorage.getItem('permissionManagerSession')}` } : {}),
+            ...(sessionStorage.getItem('permissionManagerSession') && sessionStorage.getItem('permissionManagerSessionUser')?.toLowerCase() === state.actorUsername.toLowerCase()
+                ? { 'Authorization': `Bearer ${sessionStorage.getItem('permissionManagerSession')}` }
+                : {}),
             ...(options.headers || {})
         };
         const response = await fetch(url, { ...options, headers, cache: 'no-store' });
@@ -1243,7 +1245,38 @@
     }
 
     async function establishPermissionSession() {
-        if (sessionStorage.getItem('permissionManagerSession')) return;
+        const savedSessionUser = (sessionStorage.getItem('permissionManagerSessionUser') || '').toLowerCase();
+        if (sessionStorage.getItem('permissionManagerSession') && savedSessionUser === state.actorUsername.toLowerCase()) return;
+        sessionStorage.removeItem('permissionManagerSession');
+        sessionStorage.removeItem('permissionManagerSessionUser');
+        const developerOtpFlow = state.actorUsername.toLowerCase() === 'developer' && localStorage.getItem('isDevLogin') === 'true';
+        if (developerOtpFlow) {
+            const otpRequest = await fetch(`${getApiBase()}/permissions/session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: state.actorUsername, action: 'request_developer_otp' }),
+                cache: 'no-store'
+            });
+            const otpRequestResult = await otpRequest.json();
+            if (!otpRequest.ok || otpRequestResult.success !== true) throw new Error(otpRequestResult.message || 'Could not request Developer verification.');
+
+            const otp = window.prompt('Enter the 6-digit Developer OTP sent to the configured Developer email address.');
+            if (!otp) throw new Error('Developer OTP verification is required to manage permissions.');
+            const sessionResponse = await fetch(`${getApiBase()}/permissions/session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: state.actorUsername, otp: String(otp).trim() }),
+                cache: 'no-store'
+            });
+            const sessionResult = await sessionResponse.json();
+            if (!sessionResponse.ok || sessionResult.success !== true || !sessionResult.token) throw new Error(sessionResult.message || 'Developer verification failed.');
+            sessionStorage.setItem('permissionManagerSession', sessionResult.token);
+            sessionStorage.setItem('permissionManagerSessionUser', sessionResult.username);
+            state.actorUsername = sessionResult.username;
+            state.tenantOwner = sessionResult.tenantOwner;
+            return;
+        }
+
         let password = '';
         try { password = window.prompt('Re-enter your Admin password to open the permission manager. It will only be sent to the backend for verification.'); }
         catch (_) { password = ''; }
@@ -1258,6 +1291,7 @@
         const result = await response.json();
         if (!response.ok || result.success !== true || !result.token) throw new Error(result.message || 'Account verification failed.');
         sessionStorage.setItem('permissionManagerSession', result.token);
+        sessionStorage.setItem('permissionManagerSessionUser', result.username);
         state.actorUsername = result.username;
         state.tenantOwner = result.tenantOwner;
     }
