@@ -53,16 +53,17 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
             const users = await getConfiguredAdminUsers();
 
             const subUsers = users
-                .map((u, idx) => {
-                    const userId = String(u.userId || u.id || u.username || `USR-${idx + 1}`).trim();
+                .map(u => {
+                    const userId = String(u.userId || u.id || u.username || '').trim();
                     const username = String(u.username || '').trim();
                     const role = String(u.role || 'User').trim();
-                    const isActive = u.active !== false && u.isActive !== false && String(u.status || 'Active').toLowerCase() !== 'inactive';
+                    const accountStatus = String(u.status || ((u.active === false || u.isActive === false) ? 'Inactive' : 'Active')).trim();
+                    const isActive = u.active !== false && u.isActive !== false && !['inactive', 'disabled', 'suspended'].includes(accountStatus.toLowerCase());
                     return {
                         userId,
                         username,
                         role,
-                        status: isActive ? 'Active' : 'Inactive',
+                        status: accountStatus,
                         isActive,
                         isPrivileged: isPrivilegedUser(u, username)
                     };
@@ -134,15 +135,17 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
             const tenantOwner = String(req.query.user || 'System').trim();
             const users = await getConfiguredAdminUsers();
             const actor = users.find(u => String(u.username || '').trim().toLowerCase() === actorUsername.toLowerCase());
-
+            if (!actor || !actorUsername) {
+                return res.status(401).json({ success: false, message: 'A registered CRM account is required.' });
+            }
+            if (actor.active === false || actor.isActive === false || ['inactive', 'disabled', 'suspended'].includes(String(actor.status || '').toLowerCase())) {
+                return res.status(403).json({ success: false, message: 'Account is inactive.' });
+            }
             if (isPrivilegedUser(actor, actorUsername)) {
                 return res.json({ success: true, privileged: true, permissions: {} });
             }
-
-            const doc = await UserPermission.findOne({
-                tenantOwner,
-                userId: { $regex: `^${actorUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
-            }).lean();
+            const actorIds = [actor.userId, actor.id, actor.username].map(value => String(value || '').trim()).filter(Boolean);
+            const doc = await UserPermission.findOne({ tenantOwner, userId: { $in: actorIds } }).lean();
 
             res.json({
                 success: true,
@@ -183,6 +186,14 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
                 });
             }
 
+            const actorIds = [actor.username, actor.userId, actor.id].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+            const targetIds = [targetUserId, targetAccount.username, targetAccount.userId, targetAccount.id].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+            if (actorIds.some(id => targetIds.includes(id))) {
+                return res.status(403).json({ success: false, message: 'You cannot modify your own permissions.' });
+            }
+            if (targetAccount.active === false || targetAccount.isActive === false || ['inactive', 'disabled', 'suspended'].includes(String(targetAccount.status || '').trim().toLowerCase())) {
+                return res.status(403).json({ success: false, message: 'Inactive sub-users cannot be assigned permissions.' });
+            }
             if (isPrivilegedUser(targetAccount, targetAccount.username)) {
                 return res.status(403).json({
                     success: false,
@@ -191,7 +202,7 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
             }
 
             const incomingPerms = req.body.permissions || {};
-            const actionType = req.body.actionPerformed || 'BULK_SAVE';
+            const actionType = req.body.actionPerformed === 'COPY' ? 'COPY' : 'BULK_SAVE';
             const moduleLabels = req.body.moduleLabels || {};
 
             const existingDoc = await UserPermission.findOne({ tenantOwner, userId: targetUserId }).lean();

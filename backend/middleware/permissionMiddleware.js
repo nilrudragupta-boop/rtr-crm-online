@@ -1,33 +1,39 @@
 const { UserPermission } = require('../models/permissions');
+const mongoose = require('mongoose');
 
 // Maps existing CRM API prefixes and HTML pages to canonical module IDs
 const ROUTE_MODULE_MAP = [
-    { prefix: '/api/invoices', moduleId: 'invoice' },
-    { prefix: '/api/sales-records', moduleId: 'invoice' },
-    { prefix: '/api/items', moduleId: 'item_stock' },
-    { prefix: '/api/stock-journal', moduleId: 'item_stock' },
-    { prefix: '/api/customers', moduleId: 'customer' },
-    { prefix: '/api/suppliers', moduleId: 'supplier' },
-    { prefix: '/api/purchases', moduleId: 'purchase' },
-    { prefix: '/api/advance-payments', moduleId: 'advance_payment' },
-    { prefix: '/api/expenses', moduleId: 'expense_manager' },
+    { prefix: '/api/invoices', moduleId: 'invoice', modelName: 'Invoice' },
+    { prefix: '/api/sales-records', moduleId: 'invoice', modelName: 'SalesRecord' },
+    { prefix: '/api/items', moduleId: 'item_stock', modelName: 'Item' },
+    { prefix: '/api/stock-journal', moduleId: 'item_stock', modelName: 'StockJournal' },
+    { prefix: '/api/customers', moduleId: 'customer', modelName: 'Customer' },
+    { prefix: '/api/suppliers', moduleId: 'supplier', modelName: 'Supplier' },
+    { prefix: '/api/purchases', moduleId: 'purchase', modelName: 'Purchase' },
+    { prefix: '/api/advance-payments', moduleId: 'advance_payment', modelName: 'AdvancePayment' },
+    { prefix: '/api/expenses', moduleId: 'expense_manager', modelName: 'Expense' },
     { prefix: '/api/reminders', moduleId: 'reminder' },
-    { prefix: '/api/follow-ups', moduleId: 'follow_up' },
-    { prefix: '/api/crm-contacts', moduleId: 'contacts' },
-    { prefix: '/api/crm/customer', moduleId: 'business_360' },
-    { prefix: '/api/crm-enquiries', moduleId: 'crm_v2' },
-    { prefix: '/api/crm-technical-reviews', moduleId: 'crm_v2' },
-    { prefix: '/api/crm-negotiations', moduleId: 'crm_v2' },
+    { prefix: '/api/follow-ups', moduleId: 'follow_up', modelName: 'FollowUp' },
+    { prefix: '/api/crm-contacts', moduleId: 'contacts', modelName: 'CrmContact' },
+    { prefix: '/api/crm/customer', moduleId: 'business_360', modelName: 'Customer' },
+    { prefix: '/api/crm-enquiries', moduleId: 'crm_v2', modelName: 'CrmEnquiry' },
+    { prefix: '/api/crm-technical-reviews', moduleId: 'crm_v2', modelName: 'CrmTechnicalReview' },
+    { prefix: '/api/crm-negotiations', moduleId: 'crm_v2', modelName: 'CrmNegotiation' },
     { prefix: '/api/settings', moduleId: 'settings' },
-    { prefix: '/api/custom-fields', moduleId: 'settings' },
-    { prefix: '/api/custom-pages', moduleId: 'settings' },
-    { prefix: '/api/quotations', moduleId: 'quotation' },
-    { prefix: '/api/order-sheets', moduleId: 'ordersheet' },
-    { prefix: '/api/production', moduleId: 'production' },
-    { prefix: '/api/boms', moduleId: 'production' },
-    { prefix: '/api/scraps', moduleId: 'production' },
-    { prefix: '/api/journal-vouchers', moduleId: 'journal_voucher' },
-    { prefix: '/api/credit-debit-notes', moduleId: 'credit_debit_note' }
+    { prefix: '/api/custom-fields', moduleId: 'settings', modelName: 'CustomField' },
+    { prefix: '/api/custom-pages', moduleId: 'settings', modelName: 'CustomPage' },
+    { prefix: '/api/quotations', moduleId: 'quotation', modelName: 'Quotation' },
+    { prefix: '/api/order-sheets', moduleId: 'ordersheet', modelName: 'OrderSheet' },
+    { prefix: '/api/production', moduleId: 'production', modelName: 'Production' },
+    { prefix: '/api/boms', moduleId: 'production', modelName: 'Bom' },
+    { prefix: '/api/scraps', moduleId: 'production', modelName: 'Scrap' },
+    { prefix: '/api/journal-vouchers', moduleId: 'journal_voucher', modelName: 'JournalVoucher' },
+    { prefix: '/api/credit-debit-notes', moduleId: 'credit_debit_note', modelName: 'CreditDebitNote' },
+    { prefix: '/api/bank-accounts', moduleId: 'journal_voucher', modelName: 'BankAccount' },
+    { prefix: '/api/bank-transactions', moduleId: 'journal_voucher', modelName: 'BankTransaction' },
+    { prefix: '/api/marketing-visits', moduleId: 'follow_up', modelName: 'MarketingVisit' },
+    { prefix: '/api/employees', moduleId: 'settings', modelName: 'Employee' },
+    { prefix: '/api/advance-audit', moduleId: 'advance_payment', modelName: 'AdvanceAuditEvent' }
 ];
 
 const PRIVILEGED_ROLES = new Set(['developer', 'super admin', 'superadmin', 'admin']);
@@ -74,10 +80,10 @@ function createPermissionGuards(getConfiguredAdminUsers) {
     async function requirePermissionAdmin(req, res, next) {
         try {
             const { username, actor, privileged } = await resolveActor(req);
-            if (!username || username === 'System') {
-                return res.status(401).json({ success: false, message: 'Authentication required.' });
+            if (!username || username === 'System' || !actor) {
+                return res.status(401).json({ success: false, message: 'A registered CRM account is required.' });
             }
-            if (actor && (actor.active === false || actor.isActive === false)) {
+            if (actor.active === false || actor.isActive === false || String(actor.status || '').toLowerCase() === 'inactive') {
                 return res.status(403).json({ success: false, message: 'Account is inactive.' });
             }
             if (!privileged) {
@@ -107,36 +113,51 @@ function createPermissionGuards(getConfiguredAdminUsers) {
             if (!matchedRoute) return next();
 
             const { username, actor, privileged } = await resolveActor(req);
+            if (!actor) {
+                return res.status(401).json({ success: false, code: 'AUTH_REQUIRED', message: 'A registered CRM account is required.' });
+            }
+            if (actor.active === false || actor.isActive === false || ['inactive', 'disabled', 'suspended'].includes(String(actor.status || '').toLowerCase())) {
+                return res.status(403).json({ success: false, message: 'Account is inactive.' });
+            }
             if (privileged) return next();
 
-            // If a sub-user is identified, verify their saved permissions in MongoDB
-            if (!actor) return next(); // Preserve legacy single-tenant fallback if user is not in sub-user registry
+            // Resolve the actor's configured permission record in MongoDB.
 
             const tenantOwner = String(req.query.user || 'System').trim();
-            const permDoc = await UserPermission.findOne({
-                tenantOwner,
-                userId: { $regex: `^${username.replace(/[.*+?^${}()\vert{}[\]\\]/g, '\\$&')}$`, $options: 'i' }
-            }).lean();
+            const actorIds = [actor.userId, actor.id, actor.username].map(value => String(value || '').trim()).filter(Boolean);
+            const permDoc = await UserPermission.findOne({ tenantOwner, userId: { $in: actorIds } }).lean();
 
             // Determine required action from HTTP method, headers, or URL suffix
-            const explicitAction = String(req.headers['x-rtr-action'] || req.query.permAction || '').trim();
-            const urlLower = req.originalUrl.toLowerCase();
-            let requiredAction = explicitAction;
-
-            if (!requiredAction) {
-                if (urlLower.includes('/pdf') || urlLower.includes('format=pdf')) requiredAction = 'pdfDownload';
-                else if (urlLower.includes('/excel') || urlLower.includes('format=xlsx') || urlLower.includes('format=csv')) requiredAction = 'excelDownload';
-                else if (urlLower.includes('/import')) requiredAction = 'import';
-                else if (urlLower.includes('/export')) requiredAction = 'export';
-                else if (urlLower.includes('/print')) requiredAction = 'print';
-                else if (req.method === 'GET') requiredAction = 'view';
-                else if (req.method === 'DELETE') requiredAction = 'delete';
-                else if (req.method === 'PUT' || req.method === 'PATCH') requiredAction = 'edit';
-                else if (req.method === 'POST') {
-                    // Upsert pattern in server.js: check if updating an existing record vs creating new
-                    const isEdit = Boolean(req.body && (req.body._id || req.body.isEdit === true));
-                    requiredAction = isEdit ? 'edit' : 'add';
-                }
+            const urlLower = String(req.path || '').toLowerCase();
+            const requestedFormat = String(req.query.format || '').toLowerCase();
+            let requiredAction = '';
+            if (urlLower.includes('/pdf') || requestedFormat === 'pdf') requiredAction = 'pdfDownload';
+            else if (urlLower.includes('/excel') || requestedFormat === 'xlsx' || requestedFormat === 'csv') requiredAction = 'excelDownload';
+            else if (urlLower.includes('/import')) requiredAction = 'import';
+            else if (urlLower.includes('/export')) requiredAction = 'export';
+            else if (urlLower.includes('/print')) requiredAction = 'print';
+            else if (req.method === 'GET') requiredAction = 'view';
+            else if (req.method === 'DELETE') requiredAction = 'delete';
+            else if (req.method === 'PUT' || req.method === 'PATCH') requiredAction = 'edit';
+            else if (req.method === 'POST') {
+                const restoreOrReorder = /\/(restore|reorder)(?:\?|$)/i.test(req.originalUrl);
+                    if (restoreOrReorder) {
+                        requiredAction = 'edit';
+                    } else {
+                        const model = matchedRoute.modelName && mongoose.models[matchedRoute.modelName];
+                        const identifiers = [req.params.id, req.params.orderNo, req.params.pageId, req.body && req.body._id, req.body && req.body.id, req.body && req.body.invoiceNo, req.body && req.body.orderNo].filter(value => value !== undefined && value !== null && String(value) !== '');
+                        let isEdit = false;
+                        if (model && identifiers.length) {
+                            const fields = matchedRoute.idFields || ['_id', 'id', 'invoiceNo', 'orderNo', 'pageId'];
+                            for (const field of fields) {
+                                for (const value of identifiers) {
+                                    try { if (await model.exists({ [field]: value })) { isEdit = true; break; } } catch (_) {}
+                                }
+                                if (isEdit) break;
+                            }
+                        }
+                        requiredAction = isEdit ? 'edit' : 'add';
+                    }
             }
 
             const modulePerms = permDoc && permDoc.permissions ? permDoc.permissions[matchedRoute.moduleId] : null;
