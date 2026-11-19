@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Permission Manager | RISE Tech Revolution CRM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="anti-debug.js"></script>
+    <script src="settings.js"></script>
+    <script src="apiClient.js"></script>
+    <style>
+        :root {
+            --slds-brand: #0176d3;
+            --slds-brand-dark: #014486;
+            --slds-brand-light: #eef4ff;
+            --slds-bg: #f3f3f3;
+            --slds-surface: #ffffff;
+            --slds-border: #dddbda;
+            --slds-text: #181818;
+            --slds-text-muted: #444444;
+            --slds-success: #2e844a;
+            --slds-success-bg: #ebf7ee;
+            --slds-danger: #ba0517;
+            --slds-danger-bg: #fef1ee;
+            --slds-warning: #dd7a01;
+            --slds-warning-bg: #fef6ec;
+            --slds-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+            --radius: 6px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--slds-bg);
+            color: var(--slds-text);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        /* Unauthorized Lockout Screen */
+        #unauthorizedScreen {
+            display: none;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: #f3f3f3;
+        }
+
+        .lock-card {
+            background: #ffffff;
+            border: 1px solid var(--slds-border);
+            border-top: 4px solid var(--slds-danger);
+            border-radius: 8px;
+            max-width: 460px;
+            width: 100%;
+            padding: 32px;
+            text-align: center;
+            box-shadow: var(--slds-shadow);
+        }
+
+        /* Top Lightning Page Header */
+        .slds-page-header {
+            background: var(--slds-surface);
+            border-bottom: 1px solid var(--slds-border);
+            padding: 16px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            background: var(--slds-brand);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .header-title h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--slds-text);
+            letter-spacing: 0.2px;
+        }
+
+        .header-title p {
+            font-size: 12px;
+            color: var(--slds-text-muted);
+            margin-top: 2px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Unsaved Banner */
+        .unsaved-badge {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            background: var(--slds-warning-bg);
+            color: var(--slds-warning);
+            border: 1px solid #f5c284;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .unsaved-badge.visible {
+            display: inline-flex;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 4px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--slds-border);
+            background: #ffffff;
+            color: var(--slds-brand);
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: #f4f6f9;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--slds-brand);
+            border-color: var(--slds-brand);
+            color: #ffffff;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--slds-brand-dark);
+            border-color: var(--slds-brand-dark);
+        }
+
+        .btn-success {
+            background: var(--slds-success);
+            border-color: var(--slds-success);
+            color: #ffffff;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #23683a;
+        }
+
+        .btn-danger {
+            background: #ffffff;
+            border-color: var(--slds-danger);
+            color: var(--slds-danger);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: var(--slds-danger-bg);
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 20px 24px 48px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--slds-surface);
+            border: 1px solid var(--slds-border);
+            border-radius: var(--radius);
+            box-shadow: var(--slds-shadow);
+            padding: 18px 20px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #ecebea;
+        }
+
+        .card-title {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--slds-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Top Selector Grid */
+        .selector-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1.2fr;
+            gap: 18px;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            .selector-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .field-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--slds-text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Searchable Dropdown Component */
+        .searchable-select {
+            position: relative;
+            width: 100%;
+        }
+
+        .select-trigger {
+            width: 100%;
+            min-height: 38px;
+            padding: 7px 34px 7px 12px;
+            background: #ffffff;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--slds-text);
+            transition: border-color 0.15s;
+        }
+
+        .select-trigger:hover,
+        .searchable-select.open .select-trigger {
+            border-color: var(--slds-brand);
+            box-shadow: 0 0 0 2px rgba(1, 118, 211, 0.15);
+        }
+
+        .select-chevron {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #706e6b;
+            pointer-events: none;
+        }
+
+        .select-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+            z-index: 50;
+            max-height: 290px;
+            flex-direction: column;
+        }
+
+        .searchable-select.open .select-dropdown {
+            display: flex;
+        }
+
+        .select-search-box {
+            padding: 8px;
+            border-bottom: 1px solid #ecebea;
+            background: #fafaf9;
+        }
+
+        .select-search-box input {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            font-size: 12.5px;
+            outline: none;
+        }
+
+        .select-search-box input:focus {
+            border-color: var(--slds-brand);
+        }
+
+        .select-options {
+            overflow-y: auto;
+            max-height: 235px;
+        }
+
+        .select-option {
+            padding: 9px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f4f4f4;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .select-option:hover,
+        .select-option.selected {
+            background: var(--slds-brand-light);
+        }
+
+        .option-main {
+            font-weight: 600;
+            color: var(--slds-text);
+        }
+
+        .option-sub {
+            font-size: 11.5px;
+            color: var(--slds-text-muted);
+        }
+
+        .status-pill {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .status-active {
+            background: var(--slds-success-bg);
+            color: var(--slds-success);
+        }
+
+        .status-inactive {
+            background: var(--slds-danger-bg);
+            color: var(--slds-danger);
+        }
+
+        /* Active User Banner Card */
+        .user-identity-box {
+            background: #fafaf9;
+            border: 1px solid var(--slds-border);
+            border-left: 4px solid var(--slds-brand);
+            border-radius: 4px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .identity-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .identity-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--slds-text);
+        }
+
+        .identity-meta {
+            font-size: 12px;
+            color: var(--slds-text-muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+
+        /* Permission Checkboxes Matrix */
+        .quick-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 10px 12px;
+            background: #fafaf9;
+            border: 1px solid #ecebea;
+            border-radius: 4px;
+        }
+
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+            gap: 12px;
+        }
+
+        .perm-checkbox-card {
+            border: 1px solid var(--slds-border);
+            border-radius: 5px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            background: #ffffff;
+            transition: all 0.12s ease;
+            user-select: none;
+        }
+
+        .perm-checkbox-card:hover {
+            border-color: var(--slds-brand);
+            background: #fafcff;
+        }
+
+        .perm-checkbox-card.checked {
+            border-color: var(--slds-brand);
+            background: var(--slds-brand-light);
+        }
+
+        .perm-checkbox-card input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--slds-brand);
+            cursor: pointer;
+        }
+
+        .perm-checkbox-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--slds-text);
+        }
+
+        /* KPI & Filter Bar */
+        .kpi-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .kpi-box {
+            background: #fafaf9;
+            border: 1px solid #ecebea;
+            border-radius: 4px;
+            padding: 10px 14px;
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--slds-text-muted);
+            font-weight: 700;
+        }
+
+        .kpi-value {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--slds-brand);
+            margin-top: 2px;
+        }
+
+        .table-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 14px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-control {
+            padding: 6px 11px;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            font-size: 12.5px;
+            color: var(--slds-text);
+            background: #ffffff;
+            min-width: 210px;
+        }
+
+        .input-control:focus {
+            outline: none;
+            border-color: var(--slds-brand);
+        }
+
+        /* Compact Summary Data Table */
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            font-size: 12.5px;
+        }
+
+        th {
+            background: #fafaf9;
+            color: var(--slds-text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.3px;
+            padding: 9px 10px;
+            border-bottom: 1px solid var(--slds-border);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        th:first-child, td:first-child {
+            text-align: left;
+            padding-left: 14px;
+            position: sticky;
+            left: 0;
+            background: inherit;
+            z-index: 2;
+        }
+
+        tr {
+            background: #ffffff;
+            border-bottom: 1px solid #ecebea;
+        }
+
+        tr:hover {
+            background: #f8fbff;
+        }
+
+        tr.active-editing {
+            background: #eef4ff;
+        }
+
+        td {
+            padding: 8px 10px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .tick-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--slds-success-bg);
+            color: var(--slds-success);
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .cross-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #f4f4f4;
+            color: #9e9e9e;
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        /* Modal */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+        }
+
+        .modal-dialog {
+            background: #ffffff;
+            border-radius: 6px;
+            max-width: 460px;
+            width: 100%;
+            border: 1px solid var(--slds-border);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--slds-border);
+            font-weight: 700;
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 18px;
+            color: var(--slds-text);
+        }
+
+        .modal-footer {
+            padding: 12px 18px;
+            background: #fafaf9;
+            border-top: 1px solid var(--slds-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Toast Notifications */
+        #toastContainer {
+            position: fixed;
+            top: 18px;
+            right: 20px;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            min-width: 280px;
+            max-width: 400px;
+            padding: 12px 16px;
+            border-radius: 5px;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.2s ease;
+        }
+
+        .toast-success { background: var(--slds-success); }
+        .toast-error { background: var(--slds-danger); }
+        .toast-info { background: var(--slds-brand); }
+
+        @keyframes slideIn {
+            from { transform: translateX(30px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Loading Overlay */
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.72);
+            z-index: 150;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 10px;
+            font-weight: 700;
+            color: var(--slds-brand);
+        }
+
+        #loadingOverlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 34px;
+            height: 34px;
+            border: 3px solid #d8edff;
+            border-top-color: var(--slds-brand);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div id="loadingText">Loading permissions...</div>
+</div>
+
+<div id="toastContainer"></div>
+
+<!-- Unauthorized Access Screen -->
+<div id="unauthorizedScreen">
+    <div class="lock-card">
+        <div style="font-size: 38px; color: var(--slds-danger); margin-bottom: 12px;">
+            <i class="fas fa-shield-alt"></i>
+        </div>
+        <h2 style="font-size: 18px; margin-bottom: 8px;">Access Restricted</h2>
+        <p style="color: var(--slds-text-muted); margin-bottom: 20px;">
+            Only authorized <strong>Developer</strong>, <strong>Super Admin</strong>, or <strong>Admin</strong> accounts can access the User Permission Manager.
+        </p>
+        <button class="btn btn-primary" onclick="window.location.href='dashboardB.html'">
+            <i class="fas fa-arrow-left"></i> Return to Dashboard
+        </button>
+    </div>
+</div>
+
+<!-- Main Application Shell -->
+<div id="appShell" style="display: none;">
+    <header class="slds-page-header">
+        <div class="header-left">
+            <div class="header-icon"><i class="fas fa-user-shield"></i></div>
+            <div class="header-title">
+                <h1>🔐 USER PERMISSION MANAGER</h1>
+                <p>Manage Individual Sub-User Access &amp; Module Permissions</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <span id="unsavedIndicator" class="unsaved-badge">
+                <i class="fas fa-exclamation-circle"></i> Unsaved Changes
+            </span>
+            <button class="btn" onclick="openCopyModal()" id="btnCopyPermissions" disabled>
+                <i class="fas fa-copy"></i> Copy Permissions
+            </button>
+            <button class="btn" onclick="resetPermissions()" id="btnResetPermissions" disabled>
+                <i class="fas fa-undo"></i> Reset
+            </button>
+            <button class="btn btn-primary" onclick="saveAllPermissions()" id="btnSavePermissions" disabled>
+                <i class="fas fa-save"></i> Save Permissions
+            </button>
+            <button class="btn" onclick="window.location.href='dashboardB.html'" title="Back to Dashboard">
+                <i class="fas fa-home"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- 1. User & Module Selection Card -->
+        <section class="card">
+            <div class="selector-grid">
+                <!-- Dynamic Sub-User Dropdown -->
+                <div>
+                    <label class="field-label">1. Select Sub-User (MongoDB Active Users)</label>
+                    <div class="searchable-select" id="userDropdown">
+                        <div class="select-trigger" onclick="toggleDropdown('userDropdown')">
+                            <span id="userTriggerText">-- Select an active sub-user --</span>
+                            <i class="fas fa-chevron-down select-chevron"></i>
+                        </div>
+                        <div class="select-dropdown">
+                            <div class="select-search-box">
+                                <input type="text" id="userSearchInput" placeholder="Search by User ID, Username, or Role..." oninput="renderUserOptions()">
+                            </div>
+                            <div class="select-options" id="userOptionsList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Module Dropdown -->
+                <div>
+                    <label class="field-label">2. Select CRM Module</label>
+                    <div class="searchable-select" id="moduleDropdown">
+                        <div class="select-trigger" onclick="toggleDropdown('moduleDropdown')">
+                            <span id="moduleTriggerText">-- Select a module --</span>
+                            <i class="fas fa-chevron-down select-chevron"></i>
+                        </div>
+                        <div class="select-dropdown">
+                            <div class="select-search-box">
+                                <input type="text" id="moduleSearchInput" placeholder="Search registered CRM modules..." oninput="renderModuleOptions()">
+                            </div>
+                            <div class="select-options" id="moduleOptionsList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selected Sub-User Identity Summary -->
+                <div>
+                    <label class="field-label">Selected Sub-User Context</label>
+                    <div class="user-identity-box">
+                        <div class="identity-row">
+                            <span class="identity-name" id="displaySelectedUsername">No Sub-User Selected</span>
+                            <span class="status-pill status-active" id="displaySelectedStatus" style="display: none;">Active</span>
+                        </div>
+                        <div class="identity-meta">
+                            <span><strong>User ID:</strong> <span id="displaySelectedUserId">—</span></span>
+                            <span><strong>Role:</strong> <span id="displaySelectedRole">—</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. Module Permission Configurator Card -->
+        <section class="card" id="permissionEditorCard">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-sliders-h" style="color: var(--slds-brand);"></i>
+                    <span>Module Permission Matrix: <strong id="activeModuleHeading" style="color: var(--slds-brand);">Select a User &amp; Module</strong></span>
+                </div>
+                <div style="font-size: 12px; color: var(--slds-text-muted);">
+                    Every permission flag is independent. <em>View</em> does not auto-enable Print, PDF, or Excel.
+                </div>
+            </div>
+
+            <!-- Quick Permission Controls -->
+            <div class="quick-toolbar">
+                <button class="btn btn-sm" onclick="applyQuickPreset('VIEW_ONLY')" id="btnViewOnly" disabled>
+                    <i class="fas fa-eye"></i> View Only
+                </button>
+                <button class="btn btn-sm" onclick="applyQuickPreset('FULL_ACCESS')" id="btnFullAccess" disabled>
+                    <i class="fas fa-check-double"></i> Full Access
+                </button>
+                <button class="btn btn-sm" onclick="applyQuickPreset('SELECT_ALL')" id="btnSelectAll" disabled>
+                    <i class="fas fa-check-square"></i> Select All
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="applyQuickPreset('CLEAR_ALL')" id="btnClearAll" disabled>
+                    <i class="fas fa-times-circle"></i> Clear All
+                </button>
+            </div>
+
+            <!-- 9 Independent Checkbox Permissions -->
+            <div class="checkbox-grid" id="checkboxMatrix"></div>
+        </section>
+
+        <!-- 3. Permission Summary Table Card -->
+        <section class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-table" style="color: var(--slds-brand);"></i>
+                    <span>Permission Summary Matrix</span>
+                </div>
+                <div style="font-size: 12px; color: var(--slds-text-muted);">
+                    Last Modified: <strong id="metaLastModified">Never</strong> &nbsp;|&nbsp;
+                    Modified By: <strong id="metaModifiedBy">—</strong>
+                </div>
+            </div>
+
+            <!-- KPI Counters -->
+            <div class="kpi-strip">
+                <div class="kpi-box">
+                    <div class="kpi-label">Total Assigned Modules</div>
+                    <div class="kpi-value" id="kpiAssignedModules">0</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-label">Total Enabled Permissions</div>
+                    <div class="kpi-value" id="kpiEnabledPermissions">0</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-label">Registered CRM Modules</div>
+                    <div class="kpi-value" id="kpiTotalModules">0</div>
+                </div>
+            </div>
+
+            <!-- Search & Permission Filters -->
+            <div class="table-controls">
+                <div class="control-group">
+                    <input type="text" class="input-control" id="tableModuleSearch" placeholder="Filter table by module name..." oninput="renderSummaryTable()">
+                    <select class="input-control" id="tablePermFilter" onchange="renderSummaryTable()">
+                        <option value="ALL">All Modules</option>
+                        <option value="ASSIGNED">Assigned Modules Only (≥ 1 Permission)</option>
+                        <option value="UNASSIGNED">Unassigned Modules Only</option>
+                        <option value="view">Has View</option>
+                        <option value="add">Has Add</option>
+                        <option value="edit">Has Edit</option>
+                        <option value="delete">Has Delete</option>
+                        <option value="print">Has Print</option>
+                        <option value="pdfDownload">Has PDF Download</option>
+                        <option value="excelDownload">Has Excel Download</option>
+                        <option value="import">Has Import</option>
+                        <option value="export">Has Export</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Module Name</th>
+                            <th>View</th>
+                            <th>Add</th>
+                            <th>Edit</th>
+                            <th>Delete</th>
+                            <th>Print</th>
+                            <th>PDF</th>
+                            <th>Excel</th>
+                            <th>Import</th>
+                            <th>Export</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody">
+                        <tr>
+                            <td colspan="11" style="text-align: center; padding: 24px; color: var(--slds-text-muted);">
+                                Select an active sub-user above to view and configure module permissions.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 4. Permission Audit Trail Card -->
+        <section class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-history" style="color: var(--slds-brand);"></i>
+                    <span>Permission Audit Trail (Immutable Security Log)</span>
+                </div>
+                <button class="btn btn-sm" onclick="loadAuditLogs()">
+                    <i class="fas fa-sync-alt"></i> Refresh Logs
+                </button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date &amp; Time</th>
+                            <th>Sub-User (ID)</th>
+                            <th>Module Name</th>
+                            <th>Action</th>
+                            <th>Previous Permissions</th>
+                            <th>New Permissions</th>
+                            <th>Changed By</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 18px; color: var(--slds-text-muted);">
+                                Loading audit trail...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- Copy Permissions Modal -->
+<div class="modal-backdrop" id="copyModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span><i class="fas fa-copy" style="color: var(--slds-brand);"></i> Copy Permissions From Sub-User</span>
+            <button class="btn btn-sm" onclick="closeModal('copyModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 12px; color: var(--slds-text-muted);">
+                Select a source sub-user to copy their saved module permission matrix into <strong id="copyTargetLabel"></strong>:
+            </p>
+            <select id="copySourceUserSelect" class="input-control" style="width: 100%;"></select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal('copyModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmCopyPermissions()">Apply Permissions</button>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Permission Confirmation Modal -->
+<div class="modal-backdrop" id="confirmModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span style="color: var(--slds-danger);"><i class="fas fa-exclamation-triangle"></i> Confirm Permission Removal</span>
+            <button class="btn btn-sm" onclick="closeModal('confirmModal')">&times;</button>
+        </div>
+        <div class="modal-body" id="confirmModalMessage">
+            Are you sure you want to remove all permissions for this module?
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal('confirmModal')">Cancel</button>
+            <button class="btn btn-danger" id="confirmModalYesBtn">Remove Permissions</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const PERMISSION_DEFINITIONS = [
+        { key: 'view', label: 'View' },
+        { key: 'add', label: 'Add' },
+        { key: 'edit', label: 'Edit' },
+        { key: 'delete', label: 'Delete' },
+        { key: 'print', label: 'Print' },
+        { key: 'pdfDownload', label: 'PDF Download' },
+        { key: 'excelDownload', label: 'Excel Download' },
+        { key: 'import', label: 'Import' },
+        { key: 'export', label: 'Export' }
+    ];
+
+    const state = {
+        actorUsername: '',
+        actorRole: '',
+        tenantOwner: 'System',
+        subUsers: [],
+        modules: [],
+        selectedUser: null,
+        selectedModuleId: null,
+        savedPermissions: {},    // Last saved state from MongoDB
+        workingPermissions: {},  // Live editable state
+        hasUnsavedChanges: false,
+        lastModifiedAt: null,
+        lastModifiedBy: null
+    };
+
+    function getApiBase() {
+        const configured = localStorage.getItem('backendApiUrl');
+        const local = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
+        return (configured || (local ? 'http://localhost:5000/api' : `${window.location.origin}/api`)).replace(/\/+$/, '');
+    }
+
+    async function apiRequest(endpoint, options = {}) {
+        const sep = endpoint.includes('?') ? '&' : '?';
+        const url = `${getApiBase()}${endpoint}${sep}user=${encodeURIComponent(state.tenantOwner)}&actor=${encodeURIComponent(state.actorUsername)}`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'x-rtr-user': state.actorUsername,
+            ...(options.headers || {})
+        };
+        const response = await fetch(url, { ...options, headers, cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok || data.success === false) {
+            throw new Error(data.message || `Request failed (HTTP ${response.status})`);
+        }
+        return data;
+    }
+
+    function showLoading(show, text = 'Loading...') {
+        const el = document.getElementById('loadingOverlay');
+        document.getElementById('loadingText').textContent = text;
+        el.classList.toggle('active', show);
+    }
+
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+        toast.innerHTML = `<i class="fas ${icon}"></i><span>${escapeHtml(message)}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    function escapeHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function createEmptyPerms() {
+        const obj = {};
+        PERMISSION_DEFINITIONS.forEach(p => obj[p.key] = false);
+        return obj;
+    }
+
+    function clonePermsMap(map) {
+        const copy = {};
+        for (const [modId, perms] of Object.entries(map || {})) {
+            copy[modId] = { ...createEmptyPerms(), ...perms };
+        }
+        return copy;
+    }
+
+    function markUnsaved(dirty) {
+        state.hasUnsavedChanges = dirty;
+        document.getElementById('unsavedIndicator').classList.toggle('visible', dirty);
+        document.getElementById('btnSavePermissions').disabled = !state.selectedUser;
+        document.getElementById('btnResetPermissions').disabled = !state.selectedUser || !dirty;
+    }
+
+    // --- Initialization & Admin Access Gate ---
+    window.addEventListener('DOMContentLoaded', async () => {
+        showLoading(true, 'Verifying administrator session...');
+        try {
+            state.actorUsername = (localStorage.getItem('currentUser') || '').trim();
+            if (!state.actorUsername) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            if (typeof apiClient !== 'undefined' && apiClient.getTenantId) {
+                state.tenantOwner = await apiClient.getTenantId();
+            } else {
+                state.tenantOwner = state.actorUsername;
+            }
+
+            // Server-side verification of Developer / Super Admin / Admin authority
+            const [usersRes, modulesRes] = await Promise.all([
+                apiRequest('/permissions/sub-users'),
+                apiRequest('/permissions/modules')
+            ]);
+
+            state.subUsers = usersRes.data || [];
+            state.modules = modulesRes.data || [];
+
+            document.getElementById('appShell').style.display = 'block';
+            document.getElementById('kpiTotalModules').textContent = state.modules.length;
+
+            renderUserOptions();
+            renderModuleOptions();
+            renderCheckboxMatrix();
+            await loadAuditLogs();
+        } catch (err) {
+            console.error('Initialization blocked:', err);
+            document.getElementById('unauthorizedScreen').style.display = 'flex';
+        } finally {
+            showLoading(false);
+        }
+    });
+
+    // Warn before leaving page with unsaved permission edits
+    window.addEventListener('beforeunload', (e) => {
+        if (state.hasUnsavedChanges) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // --- Searchable Dropdown Controls ---
+    function toggleDropdown(dropdownId) {
+        const target = document.getElementById(dropdownId);
+        const wasOpen = target.classList.contains('open');
+        document.querySelectorAll('.searchable-select').forEach(el => el.classList.remove('open'));
+        if (!wasOpen) {
+            target.classList.add('open');
+            const input = target.querySelector('input');
+            if (input) setTimeout(() => input.focus(), 40);
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.searchable-select')) {
+            document.querySelectorAll('.searchable-select').forEach(el => el.classList.remove('open'));
+        }
+    });
+
+    function renderUserOptions() {
+        const query = document.getElementById('userSearchInput').value.trim().toLowerCase();
+        const container = document.getElementById('userOptionsList');
+
+        const filtered = state.subUsers.filter(u =>
+            u.username.toLowerCase().includes(query) ||
+            u.userId.toLowerCase().includes(query) ||
+            u.role.toLowerCase().includes(query)
+        );
+
+        if (filtered.length === 0) {
+            container.innerHTML = `<div style="padding: 12px; color: #706e6b; text-align: center;">No active sub-users found in MongoDB.</div>`;
+            return;
+        }
+
+        container.innerHTML = filtered.map(u => `
+            <div class="select-option ${state.selectedUser && state.selectedUser.userId === u.userId ? 'selected' : ''}"
+                 onclick="selectSubUser('${escapeHtml(u.userId)}')">
+                <div>
+                    <div class="option-main">${escapeHtml(u.username)} <span style="font-weight:400; color:#706e6b;">(${escapeHtml(u.userId)})</span></div>
+                    <div class="option-sub">Role: ${escapeHtml(u.role)}</div>
+                </div>
+                <span class="status-pill ${u.isActive ? 'status-active' : 'status-inactive'}">${escapeHtml(u.status)}</span>
+            </div>
+        `).join('');
+    }
+
+    function renderModuleOptions() {
+        const query = document.getElementById('moduleSearchInput').value.trim().toLowerCase();
+        const container = document.getElementById('moduleOptionsList');
+
+        const filtered = state.modules.filter(m =>
+            m.name.toLowerCase().includes(query) ||
+            m.id.toLowerCase().includes(query) ||
+            (m.category || '').toLowerCase().includes(query)
+        );
+
+        if (filtered.length === 0) {
+            container.innerHTML = `<div style="padding: 12px; color: #706e6b; text-align: center;">No matching CRM modules.</div>`;
+            return;
+        }
+
+        container.innerHTML = filtered.map(m => `
+            <div class="select-option ${state.selectedModuleId === m.id ? 'selected' : ''}"
+                 onclick="selectModule('${escapeHtml(m.id)}')">
+                <div>
+                    <div class="option-main">${escapeHtml(m.name)}</div>
+                    <div class="option-sub">ID: ${escapeHtml(m.id)} • ${escapeHtml(m.category || 'CRM')}</div>
+                </div>
+                ${state.workingPermissions[m.id] && Object.values(state.workingPermissions[m.id]).some(Boolean)
+                    ? '<span class="status-pill status-active">Configured</span>'
+                    : ''}
+            </div>
+        `).join('');
+    }
+
+    async function selectSubUser(userId) {
+        if (state.hasUnsavedChanges) {
+            const proceed = confirm('You have unsaved permission changes for the current user. Discard changes and switch sub-user?');
+            if (!proceed) return;
+        }
+
+        const userObj = state.subUsers.find(u => u.userId === userId);
+        if (!userObj) return;
+
+        document.getElementById('userDropdown').classList.remove('open');
+        showLoading(true, `Loading permissions for ${userObj.username}...`);
+
+        try {
+            const res = await apiRequest(`/permissions/user/${encodeURIComponent(userObj.userId)}`);
+            const doc = res.data || {};
+
+            state.selectedUser = userObj;
+            state.savedPermissions = clonePermsMap(doc.permissions || {});
+            state.workingPermissions = clonePermsMap(doc.permissions || {});
+            state.lastModifiedAt = doc.updatedAt || null;
+            state.lastModifiedBy = doc.updatedBy || null;
+
+            // Default to first module if none selected yet
+            if (!state.selectedModuleId && state.modules.length > 0) {
+                state.selectedModuleId = state.modules[0].id;
+            }
+
+            // Update UI Headers
+            document.getElementById('userTriggerText').textContent = `${userObj.username} (${userObj.userId}) — ${userObj.role}`;
+            document.getElementById('displaySelectedUsername').textContent = userObj.username;
+            document.getElementById('displaySelectedUserId').textContent = userObj.userId;
+            document.getElementById('displaySelectedRole').textContent = userObj.role;
+            const statusPill = document.getElementById('displaySelectedStatus');
+            statusPill.textContent = userObj.status;
+            statusPill.style.display = 'inline-block';
+
+            document.getElementById('btnCopyPermissions').disabled = false;
+            markUnsaved(false);
+
+            if (state.selectedModuleId) {
+                const mod = state.modules.find(m => m.id === state.selectedModuleId);
+                if (mod) document.getElementById('moduleTriggerText').textContent = `${mod.name} (${mod.id})`;
+            }
+
+            renderUserOptions();
+            renderModuleOptions();
+            renderCheckboxMatrix();
+            renderSummaryTable();
+            await loadAuditLogs(userObj.userId);
+        } catch (err) {
+            showToast(err.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function selectModule(moduleId) {
+        const mod = state.modules.find(m => m.id === moduleId);
+        if (!mod) return;
+
+        state.selectedModuleId = moduleId;
+        document.getElementById('moduleDropdown').classList.remove('open');
+        document.getElementById('moduleTriggerText').textContent = `${mod.name} (${mod.id})`;
+
+        renderModuleOptions();
+        renderCheckboxMatrix();
+        renderSummaryTable();
+    }
+
+    // --- Checkbox Matrix & Quick Controls ---
+    function renderCheckboxMatrix() {
+        const container = document.getElementById('checkboxMatrix');
+        const heading = document.getElementById('activeModuleHeading');
+        const hasSelection = Boolean(state.selectedUser && state.selectedModuleId);
+
+        ['btnViewOnly', 'btnFullAccess', 'btnSelectAll', 'btnClearAll'].forEach(id => {
+            document.getElementById(id).disabled = !hasSelection;
+        });
+
+        if (!hasSelection) {
+            heading.textContent = 'Select a User & Module';
+            container.innerHTML = PERMISSION_DEFINITIONS.map(p => `
+                <label class="perm-checkbox-card" style="opacity:0.55; cursor:not-allowed;">
+                    <input type="checkbox" disabled>
+                    <span class="perm-checkbox-label">${p.label}</span>
+                </label>
+            `).join('');
+            return;
+        }
+
+        const mod = state.modules.find(m => m.id === state.selectedModuleId);
+        heading.textContent = `${mod ? mod.name : state.selectedModuleId} — (${state.selectedUser.username})`;
+
+        const currentPerms = state.workingPermissions[state.selectedModuleId] || createEmptyPerms();
+
+        container.innerHTML = PERMISSION_DEFINITIONS.map(p => {
+            const checked = Boolean(currentPerms[p.key]);
+            return `
+                <label class="perm-checkbox-card ${checked ? 'checked' : ''}">
+                    <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleSinglePermission('${p.key}', this.checked)">
+                    <span class="perm-checkbox-label">${p.label}</span>
+                </label>
+            `;
+        }).join('');
+    }
+
+    function toggleSinglePermission(permKey, isChecked) {
+        if (!state.selectedUser || !state.selectedModuleId) return;
+
+        if (!state.workingPermissions[state.selectedModuleId]) {
+            state.workingPermissions[state.selectedModuleId] = createEmptyPerms();
+        }
+        state.workingPermissions[state.selectedModuleId][permKey] = Boolean(isChecked);
+
+        markUnsaved(true);
+        renderCheckboxMatrix();
+        renderModuleOptions();
+        renderSummaryTable();
+    }
+
+    function applyQuickPreset(preset) {
+        if (!state.selectedUser || !state.selectedModuleId) return;
+
+        const existing = state.workingPermissions[state.selectedModuleId] || createEmptyPerms();
+        let updated = { ...existing };
+
+        if (preset === 'VIEW_ONLY') {
+            // Enable View, disable Add/Edit/Delete/Import, keep Print/PDF/Excel/Export independently configurable
+            updated.view = true;
+            updated.add = false;
+            updated.edit = false;
+            updated.delete = false;
+            updated.import = false;
+        } else if (preset === 'FULL_ACCESS' || preset === 'SELECT_ALL') {
+            PERMISSION_DEFINITIONS.forEach(p => updated[p.key] = true);
+        } else if (preset === 'CLEAR_ALL') {
+            updated = createEmptyPerms();
+        }
+
+        state.workingPermissions[state.selectedModuleId] = updated;
+        markUnsaved(true);
+        renderCheckboxMatrix();
+        renderModuleOptions();
+        renderSummaryTable();
+    }
+
+    // --- Save, Reset, Copy, and Remove ---
+    async function saveAllPermissions(actionPerformed = 'BULK_SAVE') {
+        if (!state.selectedUser) return;
+
+        showLoading(true, `Saving permissions for ${state.selectedUser.username}...`);
+        try {
+            const moduleLabels = {};
+            state.modules.forEach(m => moduleLabels[m.id] = m.name);
+
+            const res = await apiRequest(`/permissions/user/${encodeURIComponent(state.selectedUser.userId)}`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    permissions: state.workingPermissions,
+                    actionPerformed,
+                    moduleLabels
+                })
+            });
+
+            const doc = res.data || {};
+            state.savedPermissions = clonePermsMap(doc.permissions || {});
+            state.workingPermissions = clonePermsMap(doc.permissions || {});
+            state.lastModifiedAt = doc.updatedAt || new Date().toISOString();
+            state.lastModifiedBy = doc.updatedBy || state.actorUsername;
+
+            markUnsaved(false);
+            renderCheckboxMatrix();
+            renderModuleOptions();
+            renderSummaryTable();
+            await loadAuditLogs(state.selectedUser.userId);
+            showToast(`Permissions saved for ${state.selectedUser.username} (${res.auditCount || 0} audit entries logged).`, 'success');
+        } catch (err) {
+            showToast(err.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function resetPermissions() {
+        if (!state.selectedUser) return;
+        state.workingPermissions = clonePermsMap(state.savedPermissions);
+        markUnsaved(false);
+        renderCheckboxMatrix();
+        renderModuleOptions();
+        renderSummaryTable();
+        showToast('Restored last saved permission configuration.', 'info');
+    }
+
+    function openCopyModal() {
+        if (!state.selectedUser) return;
+        const others = state.subUsers.filter(u => u.userId !== state.selectedUser.userId);
+        if (others.length === 0) {
+            showToast('No other sub-users available to copy permissions from.', 'info');
+            return;
+        }
+        document.getElementById('copyTargetLabel').textContent = `${state.selectedUser.username} (${state.selectedUser.userId})`;
+        document.getElementById('copySourceUserSelect').innerHTML = others.map(u =>
+            `<option value="${escapeHtml(u.userId)}">${escapeHtml(u.username)} (${escapeHtml(u.userId)}) — ${escapeHtml(u.role)}</option>`
+        ).join('');
+        document.getElementById('copyModal').classList.add('open');
+    }
+
+    async function confirmCopyPermissions() {
+        const sourceId = document.getElementById('copySourceUserSelect').value;
+        if (!sourceId || !state.selectedUser) return;
+
+        closeModal('copyModal');
+        showLoading(true, 'Copying permissions...');
+        try {
+            const res = await apiRequest(`/permissions/user/${encodeURIComponent(sourceId)}`);
+            const sourcePerms = (res.data && res.data.permissions) ? res.data.permissions : {};
+            state.workingPermissions = clonePermsMap(sourcePerms);
+            markUnsaved(true);
+            renderCheckboxMatrix();
+            renderModuleOptions();
+            renderSummaryTable();
+            showToast('Permissions copied. Click "Save Permissions" to commit to MongoDB.', 'info');
+        } catch (err) {
+            showToast(err.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function promptRemoveModulePermission(moduleId) {
+        const mod = state.modules.find(m => m.id === moduleId);
+        const modName = mod ? mod.name : moduleId;
+        document.getElementById('confirmModalMessage').innerHTML =
+            `Are you sure you want to remove all permissions for <strong>${escapeHtml(modName)}</strong> from sub-user <strong>${escapeHtml(state.selectedUser.username)}</strong>?`;
+
+        const yesBtn = document.getElementById('confirmModalYesBtn');
+        yesBtn.onclick = () => {
+            delete state.workingPermissions[moduleId];
+            closeModal('confirmModal');
+            markUnsaved(true);
+            renderCheckboxMatrix();
+            renderModuleOptions();
+            renderSummaryTable();
+            showToast(`Removed ${modName} permissions. Click "Save Permissions" to persist.`, 'info');
+        };
+        document.getElementById('confirmModal').classList.add('open');
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('open');
+    }
+
+    // --- Permission Summary Table ---
+    function renderSummaryTable() {
+        const tbody = document.getElementById('summaryTableBody');
+        if (!state.selectedUser) {
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:24px; color:#706e6b;">Select an active sub-user above to view and configure module permissions.</td></tr>`;
+            return;
+        }
+
+        // Compute KPI Totals across all modules
+        let assignedCount = 0;
+        let enabledFlagsCount = 0;
+
+        state.modules.forEach(m => {
+            const perms = state.workingPermissions[m.id];
+            if (perms) {
+                const activeCount = PERMISSION_DEFINITIONS.filter(p => perms[p.key] === true).length;
+                if (activeCount > 0) assignedCount++;
+                enabledFlagsCount += activeCount;
+            }
+        });
+
+        document.getElementById('kpiAssignedModules').textContent = assignedCount;
+        document.getElementById('kpiEnabledPermissions').textContent = enabledFlagsCount;
+        document.getElementById('metaLastModified').textContent = state.lastModifiedAt
+            ? new Date(state.lastModifiedAt).toLocaleString('en-IN')
+            : 'Not Saved Yet';
+        document.getElementById('metaModifiedBy').textContent = state.lastModifiedBy || '—';
+
+        // Filter rows
+        const search = document.getElementById('tableModuleSearch').value.trim().toLowerCase();
+        const filter = document.getElementById('tablePermFilter').value;
+
+        const filteredModules = state.modules.filter(m => {
+            const matchesText = m.name.toLowerCase().includes(search) || m.id.toLowerCase().includes(search);
+            if (!matchesText) return false;
+
+            const perms = state.workingPermissions[m.id] || createEmptyPerms();
+            const hasAny = PERMISSION_DEFINITIONS.some(p => perms[p.key] === true);
+
+            if (filter === 'ASSIGNED') return hasAny;
+            if (filter === 'UNASSIGNED') return !hasAny;
+            if (filter !== 'ALL') return perms[filter] === true;
+            return true;
+        });
+
+        if (filteredModules.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:20px; color:#706e6b;">No modules match the current filter criteria.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filteredModules.map(m => {
+            const perms = state.workingPermissions[m.id] || createEmptyPerms();
+            const hasAny = PERMISSION_DEFINITIONS.some(p => perms[p.key] === true);
+            const isEditing = state.selectedModuleId === m.id;
+
+            const cells = PERMISSION_DEFINITIONS.map(p =>
+                perms[p.key]
+                    ? `<td><span class="tick-badge" title="Enabled">✓</span></td>`
+                    : `<td><span class="cross-badge" title="Disabled">✗</span></td>`
+            ).join('');
+
+            return `
+                <tr class="${isEditing ? 'active-editing' : ''}">
+                    <td>
+                        <strong>${escapeHtml(m.name)}</strong>
+                        <div style="font-size:11px; color:#706e6b;">${escapeHtml(m.id)}</div>
+                    </td>
+                    ${cells}
+                    <td>
+                        <div style="display:inline-flex; gap:6px;">
+                            <button class="btn btn-sm" onclick="selectModule('${escapeHtml(m.id)}')" title="Edit Permission">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="promptRemoveModulePermission('${escapeHtml(m.id)}')" ${hasAny ? '' : 'disabled'} title="Remove Permission">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // --- Audit Trail Table ---
+    async function loadAuditLogs(subUserId = '') {
+        const tbody = document.getElementById('auditTableBody');
+        try {
+            const query = subUserId ? `?subUserId=${encodeURIComponent(subUserId)}` : '';
+            const res = await apiRequest(`/permissions/audit${query}`);
+            const logs = res.data || [];
+
+            if (logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:18px; color:#706e6b;">No permission audit logs recorded yet.</td></tr>`;
+                return;
+            }
+
+            const formatPermsBadge = (permObj) => {
+                if (!permObj) return '<span style="color:#706e6b;">None</span>';
+                const enabled = PERMISSION_DEFINITIONS.filter(p => permObj[p.key]).map(p => p.label);
+                return enabled.length ? escapeHtml(enabled.join(', ')) : '<span style="color:#706e6b;">All Disabled</span>';
+            };
+
+            tbody.innerHTML = logs.map(log => `
+                <tr>
+                    <td style="text-align:left;">${new Date(log.timestamp).toLocaleString('en-IN')}</td>
+                    <td><strong>${escapeHtml(log.subUserName)}</strong> (${escapeHtml(log.subUserId)})</td>
+                    <td>${escapeHtml(log.moduleName)}</td>
+                    <td><span class="status-pill status-active">${escapeHtml(log.actionPerformed)}</span></td>
+                    <td style="max-width:220px; white-space:normal; text-align:left; font-size:11.5px;">${formatPermsBadge(log.previousPermissions)}</td>
+                    <td style="max-width:220px; white-space:normal; text-align:left; font-size:11.5px;">${formatPermsBadge(log.newPermissions)}</td>
+                    <td>${escapeHtml(log.changedBy)}</td>
+                </tr>
+            `).join('');
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:18px; color:var(--slds-danger);">${escapeHtml(err.message)}</td></tr>`;
+        }
+    }
+</script>
+</body>
+</html>

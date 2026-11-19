@@ -683,6 +683,77 @@ function mergePreservedUser2FA(users) {
 
 // Auto-apply on load and sync across windows
 window.addEventListener('DOMContentLoaded', async () => {
+
+    // Add inside DOMContentLoaded in frontend/settings.js
+const PAGE_TO_MODULE = {
+    'invoice.html': 'invoice',
+    'item.html': 'item_stock',
+    'customer.html': 'customer',
+    'supplier.html': 'supplier',
+    'purchase.html': 'purchase',
+    'advance_pay.html': 'advance_payment',
+    'day_book.html': 'daybook',
+    'ledger.html': 'ledger',
+    'expense_manager.html': 'expense_manager',
+    'profit_loss_report.html': 'profit_loss',
+    'stock_report.html': 'stock_report',
+    'reminder.html': 'reminder',
+    'follow_up.html': 'follow_up',
+    'contacts.html': 'contacts',
+    'business360.html': 'business_360',
+    'crm_v2.html': 'crm_v2',
+    'report.html': 'reports',
+    'settings.html': 'settings',
+    'quotation.html': 'quotation',
+    'order-sheet.html': 'ordersheet',
+    'production.html': 'production',
+    'journal_voucher.html': 'journal_voucher',
+    'credit_debit_notes.html': 'credit_debit_note',
+    'pdf_ocr_studio.html': 'pdf_ocr_studio'
+};
+
+async function enforcePageLevelPermissions() {
+    const currentUser = getCurrentUser();
+    if (!currentUser || window.location.pathname.includes('login.html')) return;
+
+    const pageName = window.location.pathname.split('/').pop();
+    const moduleId = PAGE_TO_MODULE[pageName];
+    const apiBase = (localStorage.getItem('backendApiUrl') || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : `${window.location.origin}/api`)).replace(/\/+$/, '');
+    const tenant = (typeof apiClient !== 'undefined' && apiClient.getTenantId) ? await apiClient.getTenantId() : currentUser;
+
+    try {
+        const res = await fetch(`${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(currentUser)}`, {
+            headers: { 'x-rtr-user': currentUser }
+        });
+        const result = await res.json();
+        if (!result.success || result.privileged) return;
+
+        const modPerms = result.permissions ? result.permissions[moduleId] : null;
+        if (moduleId && (!modPerms || modPerms.view !== true)) {
+            document.body.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#f3f3f3;">
+                    <div style="background:#fff;padding:32px;border-radius:8px;border-top:4px solid #ba0517;text-align:center;max-width:420px;">
+                        <h2 style="margin-bottom:8px;color:#181818;">Access Denied</h2>
+                        <p style="color:#444;margin-bottom:18px;">You do not have View permission for this module.</p>
+                        <button onclick="window.location.href='dashboardB.html'" style="background:#0176d3;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Back to Dashboard</button>
+                    </div>
+                </div>`;
+            return;
+        }
+
+        // Sync granular button permissions with existing UI_PERMISSION_REGISTRY
+        if (modPerms) {
+            const synced = getUIPermissions();
+            synced.perm_print = !!modPerms.print;
+            synced.perm_export_excel = !!modPerms.excelDownload;
+            synced.perm_delete_action = !!modPerms.delete;
+            saveUIPermissions(synced);
+            applyUIPermissions();
+        }
+    } catch (e) {
+        console.warn('Permission sync check skipped:', e.message);
+    }
+}
     applyUIPermissions();
     await fetchDeveloperSettings();
     updateDeveloperUI();
