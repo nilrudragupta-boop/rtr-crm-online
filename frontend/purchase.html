@@ -746,14 +746,14 @@
             </div>
         </h2>
     </div>
-    <div class="no-print"
-        style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 2px solid #dee2e6; margin-bottom: 15px; padding-bottom: 5px;"
+    <div id="purchaseFormToggleHeader" class="no-print"
+        style="display: none; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 2px solid #dee2e6; margin-bottom: 15px; padding-bottom: 5px;"
         onclick="togglePurchaseForm()">
         <h3 style="margin:0; color:#2c3e50;">Add / Edit Purchase</h3>
         <button id="toggleFormBtn" type="button"
             style="background:none; border:none; font-size:1.2em; padding:0 10px; margin:0; cursor:pointer; color:#2c3e50; box-shadow:none;">&#9650;</button>
     </div>
-    <div id="purchaseFormContainer">
+    <div id="purchaseFormContainer" style="display:none;">
         <div class="section-panel">
             <h4><i class="fas fa-file-invoice"></i> Document Details</h4>
             <div class="row-grid">
@@ -1454,6 +1454,7 @@
         let isPurchaseFormVisible = localStorage.getItem("purchaseFormVisible") !== "false";
 
         function togglePurchaseForm() {
+            if (!canAddPurchase() && !canEditPurchase()) return;
             isPurchaseFormVisible = !isPurchaseFormVisible;
             localStorage.setItem("purchaseFormVisible", isPurchaseFormVisible);
             applyPurchaseFormVisibility();
@@ -1463,6 +1464,10 @@
             const container = document.getElementById('purchaseFormContainer');
             const btn = document.getElementById('toggleFormBtn');
             if (container && btn) {
+                if (!canAddPurchase() && !canEditPurchase()) {
+                    container.style.display = 'none';
+                    return;
+                }
                 if (isPurchaseFormVisible) {
                     container.style.display = 'block';
                     btn.innerHTML = '&#9650;';
@@ -1630,18 +1635,68 @@
         let idsToDelete = [];
         let currentPage = 1;
         let rowsPerPage = 20;
+        let purchaseModulePermissionData = null;
+        let purchaseModulePermissionsReady = false;
+
+        async function loadPurchaseModulePermissions() {
+            const currentUser = String(localStorage.getItem("currentUser") || "").trim();
+            if (!currentUser) {
+                purchaseModulePermissionData = {};
+                purchaseModulePermissionsReady = true;
+                return;
+            }
+
+            try {
+                const tenant = typeof apiClient !== "undefined" && apiClient.getTenantId
+                    ? await apiClient.getTenantId()
+                    : currentUser;
+                const local = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+                const apiBase = (localStorage.getItem("backendApiUrl") || (local
+                    ? "http://localhost:5000/api"
+                    : `${window.location.origin}/api`)).replace(/\/+$/, "");
+                const response = await fetch(
+                    `${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(currentUser)}`,
+                    { headers: { "x-rtr-user": currentUser }, cache: "no-store" }
+                );
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message || "Could not load Purchase permissions.");
+
+                purchaseModulePermissionData = result.privileged
+                    ? { privileged: true, permissions: {} }
+                    : { privileged: false, permissions: result.permissions?.purchase || {} };
+            } catch (error) {
+                console.warn("Purchase permissions could not be loaded:", error.message);
+                purchaseModulePermissionData = { privileged: false, permissions: {} };
+            } finally {
+                purchaseModulePermissionsReady = true;
+                applyPurchaseActionPermissions();
+            }
+        }
 
         function hasPurchasePermission(permissionId) {
+            if (!purchaseModulePermissionsReady || !purchaseModulePermissionData) return false;
+            if (purchaseModulePermissionData.privileged) return true;
+
+            const actionByFlag = {
+                perm_add_purchase: "add",
+                perm_edit_purchase: "edit",
+                perm_delete_purchase: "delete",
+                perm_delete_action: "delete",
+                perm_print: "print",
+                perm_export_excel: "excelDownload"
+            };
+            const action = actionByFlag[permissionId];
+            if (action) return purchaseModulePermissionData.permissions[action] === true;
+
             try {
-                if (typeof getUIPermissions === "function") {
-                    return getUIPermissions()[permissionId] !== false;
-                }
-                const user = localStorage.getItem("currentUser") || "admin";
-                const raw = localStorage.getItem("remotePermissions_" + user);
-                return !raw || JSON.parse(raw)[permissionId] !== false;
+                return typeof getUIPermissions === "function" && getUIPermissions()[permissionId] !== false;
             } catch (error) {
                 return false;
             }
+        }
+
+        function canAddPurchase() {
+            return hasPurchasePermission("perm_add_purchase");
         }
 
         function canEditPurchase() {
@@ -1655,8 +1710,32 @@
         function applyPurchaseActionPermissions() {
             const editToggle = $("showEditBtn");
             const deleteToggle = $("showDeleteBtn");
+            const canAdd = canAddPurchase();
             const canEdit = canEditPurchase();
             const canDelete = canDeletePurchase();
+            const canChange = canAdd || canEdit;
+
+            const formHeader = $("purchaseFormToggleHeader");
+            const formContainer = $("purchaseFormContainer");
+            if (formHeader) formHeader.style.display = canChange ? "flex" : "none";
+            if (formContainer) {
+                formContainer.style.display = canChange && isPurchaseFormVisible ? "block" : "none";
+            }
+            const addDraftButton = $("addDraftBtn");
+            if (addDraftButton) addDraftButton.disabled = editingId ? !canEdit : !canAdd;
+            const saveAllButton = $("saveAllBtn");
+            if (saveAllButton) saveAllButton.disabled = !canAdd;
+            const updateButton = $("updateBtn");
+            if (updateButton && editingId && !canEdit) updateButton.style.display = "none";
+            const deleteSelectedButton = $("btnDeleteSelectedPurchases");
+            if (deleteSelectedButton) deleteSelectedButton.style.display = canDelete ? "" : "none";
+            const recycleBinButton = $("purchaseRecycleBinBtn");
+            if (recycleBinButton && !canEdit) recycleBinButton.style.display = "none";
+            const printButton = document.querySelector('[data-permission-id="perm_print"]');
+            if (printButton) printButton.style.display = hasPurchasePermission("perm_print") ? "" : "none";
+            const selectAll = $("selectAll");
+            if (selectAll) selectAll.disabled = !canDelete;
+
             if (editToggle) {
                 editToggle.disabled = !canEdit;
                 editToggle.title = canEdit ? "" : "Disabled by Remote Permissions: perm_edit_purchase";
@@ -1666,8 +1745,6 @@
                 deleteToggle.title = canDelete ? "" : "Disabled by Remote Permissions: perm_delete_purchase";
             }
             document.body.classList.toggle("purchase-delete-disabled", !canDelete);
-            const updateButton = $("updateBtn");
-            if (updateButton && editingId) updateButton.style.display = canEdit ? "inline-block" : "none";
             applyPurchaseToolbarButtonVisibility();
         }
 
@@ -2208,6 +2285,9 @@
 
         // --- Draft Logic ---
         function addToDraft() {
+            if (editingId ? !canEditPurchase() : !canAddPurchase()) {
+                return showToast(editingId ? "Purchase editing is disabled for this user." : "Purchase creation is disabled for this user.", "#c0392b");
+            }
             const itemName = $("itemInput").value.trim();
             const itemCode = $("itemCode").value.trim();
             const items = JSON.parse(localStorage.getItem("items")) || [];
@@ -2474,6 +2554,7 @@
         }
 
         async function saveAllDraft() {
+            if (!canAddPurchase()) return showToast("Purchase creation is disabled for this user.", "#c0392b");
             const supplierName = $("supplierInput").value.trim();
             const supplierInv = $("supplierInv").value.trim();
             const date = $("purchaseDate").value;
@@ -2590,7 +2671,7 @@
                 await loadPurchases();
                 showToast("All items saved successfully ✅");
             } finally {
-                btnSave.disabled = false;
+                btnSave.disabled = !canAddPurchase();
                 btnSave.innerHTML = originalText;
                 if ($("loadingOverlay")) $("loadingOverlay").style.display = "none";
             }
@@ -3314,7 +3395,7 @@
                     handleRowClick(tr, p);
                 };
                 tr.innerHTML = `
-      <td><input type="checkbox" class="purchase-checkbox" value="${p.id}"></td>
+      <td><input type="checkbox" class="purchase-checkbox" value="${p.id}" ${canDeletePurchase() ? '' : 'disabled'}></td>
       <td>${startIndex + i + 1}</td>
       <td>${displayDate || "-"}</td>
       <td><a href="#" onclick="filterBySupplier('${escapeHtml(p.supplierName)}'); return false;" style="color: #0056b3; text-decoration: none;">${displaySupplier || "-"}</a></td>
@@ -3345,21 +3426,21 @@
       <td>
         <div style="display:flex; align-items:center; gap:5px;" title="Cash: ₹${paidCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nBank: ₹${paidBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}">
             <input type="number" step="any" value="${paid}" id="paidInput-${p.id}" style="width:80px; padding:4px; border:1px solid #ccc; border-radius:4px; font-weight:bold; color:#28a745; cursor:help;" readonly>
-            <button class="btn-edit" style="padding:2px 6px; font-size:12px;" onclick="openPaymentSplitModal('${p.id}')">✏️</button>
+            ${canEditPurchase() ? `<button class="btn-edit" style="padding:2px 6px; font-size:12px;" onclick="openPaymentSplitModal('${p.id}')">✏️</button>` : ''}
             <button class="btn-search" style="padding:2px 6px; font-size:11px;" onclick="showPurchasePaymentHistory('${p.id}')" title="View installment history">History</button>
         </div>
       </td>
       <td id="due-${p.id}" style="font-weight:bold; color:${due > 0.01 ? 'red' : 'green'}">${due.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       <td>
         <div style="display:flex; flex-direction:column; gap:5px;">
-            <input type="date" id="paymentDateInput-${p.id}" value="${paymentDate}" style="width:130px; padding:4px; border:1px solid #ccc; border-radius:4px;">
-            <button class="btn-save" style="padding:2px 8px; font-size:12px;" onclick="savePaymentDate('${p.id}')">Save</button>
+            <input type="date" id="paymentDateInput-${p.id}" value="${paymentDate}" ${canEditPurchase() ? '' : 'readonly disabled'} style="width:130px; padding:4px; border:1px solid #ccc; border-radius:4px;">
+            ${canEditPurchase() ? `<button class="btn-save" style="padding:2px 8px; font-size:12px;" onclick="savePaymentDate('${p.id}')">Save</button>` : ''}
         </div>
       </td>
       <td>
         <div style="display:flex; align-items:center; gap:5px;">
             <textarea class="remarks-input" title="${escapeHtml(remarks)}" readonly style="width:100%; min-width:200px; padding:4px; border:1px solid #ccc; border-radius:4px; resize:vertical; height:38px; font-family:inherit; background:#f9f9f9; cursor:not-allowed;" placeholder="Locked">${escapeHtml(remarks)}</textarea>
-            <button class="small toggle-remarks-btn" style="padding:2px 5px; background:none; border:none; cursor:pointer; font-size:16px;" title="Unlock to Edit" onclick="toggleRemarksEdit(this, '${p.id}')">🔒</button>
+            ${canEditPurchase() ? `<button class="small toggle-remarks-btn" style="padding:2px 5px; background:none; border:none; cursor:pointer; font-size:16px;" title="Unlock to Edit" onclick="toggleRemarksEdit(this, '${p.id}')">🔒</button>` : ''}
         </div>
       </td>
       <td style="font-size:11px; color:#666;">${createdInfo}</td>
@@ -3370,7 +3451,7 @@
             <div class="action-dropdown-content">
                 ${actionButtonVisibility.view ? `<button onclick="viewPurchase('${p.id}')">👁️ View</button>` : ''}
                 ${actionButtonVisibility.edit && canEditPurchase() ? `<button onclick="editPurchase('${p.id}')">✏️ Edit</button>` : ''}
-                ${actionButtonVisibility.copy ? `<button onclick="duplicatePurchase('${p.id}')">📋 Copy</button>` : ''}
+                ${actionButtonVisibility.copy && canAddPurchase() ? `<button onclick="duplicatePurchase('${p.id}')">📋 Copy</button>` : ''}
                 ${actionButtonVisibility.delete && canDeletePurchase() ? `<button onclick="deletePurchase('${p.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>` : ''}
             </div>
         </div>
@@ -3693,6 +3774,7 @@
         }
 
         async function duplicatePurchase(id) {
+            if (!canAddPurchase()) return showToast("Purchase creation is disabled for this user.", "#c0392b");
             let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const p = purchases.find(x => String(x.id) === String(id));
             if (!p) return showToast("Purchase not found ⚠️");
@@ -3821,6 +3903,7 @@
         }
 
         async function restorePurchaseFromBin(id, modal) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             const localRecords = JSON.parse(localStorage.getItem('recycleBin_purchases') || '[]');
             const localRecord = localRecords.find(record => String(record.id) === String(id));
             const result = typeof apiClient !== 'undefined' && apiClient.restorePurchase ? await apiClient.restorePurchase(id) : null;
@@ -4162,6 +4245,7 @@
         }
 
         async function printPurchaseDetails(purchaseId) {
+            if (!hasPurchasePermission("perm_print")) return showToast("Printing is disabled for this user.", "#c0392b");
             const allPurchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const p = allPurchases.find(x => String(x.id) === String(purchaseId));
             if (!p) return showToast("Could not find purchase to print.");
@@ -4417,6 +4501,7 @@
         }
 
         async function savePaymentDate(id) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             const input = document.getElementById(`paymentDateInput-${id}`);
             if (input) {
                 let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
@@ -4431,6 +4516,7 @@
         }
 
         async function updateRemarks(id, value) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             let purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const idx = purchases.findIndex(p => String(p.id) === String(id));
             if (idx > -1) {
@@ -4442,6 +4528,7 @@
         }
 
         function toggleRemarksEdit(btn, id) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             const container = btn.parentElement;
             const textarea = container.querySelector('.remarks-input');
             const isLocked = textarea.hasAttribute('readonly');
@@ -4723,6 +4810,7 @@
         }
 
         function exportToExcel() {
+            if (!hasPurchasePermission("perm_export_excel")) return showToast("Excel export is disabled for this user.", "#c0392b");
             if (!currentFilteredPurchases || currentFilteredPurchases.length === 0) {
                 showToast("No data to export ⚠️");
                 return;
@@ -4986,6 +5074,8 @@
         });
 
         (async function init() {
+            applyPurchaseActionPermissions();
+            await loadPurchaseModulePermissions();
             // Load Brand Name
             await loadItems();
             await loadSuppliers();
@@ -5144,6 +5234,7 @@
             return (Number(value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         function showPurchasePaymentHistory(id) {
+            if (!purchaseModulePermissionsReady) return showToast("Loading Purchase permissions. Please try again.", "#c0392b");
             const records = JSON.parse(localStorage.getItem('purchases') || '[]');
             const purchase = records.find(record => String(record.id) === String(id)); if (!purchase) return;
             currentPurchasePaymentHistoryId = id;
@@ -5181,9 +5272,14 @@
                     <td><div style="display:flex;gap:5px;min-width:180px;"><input class="purchase-payment-reference" type="text" value="${escapeHtml(payment.reference || '')}" maxlength="100" aria-label="Payment reference" style="width:140px;box-sizing:border-box;"><button type="button" class="btn-save" onclick="savePurchasePaymentReference('${escapeHtml(id)}','${escapeHtml(payment.id || '')}',this)">Save</button></div></td>
                     <td>${escapeHtml(payment.bankAccountName || '-')}</td></tr>`;
             }).join('') : '<tr><td colspan="8" style="text-align:center;padding:16px;">No payments recorded.</td></tr>';
+            if (!canEditPurchase()) {
+                body.querySelectorAll('input').forEach(input => { input.readOnly = true; input.disabled = true; });
+                body.querySelectorAll('button').forEach(button => { button.style.display = 'none'; });
+            }
             document.getElementById('purchasePaymentHistoryModal').style.display = 'block';
         }
         async function savePurchasePaymentAmount(purchaseId, paymentId, button) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             const purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
             const purchase = purchases.find(record => String(record.id) === String(purchaseId)); if (!purchase) return showToast('Purchase record was not found.', '#c0392b');
             if (!Array.isArray(purchase.paymentHistory) || !purchase.paymentHistory.length) purchase.paymentHistory = getPurchasePaymentHistory(purchase).map(payment => ({ ...payment }));
@@ -5211,6 +5307,7 @@
             showPurchasePaymentHistory(purchaseId); showToast('Installment amount updated.');
         }
         async function saveAuditedPurchase(purchase) {
+            if (!canEditPurchase()) return false;
             if (typeof apiClient === 'undefined' || !apiClient.savePurchase) return;
             try {
                 const result = await apiClient.savePurchase(purchase);
@@ -5223,6 +5320,7 @@
             }
         }
         async function savePurchasePaymentReference(purchaseId, paymentId, button) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             const purchases = JSON.parse(localStorage.getItem('purchases') || '[]');
             const purchase = purchases.find(record => String(record.id) === String(purchaseId)); if (!purchase) return showToast('Purchase record was not found.', '#c0392b');
             if (!Array.isArray(purchase.paymentHistory) || !purchase.paymentHistory.length) purchase.paymentHistory = getPurchasePaymentHistory(purchase).map(payment => ({ ...payment }));
@@ -5280,6 +5378,7 @@
         }
 
         function openPaymentSplitModal(id) {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             currentPaymentInvoiceId = id;
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const purchase = purchases.find(p => p.id == id);
@@ -5375,6 +5474,7 @@
         }
 
         async function savePaymentSplit() {
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
             const cash = Math.max(0, Number(document.getElementById('payCash').value) || 0);
             const bank = Math.max(0, Number(document.getElementById('payBank').value) || 0);
             const cashDate = document.getElementById('payCashDate').value;
