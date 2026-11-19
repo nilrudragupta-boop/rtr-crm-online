@@ -727,7 +727,7 @@ async function enforcePageLevelPermissions() {
     const tenant = (typeof apiClient !== 'undefined' && apiClient.getTenantId) ? await apiClient.getTenantId() : currentUser;
 
     try {
-        const res = await fetch(`${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(currentUser)}`, {
+        const res = await fetch(`${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(currentUser)}&module=${encodeURIComponent(moduleId)}`, {
             headers: { 'x-rtr-user': currentUser }
         });
         const result = await res.json();

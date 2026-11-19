@@ -81,7 +81,7 @@
             const tenant = typeof apiClient !== 'undefined' && apiClient.getTenantId ? await apiClient.getTenantId() : actor;
             const local = ['localhost','127.0.0.1'].includes(location.hostname);
             const apiBase = (localStorage.getItem('backendApiUrl') || (local ? 'http://localhost:5000/api' : `${location.origin}/api`)).replace(/\/+$/, '');
-            const response = await fetch(`${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(actor)}`, { headers:{ 'x-rtr-user':actor }, cache:'no-store' });
+            const response = await fetch(`${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(actor)}&module=${encodeURIComponent(moduleId)}`, { headers:{ 'x-rtr-user':actor }, cache:'no-store' });
             const result = await response.json();
             if (!response.ok || !result.success) throw new Error(result.message || 'Permission load failed');
             permissionState = { privileged:result.privileged === true, permissions:result.permissions?.[moduleId] || {} };
