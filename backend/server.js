@@ -2458,19 +2458,30 @@ app.post('/api/permission-manager/request-otp', async (req, res) => {
         : { count: 1, resetAt: now + 60 * 1000 });
 
     try {
-        // Prefer explicit deployment configuration without making OTP delivery
-        // depend on MongoDB being available. Only read AdminCreds when no
-        // environment variable supplies the destination.
-        let email = String(process.env.DEVELOPER_OTP_EMAIL || process.env.DEVELOPER_EMAIL || '').trim();
-        if (!email) {
-            const creds = await AdminCreds.findOne({ id: 'global_creds' }).select('adminEmail').lean();
-            email = String((creds && creds.adminEmail) || 'nilrudragupta@gmail.com').trim();
+        // The web Settings page stores mail credentials in AdminCreds. Use
+        // Render environment variables when supplied, otherwise use those
+        // saved settings so this route works with the app's configured mailer.
+        const envMailConfigured = Boolean(process.env.EMAIL_USER && process.env.EMAIL_APP_PASSWORD);
+        let creds = null;
+        if (!envMailConfigured || (!process.env.DEVELOPER_OTP_EMAIL && !process.env.DEVELOPER_EMAIL)) {
+            creds = await AdminCreds.findOne({ id: 'global_creds' })
+                .select('adminEmail adminEmailPass emailProvider smtpHost smtpPort')
+                .lean();
         }
+
+        const email = String(
+            process.env.DEVELOPER_OTP_EMAIL ||
+            process.env.DEVELOPER_EMAIL ||
+            (creds && creds.adminEmail) ||
+            'nilrudragupta@gmail.com'
+        ).trim();
         if (!email) {
             return res.status(503).json({ success: false, message: 'Developer email is not configured in CRM Settings.' });
         }
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
-            return res.status(503).json({ success: false, message: 'Server email delivery is not configured.' });
+        const mailUser = String(process.env.EMAIL_USER || (creds && creds.adminEmail) || '').trim();
+        const mailPassword = String(process.env.EMAIL_APP_PASSWORD || (creds && creds.adminEmailPass) || '').trim();
+        if (!mailUser || !mailPassword) {
+            return res.status(503).json({ success: false, message: 'Email sender is not configured. Add the sender email and app password in Settings.' });
         }
 
         const otp = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -2487,8 +2498,29 @@ app.post('/api/permission-manager/request-otp', async (req, res) => {
         }
         permissionManagerChallenges.set(challengeId, challenge);
 
-        await transporter.sendMail({
-            from: `"RISE CRM Security" <${process.env.EMAIL_USER}>`,
+        const mailTransport = envMailConfigured
+            ? transporter
+            : String((creds && creds.emailProvider) || 'Gmail').toLowerCase() === 'custom'
+                ? (() => {
+                    const host = String((creds && creds.smtpHost) || '').trim();
+                    const port = Number((creds && creds.smtpPort) || 587);
+                    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+                        throw new Error('Custom SMTP host or port is invalid. Check Email Provider settings.');
+                    }
+                    return nodemailer.createTransport({
+                        host,
+                        port,
+                        secure: port === 465,
+                        auth: { user: mailUser, pass: mailPassword }
+                    });
+                })()
+                : nodemailer.createTransport({
+                    service: 'gmail',
+                    auth: { user: mailUser, pass: mailPassword }
+                });
+
+        await mailTransport.sendMail({
+            from: `"RISE CRM Security" <${mailUser}>`,
             to: email,
             subject: 'Developer OTP: User Permission Manager',
             text: `Your one-time code to open the RISE CRM User Permission Manager is ${otp}. It expires in 5 minutes. If you did not request this code, ignore this email.`
@@ -2497,8 +2529,8 @@ app.post('/api/permission-manager/request-otp', async (req, res) => {
         res.set('Cache-Control', 'no-store');
         res.json({ success: true, challengeId, targetEmail: maskPermissionManagerEmail(email), expiresIn: 300 });
     } catch (error) {
-        console.error('Permission Manager OTP delivery failed:', error.message);
-        res.status(503).json({ success: false, message: 'Could not send the Developer OTP.' });
+        console.error('Permission Manager OTP delivery failed:', error.code || '', error.message);
+        res.status(503).json({ success: false, message: 'Could not send the Developer OTP. Check the sender email settings and the server deployment logs.' });
     }
 });
 
