@@ -1,5 +1,6 @@
 const { UserPermission } = require('../models/permissions');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 // Maps existing CRM API prefixes and HTML pages to canonical module IDs
 const ROUTE_MODULE_MAP = [
@@ -98,23 +99,46 @@ function isPrivilegedUser(actor, username) {
  * Resolves the authenticated actor from AdminCreds without altering existing login/session logic.
  */
 function createPermissionGuards(getConfiguredAdminUsers) {
-    async function resolveActor(req) {
-        if (req.permissionManagerSession) {
-            const username = String(req.permissionManagerSession.username || 'developer');
-            const actor = { username, role: 'Developer', isLicensedAdmin: true };
-            return { username, actor, privileged: true };
-        }
+    const sessionSecret = String(process.env.PERMISSION_MANAGER_SESSION_SECRET || '');
+    const sessionSeconds = 30 * 60;
 
-        // Permission Manager requests include both a tenant (`user`) and the
-        // signed-in actor. Prefer the actor fields so the tenant cannot be
-        // mistaken for the person making the request.
-        const actorUsername = String(
-            req.headers['x-rtr-user'] ||
-            req.query.actor ||
-            req.actorUsername ||
-            req.query.user ||
-            ''
-        ).trim();
+    function createManagerSession(username, tenantOwner, now = Date.now()) {
+        if (sessionSecret.length < 32) throw new Error('Permission manager session signing is not configured.');
+        const payload = Buffer.from(JSON.stringify({
+            username,
+            tenantOwner,
+            expiresAt: Math.floor(now / 1000) + sessionSeconds,
+            nonce: crypto.randomBytes(16).toString('base64url')
+        })).toString('base64url');
+        const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('base64url');
+        return `${payload}.${signature}`;
+    }
+
+    function readManagerSession(req, now = Date.now()) {
+        if (sessionSecret.length < 32) return null;
+        const authorization = String(req.headers.authorization || '');
+        const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+        const parts = token.split('.');
+        if (parts.length !== 2) return null;
+        const [payload, signature] = parts;
+        const expected = crypto.createHmac('sha256', sessionSecret).update(payload).digest('base64url');
+        const left = Buffer.from(signature);
+        const right = Buffer.from(expected);
+        if (left.length !== right.length || !crypto.timingSafeEqual(left, right)) return null;
+        try {
+            const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+            if (!claims.username || !claims.tenantOwner || !Number.isInteger(claims.expiresAt) || claims.expiresAt <= Math.floor(now / 1000)) return null;
+            return claims;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function resolveActor(req, requireSession = false) {
+        const session = readManagerSession(req);
+        if (session) req.permissionManagerSession = session;
+        if (!session && requireSession) return { username: '', actor: null, privileged: false };
+        const actorUsername = String(session?.username || req.headers['x-rtr-user'] || req.query.actor || req.actorUsername || req.query.user || '').trim();
 
         if (!actorUsername || actorUsername === 'System') {
             return { username: actorUsername || 'System', actor: null, privileged: false };
@@ -125,9 +149,6 @@ function createPermissionGuards(getConfiguredAdminUsers) {
             u => String(u.username || '').trim().toLowerCase() === actorUsername.toLowerCase()
         ) || null;
 
-        // The Developer account is a built-in privileged identity and may not
-        // be present in AdminCreds.adminUsers. Give it a permission-scoped
-        // identity so the manager's own admin routes can still authorize it.
         if (!actor && isPrivilegedUser(null, actorUsername)) {
             actor = { username: actorUsername, role: 'Developer', isLicensedAdmin: true };
         }
@@ -141,9 +162,9 @@ function createPermissionGuards(getConfiguredAdminUsers) {
      */
     async function requirePermissionAdmin(req, res, next) {
         try {
-            const { username, actor, privileged } = await resolveActor(req);
+            const { username, actor, privileged } = await resolveActor(req, true);
             if (!username || username === 'System' || !actor) {
-                return res.status(401).json({ success: false, message: 'A registered CRM account is required.' });
+                return res.status(401).json({ success: false, message: 'Permission manager session expired. Sign in again.' });
             }
             if (actor.active === false || actor.isActive === false || String(actor.status || '').toLowerCase() === 'inactive') {
                 return res.status(403).json({ success: false, message: 'Account is inactive.' });
@@ -155,6 +176,7 @@ function createPermissionGuards(getConfiguredAdminUsers) {
                 });
             }
             req.permissionActor = { username, role: actor?.role || 'Developer', privileged: true };
+            req.permissionTenantOwner = String(req.permissionManagerSession.tenantOwner);
             next();
         } catch (err) {
             res.status(500).json({ success: false, message: 'Authorization verification failed.' });
@@ -243,6 +265,8 @@ function createPermissionGuards(getConfiguredAdminUsers) {
         requirePermissionAdmin,
         enforceModulePermission,
         isPrivilegedUser,
+        createManagerSession,
+        readManagerSession,
         findUserPermission,
         getModulePermissions,
         toPermissionObject

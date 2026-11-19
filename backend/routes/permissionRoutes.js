@@ -2,6 +2,27 @@ const express = require('express');
 const crypto = require('crypto');
 const { UserPermission, PermissionAudit } = require('../models/permissions');
 
+const permissionLoginAttempts = new Map();
+
+function canonicalFlags(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Permission flags must be an object.');
+    const keys = Object.keys(input);
+    if (keys.length > 200) throw new Error('Too many permission flags.');
+    const result = {};
+    keys.sort().forEach(key => {
+        if (!/^perm_[a-z0-9_-]{1,100}$/i.test(key) || typeof input[key] !== 'boolean') {
+            throw new Error('Permission flags contain an invalid entry.');
+        }
+        result[key] = input[key];
+    });
+    return result;
+}
+
+function createRemotePermissionSignature(method, actor, target, timestamp, nonce, flags, secret) {
+    const canonical = `${method}\n${actor}\n${target}\n${timestamp}\n${nonce}\n${JSON.stringify(flags)}`;
+    return crypto.createHmac('sha256', secret).update(canonical).digest('hex');
+}
+
 // Canonical CRM Module Registry aligned with existing HTML pages and UI_PERMISSION_REGISTRY
 const BASE_CRM_MODULES = [
     { id: 'dashboard', name: 'Dashboard', page: 'dashboardB.html', legacyPermId: 'perm_summary_chart', category: 'Core' },
@@ -41,16 +62,146 @@ function sanitizePermissionSet(raw = {}) {
     return clean;
 }
 
-function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, permissionGuards }) {
+function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPassword, googleScriptTargetUrl, CustomPage, permissionGuards }) {
     const router = express.Router();
-    const { requirePermissionAdmin, isPrivilegedUser } = permissionGuards;
+    const { requirePermissionAdmin, isPrivilegedUser, createManagerSession } = permissionGuards;
+
+    router.post('/session', async (req, res) => {
+        const username = String(req.body?.username || '').trim();
+        const password = String(req.body?.password || '');
+        const attemptKey = String(req.ip || req.socket?.remoteAddress || 'unknown');
+        const now = Date.now();
+        const attempt = permissionLoginAttempts.get(attemptKey);
+        if (attempt && attempt.blockedUntil > now) {
+            return res.status(429).json({ success: false, message: 'Too many attempts. Try again in a few minutes.' });
+        }
+        if (!username || !password || username.length > 200 || password.length > 512) {
+            return res.status(400).json({ success: false, message: 'Enter your account password to continue.' });
+        }
+        try {
+            const account = await verifyAdminPassword(username, password);
+            const inactive = account && (account.active === false || account.isActive === false || ['inactive', 'disabled', 'suspended'].includes(String(account.status || '').toLowerCase()));
+            if (!account || inactive || !isPrivilegedUser(account, username)) {
+                const next = attempt && attempt.windowStarted > now - 10 * 60 * 1000 ? attempt : { failures: 0, windowStarted: now };
+                next.failures += 1;
+                if (next.failures >= 8) next.blockedUntil = now + 10 * 60 * 1000;
+                permissionLoginAttempts.set(attemptKey, next);
+                return res.status(401).json({ success: false, message: 'Account verification failed.' });
+            }
+            permissionLoginAttempts.delete(attemptKey);
+            const tenantOwner = username.toLowerCase() === 'developer' || username === '7908040851' ? '7908040851' : String(account.username || username).trim();
+            const token = createManagerSession(String(account.username || username).trim(), tenantOwner);
+            res.set('Cache-Control', 'no-store');
+            return res.json({ success: true, token, expiresIn: 1800, username: String(account.username || username).trim(), tenantOwner });
+        } catch (err) {
+            return res.status(503).json({ success: false, message: err.message || 'Permission manager authentication is unavailable.' });
+        }
+    });
+
+    function getTenantOwner(req) {
+        return String(req.permissionTenantOwner || 'System').trim();
+    }
+
+    function normalizedContacts(account) {
+        return String(account?.contactNumber || '').split(',').map(value => value.replace(/\D/g, '').slice(-10)).filter(Boolean);
+    }
+
+    async function getPermissionTargets(req) {
+        const users = await getConfiguredAdminUsers();
+        const actor = users.find(user => String(user.username || '').trim().toLowerCase() === req.permissionActor.username.toLowerCase());
+        if (req.permissionActor.role.toLowerCase() === 'developer') return users;
+        const ownerName = getTenantOwner(req).toLowerCase();
+        const owner = users.find(user => String(user.username || '').trim().toLowerCase() === ownerName) || actor;
+        const ownerContacts = normalizedContacts(owner);
+        if (!ownerContacts.length) return actor ? [actor] : [];
+        return users.filter(user => normalizedContacts(user).some(contact => ownerContacts.includes(contact)));
+    }
+
+    function findPermissionTarget(targetId, targets) {
+        const normalizedId = String(targetId || '').trim().toLowerCase();
+        return targets.find(user => [user.username, user.userId, user.id].some(value => String(value || '').trim().toLowerCase() === normalizedId)) || null;
+    }
+
+    async function callSignedRemotePermissions(method, actor, targetUsername, flags = {}) {
+        const secret = String(process.env.REMOTE_PERMISSION_HMAC_SECRET || '');
+        if (secret.length < 32) throw new Error('Remote permission signing is not configured on the backend.');
+        let target;
+        try { target = new URL(googleScriptTargetUrl || ''); }
+        catch (_) { throw new Error('Google Apps Script service is not configured.'); }
+        if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !target.pathname.startsWith('/macros/s/')) {
+            throw new Error('Google Apps Script service configuration is invalid.');
+        }
+        const timestamp = Date.now();
+        const nonce = crypto.randomBytes(18).toString('hex');
+        const signature = createRemotePermissionSignature(method, actor, targetUsername, timestamp, nonce, flags, secret);
+        const response = await fetch(target, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ method, actor, targetUsername, timestamp, nonce, permissionFlags: flags, signature }),
+            redirect: 'follow'
+        });
+        const data = await response.json();
+        if (!response.ok || data.success !== true) throw new Error(data.message || 'Google Sheet permission update failed.');
+        return data;
+    }
+
+    router.get('/remote/:userId', requirePermissionAdmin, async (req, res) => {
+        try {
+            const target = decodeURIComponent(req.params.userId).trim();
+            const actor = req.permissionActor.username;
+            const targetAccount = findPermissionTarget(target, await getPermissionTargets(req));
+            if (!targetAccount) return res.status(404).json({ success: false, message: 'The selected account is outside this Admin’s tenant.' });
+            if (isPrivilegedUser(targetAccount, targetAccount.username) && targetAccount.username.toLowerCase() !== actor.toLowerCase() && req.permissionActor.role.toLowerCase() !== 'developer') {
+                return res.status(403).json({ success: false, message: 'You can only view your own licensed Admin permissions.' });
+            }
+            const result = await callSignedRemotePermissions('get_remote_permissions', actor, String(targetAccount.username).trim());
+            res.set('Cache-Control', 'no-store');
+            return res.json({ success: true, data: result.data || { permFlags: {} } });
+        } catch (err) {
+            return res.status(502).json({ success: false, message: err.message });
+        }
+    });
+
+    router.post('/remote/:userId', requirePermissionAdmin, async (req, res) => {
+        try {
+            const target = decodeURIComponent(req.params.userId).trim();
+            const actor = req.permissionActor.username;
+            const targetAccount = findPermissionTarget(target, await getPermissionTargets(req));
+            if (!targetAccount) return res.status(404).json({ success: false, message: 'The selected account is outside this Admin’s tenant.' });
+            if (isPrivilegedUser(targetAccount, targetAccount.username) && targetAccount.username.toLowerCase() !== actor.toLowerCase() && req.permissionActor.role.toLowerCase() !== 'developer') {
+                return res.status(403).json({ success: false, message: 'You can only change your own licensed Admin permissions.' });
+            }
+            const flags = canonicalFlags(req.body?.permFlags);
+            const result = await callSignedRemotePermissions('set_remote_permissions', actor, String(targetAccount.username).trim(), flags);
+            const previousFlags = result.data?.previousPermFlags || {};
+            const auditEntries = Object.keys(flags).filter(id => previousFlags[id] !== flags[id]).map(id => ({
+                auditId: `AUD-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
+                tenantOwner: getTenantOwner(req),
+                subUserId: targetAccount.username.toLowerCase() === actor.toLowerCase() ? actor : targetAccount.userId || targetAccount.id || targetAccount.username,
+                subUserName: targetAccount.username,
+                moduleId: id,
+                moduleName: id,
+                previousPermissions: typeof previousFlags[id] === 'boolean' ? { value: previousFlags[id] } : null,
+                newPermissions: { value: flags[id] },
+                actionPerformed: typeof previousFlags[id] === 'boolean' ? 'UPDATE' : 'CREATE',
+                changedBy: actor,
+                changedByRole: req.permissionActor.role,
+                ipAddress: req.ip || req.socket?.remoteAddress || '',
+                timestamp: new Date()
+            }));
+            if (auditEntries.length) await PermissionAudit.insertMany(auditEntries);
+            return res.json({ success: true, message: result.message || 'Remote permissions saved to the Licenses sheet.', data: result.data || { permFlags: flags }, auditCount: auditEntries.length });
+        } catch (err) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+    });
 
     // 1. Fetch active sub-users from existing MongoDB AdminCreds collection
     router.get('/sub-users', requirePermissionAdmin, async (req, res) => {
         try {
-            const tenantOwner = String(req.query.user || 'System').trim();
+            const tenantOwner = getTenantOwner(req);
             const includeInactive = req.query.includeInactive === 'true';
-            const users = await getConfiguredAdminUsers();
+            const users = await getPermissionTargets(req);
 
             const subUsers = users
                 .map(u => {
@@ -80,7 +231,7 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
     // 2. Fetch dynamic module registry (Base modules + any custom pages registered in MongoDB)
     router.get('/modules', requirePermissionAdmin, async (req, res) => {
         try {
-            const tenantOwner = String(req.query.user || 'System').trim();
+            const tenantOwner = getTenantOwner(req);
             const modules = [...BASE_CRM_MODULES];
 
             if (CustomPage) {
@@ -108,8 +259,12 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
     // 3. Get saved permissions for a specific sub-user
     router.get('/user/:userId', requirePermissionAdmin, async (req, res) => {
         try {
-            const tenantOwner = String(req.query.user || 'System').trim();
+            const tenantOwner = getTenantOwner(req);
             const targetUserId = decodeURIComponent(req.params.userId).trim();
+            const targetAccount = findPermissionTarget(targetUserId, await getPermissionTargets(req));
+            if (!targetAccount || isPrivilegedUser(targetAccount, targetAccount.username)) {
+                return res.status(404).json({ success: false, message: 'Sub-user not found in this Admin’s tenant.' });
+            }
 
             const doc = await UserPermission.findOne({ tenantOwner, userId: targetUserId }).lean();
             res.json({
@@ -161,7 +316,7 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
     // 5. Save or update permissions for a sub-user + record immutable Audit Trail
     router.post('/user/:userId', requirePermissionAdmin, async (req, res) => {
         try {
-            const tenantOwner = String(req.query.user || 'System').trim();
+            const tenantOwner = getTenantOwner(req);
             const targetUserId = decodeURIComponent(req.params.userId).trim();
             const actor = req.permissionActor;
 
@@ -174,11 +329,8 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
             }
 
             // Verify target sub-user exists in AdminCreds (do not create duplicate users)
-            const users = await getConfiguredAdminUsers();
-            const targetAccount = users.find(u =>
-                String(u.userId || u.id || u.username || '').trim().toLowerCase() === targetUserId.toLowerCase() ||
-                String(u.username || '').trim().toLowerCase() === targetUserId.toLowerCase()
-            );
+            const users = await getPermissionTargets(req);
+            const targetAccount = findPermissionTarget(targetUserId, users);
 
             if (!targetAccount) {
                 return res.status(404).json({
@@ -286,7 +438,7 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, pe
     // 6. Fetch immutable Audit Trail logs
     router.get('/audit', requirePermissionAdmin, async (req, res) => {
         try {
-            const tenantOwner = String(req.query.user || 'System').trim();
+            const tenantOwner = getTenantOwner(req);
             const query = { tenantOwner };
             if (req.query.subUserId) query.subUserId = String(req.query.subUserId).trim();
 
