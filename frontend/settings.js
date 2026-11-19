@@ -684,7 +684,7 @@ function mergePreservedUser2FA(users) {
 
 // Auto-apply on load and sync across windows
 window.addEventListener('DOMContentLoaded', async () => {
-    if (!(await enforcePageLevelPermissions())) return;
+
 
     // Add inside DOMContentLoaded in frontend/settings.js
 const PAGE_TO_MODULE = {
@@ -736,6 +736,15 @@ async function enforcePageLevelPermissions() {
 
         const modPerms = result.permissions ? result.permissions[moduleId] : null;
         if (moduleId && (!modPerms || modPerms.view !== true)) {
+            if (pageName === 'dashboardB.html') {
+                const firstAllowedPage = Object.entries(PAGE_TO_MODULE).find(([page, candidateModule]) =>
+                    page !== pageName && result.permissions?.[candidateModule]?.view === true
+                )?.[0];
+                if (firstAllowedPage) {
+                    window.location.replace(firstAllowedPage);
+                    return false;
+                }
+            }
             document.body.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#f3f3f3;">
                     <div style="background:#fff;padding:32px;border-radius:8px;border-top:4px solid #ba0517;text-align:center;max-width:420px;">
@@ -772,6 +781,9 @@ async function enforcePageLevelPermissions() {
         return false;
     }
 }
+    // Run this only after PAGE_TO_MODULE is initialized above.
+    if (!(await enforcePageLevelPermissions())) return;
+
     applyUIPermissions();
     await fetchDeveloperSettings();
     updateDeveloperUI();
