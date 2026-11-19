@@ -2459,7 +2459,12 @@ app.post('/api/permission-manager/request-otp', async (req, res) => {
 
     try {
         const creds = await AdminCreds.findOne({ id: 'global_creds' }).select('adminEmail').lean();
-        const email = String(process.env.DEVELOPER_OTP_EMAIL || (creds && creds.adminEmail) || '').trim();
+        const email = String(
+            process.env.DEVELOPER_OTP_EMAIL ||
+            (creds && creds.adminEmail) ||
+            process.env.DEVELOPER_EMAIL ||
+            'nilrudragupta@gmail.com'
+        ).trim();
         if (!email) {
             return res.status(503).json({ success: false, message: 'Developer email is not configured in CRM Settings.' });
         }
