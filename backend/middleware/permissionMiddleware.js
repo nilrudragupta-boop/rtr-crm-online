@@ -99,7 +99,13 @@ function isPrivilegedUser(actor, username) {
  * Resolves the authenticated actor from AdminCreds without altering existing login/session logic.
  */
 function createPermissionGuards(getConfiguredAdminUsers) {
-    const sessionSecret = String(process.env.PERMISSION_MANAGER_SESSION_SECRET || '');
+    const sessionSecret = String(
+        process.env.PERMISSION_MANAGER_SESSION_SECRET ||
+        process.env.NANCY_AUTH_SECRET ||
+        (process.env.MONGO_URI
+            ? crypto.createHash('sha256').update(`rtr-permission-manager-session:${process.env.MONGO_URI}`).digest('hex')
+            : '')
+    );
     const sessionSeconds = 30 * 60;
 
     function createManagerSession(username, tenantOwner, now = Date.now()) {

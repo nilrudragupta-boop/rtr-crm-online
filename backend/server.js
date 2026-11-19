@@ -143,6 +143,88 @@ async function verifyPermissionAdminPassword(username, password) {
     return account;
 }
 
+const permissionManagerDeveloperOtpRate = new Map();
+
+async function requestPermissionManagerDeveloperOtp(req, challengeId) {
+    const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
+    const sentAt = permissionManagerDeveloperOtpRate.get(ip) || 0;
+    if (Date.now() - sentAt < 60 * 1000) {
+        return { success: false, status: 429, message: 'A Developer code was sent recently. Wait one minute before requesting another.' };
+    }
+    if (!/^[a-f0-9]{36}$/.test(String(challengeId || ''))) {
+        return { success: false, status: 400, message: 'Developer verification request is invalid.' };
+    }
+
+    const scriptUrl = String(GOOGLE_SCRIPT_TARGET_URL || '');
+    let target;
+    try { target = new URL(scriptUrl); }
+    catch (_) { return { success: false, status: 503, message: 'Google Apps Script service is not configured.' }; }
+    if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !target.pathname.startsWith('/macros/s/')) {
+        return { success: false, status: 503, message: 'Google Apps Script service configuration is invalid.' };
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpKey = `PERMISSION_MANAGER_DEVELOPER_${challengeId}`;
+    otpStore.set(otpKey, { otp, action: 'PERMISSION_MANAGER_DEVELOPER', ip, expires: Date.now() + 5 * 60 * 1000, attempts: 0 });
+    permissionManagerDeveloperOtpRate.set(ip, Date.now());
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 50000);
+    try {
+        const response = await fetch(target, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                method: 'send_dev_login_otp',
+                otp,
+                machineId: `Permission Manager (${ip})`,
+                companyName: 'Developer Verification',
+                expiryDate: '5 minutes'
+            }),
+            redirect: 'follow',
+            signal: controller.signal
+        });
+        const result = await response.json();
+        if (!response.ok || result.success !== true) {
+            otpStore.delete(otpKey);
+            return { success: false, status: 502, message: result.message || 'Google Apps Script could not send the Developer OTP.' };
+        }
+        return { success: true, challengeId, message: 'Developer OTP sent.' };
+    } catch (error) {
+        otpStore.delete(otpKey);
+        return {
+            success: false,
+            status: error.name === 'AbortError' ? 504 : 502,
+            message: error.name === 'AbortError' ? 'Google Apps Script did not respond in time.' : 'Could not contact Google Apps Script to send the Developer OTP.'
+        };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function verifyPermissionManagerDeveloperOtp(req, challengeId, submittedOtp) {
+    const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
+    const key = `PERMISSION_MANAGER_DEVELOPER_${challengeId}`;
+    const record = otpStore.get(key);
+    if (!record || record.action !== 'PERMISSION_MANAGER_DEVELOPER' || record.ip !== ip || Date.now() > record.expires) {
+        otpStore.delete(key);
+        return false;
+    }
+    record.attempts = Number(record.attempts || 0) + 1;
+    if (record.attempts > 5) {
+        otpStore.delete(key);
+        return false;
+    }
+    const entered = Buffer.from(String(submittedOtp || ''));
+    const expected = Buffer.from(String(record.otp));
+    if (entered.length !== expected.length || !crypto.timingSafeEqual(entered, expected)) {
+        if (record.attempts >= 5) otpStore.delete(key);
+        else otpStore.set(key, record);
+        return false;
+    }
+    otpStore.delete(key);
+    return true;
+}
+
 app.use('/api', async (req, res, next) => {
     const bodyActor = req.body && !Array.isArray(req.body) ? req.body.createdBy : '';
     const actorUsername = String(req.query.user || bodyActor || '').trim();
@@ -1810,6 +1892,8 @@ crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
 registerPermissionRoutes(app, {
     getConfiguredAdminUsers,
     verifyAdminPassword: verifyPermissionAdminPassword,
+    requestDeveloperOtp: requestPermissionManagerDeveloperOtp,
+    verifyDeveloperOtp: verifyPermissionManagerDeveloperOtp,
     googleScriptTargetUrl: GOOGLE_SCRIPT_TARGET_URL,
     CustomPage,
     permissionGuards
