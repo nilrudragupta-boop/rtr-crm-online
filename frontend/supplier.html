@@ -574,7 +574,7 @@
         <button class="action" id="supplierRecycleBinBtn" onclick="openSupplierRecycleBin()"
             style="background:#6f42c1; display:none;">♻️ Recycle Bin</button>
         <button class="action" onclick="deleteSelectedSuppliers()" style="background:#dc3545;"
-            data-permission-id="perm_delete_action">Delete Selected</button>
+            data-permission-id="perm_delete_supplier">Delete Selected</button>
     </div>
 
     <div id="supplierSummary" class="summary-box">
@@ -1984,10 +1984,10 @@
                         <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
                         <div class="action-dropdown-content">
                             <button class="btn-action-view" onclick="viewSupplier('${s.id}')">👁️ View</button>
-                            <button class="btn-action-edit" id="editBtn-${s.id}" onclick="editSupplier('${s.id}')" data-permission-id="perm_supplier_manager">✏️ Edit</button>
+                            <button class="btn-action-edit" id="editBtn-${s.id}" onclick="editSupplier('${s.id}')" data-permission-id="perm_edit_supplier">✏️ Edit</button>
                             <button class="btn-action-ledger" onclick="openLedger('${escapeHtml(s.name)}')">📒 Ledger</button>
                             <button class="btn-action-attach" onclick="openManageAttachments('${s.id}')">📎 Attach</button>
-                            <button class="btn-action-delete" onclick="deleteSupplier('${s.id}')" data-permission-id="perm_delete_action" style="color: #dc3545 !important;">🗑️ Delete</button>
+                            <button class="btn-action-delete" onclick="deleteSupplier('${s.id}')" data-permission-id="perm_delete_supplier" style="color: #dc3545 !important;">🗑️ Delete</button>
                         </div>
                     </div>
                 </td>`
@@ -2110,6 +2110,9 @@
 
         // 🔹 Save Supplier (Add or Update)
         function saveSupplier() {
+            const permissions = typeof getUIPermissions === "function" ? getUIPermissions() : {};
+            const isEditing = !!document.getElementById("supplierId").value;
+            if (permissions[isEditing ? "perm_edit_supplier" : "perm_new_supplier"] === false) return openWarningModal("You do not have permission to " + (isEditing ? "edit" : "create") + " suppliers.");
             const id = document.getElementById("supplierId").value;
             const name = document.getElementById("newSupplierName").value.trim();
             const contact = document.getElementById("newContact").value.trim();
@@ -2207,6 +2210,7 @@
         }
 
         function editSupplier(id) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_edit_supplier === false) return openWarningModal("You do not have permission to edit suppliers.");
             askConfirm("Confirm Edit", "Load this supplier for editing? Unsaved changes in the form will be lost.", () => {
                 performEdit(id);
             });
@@ -2366,6 +2370,7 @@
 
         // 🔹 Delete supplier
         function deleteSupplier(id) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_supplier === false) return openWarningModal("You do not have permission to delete suppliers.");
             idsToDelete = [id];
             document.getElementById("modalMessage").innerText = "Are you sure you want to delete this supplier?";
             document.getElementById("confirmationModal").style.display = "flex";
@@ -2380,6 +2385,7 @@
 
         // 🔹 Delete Selected Suppliers
         function deleteSelectedSuppliers() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_supplier === false) return openWarningModal("You do not have permission to delete suppliers.");
             const checkboxes = document.querySelectorAll(".supplier-checkbox:checked");
             if (checkboxes.length === 0) return openWarningModal("Please select suppliers to delete.");
 
@@ -2389,6 +2395,7 @@
         }
 
         async function confirmDelete() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_supplier === false) return openWarningModal("You do not have permission to delete suppliers.");
             if (idsToDelete.length === 0) return;
 
             const recycleBin = JSON.parse(localStorage.getItem('recycleBin_suppliers') || '[]');

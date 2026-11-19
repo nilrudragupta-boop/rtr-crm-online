@@ -385,13 +385,13 @@
                     onclick="openWindow('direct_sale.html', 1100, 700, 'salesWindow')"
                     data-permission-id="perm_direct_sale">Sales</button>
                 <button class="btn btn-outline-danger" onclick="deleteSelectedItems()"
-                    data-permission-id="perm_delete_action">Delete</button>
+                    data-permission-id="perm_delete_item">Delete</button>
                 <button class="btn btn-light border" onclick="location.reload()">Refresh</button>
             </div>
         </div>
 
         <!-- Add New Item -->
-        <div class="card shadow-sm mb-4 border-0">
+        <div class="card shadow-sm mb-4 border-0" data-permission-id="perm_new_item">
             <div class="card-body p-4">
                 <h5 class="card-title mb-2 text-primary d-flex align-items-center gap-2"
                     style="cursor: pointer; justify-content: space-between;" onclick="toggleAddItemForm()">
@@ -1884,13 +1884,13 @@
                     <button class="action-btn-main" onclick="toggleActionMenu(this)">Actions ▼</button>
                     <div class="action-dropdown-content">
                         <button id="viewBtn-${item.id}" onclick="viewItem('${item.id}')">👁️ View</button>
-                        <button id="editBtn-${item.id}" onclick="editItem('${item.id}')" data-permission-id="perm_manage_items">✏️ Edit</button>
+                        <button id="editBtn-${item.id}" onclick="editItem('${item.id}')" data-permission-id="perm_edit_item">✏️ Edit</button>
                         <button onclick="copyItem('${item.id}')" data-permission-id="perm_manage_items">📋 Copy</button>
                         <button onclick="openBarcodeModal('${item.id}')">🏷️ Barcode</button>
-                        <button onclick="deleteItem('${item.id}')" data-permission-id="perm_delete_action" style="color: #dc3545 !important;">🗑️ Delete</button>
+                        <button onclick="deleteItem('${item.id}')" data-permission-id="perm_delete_item" style="color: #dc3545 !important;">🗑️ Delete</button>
                     </div>
                 </div>
-                <button class="btn btn-sm btn-success" id="saveBtn-${item.id}" style="display:none;" onclick="editItem('${item.id}')">💾 Save</button>
+                <button class="btn btn-sm btn-success" id="saveBtn-${item.id}" data-permission-id="perm_edit_item" style="display:none;" onclick="editItem('${item.id}')">💾 Save</button>
             </td>
           </tr>
         `;
@@ -2221,6 +2221,7 @@
 
         // 🔹 Add new item
         function initiateAddItem() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_new_item === false) return openInfoModal("You do not have permission to create items.");
             const name = document.getElementById("newItemName").value.trim();
             const code = document.getElementById("newItemCode").value.trim();
             const hsn = document.getElementById("newItemHsn").value.trim();
@@ -2252,6 +2253,7 @@
         }
 
         async function performAddItem() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_new_item === false) return openInfoModal("You do not have permission to create items.");
             const name = document.getElementById("newItemName").value.trim();
             const itemCode = document.getElementById("newItemCode").value.trim();
             const category = document.getElementById("newItemCategory").value.trim();
@@ -2311,6 +2313,7 @@
 
         // 🔹 Edit existing item
         function editItem(id) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_edit_item === false) return openInfoModal("You do not have permission to edit items.");
             const editBtn = document.getElementById(`editBtn-${id}`);
             if (editBtn && editBtn.textContent.includes("Edit")) {
                 openActionConfirmModal("Confirm Edit", "Do you want to edit this item?", () => {
@@ -2354,6 +2357,7 @@
         }
 
         async function performUpdateItem(id) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_edit_item === false) return openInfoModal("You do not have permission to edit items.");
             const codeInput = document.getElementById(`code-${id}`);
             const indexInput = document.getElementById(`index-${id}`);
             const categoryInput = document.getElementById(`category-${id}`);
@@ -2577,6 +2581,7 @@
 
         // 🔹 Delete item
         function deleteItem(id) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_item === false) return openInfoModal("You do not have permission to delete items.");
             idsToDelete = [id];
             document.getElementById("modalMessage").innerText = "Are you sure to delete this item?";
             document.getElementById("confirmationModal").style.display = "flex";
@@ -2591,6 +2596,7 @@
 
         // 🔹 Delete Selected Items
         function deleteSelectedItems() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_item === false) return openInfoModal("You do not have permission to delete items.");
             const checkboxes = document.querySelectorAll(".item-checkbox:checked");
             if (checkboxes.length === 0) return openInfoModal("Please select items to delete.");
 
@@ -2601,6 +2607,7 @@
 
         // 🔹 Bulk Edit Category
         function bulkEditCategory() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_edit_item === false) return openInfoModal("You do not have permission to edit items.");
             const checkboxes = document.querySelectorAll(".item-checkbox:checked");
             if (checkboxes.length === 0) return openInfoModal("Please select items to edit.");
 
@@ -2614,6 +2621,7 @@
         }
 
         async function confirmBulkEdit() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_edit_item === false) return openInfoModal("You do not have permission to edit items.");
             const newCategory = document.getElementById("bulkEditCategoryInput").value.trim();
             const checkboxes = document.querySelectorAll(".item-checkbox:checked");
             const idsToUpdate = Array.from(checkboxes).map(cb => cb.value);
@@ -2646,6 +2654,7 @@
         }
 
         async function confirmDelete() {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_item === false) return openInfoModal("You do not have permission to delete items.");
             if (idsToDelete.length === 0) return;
 
             const recycleBin = JSON.parse(localStorage.getItem('recycleBin_items') || '[]');

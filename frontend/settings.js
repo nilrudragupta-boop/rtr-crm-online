@@ -373,18 +373,30 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_delete_invoice', label: 'Delete Invoices', feature: 'invoice' },
     { id: 'perm_regular_invoice', label: 'Regular Invoice', feature: 'invoice' },
     { id: 'perm_quotation', label: 'Quotation', feature: 'quotation' },
+    { id: 'perm_new_quotation', label: 'Create Quotations', feature: 'quotation', defaultValue: false },
+    { id: 'perm_edit_quotation', label: 'Edit Quotations', feature: 'quotation', defaultValue: false },
+    { id: 'perm_delete_quotation', label: 'Delete Quotations', feature: 'quotation', defaultValue: false },
     { id: 'perm_restaurant_pos', label: 'Restaurant POS', defaultValue: false },
     { id: 'perm_restaurant_kds', label: 'Kitchen Display (KDS)', defaultValue: false },
     { id: 'perm_invoice_report', label: 'Invoice Report', feature: 'invoice' },
     { id: 'perm_invoice_analytics', label: 'Invoice Analytics', feature: 'invoice' },
     { id: 'perm_manage_customers', label: 'Manage Customers' },
     { id: 'perm_manage_items', label: 'Manage Items', feature: 'inventory' },
+    { id: 'perm_new_item', label: 'Create Items', feature: 'inventory', defaultValue: false },
+    { id: 'perm_edit_item', label: 'Edit Items', feature: 'inventory', defaultValue: false },
+    { id: 'perm_delete_item', label: 'Delete Items', feature: 'inventory', defaultValue: false },
     { id: 'perm_purchase_entries', label: 'Purchase Entries', feature: 'inventory' },
+    { id: 'perm_new_purchase', label: 'New Purchases', feature: 'inventory' },
+    { id: 'perm_edit_purchase', label: 'Edit Purchases', feature: 'inventory' },
+    { id: 'perm_delete_purchase', label: 'Delete Purchases', feature: 'inventory' },
     { id: 'perm_purchase_report', label: 'Purchase Analytics', feature: 'inventory' },
     { id: 'perm_manage_bom', label: 'Manage BOM', feature: 'inventory' },
     { id: 'perm_production_entry', label: 'Production Entries', feature: 'inventory' },
     { id: 'perm_order_sheet', label: 'Order Sheet', feature: 'inventory' },
     { id: 'perm_advance_pay', label: 'Advance Payment', feature: 'invoice' },
+    { id: 'perm_record_advance_pay', label: 'Record Advance Payments', feature: 'invoice', defaultValue: false },
+    { id: 'perm_edit_advance_pay', label: 'Edit Advance Payments', feature: 'invoice', defaultValue: false },
+    { id: 'perm_delete_advance_pay', label: 'Delete Advance Payments', feature: 'invoice', defaultValue: false },
     { id: 'perm_stock_report', label: 'Stock Report', feature: 'inventory' },
     { id: 'perm_stock_journal', label: 'Stock Entry & Exit', feature: 'inventory' },
     { id: 'perm_stock_ledger', label: 'Stock Ledger', feature: 'inventory' },
@@ -395,6 +407,9 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_expense_manager', label: 'Expense Manager', feature: 'invoice' },
     { id: 'perm_medicine_depts', label: 'Medicine Depts', defaultValue: false },
     { id: 'perm_supplier', label: 'Supplier', feature: 'inventory' },
+    { id: 'perm_new_supplier', label: 'Create Suppliers', feature: 'inventory', defaultValue: false },
+    { id: 'perm_edit_supplier', label: 'Edit Suppliers', feature: 'inventory', defaultValue: false },
+    { id: 'perm_delete_supplier', label: 'Delete Suppliers', feature: 'inventory', defaultValue: false },
     { id: 'perm_reminder', label: 'Reminder', defaultValue: false },
     { id: 'perm_summary_chart', label: 'Summary & Chart' },
     { id: 'perm_gst_report', label: 'GST Report', feature: 'gst' },
@@ -421,9 +436,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_logout', label: 'Logout' },
     { id: 'perm_print', label: 'Print Button' },
     { id: 'perm_export_excel', label: 'Export Excel' },
-    { id: 'perm_delete_action', label: 'Delete Actions' },
-    { id: 'perm_edit_purchase', label: 'Edit Purchases', feature: 'inventory' },
-    { id: 'perm_delete_purchase', label: 'Delete Purchases', feature: 'inventory' },
+    { id: 'perm_delete_action', label: 'Delete Actions' },    
     { id: 'perm_help', label: 'Help & Support' },
     { id: 'perm_payment_receipt_log', label: 'Payment Receipt Log' },
     { id: 'perm_manage_company_info', label: 'Settings: Manage Company Info' },
@@ -769,8 +782,29 @@ async function enforcePageLevelPermissions() {
                 synced.perm_print_smart = !!modPerms.print;
             }
             if (moduleId === 'purchase') {
+                synced.perm_new_purchase = !!modPerms.add;
                 synced.perm_edit_purchase = !!modPerms.edit;
                 synced.perm_delete_purchase = !!modPerms.delete;
+            }
+            if (moduleId === 'quotation') {
+                synced.perm_new_quotation = !!modPerms.add;
+                synced.perm_edit_quotation = !!modPerms.edit;
+                synced.perm_delete_quotation = !!modPerms.delete;
+            }
+            if (moduleId === 'item_stock') {
+                synced.perm_new_item = !!modPerms.add;
+                synced.perm_edit_item = !!modPerms.edit;
+                synced.perm_delete_item = !!modPerms.delete;
+            }
+            if (moduleId === 'supplier') {
+                synced.perm_new_supplier = !!modPerms.add;
+                synced.perm_edit_supplier = !!modPerms.edit;
+                synced.perm_delete_supplier = !!modPerms.delete;
+            }
+            if (moduleId === 'advance_payment') {
+                synced.perm_record_advance_pay = !!modPerms.add;
+                synced.perm_edit_advance_pay = !!modPerms.edit;
+                synced.perm_delete_advance_pay = !!modPerms.delete;
             }
             saveUIPermissions(synced);
             applyUIPermissions();

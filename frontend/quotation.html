@@ -1386,6 +1386,12 @@
 
             let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
             const existingIndex = quotations.findIndex(q => q.refNo === refNo);
+            const permissions = typeof getUIPermissions === "function" ? getUIPermissions() : {};
+            const requiredPermission = existingIndex >= 0 ? "perm_edit_quotation" : "perm_new_quotation";
+            if (permissions[requiredPermission] === false) {
+                showInfo("Access Denied", "You do not have permission to " + (existingIndex >= 0 ? "edit" : "create") + " quotations.", true);
+                return;
+            }
 
             if (existingIndex >= 0) {
                 askConfirm("Overwrite?", "Quotation with this Ref No already exists. Overwrite?", () => {
@@ -1719,6 +1725,10 @@
         }
 
         function editQuote(refNo) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_edit_quotation === false) {
+                showInfo("Access Denied", "You do not have permission to edit quotations.", true);
+                return;
+            }
             document.getElementById("searchRefNo").value = refNo;
             loadQuotation();
             toggleView();
@@ -1802,6 +1812,10 @@
         }
 
         function deleteQuote(refNo) {
+            if (typeof getUIPermissions === "function" && getUIPermissions().perm_delete_quotation === false) {
+                showInfo("Access Denied", "You do not have permission to delete quotations.", true);
+                return;
+            }
             askConfirm("Delete Quotation", `Are you sure you want to delete quotation ${refNo}?`, () => {
                 let quotations = JSON.parse(localStorage.getItem("quotations")) || [];
                 quotations = quotations.filter(q => q.refNo !== refNo);
