@@ -143,58 +143,6 @@ async function verifyPermissionAdminPassword(username, password) {
     return account;
 }
 
-const permissionManagerDeveloperOtpRate = new Map();
-
-async function requestPermissionManagerDeveloperOtp(req) {
-    const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
-    const lastSentAt = permissionManagerDeveloperOtpRate.get(ip) || 0;
-    if (Date.now() - lastSentAt < 60 * 1000) {
-        return { success: false, status: 429, message: 'A Developer OTP was sent recently. Wait one minute before requesting another.' };
-    }
-    const email = String(process.env.DEVELOPER_EMAIL || 'nilrudragupta@gmail.com').trim();
-    const otp = crypto.randomInt(100000, 1000000).toString();
-    const key = `PERMISSION_MANAGER_DEVELOPER_${ip}`;
-    otpStore.set(key, { otp, action: 'PERMISSION_MANAGER_DEVELOPER', expires: Date.now() + 5 * 60 * 1000, attempts: 0 });
-    try {
-        await transporter.sendMail({
-            from: `"Security Verification" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: 'Developer Permission Manager verification code',
-            text: `Your Developer verification code for the Permission Manager is ${otp}. It expires in 5 minutes. If you did not request it, ignore this email.`
-        });
-        permissionManagerDeveloperOtpRate.set(ip, Date.now());
-        return { success: true, message: 'A Developer OTP was sent to the configured Developer email address.' };
-    } catch (error) {
-        otpStore.delete(key);
-        console.error('[Permission Manager] Developer OTP delivery failed:', error.message);
-        return { success: false, status: 503, message: 'Could not send the Developer verification code.' };
-    }
-}
-
-async function verifyPermissionManagerDeveloperOtp(req, submittedOtp) {
-    const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
-    const key = `PERMISSION_MANAGER_DEVELOPER_${ip}`;
-    const record = otpStore.get(key);
-    if (!record || record.action !== 'PERMISSION_MANAGER_DEVELOPER' || Date.now() > record.expires) {
-        otpStore.delete(key);
-        return false;
-    }
-    record.attempts = Number(record.attempts || 0) + 1;
-    if (record.attempts > 5) {
-        otpStore.delete(key);
-        return false;
-    }
-    const actual = Buffer.from(String(submittedOtp || ''));
-    const expected = Buffer.from(String(record.otp));
-    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
-        if (record.attempts >= 5) otpStore.delete(key);
-        else otpStore.set(key, record);
-        return false;
-    }
-    otpStore.delete(key);
-    return true;
-}
-
 app.use('/api', async (req, res, next) => {
     const bodyActor = req.body && !Array.isArray(req.body) ? req.body.createdBy : '';
     const actorUsername = String(req.query.user || bodyActor || '').trim();
@@ -1862,8 +1810,6 @@ crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
 registerPermissionRoutes(app, {
     getConfiguredAdminUsers,
     verifyAdminPassword: verifyPermissionAdminPassword,
-    requestDeveloperOtp: requestPermissionManagerDeveloperOtp,
-    verifyDeveloperOtp: verifyPermissionManagerDeveloperOtp,
     googleScriptTargetUrl: GOOGLE_SCRIPT_TARGET_URL,
     CustomPage,
     permissionGuards

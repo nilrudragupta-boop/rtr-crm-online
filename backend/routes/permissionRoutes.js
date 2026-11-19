@@ -23,6 +23,40 @@ function createRemotePermissionSignature(method, actor, target, timestamp, nonce
     return crypto.createHmac('sha256', secret).update(canonical).digest('hex');
 }
 
+async function callSignedDeveloperOtp(method, actor, challengeId, otp, scriptUrl) {
+    const secret = String(process.env.REMOTE_PERMISSION_HMAC_SECRET || '');
+    if (secret.length < 32) throw new Error('Developer OTP signing is not configured on the backend.');
+    let target;
+    try { target = new URL(scriptUrl || ''); }
+    catch (_) { throw new Error('Google Apps Script service is not configured.'); }
+    if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' || !target.pathname.startsWith('/macros/s/')) {
+        throw new Error('Google Apps Script service configuration is invalid.');
+    }
+    const timestamp = Date.now();
+    const nonce = crypto.randomBytes(18).toString('hex');
+    const canonical = `${method}\n${actor}\n${challengeId}\n${timestamp}\n${nonce}\n${otp || ''}`;
+    const signature = crypto.createHmac('sha256', secret).update(canonical).digest('hex');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 50000);
+    try {
+        const response = await fetch(target, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ method, actor, challengeId, timestamp, nonce, otp: otp || '', signature }),
+            redirect: 'follow',
+            signal: controller.signal
+        });
+        const data = await response.json();
+        if (!response.ok || data.success !== true) return data;
+        return data;
+    } catch (error) {
+        if (error.name === 'AbortError') throw new Error('Google Apps Script did not respond in time.');
+        throw new Error('Could not contact Google Apps Script for Developer verification.');
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 // Canonical CRM Module Registry aligned with existing HTML pages and UI_PERMISSION_REGISTRY
 const BASE_CRM_MODULES = [
     { id: 'dashboard', name: 'Dashboard', page: 'dashboardB.html', legacyPermId: 'perm_summary_chart', category: 'Core' },
@@ -62,7 +96,7 @@ function sanitizePermissionSet(raw = {}) {
     return clean;
 }
 
-function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPassword, requestDeveloperOtp, verifyDeveloperOtp, googleScriptTargetUrl, CustomPage, permissionGuards }) {
+function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPassword, googleScriptTargetUrl, CustomPage, permissionGuards }) {
     const router = express.Router();
     const { requirePermissionAdmin, isPrivilegedUser, createManagerSession } = permissionGuards;
 
@@ -81,14 +115,20 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
         }
         try {
             if (isDeveloper && req.body?.action === 'request_developer_otp') {
-                const result = await requestDeveloperOtp(req);
-                return res.status(result.status || (result.success ? 200 : 503)).json(result);
+                const challengeId = crypto.randomBytes(18).toString('hex');
+                const result = await callSignedDeveloperOtp('permission_manager_dev_otp_request', 'developer', challengeId, '', googleScriptTargetUrl);
+                if (!result.success) return res.status(502).json(result);
+                return res.json({ success: true, challengeId, message: 'Developer OTP sent.' });
             }
 
             let account;
             if (isDeveloper) {
-                const otpIsValid = await verifyDeveloperOtp(req, req.body?.otp);
-                if (otpIsValid) account = { username: username.toLowerCase() === 'developer' ? 'developer' : username, role: 'Developer', isLicensedAdmin: true };
+                const challengeId = String(req.body?.challengeId || '');
+                if (!/^[a-f0-9]{36}$/.test(challengeId)) {
+                    return res.status(400).json({ success: false, message: 'Developer verification session is missing. Request a new code.' });
+                }
+                const result = await callSignedDeveloperOtp('permission_manager_dev_otp_verify', 'developer', challengeId, String(req.body?.otp || ''), googleScriptTargetUrl);
+                if (result.verified === true) account = { username: username.toLowerCase() === 'developer' ? 'developer' : username, role: 'Developer', isLicensedAdmin: true };
             } else {
                 account = await verifyAdminPassword(username, password);
             }

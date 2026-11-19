@@ -1,6 +1,6 @@
 # Permission Manager secure write setup
 
-The browser does not contain the Apps Script URL signing secret. Admin sessions re-verify the Admin password; Developer sessions request and verify a fresh Developer email OTP on the backend. Both receive a short-lived permission-manager session and call protected backend routes. The backend signs License-sheet requests before forwarding them to Apps Script.
+The browser does not contain the Apps Script URL signing secret. Admin sessions re-verify the Admin password; Developer sessions request and verify a fresh Developer email OTP through Apps Script. Both receive a short-lived permission-manager session and call protected backend routes. The backend signs License-sheet requests and OTP operations before forwarding them to Apps Script.
 
 ## Backend environment
 
@@ -9,7 +9,6 @@ Configure these server environment variables before deploying:
 - `PERMISSION_MANAGER_SESSION_SECRET`: a random secret of at least 32 characters, used to sign 30-minute manager sessions.
 - `REMOTE_PERMISSION_HMAC_SECRET`: a separate random secret of at least 32 characters, shared with the Apps Script property below.
 - `GOOGLE_SCRIPT_URL`: the deployed Apps Script web app URL. The existing default is retained if this value is not configured.
-- `EMAIL_USER`, `EMAIL_APP_PASSWORD`, and optionally `DEVELOPER_EMAIL`: the backend mail settings used to send a fresh Developer OTP when opening the manager from a Developer session.
 
 Do not put either secret in frontend files, query strings, or browser storage. The manager stores only the short-lived session token in `sessionStorage`; it does not store the password.
 
@@ -20,7 +19,7 @@ Do not put either secret in frontend files, query strings, or browser storage. T
 3. Deploy a new web app version using the same deployment identity and spreadsheet access as the current license script.
 4. Set the backend `GOOGLE_SCRIPT_URL` to the deployment URL if it changed.
 
-The script rejects unsigned, expired, or replayed permission requests. It updates Column F only after finding exactly one `Licenses` row with the target username. If existing JSON is malformed, the manager opens with all buttons off and identifies the bad value; saving the reviewed checkbox selection replaces it. Runtime permission loading also fails closed for malformed values.
+The script rejects unsigned, expired, or replayed permission requests. Developer OTPs are generated and emailed by Apps Script, then kept in its short-lived cache until the signed backend verifies them. The script updates Column F only after finding exactly one `Licenses` row with the target username. If existing JSON is malformed, the manager opens with all buttons off and identifies the bad value; saving the reviewed checkbox selection replaces it. Runtime permission loading also fails closed for malformed values.
 
 ## Account behavior
 
