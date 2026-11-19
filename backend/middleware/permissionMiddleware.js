@@ -53,6 +53,12 @@ function isPrivilegedUser(actor, username) {
  */
 function createPermissionGuards(getConfiguredAdminUsers) {
     async function resolveActor(req) {
+        if (req.permissionManagerSession) {
+            const username = String(req.permissionManagerSession.username || 'developer');
+            const actor = { username, role: 'Developer', isLicensedAdmin: true };
+            return { username, actor, privileged: true };
+        }
+
         const actorUsername = String(
             req.actorUsername ||
             req.headers['x-rtr-user'] ||
