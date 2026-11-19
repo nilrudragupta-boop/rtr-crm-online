@@ -416,6 +416,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_reminder', label: 'Reminder', defaultValue: false },
     { id: 'perm_summary_chart', label: 'Summary & Chart' },
     { id: 'perm_gst_report', label: 'GST Report', feature: 'gst' },
+    { id: 'perm_enquiry', label: 'Enquiry Management' },
     { id: 'perm_ledger_report', label: 'Ledger Report' },
     { id: 'perm_settings', label: 'Settings', defaultValue: false },
     { id: 'perm_vault_ledger', label: 'Vault Ledger', defaultValue: false },
@@ -439,7 +440,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_logout', label: 'Logout' },
     { id: 'perm_print', label: 'Print Button' },
     { id: 'perm_export_excel', label: 'Export Excel' },
-    { id: 'perm_delete_action', label: 'Delete Actions' },    
+    { id: 'perm_delete_action', label: 'Delete Actions' },
     { id: 'perm_help', label: 'Help & Support' },
     { id: 'perm_payment_receipt_log', label: 'Payment Receipt Log' },
     { id: 'perm_manage_company_info', label: 'Settings: Manage Company Info' },
@@ -463,11 +464,15 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_image-to-text', label: 'Image to Text' },
     { id: 'perm_rtr_pdf_studio', label: 'PDF Studio' },
     { id: 'perm_whatsapp_sender', label: 'WhatsApp Sender' },
+    { id: 'perm_contacts', label: 'Contacts Manager' },
     { id: 'perm_finance_and_tools', label: 'Finance & Tools' },
     { id: 'perm_intro_rtr', label: 'System Intro' },
     { id: 'perm_godown_live', label: 'Godown Live' },
     { id: 'perm_godown_terminal', label: 'Godown Terminal' },
     { id: 'perm_godown_auth', label: 'Godown Authorization' },
+    { id: 'perm_manage_contacts', label: 'Contacts' },
+    { id: 'perm_employee_manager', label: 'Employees' },
+    { id: 'perm_data_analysis', label: 'Data Analysis (BI)' },
     { id: 'perm_user_permission_manager', label: 'User Permission Manager', defaultValue: false },
     { id: 'perm_business360', label: 'Business 360' }
 ];
@@ -708,65 +713,65 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 
     // Add inside DOMContentLoaded in frontend/settings.js
-const PAGE_TO_MODULE = {
-    'dashboardB.html': 'dashboard',
-    'invoice.html': 'invoice',
-    'item.html': 'item_stock',
-    'customer.html': 'customer',
-    'supplier.html': 'supplier',
-    'purchase.html': 'purchase',
-    'advance_pay.html': 'advance_payment',
-    'day_book.html': 'daybook',
-    'ledger.html': 'ledger',
-    'expense_manager.html': 'expense_manager',
-    'profit_loss_report.html': 'profit_loss',
-    'stock_report.html': 'stock_report',
-    'reminder.html': 'reminder',
-    'follow_up.html': 'follow_up',
-    'contacts.html': 'contacts',
-    'business360.html': 'business_360',
-    'crm_v2.html': 'crm_v2',
-    'report.html': 'reports',
-    'settings.html': 'settings',
-    'quotation.html': 'quotation',
-    'order-sheet.html': 'ordersheet',
-    'production.html': 'production',
-    'journal_voucher.html': 'journal_voucher',
-    'credit_debit_notes.html': 'credit_debit_note',
-    'pdf_ocr_studio.html': 'pdf_ocr_studio'
-};
+    const PAGE_TO_MODULE = {
+        'dashboardB.html': 'dashboard',
+        'invoice.html': 'invoice',
+        'item.html': 'item_stock',
+        'customer.html': 'customer',
+        'supplier.html': 'supplier',
+        'purchase.html': 'purchase',
+        'advance_pay.html': 'advance_payment',
+        'day_book.html': 'daybook',
+        'ledger.html': 'ledger',
+        'expense_manager.html': 'expense_manager',
+        'profit_loss_report.html': 'profit_loss',
+        'stock_report.html': 'stock_report',
+        'reminder.html': 'reminder',
+        'follow_up.html': 'follow_up',
+        'contacts.html': 'contacts',
+        'business360.html': 'business_360',
+        'crm_v2.html': 'crm_v2',
+        'report.html': 'reports',
+        'settings.html': 'settings',
+        'quotation.html': 'quotation',
+        'order-sheet.html': 'ordersheet',
+        'production.html': 'production',
+        'journal_voucher.html': 'journal_voucher',
+        'credit_debit_notes.html': 'credit_debit_note',
+        'pdf_ocr_studio.html': 'pdf_ocr_studio'
+    };
 
-async function enforcePageLevelPermissions() {
-    const currentUser = getCurrentUser();
-    if (window.location.pathname.includes('login.html')) return true;
-    if (!currentUser) return false;
+    async function enforcePageLevelPermissions() {
+        const currentUser = getCurrentUser();
+        if (window.location.pathname.includes('login.html')) return true;
+        if (!currentUser) return false;
 
-    const pageName = window.location.pathname.split('/').pop();
-    const moduleId = PAGE_TO_MODULE[pageName];
-    if (!moduleId) return true;
-    const apiBase = (localStorage.getItem('backendApiUrl') || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : `${window.location.origin}/api`)).replace(/\/+$/, '');
-    const tenant = (typeof apiClient !== 'undefined' && apiClient.getTenantId) ? await apiClient.getTenantId() : currentUser;
+        const pageName = window.location.pathname.split('/').pop();
+        const moduleId = PAGE_TO_MODULE[pageName];
+        if (!moduleId) return true;
+        const apiBase = (localStorage.getItem('backendApiUrl') || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : `${window.location.origin}/api`)).replace(/\/+$/, '');
+        const tenant = (typeof apiClient !== 'undefined' && apiClient.getTenantId) ? await apiClient.getTenantId() : currentUser;
 
-    try {
-        const res = await fetch(`${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(currentUser)}&module=${encodeURIComponent(moduleId)}`, {
-            headers: { 'x-rtr-user': currentUser }
-        });
-        const result = await res.json();
-        if (!result.success) return false;
-        if (result.privileged) return true;
+        try {
+            const res = await fetch(`${apiBase}/permissions/my-permissions?user=${encodeURIComponent(tenant)}&actor=${encodeURIComponent(currentUser)}&module=${encodeURIComponent(moduleId)}`, {
+                headers: { 'x-rtr-user': currentUser }
+            });
+            const result = await res.json();
+            if (!result.success) return false;
+            if (result.privileged) return true;
 
-        const modPerms = result.permissions ? result.permissions[moduleId] : null;
-        if (moduleId && (!modPerms || modPerms.view !== true)) {
-            if (pageName === 'dashboardB.html') {
-                const firstAllowedPage = Object.entries(PAGE_TO_MODULE).find(([page, candidateModule]) =>
-                    page !== pageName && result.permissions?.[candidateModule]?.view === true
-                )?.[0];
-                if (firstAllowedPage) {
-                    window.location.replace(firstAllowedPage);
-                    return false;
+            const modPerms = result.permissions ? result.permissions[moduleId] : null;
+            if (moduleId && (!modPerms || modPerms.view !== true)) {
+                if (pageName === 'dashboardB.html') {
+                    const firstAllowedPage = Object.entries(PAGE_TO_MODULE).find(([page, candidateModule]) =>
+                        page !== pageName && result.permissions?.[candidateModule]?.view === true
+                    )?.[0];
+                    if (firstAllowedPage) {
+                        window.location.replace(firstAllowedPage);
+                        return false;
+                    }
                 }
-            }
-            document.body.innerHTML = `
+                document.body.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#f3f3f3;">
                     <div style="background:#fff;padding:32px;border-radius:8px;border-top:4px solid #ba0517;text-align:center;max-width:420px;">
                         <h2 style="margin-bottom:8px;color:#181818;">Access Denied</h2>
@@ -774,60 +779,60 @@ async function enforcePageLevelPermissions() {
                         <button onclick="window.location.href='dashboardB.html'" style="background:#0176d3;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Back to Dashboard</button>
                     </div>
                 </div>`;
+                return false;
+            }
+
+            // Sync granular button permissions with existing UI_PERMISSION_REGISTRY
+            if (modPerms) {
+                const synced = getUIPermissions();
+                synced.perm_print = !!modPerms.print;
+                synced.perm_export_excel = !!modPerms.excelDownload;
+                synced.perm_delete_action = !!modPerms.delete;
+                if (moduleId === 'invoice') {
+                    synced.perm_make_invoice = !!modPerms.add;
+                    synced.perm_edit_invoice = !!modPerms.edit;
+                    synced.perm_delete_invoice = !!modPerms.delete;
+                    synced.perm_print_smart = !!modPerms.print;
+                }
+                if (moduleId === 'purchase') {
+                    synced.perm_new_purchase = !!modPerms.add;
+                    synced.perm_edit_purchase = !!modPerms.edit;
+                    synced.perm_delete_purchase = !!modPerms.delete;
+                }
+                if (moduleId === 'quotation') {
+                    synced.perm_new_quotation = !!modPerms.add;
+                    synced.perm_edit_quotation = !!modPerms.edit;
+                    synced.perm_delete_quotation = !!modPerms.delete;
+                }
+                if (moduleId === 'item_stock') {
+                    synced.perm_new_item = !!modPerms.add;
+                    synced.perm_edit_item = !!modPerms.edit;
+                    synced.perm_delete_item = !!modPerms.delete;
+                }
+                if (moduleId === 'supplier') {
+                    synced.perm_new_supplier = !!modPerms.add;
+                    synced.perm_edit_supplier = !!modPerms.edit;
+                    synced.perm_delete_supplier = !!modPerms.delete;
+                }
+                if (moduleId === 'advance_payment') {
+                    synced.perm_record_advance_pay = !!modPerms.add;
+                    synced.perm_edit_advance_pay = !!modPerms.edit;
+                    synced.perm_delete_advance_pay = !!modPerms.delete;
+                }
+                if (moduleId === 'customer') {
+                    synced.perm_new_customer = !!modPerms.add;
+                    synced.perm_edit_customer = !!modPerms.edit;
+                    synced.perm_delete_customer = !!modPerms.delete;
+                }
+                saveUIPermissions(synced);
+                applyUIPermissions();
+            }
+            return true;
+        } catch (e) {
+            console.warn('Permission sync check failed:', e.message);
             return false;
         }
-
-        // Sync granular button permissions with existing UI_PERMISSION_REGISTRY
-        if (modPerms) {
-            const synced = getUIPermissions();
-            synced.perm_print = !!modPerms.print;
-            synced.perm_export_excel = !!modPerms.excelDownload;
-            synced.perm_delete_action = !!modPerms.delete;
-            if (moduleId === 'invoice') {
-                synced.perm_make_invoice = !!modPerms.add;
-                synced.perm_edit_invoice = !!modPerms.edit;
-                synced.perm_delete_invoice = !!modPerms.delete;
-                synced.perm_print_smart = !!modPerms.print;
-            }
-            if (moduleId === 'purchase') {
-                synced.perm_new_purchase = !!modPerms.add;
-                synced.perm_edit_purchase = !!modPerms.edit;
-                synced.perm_delete_purchase = !!modPerms.delete;
-            }
-            if (moduleId === 'quotation') {
-                synced.perm_new_quotation = !!modPerms.add;
-                synced.perm_edit_quotation = !!modPerms.edit;
-                synced.perm_delete_quotation = !!modPerms.delete;
-            }
-            if (moduleId === 'item_stock') {
-                synced.perm_new_item = !!modPerms.add;
-                synced.perm_edit_item = !!modPerms.edit;
-                synced.perm_delete_item = !!modPerms.delete;
-            }
-            if (moduleId === 'supplier') {
-                synced.perm_new_supplier = !!modPerms.add;
-                synced.perm_edit_supplier = !!modPerms.edit;
-                synced.perm_delete_supplier = !!modPerms.delete;
-            }
-            if (moduleId === 'advance_payment') {
-                synced.perm_record_advance_pay = !!modPerms.add;
-                synced.perm_edit_advance_pay = !!modPerms.edit;
-                synced.perm_delete_advance_pay = !!modPerms.delete;
-            }
-            if (moduleId === 'customer') {
-                synced.perm_new_customer = !!modPerms.add;
-                synced.perm_edit_customer = !!modPerms.edit;
-                synced.perm_delete_customer = !!modPerms.delete;
-            }
-            saveUIPermissions(synced);
-            applyUIPermissions();
-        }
-        return true;
-    } catch (e) {
-        console.warn('Permission sync check failed:', e.message);
-        return false;
     }
-}
     // Run this only after PAGE_TO_MODULE is initialized above.
     if (!(await enforcePageLevelPermissions())) return;
 
