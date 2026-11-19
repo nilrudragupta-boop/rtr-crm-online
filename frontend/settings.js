@@ -492,16 +492,21 @@ function getUIPermissions() {
         const remoteStr = localStorage.getItem("remotePermissions_" + user);
         if (remoteStr) {
             const remotePerms = JSON.parse(remoteStr);
-            for (const [permId, isAllowed] of Object.entries(remotePerms)) {
-                if (isAllowed === false) {
-                    permissions[permId] = false;
-                } else if (isAllowed === true) {
-                    permissions[permId] = true;
+            if (!remotePerms || typeof remotePerms !== 'object' || Array.isArray(remotePerms) || remotePerms.__invalidRemotePermissions === true) {
+                UI_PERMISSION_REGISTRY.forEach(item => { permissions[item.id] = false; });
+            } else {
+                for (const [permId, isAllowed] of Object.entries(remotePerms)) {
+                    if (isAllowed === false) {
+                        permissions[permId] = false;
+                    } else if (isAllowed === true) {
+                        permissions[permId] = true;
+                    }
                 }
             }
         }
     } catch (e) {
         console.error("Error applying global remote permissions:", e);
+        UI_PERMISSION_REGISTRY.forEach(item => { permissions[item.id] = false; });
     }
 
     if (permissions.perm_godown_terminal === false) permissions.perm_godown_auth = false;

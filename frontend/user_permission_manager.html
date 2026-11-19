@@ -818,7 +818,7 @@
             <div class="header-icon"><i class="fas fa-user-shield"></i></div>
             <div class="header-title">
                 <h1>🔐 USER PERMISSION MANAGER</h1>
-                <p>Manage Individual Sub-User Access &amp; Module Permission IDs (<code>true</code> / <code>false</code>)</p>
+                <p>Manage licensed Admin button permissions in Licenses and sub-user permissions in the secure permission store.</p>
             </div>
         </div>
         <div class="header-actions">
@@ -849,10 +849,10 @@
             <div class="selector-grid">
                 <!-- Dynamic Sub-User Dropdown -->
                 <div>
-                    <label class="field-label">1. Select Sub-User (MongoDB Active Users)</label>
+                    <label class="field-label">1. Select Licensed Admin or Sub-User</label>
                     <div class="searchable-select" id="userDropdown">
                         <div class="select-trigger" onclick="toggleDropdown('userDropdown')">
-                            <span id="userTriggerText">-- Select an active sub-user --</span>
+                            <span id="userTriggerText">-- Select an account --</span>
                             <i class="fas fa-chevron-down select-chevron"></i>
                         </div>
                         <div class="select-dropdown">
@@ -1056,10 +1056,11 @@
 <div class="modal-backdrop" id="jsonModal">
     <div class="modal-dialog">
         <div class="modal-header">
-            <span><i class="fas fa-code" style="color: var(--slds-brand);"></i> Boolean Permission ID JSON</span>
+            <span><i class="fas fa-code" style="color: var(--slds-brand);"></i> Remote Permissions JSON (Licenses Column F)</span>
             <button class="btn btn-sm" onclick="closeModal('jsonModal')">&times;</button>
         </div>
         <div class="modal-body">
+            <p id="jsonHelpText" style="margin:0 0 12px;color:#706e6b;"></p>
             <pre class="json-preview" id="jsonPreviewContent"></pre>
         </div>
         <div class="modal-footer">
@@ -1201,6 +1202,7 @@
     const state = {
         actorUsername: '',
         tenantOwner: 'System',
+        licensedAdmin: null,
         subUsers: [],
         modules: [...FLAT_PERMISSION_MODULES],
         selectedUser: null,
@@ -1218,20 +1220,46 @@
         return (configured || (local ? 'http://localhost:5000/api' : `${window.location.origin}/api`)).replace(/\/+$/, '');
     }
 
-    async function apiRequest(endpoint, options = {}) {
+    async function apiRequest(endpoint, options = {}, retrySession = true) {
         const sep = endpoint.includes('?') ? '&' : '?';
         const url = `${getApiBase()}${endpoint}${sep}user=${encodeURIComponent(state.tenantOwner)}&actor=${encodeURIComponent(state.actorUsername)}`;
         const headers = {
             'Content-Type': 'application/json',
             'x-rtr-user': state.actorUsername,
+            ...(sessionStorage.getItem('permissionManagerSession') ? { 'Authorization': `Bearer ${sessionStorage.getItem('permissionManagerSession')}` } : {}),
             ...(options.headers || {})
         };
         const response = await fetch(url, { ...options, headers, cache: 'no-store' });
         const data = await response.json();
         if (!response.ok || data.success === false) {
+            if (response.status === 401 && retrySession && String(data.message || '').toLowerCase().includes('session')) {
+                sessionStorage.removeItem('permissionManagerSession');
+                await establishPermissionSession();
+                return apiRequest(endpoint, options, false);
+            }
             throw new Error(data.message || `Request failed (HTTP ${response.status})`);
         }
         return data;
+    }
+
+    async function establishPermissionSession() {
+        if (sessionStorage.getItem('permissionManagerSession')) return;
+        let password = '';
+        try { password = window.prompt('Re-enter your Admin password to open the permission manager. It will only be sent to the backend for verification.'); }
+        catch (_) { password = ''; }
+        if (!password) throw new Error('Password verification is required to manage permissions.');
+        const response = await fetch(`${getApiBase()}/permissions/session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: state.actorUsername, password }),
+            cache: 'no-store'
+        });
+        password = '';
+        const result = await response.json();
+        if (!response.ok || result.success !== true || !result.token) throw new Error(result.message || 'Account verification failed.');
+        sessionStorage.setItem('permissionManagerSession', result.token);
+        state.actorUsername = result.username;
+        state.tenantOwner = result.tenantOwner;
     }
 
     function showLoading(show, text = 'Loading...') {
@@ -1258,16 +1286,28 @@
             .replace(/"/g, '&quot;');
     }
 
-    function buildDefaultPermFlags() {
+    const ADMIN_DEFAULT_FALSE_PERMISSIONS = new Set([
+        'perm_admin_creds', 'perm_balance_sheet', 'perm_check_updates', 'perm_close_all_windows',
+        'perm_cloud_backup', 'perm_cloud_restore', 'perm_crm_v2', 'perm_delete_advance_pay',
+        'perm_delete_customer', 'perm_delete_item', 'perm_delete_quotation', 'perm_delete_supplier',
+        'perm_edit_advance_pay', 'perm_edit_customer', 'perm_edit_item', 'perm_edit_quotation',
+        'perm_edit_supplier', 'perm_email_sender', 'perm_journal_voucher', 'perm_medicine_depts',
+        'perm_new_customer', 'perm_new_item', 'perm_new_quotation', 'perm_new_supplier',
+        'perm_print_smart', 'perm_record_advance_pay', 'perm_reminder', 'perm_renew_license',
+        'perm_restaurant_kds', 'perm_restaurant_pos', 'perm_settings', 'perm_tally_gateway',
+        'perm_user_permission_manager', 'perm_vault_ledger'
+    ]);
+
+    function buildDefaultPermFlags(defaultAllowed = false) {
         const flags = {};
         state.modules.forEach(mod => {
-            flags[mod.id] = false;
+            flags[mod.id] = defaultAllowed && !ADMIN_DEFAULT_FALSE_PERMISSIONS.has(mod.id);
         });
         return flags;
     }
 
     function extractBooleanPermFlags(doc) {
-        const base = buildDefaultPermFlags();
+        const base = buildDefaultPermFlags(!!state.selectedUser?.isLicensedAdmin);
         if (doc && doc.permFlags && typeof doc.permFlags === 'object') {
             for (const [k, v] of Object.entries(doc.permFlags)) {
                 base[k] = v === true;
@@ -1514,20 +1554,35 @@
                 return;
             }
 
-            if (state.actorUsername.toLowerCase() === 'developer' || state.actorUsername === '7908040851') {
-                state.tenantOwner = '7908040851';
-            } else if (typeof apiClient !== 'undefined' && apiClient.getTenantId) {
-                state.tenantOwner = await apiClient.getTenantId();
-            } else {
-                state.tenantOwner = state.actorUsername;
+            await establishPermissionSession();
+
+            let usersRes;
+            let backendModulesRes;
+            try {
+                [usersRes, backendModulesRes] = await Promise.all([
+                    apiRequest('/permissions/sub-users'),
+                    apiRequest('/permissions/modules').catch(() => ({ data: [] }))
+                ]);
+            } catch (error) {
+                if (!String(error.message || '').toLowerCase().includes('session')) throw error;
+                sessionStorage.removeItem('permissionManagerSession');
+                await establishPermissionSession();
+                [usersRes, backendModulesRes] = await Promise.all([
+                    apiRequest('/permissions/sub-users'),
+                    apiRequest('/permissions/modules').catch(() => ({ data: [] }))
+                ]);
             }
 
-            const [usersRes, backendModulesRes] = await Promise.all([
-                apiRequest('/permissions/sub-users'),
-                apiRequest('/permissions/modules').catch(() => ({ data: [] }))
-            ]);
-
-            state.subUsers = usersRes.data || [];
+            state.licensedAdmin = {
+                userId: state.actorUsername,
+                username: state.actorUsername,
+                role: 'Licensed Admin',
+                status: 'Active',
+                isActive: true,
+                isPrivileged: true,
+                isLicensedAdmin: true
+            };
+            state.subUsers = [state.licensedAdmin, ...(usersRes.data || [])];
 
             // Append any dynamic custom pages registered in MongoDB CustomPage as individual items
             const customModules = (backendModulesRes.data || []).filter(m => m.category === 'Custom Objects');
@@ -1592,7 +1647,7 @@
         );
 
         if (filtered.length === 0) {
-            container.innerHTML = `<div style="padding: 12px; color: #706e6b; text-align: center;">No active sub-users found in MongoDB.</div>`;
+            container.innerHTML = `<div style="padding: 12px; color: #706e6b; text-align: center;">No matching accounts found.</div>`;
             return;
         }
 
@@ -1601,7 +1656,7 @@
                  onclick="selectSubUser('${escapeHtml(u.userId)}')">
                 <div>
                     <div class="option-main">${escapeHtml(u.username)} <span style="font-weight:400; color:#706e6b;">(${escapeHtml(u.userId)})</span></div>
-                    <div class="option-sub">Role: ${escapeHtml(u.role)}</div>
+                    <div class="option-sub">${u.isLicensedAdmin ? 'Permissions stored in Licenses → Remote Permissions (Column F)' : `Role: ${escapeHtml(u.role)} · Permissions stored in the secure sub-user store`}</div>
                 </div>
                 <span class="status-pill ${u.isActive ? 'status-active' : 'status-inactive'}">${escapeHtml(u.status)}</span>
             </div>
@@ -1653,10 +1708,29 @@
         showLoading(true, `Loading module permissions for ${userObj.username}...`);
 
         try {
-            const res = await apiRequest(`/permissions/user/${encodeURIComponent(userObj.userId)}`);
-            const doc = res.data || {};
+            let doc;
+            let remoteSheetAvailable = true;
+            let invalidRemotePermissions = false;
+            if (userObj.isLicensedAdmin) {
+                const res = await apiRequest(`/permissions/remote/${encodeURIComponent(userObj.userId)}`);
+                invalidRemotePermissions = res.data?.invalidExistingPermissions === true;
+                doc = { permFlags: invalidRemotePermissions ? buildDefaultPermFlags(false) : (res.data?.permFlags || {}) };
+            } else {
+                const res = await apiRequest(`/permissions/user/${encodeURIComponent(userObj.userId)}`);
+                doc = res.data || {};
+                try {
+                    const remoteRes = await apiRequest(`/permissions/remote/${encodeURIComponent(userObj.userId)}`);
+                    const remoteFlags = remoteRes.data?.permFlags || {};
+                    invalidRemotePermissions = remoteRes.data?.invalidExistingPermissions === true;
+                    if (invalidRemotePermissions) doc.permFlags = buildDefaultPermFlags(false);
+                    else if (Object.keys(remoteFlags).length) doc.permFlags = remoteFlags;
+                } catch (_) {
+                    remoteSheetAvailable = false;
+                }
+            }
 
             state.selectedUser = userObj;
+            state.selectedUser.remoteSheetAvailable = remoteSheetAvailable;
             const extracted = extractBooleanPermFlags(doc);
             state.savedPermFlags = { ...extracted };
             state.workingPermFlags = { ...extracted };
@@ -1688,6 +1762,9 @@
             renderCheckboxMatrix();
             renderSummaryTable();
             await loadAuditLogs(userObj.userId);
+            if (invalidRemotePermissions) {
+                showToast('The sheet JSON was invalid. All buttons were loaded as off; select the intended buttons and save to replace the invalid value.', 'error');
+            }
         } catch (err) {
             showToast(err.message, 'error');
         } finally {
@@ -1803,17 +1880,31 @@
                 cleanFlags[k] = v === true;
             }
 
-            const backendPermissions = buildBackendSyncPayload(cleanFlags);
+            const isLicensedAdmin = state.selectedUser.isLicensedAdmin === true;
+            const endpoint = isLicensedAdmin
+                ? `/permissions/remote/${encodeURIComponent(state.selectedUser.userId)}`
+                : `/permissions/user/${encodeURIComponent(state.selectedUser.userId)}`;
+            const requestBody = isLicensedAdmin
+                ? { permFlags: cleanFlags }
+                : { permissions: buildBackendSyncPayload(cleanFlags), permFlags: cleanFlags, actionPerformed, moduleLabels };
 
-            const res = await apiRequest(`/permissions/user/${encodeURIComponent(state.selectedUser.userId)}`, {
+            const res = await apiRequest(endpoint, {
                 method: 'POST',
-                body: JSON.stringify({
-                    permissions: backendPermissions,
-                    permFlags: cleanFlags,
-                    actionPerformed,
-                    moduleLabels
-                })
+                body: JSON.stringify(requestBody)
             });
+            let remoteSheetError = '';
+            if (!isLicensedAdmin) {
+                try {
+                    await apiRequest(`/permissions/remote/${encodeURIComponent(state.selectedUser.userId)}`, {
+                        method: 'POST',
+                        body: JSON.stringify({ permFlags: cleanFlags })
+                    });
+                    state.selectedUser.remoteSheetAvailable = true;
+                } catch (remoteError) {
+                    remoteSheetError = remoteError.message || 'No matching Licenses row was found.';
+                    state.selectedUser.remoteSheetAvailable = false;
+                }
+            }
 
             const doc = res.data || {};
             state.savedPermFlags = { ...cleanFlags };
@@ -1832,7 +1923,11 @@
             await loadAuditLogs(state.selectedUser.userId);
 
             const trueTotal = Object.values(cleanFlags).filter(v => v === true).length;
-            showToast(`Saved for ${state.selectedUser.username}: ${trueTotal} true, ${Object.keys(cleanFlags).length - trueTotal} false.`, 'success');
+            showToast(isLicensedAdmin
+                ? `Saved to Licenses → Remote Permissions for ${state.selectedUser.username}.`
+                : remoteSheetError
+                    ? `Sub-user permissions saved. Licenses Remote Permissions was not updated: ${remoteSheetError}`
+                    : `Saved for ${state.selectedUser.username} to both permission stores: ${trueTotal} true, ${Object.keys(cleanFlags).length - trueTotal} false.`, remoteSheetError ? 'error' : 'success');
         } catch (err) {
             showToast(err.message, 'error');
         } finally {
@@ -1857,13 +1952,16 @@
             cleanFlags[k] = v === true;
         }
         document.getElementById('jsonPreviewContent').textContent = JSON.stringify(cleanFlags, null, 2);
+        document.getElementById('jsonHelpText').textContent = state.selectedUser.isLicensedAdmin
+            ? 'Save writes directly to Licenses → Remote Permissions (Column F). Copy JSON for backup or manual sheet maintenance.'
+            : 'Save updates the secure sub-user permission store and the matching Licenses row when one exists. Copy JSON for backup.';
         document.getElementById('jsonModal').classList.add('open');
     }
 
     function copyJsonToClipboard() {
         const text = document.getElementById('jsonPreviewContent').textContent;
         navigator.clipboard.writeText(text).then(() => {
-            showToast('Copied Permission ID JSON to clipboard.', 'success');
+            showToast('Copied JSON for the Licenses Remote Permissions column.', 'success');
         });
     }
 
@@ -1888,14 +1986,31 @@
         closeModal('copyModal');
         showLoading(true, 'Copying boolean permission IDs...');
         try {
-            const res = await apiRequest(`/permissions/user/${encodeURIComponent(sourceId)}`);
-            const doc = res.data || {};
-            state.workingPermFlags = extractBooleanPermFlags(doc);
+            const sourceUser = state.subUsers.find(user => user.userId === sourceId);
+            if (!sourceUser) throw new Error('Permission source account was not found.');
+            let sourceFlags = {};
+            if (sourceUser.isLicensedAdmin) {
+                const sourceRes = await apiRequest(`/permissions/remote/${encodeURIComponent(sourceUser.userId)}`);
+                sourceFlags = sourceRes.data?.permFlags || {};
+            } else {
+                try {
+                    const sourceRes = await apiRequest(`/permissions/remote/${encodeURIComponent(sourceUser.userId)}`);
+                    sourceFlags = sourceRes.data?.permFlags || {};
+                } catch (_) {
+                    try { sourceFlags = JSON.parse(localStorage.getItem(`remotePermissions_${sourceUser.username}`) || '{}'); }
+                    catch (_) { sourceFlags = {}; }
+                }
+            }
+            const destinationFlags = buildDefaultPermFlags(!!state.selectedUser.isLicensedAdmin);
+            for (const [key, value] of Object.entries(sourceFlags)) {
+                if (typeof value === 'boolean') destinationFlags[key] = value;
+            }
+            state.workingPermFlags = destinationFlags;
             markUnsaved(true);
             renderCheckboxMatrix();
             renderModuleOptions();
             renderSummaryTable();
-            showToast('Permissions copied. Click "Save Permissions" to commit to MongoDB.', 'info');
+            showToast('Permissions copied. Click "Save Permissions" to save to the selected account.', 'info');
         } catch (err) {
             showToast(err.message, 'error');
         } finally {
