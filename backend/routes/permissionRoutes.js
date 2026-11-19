@@ -62,31 +62,43 @@ function sanitizePermissionSet(raw = {}) {
     return clean;
 }
 
-function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPassword, googleScriptTargetUrl, CustomPage, permissionGuards }) {
+function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPassword, requestDeveloperOtp, verifyDeveloperOtp, googleScriptTargetUrl, CustomPage, permissionGuards }) {
     const router = express.Router();
     const { requirePermissionAdmin, isPrivilegedUser, createManagerSession } = permissionGuards;
 
     router.post('/session', async (req, res) => {
         const username = String(req.body?.username || '').trim();
         const password = String(req.body?.password || '');
+        const isDeveloper = username.toLowerCase() === 'developer' || username === '7908040851';
         const attemptKey = String(req.ip || req.socket?.remoteAddress || 'unknown');
         const now = Date.now();
         const attempt = permissionLoginAttempts.get(attemptKey);
         if (attempt && attempt.blockedUntil > now) {
             return res.status(429).json({ success: false, message: 'Too many attempts. Try again in a few minutes.' });
         }
-        if (!username || !password || username.length > 200 || password.length > 512) {
-            return res.status(400).json({ success: false, message: 'Enter your account password to continue.' });
+        if (!username || username.length > 200 || password.length > 512) {
+            return res.status(400).json({ success: false, message: 'Account verification details are required.' });
         }
         try {
-            const account = await verifyAdminPassword(username, password);
+            if (isDeveloper && req.body?.action === 'request_developer_otp') {
+                const result = await requestDeveloperOtp(req);
+                return res.status(result.status || (result.success ? 200 : 503)).json(result);
+            }
+
+            let account;
+            if (isDeveloper) {
+                const otpIsValid = await verifyDeveloperOtp(req, req.body?.otp);
+                if (otpIsValid) account = { username: username.toLowerCase() === 'developer' ? 'developer' : username, role: 'Developer', isLicensedAdmin: true };
+            } else {
+                account = await verifyAdminPassword(username, password);
+            }
             const inactive = account && (account.active === false || account.isActive === false || ['inactive', 'disabled', 'suspended'].includes(String(account.status || '').toLowerCase()));
             if (!account || inactive || !isPrivilegedUser(account, username)) {
                 const next = attempt && attempt.windowStarted > now - 10 * 60 * 1000 ? attempt : { failures: 0, windowStarted: now };
                 next.failures += 1;
                 if (next.failures >= 8) next.blockedUntil = now + 10 * 60 * 1000;
                 permissionLoginAttempts.set(attemptKey, next);
-                return res.status(401).json({ success: false, message: 'Account verification failed.' });
+                return res.status(401).json({ success: false, message: isDeveloper ? 'Developer verification code is invalid or expired.' : 'Account verification failed.' });
             }
             permissionLoginAttempts.delete(attemptKey);
             const tenantOwner = username.toLowerCase() === 'developer' || username === '7908040851' ? '7908040851' : String(account.username || username).trim();

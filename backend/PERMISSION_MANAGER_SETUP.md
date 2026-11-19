@@ -1,6 +1,6 @@
 # Permission Manager secure write setup
 
-The browser does not contain the Apps Script URL signing secret. It re-verifies the signed-in Admin password with the backend, receives a short-lived permission-manager session, and calls protected backend routes. The backend signs License-sheet requests before forwarding them to Apps Script.
+The browser does not contain the Apps Script URL signing secret. Admin sessions re-verify the Admin password; Developer sessions request and verify a fresh Developer email OTP on the backend. Both receive a short-lived permission-manager session and call protected backend routes. The backend signs License-sheet requests before forwarding them to Apps Script.
 
 ## Backend environment
 
@@ -9,6 +9,7 @@ Configure these server environment variables before deploying:
 - `PERMISSION_MANAGER_SESSION_SECRET`: a random secret of at least 32 characters, used to sign 30-minute manager sessions.
 - `REMOTE_PERMISSION_HMAC_SECRET`: a separate random secret of at least 32 characters, shared with the Apps Script property below.
 - `GOOGLE_SCRIPT_URL`: the deployed Apps Script web app URL. The existing default is retained if this value is not configured.
+- `EMAIL_USER`, `EMAIL_APP_PASSWORD`, and optionally `DEVELOPER_EMAIL`: the backend mail settings used to send a fresh Developer OTP when opening the manager from a Developer session.
 
 Do not put either secret in frontend files, query strings, or browser storage. The manager stores only the short-lived session token in `sessionStorage`; it does not store the password.
 
