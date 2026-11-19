@@ -144,6 +144,11 @@ app.use('/api', async (req, res, next) => {
         });
         if (teamUsers.length < 2) return next();
 
+        const createPermissionGuards = require('./middleware/permissionMiddleware');
+        const registerPermissionRoutes = require('./routes/permissionRoutes');
+        const permissionGuards = createPermissionGuards(getConfiguredAdminUsers);
+        app.use('/api', permissionGuards.enforceModulePermission);
+        
         const owner = teamUsers.find(account => account.isLicensedAdmin === true) ||
             teamUsers.find(account => String(account.role || '').trim().toLowerCase() === 'admin') ||
             teamUsers[0];
@@ -1782,8 +1787,8 @@ crmRoutes(app, CrmDocument, '/api/crm-documents');
 crmRoutes(app, CrmEnquiry, '/api/crm-enquiries');
 crmRoutes(app, CrmTechnicalReview, '/api/crm-technical-reviews');
 crmRoutes(app, CrmNegotiation, '/api/crm-negotiations');
-registerCrmV2(app, { Customer, Supplier, CrmContact, CrmPlant, CrmEnquiry, Invoice, Purchase, FollowUp, Quotation });
-registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production });
+registerCrmV2(app, { Customer, Supplier, CrmContact, CrmPlant, CrmEnquiry, Invoice, Purchase, FollowUp, Quotation }); registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, permissionGuards });
+registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production }); registerPermissionRoutes(app, { getConfiguredAdminUsers, CustomPage, permissionGuards });
 
 app.get('/api/crm/customer/:id/360', async (req, res) => {
     try {
