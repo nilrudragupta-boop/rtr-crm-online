@@ -202,6 +202,18 @@
 
         <div class="content">
 
+            <section id="permissionManagerEntry" style="display:none; margin-bottom:24px; padding:18px 20px; border:1px solid #d7e5f5; border-left:4px solid #0176d3; border-radius:8px; background:#f7fbff;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:16px; font-weight:700; color:#183b60;"><i class="fas fa-user-shield" style="color:#0176d3; margin-right:7px;"></i>User Permission Manager</div>
+                        <div style="margin-top:4px; color:#52677e;">Open the module access dashboard after Developer OTP verification.</div>
+                    </div>
+                    <button id="openPermissionManagerBtn" class="btn-save" type="button" onclick="openUserPermissionManager()" style="padding:10px 18px;">
+                        <i class="fas fa-lock"></i> Verify Developer OTP &amp; Open
+                    </button>
+                </div>
+            </section>
+
             <!-- General Settings -->
             <div data-permission-id="perm_manage_company_info">
                 <div class="section-title">🏢 Company Information</div>
@@ -3550,6 +3562,54 @@ function createResponse(obj) {
                         alert("Error in Javascript syntax:\n" + e.message);
                     }
                 }
+
+                function showPermissionManagerEntry() {
+                    const entry = document.getElementById('permissionManagerEntry');
+                    if (!entry) return;
+                    const currentUser = (localStorage.getItem('currentUser') || '').trim().toLowerCase();
+                    const isDeveloperLogin = currentUser === 'developer' && localStorage.getItem('isDevLogin') === 'true';
+                    entry.style.display = isDeveloperLogin ? 'block' : 'none';
+                }
+
+                async function openUserPermissionManager() {
+                    const button = document.getElementById('openPermissionManagerBtn');
+                    if (button) button.disabled = true;
+                    try {
+                        const sessionResponse = await fetch('/api/permission-manager/session', { cache: 'no-store', credentials: 'same-origin' });
+                        const session = await sessionResponse.json();
+                        if (session.authorized) {
+                            window.location.href = '/user_permission_manager.html';
+                            return;
+                        }
+
+                        const requestResponse = await fetch('/api/permission-manager/request-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({})
+                        });
+                        const request = await requestResponse.json();
+                        if (!requestResponse.ok || !request.success) throw new Error(request.message || 'Could not send Developer OTP.');
+
+                        const otp = prompt(`Enter the Developer OTP sent to ${request.targetEmail}. The code expires in 5 minutes.`);
+                        if (otp === null) return;
+                        const verifyResponse = await fetch('/api/permission-manager/verify-otp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ challengeId: request.challengeId, otp: otp.trim() })
+                        });
+                        const verification = await verifyResponse.json();
+                        if (!verifyResponse.ok || !verification.success) throw new Error(verification.message || 'Developer OTP verification failed.');
+                        window.location.href = '/user_permission_manager.html';
+                    } catch (error) {
+                        alert(error.message || 'Could not open User Permission Manager.');
+                    } finally {
+                        if (button) button.disabled = false;
+                    }
+                }
+
+                document.addEventListener('DOMContentLoaded', showPermissionManagerEntry);
 
 
             </script>
