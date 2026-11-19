@@ -452,7 +452,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_godown_live', label: 'Godown Live' },
     { id: 'perm_godown_terminal', label: 'Godown Terminal' },
     { id: 'perm_godown_auth', label: 'Godown Authorization' },
-    { id: 'perm_user_permission_manager', label: 'User Permission Manager' },
+    { id: 'perm_user_permission_manager', label: 'User Permission Manager', defaultValue: false },
     { id: 'perm_business360', label: 'Business 360' }
 ];
 
