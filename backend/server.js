@@ -2458,13 +2458,14 @@ app.post('/api/permission-manager/request-otp', async (req, res) => {
         : { count: 1, resetAt: now + 60 * 1000 });
 
     try {
-        const creds = await AdminCreds.findOne({ id: 'global_creds' }).select('adminEmail').lean();
-        const email = String(
-            process.env.DEVELOPER_OTP_EMAIL ||
-            (creds && creds.adminEmail) ||
-            process.env.DEVELOPER_EMAIL ||
-            'nilrudragupta@gmail.com'
-        ).trim();
+        // Prefer explicit deployment configuration without making OTP delivery
+        // depend on MongoDB being available. Only read AdminCreds when no
+        // environment variable supplies the destination.
+        let email = String(process.env.DEVELOPER_OTP_EMAIL || process.env.DEVELOPER_EMAIL || '').trim();
+        if (!email) {
+            const creds = await AdminCreds.findOne({ id: 'global_creds' }).select('adminEmail').lean();
+            email = String((creds && creds.adminEmail) || 'nilrudragupta@gmail.com').trim();
+        }
         if (!email) {
             return res.status(503).json({ success: false, message: 'Developer email is not configured in CRM Settings.' });
         }
