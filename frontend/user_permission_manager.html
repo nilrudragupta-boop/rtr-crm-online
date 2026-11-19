@@ -1351,11 +1351,14 @@
                 cache: 'no-store',
                 signal: controller.signal
             });
-            const result = await response.json();
+            let result;
+            try { result = await response.json(); }
+            catch (_) { throw new Error('The backend did not return a permission-session response. Deploy the updated backend and try again.'); }
             if (!response.ok || result.success !== true) throw new Error(result.message || 'Account verification failed.');
             return result;
         } catch (error) {
-            if (error.name === 'AbortError') throw new Error('Verification timed out while contacting the backend. Check that the backend is awake and its email service is configured, then try again.');
+            if (error.name === 'AbortError') throw new Error('Verification timed out while contacting the backend. Check that the backend is awake and try again.');
+            if (error instanceof TypeError) throw new Error('Could not reach the backend. Check the connection and confirm the backend is running.');
             throw error;
         } finally {
             clearTimeout(timeout);
@@ -1371,7 +1374,7 @@
         if (developerOtpFlow) {
             showLoading(false);
             showPermissionAuthStatus('Developer verification', 'Sending a verification code to the configured Developer email address…');
-            await permissionSessionFetch({ username: state.actorUsername, action: 'request_developer_otp' });
+            const otpRequest = await permissionSessionFetch({ username: state.actorUsername, action: 'request_developer_otp' });
             document.getElementById('permissionAuthModal').classList.remove('open');
             const otp = await requestPermissionAuthValue({
                 title: 'Verify Developer access',
@@ -1382,7 +1385,7 @@
             });
             if (!otp) throw new Error('Developer OTP verification was cancelled.');
             showPermissionAuthStatus('Developer verification', 'Checking the verification code…');
-            const result = await permissionSessionFetch({ username: state.actorUsername, otp: String(otp).trim() });
+            const result = await permissionSessionFetch({ username: state.actorUsername, challengeId: otpRequest.challengeId, otp: String(otp).trim() });
             sessionStorage.setItem('permissionManagerSession', result.token);
             sessionStorage.setItem('permissionManagerSessionUser', result.username);
             state.actorUsername = result.username;
