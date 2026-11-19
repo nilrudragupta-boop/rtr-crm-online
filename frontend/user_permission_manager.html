@@ -672,6 +672,23 @@
             display: flex;
         }
 
+        #permissionAuthModal { z-index: 300; }
+        #permissionAuthInput {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 11px 12px;
+            border: 1px solid var(--slds-border);
+            border-radius: 4px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        #permissionAuthError {
+            display: none;
+            color: var(--slds-danger);
+            margin: 12px 0 0;
+            font-size: 13px;
+        }
+
         .modal-dialog {
             background: #ffffff;
             border-radius: 6px;
@@ -805,9 +822,30 @@
         <p style="color: var(--slds-text-muted); margin-bottom: 20px;">
             Only authorized <strong>Developer</strong>, <strong>Super Admin</strong>, or <strong>Admin</strong> accounts can access the User Permission Manager.
         </p>
+        <p id="authFailureMessage" style="display:none;color:#ba0517;margin:0 0 16px;"></p>
+        <button class="btn btn-primary" id="retryAuthBtn" style="display:none;margin:0 auto 12px;" onclick="window.location.reload()">
+            Retry verification
+        </button>
         <button class="btn btn-primary" onclick="window.location.href='dashboardB.html'">
             <i class="fas fa-arrow-left"></i> Return to Dashboard
         </button>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="permissionAuthModal" role="dialog" aria-modal="true" aria-labelledby="permissionAuthTitle">
+    <div class="modal-dialog">
+        <form id="permissionAuthForm">
+            <div class="modal-header" id="permissionAuthTitle">Verify account</div>
+            <div class="modal-body">
+                <div id="permissionAuthMessage" style="color:var(--slds-text-muted);"></div>
+                <input id="permissionAuthInput" autocomplete="current-password" required>
+                <p id="permissionAuthError"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" type="button" id="permissionAuthCancel">Cancel</button>
+                <button class="btn btn-primary" type="submit" id="permissionAuthSubmit">Continue</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -1244,6 +1282,86 @@
         return data;
     }
 
+    function requestPermissionAuthValue({ title, message, inputType, placeholder, autoComplete }) {
+        return new Promise(resolve => {
+            const modal = document.getElementById('permissionAuthModal');
+            const form = document.getElementById('permissionAuthForm');
+            const input = document.getElementById('permissionAuthInput');
+            const error = document.getElementById('permissionAuthError');
+            document.getElementById('permissionAuthTitle').textContent = title;
+            document.getElementById('permissionAuthMessage').textContent = message;
+            input.type = inputType;
+            input.disabled = false;
+            input.placeholder = placeholder;
+            input.autocomplete = autoComplete;
+            document.getElementById('permissionAuthCancel').style.display = '';
+            document.getElementById('permissionAuthSubmit').style.display = '';
+            document.getElementById('permissionAuthSubmit').disabled = false;
+            document.getElementById('permissionAuthSubmit').textContent = 'Continue';
+            input.value = '';
+            error.textContent = '';
+            error.style.display = 'none';
+            modal.classList.add('open');
+            setTimeout(() => input.focus(), 30);
+
+            const finish = value => {
+                modal.classList.remove('open');
+                form.removeEventListener('submit', onSubmit);
+                document.getElementById('permissionAuthCancel').removeEventListener('click', onCancel);
+                resolve(value);
+            };
+            const onSubmit = event => {
+                event.preventDefault();
+                const value = input.value;
+                if (!value) {
+                    error.textContent = 'Enter a value to continue.';
+                    error.style.display = 'block';
+                    return;
+                }
+                input.value = '';
+                finish(value);
+            };
+            const onCancel = () => finish(null);
+            form.addEventListener('submit', onSubmit);
+            document.getElementById('permissionAuthCancel').addEventListener('click', onCancel);
+        });
+    }
+
+    function showPermissionAuthStatus(title, message) {
+        document.getElementById('permissionAuthTitle').textContent = title;
+        document.getElementById('permissionAuthMessage').textContent = message;
+        document.getElementById('permissionAuthInput').disabled = true;
+        document.getElementById('permissionAuthInput').placeholder = 'Please wait…';
+        document.getElementById('permissionAuthCancel').style.display = 'none';
+        const submit = document.getElementById('permissionAuthSubmit');
+        submit.textContent = 'Please wait…';
+        submit.disabled = true;
+        document.getElementById('permissionAuthError').style.display = 'none';
+        document.getElementById('permissionAuthModal').classList.add('open');
+    }
+
+    async function permissionSessionFetch(body) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        try {
+            const response = await fetch(`${getApiBase()}/permissions/session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                cache: 'no-store',
+                signal: controller.signal
+            });
+            const result = await response.json();
+            if (!response.ok || result.success !== true) throw new Error(result.message || 'Account verification failed.');
+            return result;
+        } catch (error) {
+            if (error.name === 'AbortError') throw new Error('Verification timed out while contacting the backend. Check that the backend is awake and its email service is configured, then try again.');
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
     async function establishPermissionSession() {
         const savedSessionUser = (sessionStorage.getItem('permissionManagerSessionUser') || '').toLowerCase();
         if (sessionStorage.getItem('permissionManagerSession') && savedSessionUser === state.actorUsername.toLowerCase()) return;
@@ -1251,49 +1369,44 @@
         sessionStorage.removeItem('permissionManagerSessionUser');
         const developerOtpFlow = state.actorUsername.toLowerCase() === 'developer' && localStorage.getItem('isDevLogin') === 'true';
         if (developerOtpFlow) {
-            const otpRequest = await fetch(`${getApiBase()}/permissions/session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: state.actorUsername, action: 'request_developer_otp' }),
-                cache: 'no-store'
+            showLoading(false);
+            showPermissionAuthStatus('Developer verification', 'Sending a verification code to the configured Developer email address…');
+            await permissionSessionFetch({ username: state.actorUsername, action: 'request_developer_otp' });
+            document.getElementById('permissionAuthModal').classList.remove('open');
+            const otp = await requestPermissionAuthValue({
+                title: 'Verify Developer access',
+                message: 'Enter the 6-digit verification code sent to the configured Developer email address.',
+                inputType: 'text',
+                placeholder: '6-digit Developer OTP',
+                autoComplete: 'one-time-code'
             });
-            const otpRequestResult = await otpRequest.json();
-            if (!otpRequest.ok || otpRequestResult.success !== true) throw new Error(otpRequestResult.message || 'Could not request Developer verification.');
-
-            const otp = window.prompt('Enter the 6-digit Developer OTP sent to the configured Developer email address.');
-            if (!otp) throw new Error('Developer OTP verification is required to manage permissions.');
-            const sessionResponse = await fetch(`${getApiBase()}/permissions/session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: state.actorUsername, otp: String(otp).trim() }),
-                cache: 'no-store'
-            });
-            const sessionResult = await sessionResponse.json();
-            if (!sessionResponse.ok || sessionResult.success !== true || !sessionResult.token) throw new Error(sessionResult.message || 'Developer verification failed.');
-            sessionStorage.setItem('permissionManagerSession', sessionResult.token);
-            sessionStorage.setItem('permissionManagerSessionUser', sessionResult.username);
-            state.actorUsername = sessionResult.username;
-            state.tenantOwner = sessionResult.tenantOwner;
+            if (!otp) throw new Error('Developer OTP verification was cancelled.');
+            showPermissionAuthStatus('Developer verification', 'Checking the verification code…');
+            const result = await permissionSessionFetch({ username: state.actorUsername, otp: String(otp).trim() });
+            sessionStorage.setItem('permissionManagerSession', result.token);
+            sessionStorage.setItem('permissionManagerSessionUser', result.username);
+            state.actorUsername = result.username;
+            state.tenantOwner = result.tenantOwner;
+            document.getElementById('permissionAuthModal').classList.remove('open');
             return;
         }
 
-        let password = '';
-        try { password = window.prompt('Re-enter your Admin password to open the permission manager. It will only be sent to the backend for verification.'); }
-        catch (_) { password = ''; }
-        if (!password) throw new Error('Password verification is required to manage permissions.');
-        const response = await fetch(`${getApiBase()}/permissions/session`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: state.actorUsername, password }),
-            cache: 'no-store'
+        showLoading(false);
+        const password = await requestPermissionAuthValue({
+            title: 'Verify Admin account',
+            message: 'Re-enter the password for the Admin account currently signed in.',
+            inputType: 'password',
+            placeholder: 'Admin password',
+            autoComplete: 'current-password'
         });
-        password = '';
-        const result = await response.json();
-        if (!response.ok || result.success !== true || !result.token) throw new Error(result.message || 'Account verification failed.');
+        if (!password) throw new Error('Password verification was cancelled.');
+        showLoading(true, 'Verifying Admin account...');
+        const result = await permissionSessionFetch({ username: state.actorUsername, password });
         sessionStorage.setItem('permissionManagerSession', result.token);
         sessionStorage.setItem('permissionManagerSessionUser', result.username);
         state.actorUsername = result.username;
         state.tenantOwner = result.tenantOwner;
+        showLoading(false);
     }
 
     function showLoading(show, text = 'Loading...') {
@@ -1639,6 +1752,11 @@
             await loadAuditLogs();
         } catch (err) {
             console.error('Initialization blocked:', err);
+            document.getElementById('permissionAuthModal').classList.remove('open');
+            const failure = document.getElementById('authFailureMessage');
+            failure.textContent = err.message || 'Account verification could not be completed.';
+            failure.style.display = 'block';
+            document.getElementById('retryAuthBtn').style.display = 'block';
             document.getElementById('unauthorizedScreen').style.display = 'flex';
         } finally {
             showLoading(false);
