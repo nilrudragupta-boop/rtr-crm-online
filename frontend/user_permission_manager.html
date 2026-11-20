@@ -882,8 +882,8 @@
                 <div class="header-icon"><i class="fas fa-user-shield"></i></div>
                 <div class="header-title">
                     <h1>🔐 USER PERMISSION MANAGER</h1>
-                    <p>Manage licensed Admin button permissions in Licenses and sub-user permissions in the secure
-                        permission store.</p>
+                    <p>Manage Admin and User accounts from the Google Sheet, including accounts that are offline.
+                        Module permissions sync to Licenses, and dashboard assignments save to Dash_Permissions.</p>
                 </div>
             </div>
             <div class="header-actions">
@@ -962,6 +962,25 @@
                             <div class="identity-meta">
                                 <span><strong>User ID:</strong> <span id="displaySelectedUserId">—</span></span>
                                 <span><strong>Role:</strong> <span id="displaySelectedRole">—</span></span>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px;">
+                                <label for="dashboardAssignmentSelect" style="font-weight:600;">Dashboard:</label>
+                                <select id="dashboardAssignmentSelect" class="input-control" style="min-width:170px; flex:1;" disabled>
+                                    <option value="">Select Dashboard</option>
+                                    <option value="dashboardB.html">Dashboard B</option>
+                                    <option value="dashboardC.html">Dashboard C</option>
+                                    <option value="dashboardD.html">Dashboard D</option>
+                                    <option value="dashboardE.html">Dashboard E</option>
+                                    <option value="dashboardF1.html">Dashboard F1</option>
+                                    <option value="dashboardF2.html">Dashboard F2</option>
+                                    <option value="dashboardF3.html">Dashboard F3</option>
+                                    <option value="dashboardF4.html">Dashboard F4</option>
+                                    <option value="dashboardF5.html">Dashboard F5</option>
+                                    <option value="dashboardF6.html">Dashboard F6</option>
+                                </select>
+                                <button type="button" class="btn btn-sm" id="btnSaveDashboardAssignment" onclick="saveDashboardAssignment()" disabled>
+                                    <i class="fas fa-display"></i> Save Dashboard
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1782,6 +1801,7 @@
                     isLicensedAdmin: true
                 };
                 state.subUsers = [state.licensedAdmin, ...(usersRes.data || [])];
+                if (usersRes.warning) showToast(usersRes.warning, 'error');
 
                 // Append any dynamic custom pages registered in MongoDB CustomPage as individual items
                 const customModules = (backendModulesRes.data || []).filter(m => m.category === 'Custom Objects');
@@ -1860,7 +1880,7 @@
                  onclick="selectSubUser('${escapeHtml(u.userId)}')">
                 <div>
                     <div class="option-main">${escapeHtml(u.username)} <span style="font-weight:400; color:#706e6b;">(${escapeHtml(u.userId)})</span></div>
-                    <div class="option-sub">${u.isLicensedAdmin ? 'Permissions stored in Licenses → Remote Permissions (Column F)' : `Role: ${escapeHtml(u.role)} · Permissions stored in the secure sub-user store`}</div>
+                    <div class="option-sub">Role: ${escapeHtml(u.role)} · Remote permissions stored in Licenses → Column F</div>
                 </div>
                 <span class="status-pill ${u.isActive ? 'status-active' : 'status-inactive'}">${escapeHtml(u.status)}</span>
             </div>
@@ -1954,6 +1974,9 @@
                 statusPill.style.display = 'inline-block';
 
                 document.getElementById('btnCopyPermissions').disabled = false;
+                document.getElementById('dashboardAssignmentSelect').disabled = false;
+                document.getElementById('btnSaveDashboardAssignment').disabled = false;
+                document.getElementById('dashboardAssignmentSelect').value = '';
                 markUnsaved(false);
 
                 if (state.selectedModuleId) {
@@ -1965,6 +1988,15 @@
                 renderModuleOptions();
                 renderCheckboxMatrix();
                 renderSummaryTable();
+                try {
+                    const dashboardRes = await apiRequest(`/permissions/dashboard/${encodeURIComponent(userObj.userId)}`);
+                    const assignment = dashboardRes.data?.dashboardFile || '';
+                    const dashboardSelect = document.getElementById('dashboardAssignmentSelect');
+                    dashboardSelect.value = [...dashboardSelect.options].some(option => option.value === assignment) ? assignment : '';
+                } catch (dashboardError) {
+                    document.getElementById('dashboardAssignmentSelect').value = '';
+                    showToast(`Dashboard assignment could not be loaded: ${dashboardError.message}`, 'error');
+                }
                 await loadAuditLogs(userObj.userId);
                 if (invalidRemotePermissions) {
                     showToast('The sheet JSON was invalid. All buttons were loaded as off; select the intended buttons and save to replace the invalid value.', 'error');
@@ -1973,6 +2005,28 @@
                 showToast(err.message, 'error');
             } finally {
                 showLoading(false);
+            }
+        }
+
+        async function saveDashboardAssignment() {
+            if (!state.selectedUser) return;
+            const dashboardFile = document.getElementById('dashboardAssignmentSelect').value;
+            if (!dashboardFile) {
+                showToast('Select a dashboard before saving the assignment.', 'error');
+                return;
+            }
+            const button = document.getElementById('btnSaveDashboardAssignment');
+            button.disabled = true;
+            try {
+                await apiRequest(`/permissions/dashboard/${encodeURIComponent(state.selectedUser.userId)}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ dashboardFile })
+                });
+                showToast(`Saved ${dashboardFile} assignment for ${state.selectedUser.username} to Dash_Permissions.`, 'success');
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                button.disabled = !state.selectedUser;
             }
         }
 
