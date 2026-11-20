@@ -232,7 +232,13 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
         }
     });
 
-    const allowedDashboards = new Set(['dashboardB.html', 'dashboardC.html', 'dashboardD.html', 'dashboardE.html', 'dashboardF1.html', 'dashboardF2.html', 'dashboardF3.html', 'dashboardF4.html', 'dashboardF5.html', 'dashboardF6.html']);
+    const dashboardFiles = {
+        dashboardb: 'dashboardB.html', dashboardc: 'dashboardC.html', dashboardd: 'dashboardD.html', dashboarde: 'dashboardE.html',
+        dashboardf1: 'dashboardF1.html', dashboardf2: 'dashboardF2.html', dashboardf3: 'dashboardF3.html',
+        dashboardf4: 'dashboardF4.html', dashboardf5: 'dashboardF5.html', dashboardf6: 'dashboardF6.html'
+    };
+    const allowedDashboards = new Set(Object.values(dashboardFiles));
+    const normalizeDashboardFile = value => dashboardFiles[String(value || '').trim().toLowerCase().replace(/\.(html|htm)$/i, '')] || '';
     router.get('/dashboard/:userId', requirePermissionAdmin, async (req, res) => {
         try {
             const target = decodeURIComponent(req.params.userId).trim();
@@ -240,7 +246,7 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
             if (!targetAccount) return res.status(404).json({ success: false, message: 'The selected account is outside this Admin’s tenant.' });
             const result = await callSignedRemotePermissions('get_dashboard_assignment', req.permissionActor.username, String(targetAccount.username).trim());
             res.set('Cache-Control', 'no-store');
-            return res.json({ success: true, data: result.data || { dashboardFile: '' } });
+            return res.json({ success: true, data: { dashboardFile: normalizeDashboardFile(result.data?.dashboardFile) } });
         } catch (err) {
             return res.status(502).json({ success: false, message: err.message });
         }
@@ -255,7 +261,7 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
             if (!allowedDashboards.has(dashboardFile)) return res.status(400).json({ success: false, message: 'Select a supported dashboard.' });
             const dashboardId = dashboardFile.replace(/\.html$/i, '').toLowerCase();
             const result = await callSignedRemotePermissions('set_dashboard_assignment', req.permissionActor.username, String(targetAccount.username).trim(), { [`perm_dashboard_${dashboardId}`]: true });
-            return res.json({ success: true, message: result.message || 'Dashboard assignment saved.', data: result.data || { dashboardFile } });
+            return res.json({ success: true, message: result.message || 'Dashboard assignment saved.', data: { dashboardFile: normalizeDashboardFile(result.data?.dashboardFile) || dashboardFile } });
         } catch (err) {
             return res.status(400).json({ success: false, message: err.message });
         }
