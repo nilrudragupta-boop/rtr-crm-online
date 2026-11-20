@@ -169,9 +169,8 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
             const actor = req.permissionActor.username;
             const targetAccount = findPermissionTarget(target, await getPermissionTargets(req));
             if (!targetAccount) return res.status(404).json({ success: false, message: 'The selected account is outside this Admin’s tenant.' });
-            if (isPrivilegedUser(targetAccount, targetAccount.username) && targetAccount.username.toLowerCase() !== actor.toLowerCase() && req.permissionActor.role.toLowerCase() !== 'developer') {
-                return res.status(403).json({ success: false, message: 'You can only view your own licensed Admin permissions.' });
-            }
+            // Targets have already been restricted to the signed-in Admin's tenant.
+            // Allow managing another licensed Admin in that tenant from this manager.
             const result = await callSignedRemotePermissions('get_remote_permissions', actor, String(targetAccount.username).trim());
             res.set('Cache-Control', 'no-store');
             return res.json({ success: true, data: result.data || { permFlags: {} } });
@@ -186,9 +185,8 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
             const actor = req.permissionActor.username;
             const targetAccount = findPermissionTarget(target, await getPermissionTargets(req));
             if (!targetAccount) return res.status(404).json({ success: false, message: 'The selected account is outside this Admin’s tenant.' });
-            if (isPrivilegedUser(targetAccount, targetAccount.username) && targetAccount.username.toLowerCase() !== actor.toLowerCase() && req.permissionActor.role.toLowerCase() !== 'developer') {
-                return res.status(403).json({ success: false, message: 'You can only change your own licensed Admin permissions.' });
-            }
+            // Targets have already been restricted to the signed-in Admin's tenant.
+            // Allow managing another licensed Admin in that tenant from this manager.
             const flags = canonicalFlags(req.body?.permFlags);
             const result = await callSignedRemotePermissions('set_remote_permissions', actor, String(targetAccount.username).trim(), flags);
             const previousFlags = result.data?.previousPermFlags || {};
@@ -234,10 +232,12 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
                         role,
                         status: accountStatus,
                         isActive,
-                        isPrivileged: isPrivilegedUser(u, username)
+                        isPrivileged: isPrivilegedUser(u, username),
+                        isLicensedAdmin: u.isLicensedAdmin === true || String(u.role || '').trim().toLowerCase() === 'admin'
                     };
                 })
-                .filter(u => u.username && !u.isPrivileged) // Exclude Developer/Super Admin from sub-user target list
+                .filter(u => u.username && u.username.toLowerCase() !== req.permissionActor.username.toLowerCase())
+                .filter(u => !u.isPrivileged || u.isLicensedAdmin) // Include tenant Admins; exclude Developer/Super Admin
                 .filter(u => includeInactive || u.isActive);
 
             res.json({ success: true, tenantOwner, data: subUsers });
