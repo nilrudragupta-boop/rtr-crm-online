@@ -13,11 +13,11 @@ The backend signs each Licenses-sheet read/write request with HMAC-SHA256. Apps 
 
 This signed-request design does not make an Apps Script callback to the backend, so the permission bridge does not require `UrlFetchApp` or the `script.external_request` scope. The existing `forceAuth` helper only opens the spreadsheet; it does not make an external request.
 
-Keep `GOOGLE_SCRIPT_URL` pointed at the deployed Apps Script web app (the existing default remains if it is unset). The script rejects unsigned, expired, or replayed requests and updates Column F only after finding exactly one matching username in `Licenses`.
+Keep `GOOGLE_SCRIPT_URL` pointed at the deployed Apps Script web app (the existing default remains if it is unset). The updated script supports a signed account-list request for `Licenses` and `RemoteUsers`, so accounts can be managed while offline. It reads the Role column by header when available and falls back to the established layout. Permission JSON is still stored in Column F of the matching `Licenses` row. Dashboard assignments can also be saved to `Dash_Permissions` by User ID; a `User ID` header is added in an unused column when needed. The script rejects unsigned, expired, or replayed requests.
 
 ## Account behavior
 
-- Licensed Admin permissions are written directly to that Admin's `Licenses` row.
-- Sub-user permissions are saved to the secure backend permission store. If that sub-user also has a matching username row in `Licenses`, the manager additionally writes the flags to Column F; without a matching row, the secure backend save still succeeds and the manager reports that no sheet row was updated.
-- Backend permission records and sheet writes remain limited to the signed-in Admin's tenant. A Developer session can manage accounts available to Developer.
+- The selector is populated from the sheet account list, including Admin and User rows whether or not the account is currently logged in. Developer can manage all listed accounts; an Admin remains limited to accounts sharing that Admin's tenant contacts.
+- Admin and User permission flags are written to the matching account's `Licenses` row in Column F, so the existing license check returns them at next sign-in. User permissions also retain the backend permission record and audit trail.
+- Dashboard file assignments are written to `Dash_Permissions` and keyed by User ID so one user can be assigned a dashboard without changing another user's assignment.
 - Malformed existing JSON is reported and loads as all buttons off; saving a reviewed selection replaces the malformed value. Runtime permission loading fails closed for malformed values.

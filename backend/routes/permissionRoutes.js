@@ -65,6 +65,7 @@ function sanitizePermissionSet(raw = {}) {
 function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPassword, requestDeveloperOtp, verifyDeveloperOtp, googleScriptTargetUrl, CustomPage, permissionGuards }) {
     const router = express.Router();
     const { requirePermissionAdmin, isPrivilegedUser, createManagerSession } = permissionGuards;
+    let remoteAccountsCache = { accounts: [], expiresAt: 0, loaded: false };
 
     router.post('/session', async (req, res) => {
         const username = String(req.body?.username || '').trim();
@@ -125,7 +126,26 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
     }
 
     async function getPermissionTargets(req) {
-        const users = await getConfiguredAdminUsers();
+        const configuredUsers = await getConfiguredAdminUsers();
+        let sheetUsers = remoteAccountsCache.accounts;
+        if (Date.now() >= remoteAccountsCache.expiresAt) {
+            try {
+                const response = await callSignedRemotePermissions('list_remote_permission_accounts', req.permissionActor.username, '*');
+                sheetUsers = response.data?.accounts || [];
+                remoteAccountsCache = { accounts: sheetUsers, expiresAt: Date.now() + 30000, loaded: true };
+            } catch (_) {
+                // Preserve the existing backend account flow if the optional sheet sync is unavailable.
+                sheetUsers = remoteAccountsCache.accounts.length ? remoteAccountsCache.accounts : [];
+            }
+        }
+        const usersByName = new Map();
+        (remoteAccountsCache.loaded ? sheetUsers : configuredUsers).forEach(user => {
+            const key = String(user.username || '').trim().toLowerCase();
+            if (key) usersByName.set(key, { ...(usersByName.get(key) || {}), ...user });
+        });
+        const configuredActor = configuredUsers.find(user => String(user.username || '').trim().toLowerCase() === req.permissionActor.username.toLowerCase());
+        if (configuredActor && !usersByName.has(req.permissionActor.username.toLowerCase())) usersByName.set(req.permissionActor.username.toLowerCase(), configuredActor);
+        const users = [...usersByName.values()];
         const actor = users.find(user => String(user.username || '').trim().toLowerCase() === req.permissionActor.username.toLowerCase());
         if (req.permissionActor.role.toLowerCase() === 'developer') return users;
         const ownerName = getTenantOwner(req).toLowerCase();
@@ -212,6 +232,35 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
         }
     });
 
+    const allowedDashboards = new Set(['dashboardB.html', 'dashboardC.html', 'dashboardD.html', 'dashboardE.html', 'dashboardF1.html', 'dashboardF2.html', 'dashboardF3.html', 'dashboardF4.html', 'dashboardF5.html', 'dashboardF6.html']);
+    router.get('/dashboard/:userId', requirePermissionAdmin, async (req, res) => {
+        try {
+            const target = decodeURIComponent(req.params.userId).trim();
+            const targetAccount = findPermissionTarget(target, await getPermissionTargets(req));
+            if (!targetAccount) return res.status(404).json({ success: false, message: 'The selected account is outside this Admin’s tenant.' });
+            const result = await callSignedRemotePermissions('get_dashboard_assignment', req.permissionActor.username, String(targetAccount.username).trim());
+            res.set('Cache-Control', 'no-store');
+            return res.json({ success: true, data: result.data || { dashboardFile: '' } });
+        } catch (err) {
+            return res.status(502).json({ success: false, message: err.message });
+        }
+    });
+
+    router.post('/dashboard/:userId', requirePermissionAdmin, async (req, res) => {
+        try {
+            const target = decodeURIComponent(req.params.userId).trim();
+            const targetAccount = findPermissionTarget(target, await getPermissionTargets(req));
+            if (!targetAccount) return res.status(404).json({ success: false, message: 'The selected account is outside this Admin’s tenant.' });
+            const dashboardFile = String(req.body?.dashboardFile || '');
+            if (!allowedDashboards.has(dashboardFile)) return res.status(400).json({ success: false, message: 'Select a supported dashboard.' });
+            const dashboardId = dashboardFile.replace(/\.html$/i, '').toLowerCase();
+            const result = await callSignedRemotePermissions('set_dashboard_assignment', req.permissionActor.username, String(targetAccount.username).trim(), { [`perm_dashboard_${dashboardId}`]: true });
+            return res.json({ success: true, message: result.message || 'Dashboard assignment saved.', data: result.data || { dashboardFile } });
+        } catch (err) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+    });
+
     // 1. Fetch active sub-users from existing MongoDB AdminCreds collection
     router.get('/sub-users', requirePermissionAdmin, async (req, res) => {
         try {
@@ -240,7 +289,13 @@ function registerPermissionRoutes(app, { getConfiguredAdminUsers, verifyAdminPas
                 .filter(u => !u.isPrivileged || u.isLicensedAdmin) // Include tenant Admins; exclude Developer/Super Admin
                 .filter(u => includeInactive || u.isActive);
 
-            res.json({ success: true, tenantOwner, data: subUsers });
+            res.json({
+                success: true,
+                tenantOwner,
+                source: remoteAccountsCache.loaded ? 'Google Sheet' : 'Backend fallback',
+                warning: remoteAccountsCache.loaded ? '' : 'Google Sheet account list could not be loaded; showing configured backend accounts.',
+                data: subUsers
+            });
         } catch (err) {
             res.status(500).json({ success: false, message: err.message });
         }
