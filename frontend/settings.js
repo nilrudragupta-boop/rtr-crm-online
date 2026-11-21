@@ -420,7 +420,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_summary_chart', label: 'Summary & Chart', defaultValue: false },
     { id: 'perm_gst_report', label: 'GST Report', feature: 'gst', defaultValue: false },
     { id: 'perm_enquiry', label: 'Enquiry Management', defaultValue: false },
-    { id: 'perm_ledger_report', label: 'Ledger Report', defaultValue: false },
+    { id: 'perm_ledger_report', label: 'Ledger', defaultValue: false },
     { id: 'perm_settings', label: 'Settings', defaultValue: false },
     { id: 'perm_vault_ledger', label: 'Vault Ledger', defaultValue: false },
     { id: 'perm_credit_debit_notes', label: 'Credit/Debit Notes', defaultValue: false },
