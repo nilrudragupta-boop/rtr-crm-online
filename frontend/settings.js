@@ -389,7 +389,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_edit_item', label: 'Edit Items', feature: 'inventory', defaultValue: false },
     { id: 'perm_delete_item', label: 'Delete Items', feature: 'inventory', defaultValue: false },
     { id: 'perm_purchase_entries', label: 'Purchase Entries', feature: 'inventory' },
-    { id: 'perm_new_purchase', label: 'New Purchases', feature: 'inventory' },
+    { id: 'perm_add_purchase', label: 'New Purchases', feature: 'inventory' },
     { id: 'perm_edit_purchase', label: 'Edit Purchases', feature: 'inventory' },
     { id: 'perm_delete_purchase', label: 'Delete Purchases', feature: 'inventory' },
     { id: 'perm_purchase_report', label: 'Purchase Analytics', feature: 'inventory' },
@@ -798,7 +798,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                     synced.perm_print_smart = !!modPerms.print;
                 }
                 if (moduleId === 'purchase') {
-                    synced.perm_new_purchase = !!modPerms.add;
+                    synced.perm_add_purchase = !!modPerms.add;
                     synced.perm_edit_purchase = !!modPerms.edit;
                     synced.perm_delete_purchase = !!modPerms.delete;
                 }
