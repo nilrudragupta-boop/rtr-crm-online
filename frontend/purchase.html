@@ -1679,6 +1679,7 @@
             if (purchaseModulePermissionData.privileged) return true;
 
             const actionByFlag = {
+                perm_purchase_entries: "view",
                 perm_add_purchase: "add",
                 perm_edit_purchase: "edit",
                 perm_delete_purchase: "delete",
@@ -1698,6 +1699,10 @@
 
         function canAddPurchase() {
             return hasPurchasePermission("perm_add_purchase");
+        }
+
+        function canViewPurchase() {
+            return hasPurchasePermission("perm_purchase_entries");
         }
 
         function canEditPurchase() {
@@ -3450,7 +3455,7 @@
         <div class="action-dropdown">
             <button class="action-btn-main" onclick="toggleActionMenu(this)">⚙️ Options</button>
             <div class="action-dropdown-content">
-                ${actionButtonVisibility.view ? `<button onclick="viewPurchase('${p.id}')">👁️ View</button>` : ''}
+                ${actionButtonVisibility.view && canViewPurchase() ? `<button onclick="viewPurchase('${p.id}')">👁️ View</button>` : ''}
                 ${actionButtonVisibility.edit && canEditPurchase() ? `<button onclick="editPurchase('${p.id}')">✏️ Edit</button>` : ''}
                 ${actionButtonVisibility.copy && canAddPurchase() ? `<button onclick="duplicatePurchase('${p.id}')">📋 Copy</button>` : ''}
                 ${actionButtonVisibility.delete && canDeletePurchase() ? `<button onclick="deletePurchase('${p.id}')" style="color: #dc3545 !important;">🗑️ Delete</button>` : ''}
@@ -4304,6 +4309,7 @@
         }
 
         function viewPurchase(id) {
+            if (!canViewPurchase()) return showToast("Purchase viewing is disabled for this user.", "#c0392b");
             const purchases = JSON.parse(localStorage.getItem("purchases")) || [];
             const p = purchases.find(x => x.id == id);
             if (!p) return showToast("Purchase not found");

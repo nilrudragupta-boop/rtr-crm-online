@@ -798,6 +798,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                     synced.perm_print_smart = !!modPerms.print;
                 }
                 if (moduleId === 'purchase') {
+                    synced.perm_purchase_entries = !!modPerms.view;
                     synced.perm_add_purchase = !!modPerms.add;
                     synced.perm_edit_purchase = !!modPerms.edit;
                     synced.perm_delete_purchase = !!modPerms.delete;
