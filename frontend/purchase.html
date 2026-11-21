@@ -2603,6 +2603,7 @@
                     $('supplierInv').focus();
                     return;
                 }
+                if (!canAddPurchase()) return showToast("Purchase creation is disabled for this user.", "#c0392b");
 
                 let totalTaxable = 0;
                 draftItems.forEach(i => {
@@ -2739,6 +2740,7 @@
                 $('supplierInv').focus();
                 return;
             }
+            if (!canEditPurchase()) return showToast("Purchase editing is disabled for this user.", "#c0392b");
 
             const btnUpdate = $("updateBtn");
             const originalText = btnUpdate.innerHTML;
@@ -2873,7 +2875,7 @@
                         }
                     });
                     localStorage.setItem("purchases", JSON.stringify(localPurchases));
-                    if (localPurchasesToSync.length && typeof apiClient.savePurchase === 'function') {
+                    if (canAddPurchase() && localPurchasesToSync.length && typeof apiClient.savePurchase === 'function') {
                         const currentUser = localStorage.getItem('currentUser') || 'System';
                         const syncablePurchases = localPurchasesToSync
                             .filter(record => !record.createdBy || record.createdBy === 'System' || record.createdBy === currentUser)
@@ -3786,6 +3788,7 @@
             if (!p) return showToast("Purchase not found ⚠️");
 
             askConfirm("Confirm Duplicate", "Create a new copy of this purchase entry? Its Supplier Invoice No. will be cleared to prevent recording the same supplier bill twice.", async () => {
+                if (!canAddPurchase()) return showToast("Purchase creation is disabled for this user.", "#c0392c");
                 const audit = typeof AuditManager !== 'undefined' ? AuditManager.getAuditTrail(false) : {};
                 const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                 const newEntry = {
