@@ -1719,6 +1719,7 @@
             const canAdd = canAddPurchase();
             const canEdit = canEditPurchase();
             const canDelete = canDeletePurchase();
+            const showDeleteAction = canDelete && actionButtonVisibility.delete;
             const canChange = canAdd;
 
             const formHeader = $("purchaseFormToggleHeader");
@@ -1734,13 +1735,16 @@
             const updateButton = $("updateBtn");
             if (updateButton && editingId && !canEdit) updateButton.style.display = "none";
             const deleteSelectedButton = $("btnDeleteSelectedPurchases");
-            if (deleteSelectedButton) deleteSelectedButton.style.display = canDelete ? "" : "none";
+            if (deleteSelectedButton) {
+                deleteSelectedButton.style.display = showDeleteAction ? "" : "none";
+                deleteSelectedButton.disabled = !showDeleteAction;
+            }
             const recycleBinButton = $("purchaseRecycleBinBtn");
             if (recycleBinButton && !canEdit) recycleBinButton.style.display = "none";
             const printButton = document.querySelector('[data-permission-id="perm_print"]');
             if (printButton) printButton.style.display = hasPurchasePermission("perm_print") ? "" : "none";
             const selectAll = $("selectAll");
-            if (selectAll) selectAll.disabled = !canDelete;
+            if (selectAll) selectAll.disabled = !showDeleteAction;
 
             if (editToggle) {
                 editToggle.disabled = !canEdit;
@@ -1750,7 +1754,7 @@
                 deleteToggle.disabled = !canDelete;
                 deleteToggle.title = canDelete ? "" : "Disabled by Remote Permissions: perm_delete_purchase";
             }
-            document.body.classList.toggle("purchase-delete-disabled", !canDelete);
+            document.body.classList.toggle("purchase-delete-disabled", !showDeleteAction);
             applyPurchaseToolbarButtonVisibility();
         }
 
@@ -4660,6 +4664,7 @@
             }
             actionButtonVisibility[type] = document.getElementById(`show${type.charAt(0).toUpperCase() + type.slice(1)}Btn`).checked;
             localStorage.setItem("purchaseActionButtons", JSON.stringify(actionButtonVisibility));
+            applyPurchaseActionPermissions();
             loadPurchases();
         }
 
