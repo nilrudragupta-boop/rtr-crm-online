@@ -388,7 +388,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_new_item', label: 'Create Items', feature: 'inventory', defaultValue: false },
     { id: 'perm_edit_item', label: 'Edit Items', feature: 'inventory', defaultValue: false },
     { id: 'perm_delete_item', label: 'Delete Items', feature: 'inventory', defaultValue: false },
-    { id: 'perm_purchase_entries', label: 'Purchase Entries', feature: 'inventory' },
+    { id: 'perm_purchase_entries', label: 'Purchase', feature: 'inventory' },
     { id: 'perm_add_purchase', label: 'New Purchases', feature: 'inventory' },
     { id: 'perm_edit_purchase', label: 'Edit Purchases', feature: 'inventory' },
     { id: 'perm_delete_purchase', label: 'Delete Purchases', feature: 'inventory' },
