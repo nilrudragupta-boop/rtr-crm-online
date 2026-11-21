@@ -1678,6 +1678,14 @@
             if (!purchaseModulePermissionsReady || !purchaseModulePermissionData) return false;
             if (purchaseModulePermissionData.privileged) return true;
 
+            // Honor the same granular permission IDs used by the item page and
+            // the UI permission manager, alongside the module permission data.
+            try {
+                if (typeof getUIPermissions === "function" && getUIPermissions()[permissionId] === false) return false;
+            } catch (error) {
+                return false;
+            }
+
             const actionByFlag = {
                 perm_purchase_entries: "view",
                 perm_add_purchase: "add",
