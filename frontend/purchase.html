@@ -1644,6 +1644,7 @@
             if (!currentUser) {
                 purchaseModulePermissionData = {};
                 purchaseModulePermissionsReady = true;
+                applyPurchaseActionPermissions();
                 return;
             }
 
@@ -1676,15 +1677,15 @@
 
         function hasPurchasePermission(permissionId) {
             if (!purchaseModulePermissionsReady || !purchaseModulePermissionData) return false;
-            if (purchaseModulePermissionData.privileged) return true;
 
-            // Honor the same granular permission IDs used by the item page and
-            // the UI permission manager, alongside the module permission data.
+            // Explicit granular permission IDs must remain effective even for
+            // privileged accounts, matching the item page permission checks.
             try {
                 if (typeof getUIPermissions === "function" && getUIPermissions()[permissionId] === false) return false;
             } catch (error) {
                 return false;
             }
+            if (purchaseModulePermissionData.privileged) return true;
 
             const actionByFlag = {
                 perm_purchase_entries: "view",
@@ -1755,8 +1756,10 @@
             if (selectAll) selectAll.disabled = !showDeleteAction;
 
             if (editToggle) {
-                editToggle.disabled = !canEdit;
-                editToggle.title = canEdit ? "" : "Disabled by Remote Permissions: perm_edit_purchase";
+                editToggle.disabled = !canAdd || !canEdit;
+                editToggle.title = !canAdd
+                    ? "Disabled by Remote Permissions: perm_add_purchase"
+                    : canEdit ? "" : "Disabled by Remote Permissions: perm_edit_purchase";
             }
             if (deleteToggle) {
                 deleteToggle.disabled = !canDelete;
