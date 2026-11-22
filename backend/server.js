@@ -1899,7 +1899,7 @@ registerPermissionRoutes(app, {
     permissionGuards
 });
 registerCrmV2(app, { Customer, Supplier, CrmContact, CrmPlant, CrmEnquiry, Invoice, Purchase, FollowUp, Quotation });
-registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production });
+registerNancyRoutes(app, { Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production, AdvancePayment });
 
 app.get('/api/crm/customer/:id/360', async (req, res) => {
     try {

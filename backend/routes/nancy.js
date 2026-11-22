@@ -32,7 +32,7 @@ const invoiceDate = invoice => {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production }) {
+function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, CreditDebitNote, Scrap, Production, AdvancePayment }) {
     const ownerQuery = userId => ({ createdBy: userId, deletedAt: null });
     const matchingText = value => new RegExp(escapeRegex(value), 'i');
 
@@ -361,13 +361,30 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 ...ownerQuery(userId),
                 status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
             }).sort({ date: -1 }).lean();
-            // Use the saved Total Due column value when available so Nancy
-            // reports the same outstanding amount as Invoice Reports.
+            const advances = AdvancePayment
+                ? await AdvancePayment.find({ ...ownerQuery(userId), deletedAt: null }).lean()
+                : [];
+            // Match Invoice Reports' Total Due column, including applied advances.
             return invoices.map(invoice => {
-                const savedDue = invoice.total_due ?? invoice.totalDue;
-                const due = savedDue !== undefined && savedDue !== null && savedDue !== ''
-                    ? number(savedDue)
-                    : invoiceTotal(invoice) - invoicePaid(invoice);
+                const invoiceNo = String(invoice.invoiceNo || invoice.invoice_no || '').trim().toLowerCase();
+                const customerName = String(invoice.customerName || invoice.customer_name || invoice.customer?.name || '').trim().toLowerCase();
+                const advanceApplied = invoiceNo && customerName
+                    ? advances.reduce((sum, advance) => sum + (advance.allocations || [])
+                        .filter(item => item && item.type === 'invoice_allocation'
+                            && item.documentType === 'sales_invoice' && item.status !== 'reversed'
+                            && String(item.invoiceNo || '').trim().toLowerCase() === invoiceNo
+                            && String(item.partyName || advance.partyName || '').trim().toLowerCase() === customerName)
+                        .reduce((part, item) => part + number(item.amount), 0), 0)
+                    : 0;
+                const paymentHistoryPaid = Array.isArray(invoice.paymentHistory) && invoice.paymentHistory.length
+                    ? invoice.paymentHistory.reduce((sum, payment) => sum + number(payment.amount), 0)
+                    : 0;
+                const cashPaid = Math.max(
+                    paymentHistoryPaid,
+                    firstAmount(invoice.total_paid, invoice.paid_amount, invoice.paid),
+                    number(invoice.paid_cash) + number(invoice.paid_bank)
+                );
+                const due = Math.max(0, invoiceTotal(invoice) - cashPaid - advanceApplied);
                 return { invoice, due };
             })
                 .filter(({ due }) => due > 0.01).map(({ invoice, due }) => ({
