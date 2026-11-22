@@ -366,32 +366,14 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                     ? AdvancePayment.find({ ...ownerQuery(userId), deletedAt: null }).lean()
                     : []
             ]);
-            // Match Invoice Reports' Total Due column, including applied advances.
-            const unpaidInvoices = invoices.map(invoice => {
-                const invoiceNo = String(invoice.invoice_no || invoice.invoiceNo || '').trim().toLowerCase();
-                const customerName = String(invoice.customer_name || invoice.customer?.name || '').trim().toLowerCase();
-                const advanceApplied = invoiceNo && customerName
-                    ? advances.reduce((sum, advance) => sum + (advance.allocations || [])
-                        .filter(item => item && item.type === 'invoice_allocation'
-                            && item.documentType === 'sales_invoice' && item.status !== 'reversed'
-                            && String(item.invoiceNo || '').trim().toLowerCase() === invoiceNo
-                            && String(item.partyName || advance.partyName || '').trim().toLowerCase() === customerName)
-                        .reduce((part, item) => part + number(item.amount), 0), 0)
-                    : 0;
-                const paymentHistoryPaid = Array.isArray(invoice.paymentHistory) && invoice.paymentHistory.length
-                    ? invoice.paymentHistory.reduce((sum, payment) => sum + number(payment.amount), 0)
-                    : 0;
-                const cashPaid = Math.max(
-                    paymentHistoryPaid,
-                    number(invoice.total_paid || invoice.paid_amount || invoice.paid || 0),
-                    number(invoice.paid_cash) + number(invoice.paid_bank)
-                );
-                const due = Math.max(0, invoiceTotal(invoice) - cashPaid - advanceApplied);
-                return { invoice, due };
-            })
+            // Use the saved Total Due column value directly; do not recalculate it.
+            const unpaidInvoices = invoices.map(invoice => ({
+                invoice,
+                due: number(invoice.total_due ?? invoice.totalDue)
+            }))
                 .filter(({ due }) => due > 0.01).map(({ invoice, due }) => ({
                 invoiceNo: invoice.invoiceNo || invoice.invoice_no,
-                customerName: invoice.customer_name || invoice.customer?.name || invoice.customerName,
+                customerName: invoice.customerName || invoice.customer_name || invoice.customer?.name,
                 date: invoice.date,
                 status: invoice.status,
                 outstanding: Math.max(0, due)
