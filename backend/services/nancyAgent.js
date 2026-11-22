@@ -260,11 +260,18 @@ async function getDirectAnswer(prompt, tools) {
     const normalized = query.toLowerCase().replace(/[?.!]+$/g, '').trim();
 
     if (/^(unpaid invoices|unpaid bills|unpaid invoice summary|unpaid bills summary|invoices with (?:a )?(?:balance|due)|invoices with total due|total due invoices|pending invoice dues)$/.test(normalized)) {
-        const invoices = await withTimeout(tools.getUnpaidInvoices({}), 8000, 'MongoDB unpaid-invoice query');
-        if (!invoices.length) return 'No unpaid invoices found.';
+        const result = await withTimeout(tools.getUnpaidInvoices({}), 8000, 'MongoDB unpaid-invoice query');
+        const invoices = Array.isArray(result) ? result : (result.invoices || []);
+        const unallocatedAdvances = Array.isArray(result) ? [] : (result.unallocatedAdvances || []);
         const rows = invoices.slice(0, 8).map((invoice, index) =>
             `**Sl No: ${index + 1}** | **Invoice No: ${invoice.invoiceNo || 'Invoice'}** - ${invoice.customerName || 'Unknown customer'}: **Dues: ${formatCurrency(invoice.outstanding)}**`);
-        return `Found ${invoices.length} unpaid invoices.\n${rows.join('\n')}`;
+        const invoiceSummary = invoices.length
+            ? `Found ${invoices.length} unpaid invoices.\n${rows.join('\n')}`
+            : 'No unpaid invoices found.';
+        const advanceSummary = unallocatedAdvances.length
+            ? `Unallocated Advances by customer:\n${unallocatedAdvances.map(item => `**${item.customerName}**: ${formatCurrency(item.amount)}`).join('\n')}`
+            : 'No unallocated advances found.';
+        return `${invoiceSummary}\n\n${advanceSummary}`;
     }
 
     if (/^(total sales this month|sales this month|monthly sales|invoice total this month|monthly invoice total|total invoice amount this month)$/.test(normalized)) {

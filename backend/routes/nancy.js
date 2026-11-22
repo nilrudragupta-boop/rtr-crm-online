@@ -357,17 +357,19 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
         },
 
         async getUnpaidInvoices({ userId }) {
-            const invoices = await Invoice.find({
-                ...ownerQuery(userId),
-                status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
-            }).sort({ date: -1 }).lean();
-            const advances = AdvancePayment
-                ? await AdvancePayment.find({ ...ownerQuery(userId), deletedAt: null }).lean()
-                : [];
+            const [invoices, advances] = await Promise.all([
+                Invoice.find({
+                    ...ownerQuery(userId),
+                    status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
+                }).sort({ date: -1 }).lean(),
+                AdvancePayment
+                    ? AdvancePayment.find({ ...ownerQuery(userId), deletedAt: null }).lean()
+                    : []
+            ]);
             // Match Invoice Reports' Total Due column, including applied advances.
-            return invoices.map(invoice => {
-                const invoiceNo = String(invoice.invoiceNo || invoice.invoice_no || '').trim().toLowerCase();
-                const customerName = String(invoice.customerName || invoice.customer_name || invoice.customer?.name || '').trim().toLowerCase();
+            const unpaidInvoices = invoices.map(invoice => {
+                const invoiceNo = String(invoice.invoice_no || invoice.invoiceNo || '').trim().toLowerCase();
+                const customerName = String(invoice.customer_name || invoice.customer?.name || '').trim().toLowerCase();
                 const advanceApplied = invoiceNo && customerName
                     ? advances.reduce((sum, advance) => sum + (advance.allocations || [])
                         .filter(item => item && item.type === 'invoice_allocation'
@@ -381,7 +383,7 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                     : 0;
                 const cashPaid = Math.max(
                     paymentHistoryPaid,
-                    firstAmount(invoice.total_paid, invoice.paid_amount, invoice.paid),
+                    number(invoice.total_paid || invoice.paid_amount || invoice.paid || 0),
                     number(invoice.paid_cash) + number(invoice.paid_bank)
                 );
                 const due = Math.max(0, invoiceTotal(invoice) - cashPaid - advanceApplied);
@@ -389,11 +391,36 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
             })
                 .filter(({ due }) => due > 0.01).map(({ invoice, due }) => ({
                 invoiceNo: invoice.invoiceNo || invoice.invoice_no,
-                customerName: invoice.customerName || invoice.customer_name,
+                customerName: invoice.customer_name || invoice.customer?.name || invoice.customerName,
                 date: invoice.date,
                 status: invoice.status,
                 outstanding: Math.max(0, due)
             }));
+
+            const unallocatedByCustomer = new Map();
+            advances.forEach(advance => {
+                const allocations = (advance.allocations || [])
+                    .filter(item => item && item.type === 'invoice_allocation' && item.status !== 'reversed')
+                    .reduce((sum, item) => sum + number(item.amount), 0);
+                const refunds = (advance.refunds || [])
+                    .filter(item => item && item.status !== 'reversed')
+                    .reduce((sum, item) => sum + number(item.amount), 0);
+                const remaining = Math.max(0, number(advance.amount)
+                    - Math.max(number(advance.adjustedAmount), allocations) - refunds);
+                if (remaining <= 0.005) return;
+                const name = String(advance.partyName || '').trim();
+                if (!name) return;
+                const key = name.toLowerCase();
+                const current = unallocatedByCustomer.get(key) || { customerName: name, amount: 0 };
+                current.amount += remaining;
+                unallocatedByCustomer.set(key, current);
+            });
+
+            return {
+                invoices: unpaidInvoices,
+                unallocatedAdvances: Array.from(unallocatedByCustomer.values())
+                    .sort((a, b) => a.customerName.localeCompare(b.customerName))
+            };
         }
     };
 }
