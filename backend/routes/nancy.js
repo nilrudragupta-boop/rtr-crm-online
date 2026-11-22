@@ -361,14 +361,15 @@ function createNancyDataStore({ Customer, Invoice, Item, Supplier, Purchase, Cre
                 ...ownerQuery(userId),
                 status: { $nin: ['CANCELLED', 'Cancelled', 'cancelled'] }
             }).sort({ date: -1 }).lean();
-            // Match Invoice Reports' Total Due column: any invoice with a
-            // positive remaining balance is unpaid, including partial payments.
-            return invoices.map(invoice => ({
-                invoice,
-                total: invoiceTotal(invoice),
-                paid: invoicePaid(invoice)
-            }))
-                .map(({ invoice, total, paid }) => ({ invoice, total, paid, due: total - paid }))
+            // Use the saved Total Due column value when available so Nancy
+            // reports the same outstanding amount as Invoice Reports.
+            return invoices.map(invoice => {
+                const savedDue = invoice.total_due ?? invoice.totalDue;
+                const due = savedDue !== undefined && savedDue !== null && savedDue !== ''
+                    ? number(savedDue)
+                    : invoiceTotal(invoice) - invoicePaid(invoice);
+                return { invoice, due };
+            })
                 .filter(({ due }) => due > 0.01).map(({ invoice, due }) => ({
                 invoiceNo: invoice.invoiceNo || invoice.invoice_no,
                 customerName: invoice.customerName || invoice.customer_name,
