@@ -1,0 +1,2872 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bidder Price Comparison Engine (INR)</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <!-- DevTools & F12 Blocker -->
+    <script src="anti-debug.js"></script>
+    <script src="settings.js"></script>
+    <script src="brand.service.js"></script>
+    <script src="brandLoader.js"></script>
+    <script src="apiClient.js"></script>
+    <style>
+        :root {
+            --bg: #f4f6f9;
+            --surface: #ffffff;
+            --border: #d8dee6;
+            --border-strong: #b0bac5;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --primary: #1d4ed8;
+            --primary-hover: #1e40af;
+            --low-bg: #dcfce7;
+            --low-text: #166534;
+            --low-border: #86efac;
+            --high-bg: #fee2e2;
+            --high-text: #991b1b;
+            --high-border: #fca5a5;
+            --eq-bg: #fef9c3;
+            --eq-text: #854d0e;
+            --eq-border: #fde047;
+            --header-bg: #f8fafc;
+            --bidder-accent: #eef2ff;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 16px;
+        }
+
+        /* Top Control Bar */
+        .toolbar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 14px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .title-group h1 {
+            font-size: 17px;
+            font-weight: 700;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .title-group p {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        button,
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-strong);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background: #f1f5f9;
+        }
+
+        button.primary {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        button.primary:hover {
+            background: var(--primary-hover);
+        }
+
+        button.success {
+            background: #15803d;
+            color: #fff;
+            border-color: #15803d;
+        }
+
+        button.success:hover {
+            background: #166534;
+        }
+
+        button.excel-btn {
+            background: #0f766e;
+            color: #fff;
+            border-color: #0f766e;
+        }
+
+        button.excel-btn:hover {
+            background: #115e59;
+        }
+
+        button.csv-btn {
+            background: #0369a1;
+            color: #fff;
+            border-color: #0369a1;
+        }
+
+        button.csv-btn:hover {
+            background: #075985;
+        }
+
+        button.danger {
+            color: #b91c1c;
+            border-color: #fecaca;
+            background: #fef2f2;
+        }
+
+        button.danger:hover {
+            background: #fee2e2;
+        }
+
+        .kbd-hint {
+            font-size: 10px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            padding: 1px 4px;
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            opacity: 0.85;
+        }
+
+        button.primary .kbd-hint,
+        button.success .kbd-hint,
+        button.excel-btn .kbd-hint {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: #fff;
+        }
+
+        /* Freeze Control Select */
+        .freeze-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            color: #1e3a8a;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .freeze-control select {
+            border: 1px solid #93c5fd;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #0f172a;
+            background: #ffffff;
+            cursor: pointer;
+            outline: none;
+            max-width: 210px;
+        }
+
+        .freeze-control select:focus {
+            border-color: var(--primary);
+        }
+
+        /* Legend & Status Bar */
+        .status-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 500;
+            padding-top: 4px;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+        }
+
+        .swatch.low {
+            background: var(--low-bg);
+            border-color: var(--low-border);
+        }
+
+        .swatch.high {
+            background: var(--high-bg);
+            border-color: var(--high-border);
+        }
+
+        .swatch.equal {
+            background: var(--eq-bg);
+            border-color: var(--eq-border);
+        }
+
+        .meta-inputs {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .meta-inputs label {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .meta-inputs label strong {
+            padding-top: 4px;
+            white-space: nowrap;
+            color: var(--text);
+        }
+
+        .meta-inputs input {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: var(--text);
+            background: #fff;
+        }
+
+        .meta-inline-area {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: var(--text);
+            background: #fff;
+            font-family: inherit;
+            line-height: 1.4;
+            min-width: 190px;
+            min-height: 28px;
+            resize: none;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .meta-inline-area:focus {
+            outline: 2px solid var(--primary);
+            border-color: var(--primary);
+        }
+
+        .currency-badge {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 11.5px;
+        }
+
+        /* Keyboard Shortcuts Strip */
+        .shortcut-bar {
+            background: #0f172a;
+            color: #cbd5e1;
+            border-radius: 6px;
+            padding: 6px 14px;
+            margin-bottom: 12px;
+            font-size: 11.5px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .shortcut-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .shortcut-list span strong {
+            color: #f8fafc;
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 10.5px;
+        }
+
+        /* Table Wrapper */
+        .table-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            overflow: auto;
+            max-height: 74vh;
+            position: relative;
+        }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+            min-width: 100%;
+            table-layout: fixed;
+        }
+
+        th,
+        td {
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            padding: 0;
+            vertical-align: middle;
+            position: relative;
+            overflow: hidden;
+        }
+
+        thead th {
+            background: var(--header-bg);
+            font-weight: 600;
+            color: #0f172a;
+            user-select: none;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        thead tr:nth-child(2) th {
+            top: 38px;
+        }
+
+        /* Frozen Column Styles */
+        .frozen-col {
+            position: sticky !important;
+            z-index: 15;
+            background-color: #ffffff;
+        }
+
+        tbody tr:hover td.frozen-col:not(.low-cell):not(.high-cell):not(.equal-cell):not(.target-cell) {
+            background-color: #f8fafc;
+        }
+
+        tbody tr td.row-index-cell.frozen-col {
+            background-color: #f8fafc;
+        }
+
+        tbody tr.active-row td.row-index-cell.frozen-col {
+            background-color: #dbeafe;
+        }
+
+        tbody tr td.target-cell.frozen-col {
+            background-color: #f0fdf4;
+        }
+
+        thead th.frozen-col {
+            z-index: 35 !important;
+            background-color: var(--header-bg);
+        }
+
+        thead th.bidder-group-header.frozen-col {
+            background-color: var(--bidder-accent);
+        }
+
+        thead th.l1-group-header.frozen-col {
+            background-color: #dcfce7;
+        }
+
+        thead th.l1-sub-header.frozen-col {
+            background-color: #f0fdf4;
+        }
+
+        tfoot td.frozen-col {
+            z-index: 25 !important;
+            background-color: #f1f5f9;
+        }
+
+        tfoot tr.grand-total-row td.frozen-col {
+            background-color: #e2e8f0;
+        }
+
+        tfoot td.target-cell.frozen-col {
+            background-color: #f0fdf4;
+        }
+
+        .frozen-edge {
+            border-right: 2px solid #94a3b8 !important;
+            box-shadow: 3px 0 6px -2px rgba(15, 23, 42, 0.14);
+        }
+
+        /* Column Drag & Drop Rearranging Styles */
+        .col-drag-handle {
+            cursor: grab;
+            color: #94a3b8;
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 3px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .col-drag-handle:hover {
+            color: var(--primary);
+            background: rgba(29, 78, 216, 0.08);
+        }
+
+        .col-drag-handle:active {
+            cursor: grabbing;
+        }
+
+        th.dragging-col {
+            opacity: 0.45;
+        }
+
+        th.drag-over-left {
+            border-left: 3px solid var(--primary) !important;
+        }
+
+        th.drag-over-right {
+            border-right: 3px solid var(--primary) !important;
+        }
+
+        /* Column Resizer Handle */
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 6px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 10;
+            background: transparent;
+            transition: background 0.15s;
+        }
+
+        .resizer:hover,
+        .resizer.resizing {
+            background: var(--primary);
+        }
+
+        /* Header Controls */
+        .th-inner {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .th-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+        }
+
+        .col-title-input {
+            width: 100%;
+            border: 1px solid transparent;
+            background: transparent;
+            font-weight: 700;
+            font-size: 12.5px;
+            color: #0f172a;
+            padding: 3px 5px;
+            border-radius: 4px;
+        }
+
+        .col-title-input:hover,
+        .col-title-input:focus {
+            background: #fff;
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .col-type-select {
+            width: 100%;
+            font-size: 11px;
+            padding: 2px 4px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: #fff;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .icon-btn {
+            padding: 3px 5px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            background: #e2e8f0;
+            color: #dc2626;
+        }
+
+        /* Bidder Group Header */
+        th.bidder-group-header {
+            background: var(--bidder-accent);
+            border-bottom: 2px solid #c7d2fe;
+        }
+
+        .bidder-header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            gap: 6px;
+        }
+
+        .bidder-name-input {
+            width: 100%;
+            font-weight: 700;
+            font-size: 13px;
+            color: #1e1b4b;
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid #c7d2fe;
+            border-radius: 4px;
+            padding: 4px 8px;
+            text-align: center;
+        }
+
+        .bidder-name-input:focus {
+            background: #fff;
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .sub-th {
+            padding: 6px 8px;
+            font-size: 11.5px;
+            text-align: center;
+            background: #f8fafc;
+            color: #334155;
+            font-weight: 600;
+        }
+
+        /* Table Body Cells */
+        tbody tr:hover td:not(.low-cell):not(.high-cell):not(.equal-cell) {
+            background: #f8fafc;
+        }
+
+        tbody tr.active-row td.row-index-cell {
+            background: #dbeafe;
+            color: #1e40af;
+            font-weight: 800;
+        }
+
+        .cell-input {
+            width: 100%;
+            height: 100%;
+            min-height: 36px;
+            border: none;
+            background: transparent;
+            padding: 6px 8px;
+            font-size: 13px;
+            color: inherit;
+            font-family: inherit;
+        }
+
+        textarea.cell-input {
+            resize: none;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.4;
+            display: block;
+            min-height: 36px;
+        }
+
+        .cell-input:focus {
+            outline: 2.5px solid var(--primary);
+            outline-offset: -2.5px;
+            background: #fff !important;
+            color: #0f172a !important;
+        }
+
+        .inr-input,
+        .num-input,
+        .num-align {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .cell-readonly {
+            padding: 6px 8px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            display: block;
+            min-height: 36px;
+            line-height: 24px;
+        }
+
+        .row-index-cell {
+            text-align: center;
+            color: var(--text-muted);
+            font-weight: 600;
+            background: #f8fafc;
+        }
+
+        /* Highlight States */
+        td.low-cell {
+            background-color: var(--low-bg) !important;
+            color: var(--low-text) !important;
+            font-weight: 700;
+        }
+
+        td.high-cell {
+            background-color: var(--high-bg) !important;
+            color: var(--high-text) !important;
+            font-weight: 700;
+        }
+
+        td.equal-cell {
+            background-color: var(--eq-bg) !important;
+            color: var(--eq-text) !important;
+            font-weight: 700;
+        }
+
+        /* Target / Benchmark Column */
+        td.target-cell {
+            background: #f0fdf4;
+            font-weight: 600;
+            color: #14532d;
+        }
+
+        /* Footer Totals */
+        tfoot tr {
+            background: #f1f5f9;
+            font-weight: 700;
+            border-top: 2px solid var(--border-strong);
+        }
+
+        tfoot td {
+            padding: 9px 8px;
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        tfoot tr.grand-total-row {
+            background: #e2e8f0;
+            font-size: 13.5px;
+            color: #0f172a;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        /* Help Modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 16px;
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+        }
+
+        .modal-card {
+            background: #fff;
+            border-radius: 10px;
+            max-width: 560px;
+            width: 100%;
+            padding: 20px 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }
+
+        .modal-header h2 {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 18px;
+            font-size: 12.5px;
+        }
+
+        .shortcut-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+
+        .shortcut-row kbd {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 11px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+            transition: all 0.2s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Print Styles */
+        @media print {
+            @page {
+                size: landscape;
+                margin: 10mm;
+            }
+
+            body {
+                background: #fff;
+                padding: 0;
+                font-size: 11px;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .no-print,
+            .icon-btn,
+            .col-type-select,
+            .resizer,
+            .shortcut-bar,
+            .freeze-control,
+            .col-drag-handle {
+                display: none !important;
+            }
+
+            .toolbar,
+            .status-bar,
+            .table-container {
+                box-shadow: none;
+                border: 1px solid #94a3b8;
+                margin-bottom: 8px;
+            }
+
+            .table-container {
+                overflow: visible;
+                max-height: none;
+            }
+
+            .frozen-col {
+                position: static !important;
+                box-shadow: none !important;
+            }
+
+            table {
+                width: 100%;
+            }
+
+            .col-title-input,
+            .bidder-name-input,
+            .cell-input,
+            .meta-inline-area {
+                border: none !important;
+                background: transparent !important;
+                padding: 2px 4px;
+                min-height: 20px;
+            }
+
+            td.low-cell {
+                background-color: #dcfce7 !important;
+                color: #166534 !important;
+            }
+
+            td.high-cell {
+                background-color: #fee2e2 !important;
+                color: #991b1b !important;
+            }
+
+            td.equal-cell {
+                background-color: #fef9c3 !important;
+                color: #854d0e !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Hidden CSV File Input -->
+    <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display:none"
+        onchange="handleCSVFileUpload(event)" />
+
+    <!-- Top Controls -->
+    <div class="toolbar">
+        <div class="title-group">
+            <h1><i data-lucide="scale" style="width:20px;height:20px;color:var(--primary)"></i> Comparative Statement &
+                Bidder Evaluation (INR)</h1>
+            <p>Indian Rupees formatting (00,00,000.00) • Drag headers to rearrange columns • Auto-highlights L1,
+                Highest & Equal bids</p>
+        </div>
+        <div class="actions no-print">
+            <button onclick="addCustomColumn()" title="Alt + C"><i data-lucide="columns-3"
+                    style="width:15px;height:15px"></i> Add Column <span class="kbd-hint">Alt+C</span></button>
+            <div class="freeze-control" title="Freeze columns 1 to N from the left while scrolling">
+                <i data-lucide="pin" style="width:14px;height:14px;color:var(--primary)"></i>
+                <span>Freeze Panes:</span>
+                <select id="freezeColumnSelect" onchange="updateFreezeSelection(this.value)"></select>
+            </div>
+            <button class="primary" onclick="addBidderColumn()" title="Alt + B"><i data-lucide="user-plus"
+                    style="width:15px;height:15px"></i> Add Bidder <span class="kbd-hint">Alt+B</span></button>
+            <button onclick="addRow(true)" title="Alt + R or Enter on last row"><i data-lucide="plus"
+                    style="width:15px;height:15px"></i> Add Row <span class="kbd-hint">Alt+R</span></button>
+            <button class="success" onclick="saveData()" title="Ctrl + S"><i data-lucide="save"
+                    style="width:15px;height:15px"></i> Save <span class="kbd-hint">Ctrl+S</span></button>
+            <button onclick="triggerImportCSV()" title="Import data from .csv file"><i data-lucide="upload"
+                    style="width:15px;height:15px"></i> Import CSV</button>
+            <button class="csv-btn" onclick="exportCSV()" title="Export table to .csv file"><i data-lucide="file-text"
+                    style="width:15px;height:15px"></i> Export CSV</button>
+            <button class="excel-btn" onclick="exportExcel()" title="Ctrl + E"><i data-lucide="file-spreadsheet"
+                    style="width:15px;height:15px"></i> Export Excel <span class="kbd-hint">Ctrl+E</span></button>
+            <button onclick="window.print()" title="Ctrl + P"><i data-lucide="printer"
+                    style="width:15px;height:15px"></i> Print</button>
+            <button onclick="toggleHelpModal(true)" title="Keyboard Shortcuts (Alt + /)"><i data-lucide="keyboard"
+                    style="width:15px;height:15px"></i> Keys</button>
+            <button class="danger" onclick="resetTable()" title="Reset to Default Sample"><i data-lucide="rotate-ccw"
+                    style="width:15px;height:15px"></i> Reset</button>
+        </div>
+    </div>
+
+    <!-- Quick Keyboard Guide Strip -->
+    <div class="shortcut-bar no-print">
+        <div class="shortcut-list">
+            <span><strong>↑ ↓ ← →</strong> Navigate Grid</span>
+            <span><strong>Enter</strong> Next Row (Auto-Add at bottom)</span>
+            <span><strong>Tab / Shift+Tab</strong> Next / Prev Cell</span>
+            <span><strong>Esc</strong> Revert Edit</span>
+            <span><strong>Ctrl+D</strong> Copy Above Cell</span>
+            <span><strong>Ctrl+Backspace</strong> Delete Row</span>
+        </div>
+        <span style="color:#94a3b8;font-size:11px;">Press <strong>Alt + /</strong> for all shortcuts</span>
+    </div>
+
+    <!-- Legend & Metadata -->
+    <div class="status-bar">
+        <div class="legend">
+            <span class="legend-item"><span class="swatch low"></span> Lowest Price (L1)</span>
+            <span class="legend-item"><span class="swatch high"></span> Highest Price</span>
+            <span class="legend-item"><span class="swatch equal"></span> Equal / Tied Price</span>
+        </div>
+        <div class="meta-inputs">
+            <label><strong>Enquiry No.:</strong><textarea rows="1" id="enquiryNo" class="meta-inline-area"
+                    placeholder="Write Enqui No."
+                    oninput="autoResizeMetaField(this); autoSaveSilent();"></textarea></label>
+        </div>
+        <div class="meta-inputs">
+            <label><strong>Procurement Details:</strong><textarea rows="1" id="procurementDetails"
+                    class="meta-inline-area" placeholder="Write Procurement Title"
+                    oninput="autoResizeMetaField(this); autoSaveSilent();"></textarea></label>
+        </div>
+        <div class="meta-inputs">
+            <label><strong>Project Name:</strong><textarea rows="1" id="projectName" class="meta-inline-area"
+                    placeholder="Write Project Name"
+                    oninput="autoResizeMetaField(this); autoSaveSilent();"></textarea></label>
+            <label><strong>GST / Tax %:</strong> <input type="number" id="taxPercent" value="18" min="0" max="100"
+                    step="0.5" style="width:65px" onchange="recalculateAll(); autoSaveSilent();" /></label>
+        </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="table-container">
+        <table id="comparisonTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+            <tfoot id="tableFoot"></tfoot>
+        </table>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="helpModal" class="modal-backdrop no-print" onclick="if(event.target===this) toggleHelpModal(false)">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2><i data-lucide="keyboard"
+                        style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;color:var(--primary)"></i>
+                    Keyboard Shortcuts</h2>
+                <button class="icon-btn" onclick="toggleHelpModal(false)"><i data-lucide="x"
+                        style="width:18px;height:18px"></i></button>
+            </div>
+            <div class="shortcut-grid">
+                <div class="shortcut-row"><span>Move Up / Down</span><kbd>↑</kbd> / <kbd>↓</kbd></div>
+                <div class="shortcut-row"><span>Move Left / Right</span><kbd>←</kbd> / <kbd>→</kbd></div>
+                <div class="shortcut-row"><span>Move Down / Add Row</span><kbd>Enter</kbd></div>
+                <div class="shortcut-row"><span>Move Up</span><kbd>Shift + Enter</kbd></div>
+                <div class="shortcut-row"><span>Next / Previous Field</span><kbd>Tab</kbd> / <kbd>Shift + Tab</kbd>
+                </div>
+                <div class="shortcut-row"><span>First / Last Cell in Row</span><kbd>Alt + Home</kbd> / <kbd>End</kbd>
+                </div>
+                <div class="shortcut-row"><span>Revert Active Cell Edit</span><kbd>Esc</kbd></div>
+                <div class="shortcut-row"><span>Copy Cell From Above</span><kbd>Ctrl + D</kbd></div>
+                <div class="shortcut-row"><span>Add New Row</span><kbd>Alt + R</kbd></div>
+                <div class="shortcut-row"><span>Delete Current Row</span><kbd>Ctrl + Backspace</kbd></div>
+                <div class="shortcut-row"><span>Add Bidder Column</span><kbd>Alt + B</kbd></div>
+                <div class="shortcut-row"><span>Add Custom Column</span><kbd>Alt + C</kbd></div>
+                <div class="shortcut-row"><span>Save Comparison</span><kbd>Ctrl + S</kbd></div>
+                <div class="shortcut-row"><span>Export to Excel</span><kbd>Ctrl + E</kbd></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">Saved successfully!</div>
+
+    <script>
+        const STORAGE_KEY = 'rtr_bidder_comparison_inr_v2';
+
+        const defaultState = {
+            enquiryNo: '',
+            procurementDetails: '',
+            projectName: '',
+            taxPercent: 18,
+            freezeColCount: 0, // 0 = Off; 1, 2, 3, 4... = Freeze columns 1..N from left
+            baseColumns: [
+                { id: 'col_code', name: 'Material Code', type: 'text', width: 135, role: 'text' },
+                { id: 'col_desc', name: 'Item Description', type: 'text', width: 250, role: 'text' },
+                { id: 'col_qty', name: 'Qty', type: 'number', width: 75, role: 'qty' }
+            ],
+            bidders: [
+                { id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150 },
+                { id: 'bid_2', name: 'Bidder-2', unitWidth: 135, totalWidth: 150 },
+                { id: 'bid_3', name: 'Bidder-3', unitWidth: 135, totalWidth: 150 }
+            ],
+            rows: [
+                {
+                    id: 'r1',
+                    cells: { col_code: 'Wrire Item code', col_desc: 'Write item details', col_qty: '1' },
+                    bids: { bid_1: '', bid_2: '', bid_3: '' }
+                },
+                {
+                    id: 'r2',
+                    cells: { col_code: 'Wrire Item code', col_desc: 'Write item details', col_qty: '1' },
+                    bids: { bid_1: '', bid_2: '', bid_3: '' }
+                },
+
+            ]
+        };
+
+        let state = loadState();
+        let activeCellSnapshot = null; // Stores pre-edit value for Escape revert
+        let dragColContext = null; // { group: 'base' | 'bidder', index: number }
+
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    return {
+                        ...JSON.parse(JSON.stringify(defaultState)),
+                        ...parsed
+                    };
+                }
+            } catch (e) {
+                console.error('Failed to load saved state', e);
+            }
+            return JSON.parse(JSON.stringify(defaultState));
+        }
+
+        function formatINR(val) {
+            if (val === '' || val === null || val === undefined) return '—';
+            const num = parseIndianNumber(val);
+            if (isNaN(num)) return '—';
+
+            const isNegative = num < 0;
+            const fixed = Math.abs(num).toFixed(2);
+            const [intPart, decPart] = fixed.split('.');
+
+            let formattedInt = intPart;
+            if (intPart.length > 3) {
+                const lastThree = intPart.slice(-3);
+                const remaining = intPart.slice(0, -3);
+                formattedInt = remaining.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree;
+            }
+
+            return `${isNegative ? '-' : ''}${formattedInt}.${decPart}`;
+        }
+
+        function parseIndianNumber(val) {
+            if (typeof val === 'number') return val;
+            if (val === '' || val === null || val === undefined) return NaN;
+            const cleaned = String(val).replace(/,/g, '').trim();
+            if (cleaned === '') return NaN;
+            return parseFloat(cleaned);
+        }
+
+        function getQtyColumnId() {
+            const qtyCol = state.baseColumns.find(c => c.role === 'qty');
+            return qtyCol ? qtyCol.id : null;
+        }
+
+        function autoResizeTextarea(el) {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = Math.max(36, el.scrollHeight) + 'px';
+        }
+
+        function autoResizeMetaField(el) {
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.width = 'auto';
+            const contentLength = Math.max((el.value || el.placeholder || '').length, 24);
+            el.style.width = Math.min(Math.max(190, contentLength * 7.5 + 20), 420) + 'px';
+            el.style.height = Math.max(28, el.scrollHeight) + 'px';
+        }
+
+        function resizeAllTextareas() {
+            document.querySelectorAll('textarea.cell-input').forEach(autoResizeTextarea);
+            document.querySelectorAll('textarea.meta-inline-area').forEach(autoResizeMetaField);
+        }
+
+        /* Build ordered list of all physical table columns from left (1, 2, 3, 4...) */
+        function getAllPhysicalColumns() {
+            const cols = [
+                { num: 1, label: 'Sl.', width: 48 }
+            ];
+            let counter = 2;
+
+            state.baseColumns.forEach((col) => {
+                const name = col.name && col.name.trim() ? col.name.trim() : 'Unnamed';
+                cols.push({
+                    num: counter++,
+                    label: name,
+                    width: Number(col.width) || 135
+                });
+            });
+
+            state.bidders.forEach((bidder) => {
+                const bName = bidder.name && bidder.name.trim() ? bidder.name.trim() : 'Bidder';
+                cols.push({
+                    num: counter++,
+                    label: `${bName} - Unit`,
+                    width: Number(bidder.unitWidth) || 135
+                });
+                cols.push({
+                    num: counter++,
+                    label: `${bName} - Total`,
+                    width: Number(bidder.totalWidth) || 150
+                });
+            });
+
+            cols.push({ num: counter++, label: 'L1 Unit', width: 130 });
+            cols.push({ num: counter++, label: 'L1 Total', width: 145 });
+
+            return cols;
+        }
+
+        /* Freeze Panes Dropdown & Sticky Column Engine (By Column Number 1, 2, 3, 4...) */
+        function renderFreezeOptions() {
+            const select = document.getElementById('freezeColumnSelect');
+            if (!select) return;
+
+            const allCols = getAllPhysicalColumns();
+            const maxNum = allCols.length;
+            let currentCount = parseInt(state.freezeColCount, 10) || 0;
+            if (currentCount < 0) currentCount = 0;
+            if (currentCount > maxNum) currentCount = maxNum;
+            state.freezeColCount = currentCount;
+
+            let opts = `<option value="0" ${currentCount === 0 ? 'selected' : ''}>Off (None)</option>`;
+            allCols.forEach((c) => {
+                opts += `<option value="${c.num}" ${currentCount === c.num ? 'selected' : ''}>${c.num} (${escapeHtml(c.label)})</option>`;
+            });
+
+            select.innerHTML = opts;
+        }
+
+        function updateFreezeSelection(val) {
+            state.freezeColCount = parseInt(val, 10) || 0;
+            applyFreezePanes();
+            autoSaveSilent();
+            showToast(state.freezeColCount === 0
+                ? 'Freeze Panes disabled'
+                : `Frozen columns 1 to ${state.freezeColCount} from left`);
+        }
+
+        function getFrozenCount() {
+            return Math.max(0, parseInt(state.freezeColCount, 10) || 0);
+        }
+
+        function applyFreezePanes() {
+            const table = document.getElementById('comparisonTable');
+            if (!table) return;
+
+            // Clear previous sticky freeze styles
+            table.querySelectorAll('.frozen-col, .frozen-edge').forEach(el => {
+                el.classList.remove('frozen-col', 'frozen-edge');
+                el.style.left = '';
+            });
+
+            const frozenCount = getFrozenCount();
+            if (frozenCount === 0) return;
+
+            const allCols = getAllPhysicalColumns();
+            const count = Math.min(frozenCount, allCols.length);
+
+            // Compute left pixel offsets for each physical column index 0 .. count-1
+            const leftOffsets = [];
+            let runningLeft = 0;
+            for (let i = 0; i < count; i++) {
+                leftOffsets.push(runningLeft);
+                runningLeft += allCols[i].width;
+            }
+
+            // 1. Freeze Header Row 1 & Header Row 2 respecting colspans/rowspans
+            const hRow1 = table.querySelector('thead tr:nth-child(1)');
+            const hRow2 = table.querySelector('thead tr:nth-child(2)');
+            const baseCount = 1 + state.baseColumns.length; // Sl. + baseColumns
+
+            if (hRow1) {
+                let physIdx = 0;
+                Array.from(hRow1.children).forEach((th) => {
+                    const span = parseInt(th.getAttribute('colspan') || '1', 10);
+                    const startCol = physIdx;
+                    const endCol = physIdx + span - 1;
+
+                    // Freeze header cell if all spanned columns are within frozen range
+                    if (endCol < count) {
+                        th.classList.add('frozen-col');
+                        if (endCol === count - 1) th.classList.add('frozen-edge');
+                        th.style.left = leftOffsets[startCol] + 'px';
+                    }
+                    physIdx += span;
+                });
+            }
+
+            if (hRow2) {
+                // hRow2 starts at physical column index = baseCount (under bidders & L1 headers)
+                let physIdx = baseCount;
+                Array.from(hRow2.children).forEach((th) => {
+                    if (physIdx < count) {
+                        th.classList.add('frozen-col');
+                        if (physIdx === count - 1) th.classList.add('frozen-edge');
+                        th.style.left = leftOffsets[physIdx] + 'px';
+                    }
+                    physIdx++;
+                });
+            }
+
+            // 2. Freeze Body Row cells (1-to-1 physical column mapping)
+            table.querySelectorAll('tbody tr').forEach((tr) => {
+                for (let c = 0; c < count && c < tr.children.length; c++) {
+                    const td = tr.children[c];
+                    td.classList.add('frozen-col');
+                    if (c === count - 1) td.classList.add('frozen-edge');
+                    td.style.left = leftOffsets[c] + 'px';
+                }
+            });
+
+            // 3. Freeze Footer cells respecting first cell's colspan
+            table.querySelectorAll('tfoot tr').forEach((tr) => {
+                let physIdx = 0;
+                Array.from(tr.children).forEach((td) => {
+                    const span = parseInt(td.getAttribute('colspan') || '1', 10);
+                    const startCol = physIdx;
+                    const endCol = physIdx + span - 1;
+
+                    if (startCol < count && endCol < count) {
+                        td.classList.add('frozen-col');
+                        if (endCol === count - 1) td.classList.add('frozen-edge');
+                        td.style.left = leftOffsets[startCol] + 'px';
+                    } else if (startCol === 0 && count > 0 && count < baseCount) {
+                        // Keep merged label sticky on left when freezing subset of base columns
+                        td.classList.add('frozen-col', 'frozen-edge');
+                        td.style.left = '0px';
+                    }
+                    physIdx += span;
+                });
+            });
+        }
+
+        function renderTable() {
+            const enquiryEl = document.getElementById('enquiryNo');
+            const procEl = document.getElementById('procurementDetails');
+            const projEl = document.getElementById('projectName');
+
+            enquiryEl.value = state.enquiryNo || '';
+            procEl.value = state.procurementDetails || '';
+            projEl.value = state.projectName || '';
+            document.getElementById('taxPercent').value = state.taxPercent ?? 18;
+
+            autoResizeMetaField(enquiryEl);
+            autoResizeMetaField(procEl);
+            autoResizeMetaField(projEl);
+
+            renderFreezeOptions();
+            renderHeader();
+            renderBody();
+            recalculateAll();
+            applyFreezePanes();
+            lucide.createIcons();
+        }
+
+        function renderHeader() {
+            const thead = document.getElementById('tableHead');
+
+            let row1 = `<tr>
+        <th rowspan="2" style="width:48px;" class="text-center">Sl.<div class="resizer" data-resize="sl"></div></th>`;
+
+            state.baseColumns.forEach((col, idx) => {
+                const canDelete = col.role !== 'qty';
+                row1 += `
+          <th rowspan="2" style="width:${col.width}px;" data-col-id="${col.id}"
+              draggable="true"
+              ondragstart="handleColDragStart(event, 'base', ${idx})"
+              ondragover="handleColDragOver(event, 'base', ${idx})"
+              ondragleave="handleColDragLeave(event)"
+              ondrop="handleColDrop(event, 'base', ${idx})"
+              ondragend="handleColDragEnd(event)">
+            <div class="th-inner">
+              <div class="th-top">
+                <span class="col-drag-handle no-print" title="Drag to reorder column"><i data-lucide="grip-vertical" style="width:13px;height:13px"></i></span>
+                <input type="text" class="col-title-input" value="${escapeHtml(col.name)}"
+                  onchange="updateBaseColName(${idx}, this.value)" title="Edit Column Name" />
+                ${canDelete ? `<button class="icon-btn no-print" tabindex="-1" onclick="deleteBaseColumn(${idx})" title="Remove Column"><i data-lucide="x" style="width:13px;height:13px"></i></button>` : ''}
+              </div>
+              <select class="col-type-select no-print" tabindex="-1" onchange="updateBaseColType(${idx}, this.value)" ${col.role === 'qty' ? 'disabled title="Quantity column is required for total calculation"' : ''}>
+                <option value="text" ${col.type === 'text' ? 'selected' : ''}>Text</option>
+                <option value="number" ${col.type === 'number' ? 'selected' : ''}>Number</option>
+                <option value="currency" ${col.type === 'currency' ? 'selected' : ''}>Price</option>
+                <option value="date" ${col.type === 'date' ? 'selected' : ''}>Date</option>
+              </select>
+            </div>
+            <div class="resizer" onmousedown="initResizeBase(event, ${idx})"></div>
+          </th>`;
+            });
+
+            state.bidders.forEach((bidder, bIdx) => {
+                row1 += `
+          <th colspan="2" class="bidder-group-header"
+              draggable="true"
+              ondragstart="handleColDragStart(event, 'bidder', ${bIdx})"
+              ondragover="handleColDragOver(event, 'bidder', ${bIdx})"
+              ondragleave="handleColDragLeave(event)"
+              ondrop="handleColDrop(event, 'bidder', ${bIdx})"
+              ondragend="handleColDragEnd(event)">
+            <div class="bidder-header-bar">
+              <span class="col-drag-handle no-print" title="Drag to reorder bidder"><i data-lucide="grip-vertical" style="width:14px;height:14px"></i></span>
+              <input type="text" class="bidder-name-input" value="${escapeHtml(bidder.name)}"
+                onchange="updateBidderName(${bIdx}, this.value)" title="Edit Bidder Name" />
+              ${state.bidders.length > 1 ? `<button class="icon-btn no-print" tabindex="-1" onclick="deleteBidder(${bIdx})" title="Remove Bidder"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>` : ''}
+            </div>
+          </th>`;
+            });
+
+            row1 += `
+        <th colspan="2" class="bidder-group-header l1-group-header" style="background:#dcfce7;border-bottom-color:#86efac;">
+          <div class="bidder-header-bar" style="justify-content:center;color:#14532d;font-weight:700;">
+            Lowest Bid (L1) Summary
+          </div>
+        </th>
+        <th rowspan="2" style="width:48px;" class="no-print text-center">Del</th>
+      </tr>`;
+
+            let row2 = `<tr>`;
+            state.bidders.forEach((bidder, bIdx) => {
+                row2 += `
+          <th class="sub-th" style="width:${bidder.unitWidth}px;">
+            Unit Price (₹)
+            <div class="resizer" onmousedown="initResizeBidder(event, ${bIdx}, 'unitWidth')"></div>
+          </th>
+          <th class="sub-th" style="width:${bidder.totalWidth}px;">
+            Total Price (₹)
+            <div class="resizer" onmousedown="initResizeBidder(event, ${bIdx}, 'totalWidth')"></div>
+          </th>`;
+            });
+
+            row2 += `
+        <th class="sub-th l1-sub-header" style="width:130px;background:#f0fdf4;color:#166534;">L1 Unit (₹)</th>
+        <th class="sub-th l1-sub-header" style="width:145px;background:#f0fdf4;color:#166534;">L1 Total (₹)</th>
+      </tr>`;
+
+            thead.innerHTML = row1 + row2;
+        }
+
+        /* Column Drag & Drop Rearranging Handlers */
+        function handleColDragStart(e, group, index) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON') {
+                e.preventDefault();
+                return;
+            }
+            dragColContext = { group, index };
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', `${group}:${index}`);
+            e.currentTarget.classList.add('dragging-col');
+        }
+
+        function handleColDragOver(e, group, index) {
+            if (!dragColContext || dragColContext.group !== group || dragColContext.index === index) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const th = e.currentTarget;
+            th.classList.remove('drag-over-left', 'drag-over-right');
+            if (dragColContext.index < index) {
+                th.classList.add('drag-over-right');
+            } else {
+                th.classList.add('drag-over-left');
+            }
+        }
+
+        function handleColDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over-left', 'drag-over-right');
+        }
+
+        function handleColDrop(e, group, targetIndex) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over-left', 'drag-over-right');
+            if (!dragColContext || dragColContext.group !== group || dragColContext.index === targetIndex) return;
+
+            const fromIndex = dragColContext.index;
+            if (group === 'base') {
+                const [moved] = state.baseColumns.splice(fromIndex, 1);
+                state.baseColumns.splice(targetIndex, 0, moved);
+            } else if (group === 'bidder') {
+                const [moved] = state.bidders.splice(fromIndex, 1);
+                state.bidders.splice(targetIndex, 0, moved);
+            }
+
+            dragColContext = null;
+            renderTable();
+            autoSaveSilent();
+            showToast('Column order updated');
+        }
+
+        function handleColDragEnd(e) {
+            dragColContext = null;
+            document.querySelectorAll('th.dragging-col, th.drag-over-left, th.drag-over-right').forEach(el => {
+                el.classList.remove('dragging-col', 'drag-over-left', 'drag-over-right');
+            });
+        }
+
+        function renderBody() {
+            const tbody = document.getElementById('tableBody');
+            let html = '';
+
+            state.rows.forEach((row, rIdx) => {
+                html += `<tr data-row-idx="${rIdx}">
+          <td class="row-index-cell">${rIdx + 1}</td>`;
+
+                let gridColIndex = 0;
+
+                // Base columns
+                state.baseColumns.forEach((col) => {
+                    const val = row.cells[col.id] ?? '';
+                    const gCol = gridColIndex++;
+                    if (col.type === 'currency') {
+                        const displayVal = (val !== '' && !isNaN(parseIndianNumber(val))) ? formatINR(val) : '';
+                        html += `
+              <td>
+                <input type="text" inputmode="decimal" class="cell-input inr-input grid-cell"
+                  data-row="${rIdx}" data-col="${gCol}" data-kind="base" data-key="${col.id}" data-type="currency"
+                  placeholder="0.00"
+                  value="${escapeHtml(displayVal)}"
+                  onfocus="handleGridFocus(this)"
+                  oninput="handleBaseCurrencyInput(${rIdx}, '${col.id}', this.value)"
+                  onblur="handleBaseCurrencyBlur(this, ${rIdx}, '${col.id}')" />
+              </td>`;
+                    } else if (col.type === 'text') {
+                        html += `
+              <td>
+                <textarea rows="1" class="cell-input grid-cell"
+                  data-row="${rIdx}" data-col="${gCol}" data-kind="base" data-key="${col.id}" data-type="text"
+                  onfocus="handleGridFocus(this)"
+                  oninput="updateBaseCell(${rIdx}, '${col.id}', this.value); autoResizeTextarea(this);">${escapeHtml(String(val))}</textarea>
+              </td>`;
+                    } else {
+                        const stepAttr = col.type === 'number' ? 'step="any"' : '';
+                        const numClass = col.type === 'number' ? 'num-input' : '';
+                        html += `
+              <td>
+                <input type="${col.type}" ${stepAttr} class="cell-input ${numClass} grid-cell"
+                  data-row="${rIdx}" data-col="${gCol}" data-kind="base" data-key="${col.id}" data-type="${col.type}"
+                  value="${escapeHtml(String(val))}"
+                  onfocus="handleGridFocus(this)"
+                  oninput="updateBaseCell(${rIdx}, '${col.id}', this.value)" />
+              </td>`;
+                    }
+                });
+
+                // Bidder columns
+                state.bidders.forEach((bidder) => {
+                    const gCol = gridColIndex++;
+                    const rawUnit = row.bids[bidder.id];
+                    const formattedUnit = (rawUnit !== '' && rawUnit !== null && rawUnit !== undefined && !isNaN(parseIndianNumber(rawUnit)))
+                        ? formatINR(rawUnit)
+                        : '';
+
+                    html += `
+            <td id="cell_unit_${rIdx}_${bidder.id}">
+              <input type="text" inputmode="decimal" class="cell-input inr-input grid-cell"
+                data-row="${rIdx}" data-col="${gCol}" data-kind="bid" data-key="${bidder.id}" data-type="currency"
+                placeholder="0.00"
+                value="${escapeHtml(formattedUnit)}"
+                onfocus="handleGridFocus(this)"
+                oninput="handleBidInput(${rIdx}, '${bidder.id}', this.value)"
+                onblur="handleBidBlur(this, ${rIdx}, '${bidder.id}')" />
+            </td>
+            <td id="cell_tot_${rIdx}_${bidder.id}">
+              <span class="cell-readonly" id="disp_tot_${rIdx}_${bidder.id}">—</span>
+            </td>`;
+                });
+
+                html += `
+          <td class="target-cell"><span class="cell-readonly" id="l1_unit_${rIdx}">—</span></td>
+          <td class="target-cell"><span class="cell-readonly" id="l1_tot_${rIdx}">—</span></td>
+          <td class="text-center no-print">
+            <button class="icon-btn" tabindex="-1" onclick="deleteRow(${rIdx})" title="Delete Row (Ctrl+Backspace)"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+          </td>
+        </tr>`;
+            });
+
+            tbody.innerHTML = html;
+            resizeAllTextareas();
+        }
+
+        /* Unified Focus Handler: Highlights Active Row, Snapshots Value for Esc, & Prepares Raw Currency */
+        function handleGridFocus(el) {
+            const rIdx = parseInt(el.dataset.row, 10);
+            const kind = el.dataset.kind;
+            const key = el.dataset.key;
+            const type = el.dataset.type;
+
+            // Highlight active row
+            document.querySelectorAll('#tableBody tr.active-row').forEach(tr => tr.classList.remove('active-row'));
+            const tr = el.closest('tr');
+            if (tr) tr.classList.add('active-row');
+
+            // Snapshot raw value for Escape key revert
+            const rawVal = kind === 'bid' ? state.rows[rIdx].bids[key] : state.rows[rIdx].cells[key];
+            activeCellSnapshot = { rIdx, kind, key, rawVal };
+
+            if (type === 'currency') {
+                if (rawVal !== '' && rawVal !== null && rawVal !== undefined && !isNaN(parseIndianNumber(rawVal))) {
+                    el.value = parseIndianNumber(rawVal);
+                    el.select();
+                } else {
+                    el.value = '';
+                }
+            } else if (type === 'text' || type === 'number') {
+                el.select();
+            }
+        }
+
+        function focusGridCell(row, col) {
+            const target = document.querySelector(`.grid-cell[data-row="${row}"][data-col="${col}"]`);
+            if (target) {
+                target.focus();
+                target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                return true;
+            }
+            return false;
+        }
+
+        function getTotalEditableCols() {
+            return state.baseColumns.length + state.bidders.length;
+        }
+
+        /* Full Keyboard Navigation & Shortcuts Engine */
+        document.addEventListener('keydown', (e) => {
+            const active = document.activeElement;
+            const isGridCell = active && active.classList.contains('grid-cell');
+
+            // Global Shortcuts (Work anywhere on page)
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                saveData();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+                e.preventDefault();
+                exportExcel();
+                return;
+            }
+            if (e.altKey && e.key.toLowerCase() === 'r') {
+                e.preventDefault();
+                addRow(true);
+                return;
+            }
+            if (e.altKey && e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                addBidderColumn(true);
+                return;
+            }
+            if (e.altKey && e.key.toLowerCase() === 'c') {
+                e.preventDefault();
+                addCustomColumn(true);
+                return;
+            }
+            if (e.altKey && e.key === '/') {
+                e.preventDefault();
+                const modal = document.getElementById('helpModal');
+                toggleHelpModal(!modal.classList.contains('open'));
+                return;
+            }
+            if (e.key === 'Escape' && document.getElementById('helpModal').classList.contains('open')) {
+                e.preventDefault();
+                toggleHelpModal(false);
+                return;
+            }
+
+            // Grid-specific Spreadsheet Navigation
+            if (!isGridCell) return;
+
+            const row = parseInt(active.dataset.row, 10);
+            const col = parseInt(active.dataset.col, 10);
+            const type = active.dataset.type;
+            const maxRow = state.rows.length - 1;
+            const maxCol = getTotalEditableCols() - 1;
+
+            // Escape: Revert active cell to pre-focus value
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (activeCellSnapshot && activeCellSnapshot.rIdx === row) {
+                    const { kind, key, rawVal } = activeCellSnapshot;
+                    if (kind === 'bid') {
+                        state.rows[row].bids[key] = rawVal;
+                        active.value = (rawVal !== '' && !isNaN(parseIndianNumber(rawVal))) ? parseIndianNumber(rawVal) : '';
+                    } else {
+                        state.rows[row].cells[key] = rawVal;
+                        active.value = rawVal ?? '';
+                        if (active.tagName === 'TEXTAREA') autoResizeTextarea(active);
+                    }
+                    recalculateAll();
+                    autoSaveSilent();
+                    showToast('Cell edit reverted');
+                }
+                return;
+            }
+
+            // Ctrl + D: Fill Down (Copy value from cell directly above)
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+                e.preventDefault();
+                if (row > 0) {
+                    const kind = active.dataset.kind;
+                    const key = active.dataset.key;
+                    const aboveVal = kind === 'bid' ? state.rows[row - 1].bids[key] : state.rows[row - 1].cells[key];
+
+                    if (kind === 'bid') {
+                        state.rows[row].bids[key] = aboveVal;
+                        active.value = (aboveVal !== '' && !isNaN(parseIndianNumber(aboveVal))) ? parseIndianNumber(aboveVal) : '';
+                    } else {
+                        state.rows[row].cells[key] = aboveVal;
+                        active.value = aboveVal ?? '';
+                        if (active.tagName === 'TEXTAREA') autoResizeTextarea(active);
+                    }
+                    recalculateAll();
+                    autoSaveSilent();
+                    showToast('Copied value from above');
+                }
+                return;
+            }
+
+            // Ctrl + Backspace: Delete active row and keep focus smoothly
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Backspace') {
+                e.preventDefault();
+                deleteRow(row);
+                const nextFocusRow = Math.min(row, state.rows.length - 1);
+                if (nextFocusRow >= 0) {
+                    focusGridCell(nextFocusRow, col);
+                }
+                return;
+            }
+
+            // Alt + Home / Alt + End: Jump to First / Last cell in current row
+            if (e.altKey && e.key === 'Home') {
+                e.preventDefault();
+                focusGridCell(row, 0);
+                return;
+            }
+            if (e.altKey && e.key === 'End') {
+                e.preventDefault();
+                focusGridCell(row, maxCol);
+                return;
+            }
+
+            // Enter / Shift + Enter: Move vertically; auto-add new row when pressing Enter on last row (Alt+Enter inserts newline in textarea)
+            if (e.key === 'Enter' && !e.altKey) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    if (row > 0) focusGridCell(row - 1, col);
+                } else {
+                    if (row < maxRow) {
+                        focusGridCell(row + 1, col);
+                    } else {
+                        addRow(false);
+                        focusGridCell(row + 1, 0);
+                    }
+                }
+                return;
+            }
+
+            // Up / Down Arrows: Move across rows (prevent number input spinner increment)
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (row > 0) focusGridCell(row - 1, col);
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (row < maxRow) focusGridCell(row + 1, col);
+                return;
+            }
+
+            // Left / Right Arrows: Move across columns when cursor is at text boundary (or always for date/currency)
+            if (e.key === 'ArrowLeft') {
+                const atStart = type === 'date' || active.selectionStart === 0;
+                if (atStart || e.altKey) {
+                    e.preventDefault();
+                    if (col > 0) focusGridCell(row, col - 1);
+                    else if (row > 0) focusGridCell(row - 1, maxCol);
+                }
+                return;
+            }
+
+            if (e.key === 'ArrowRight') {
+                const valLen = (active.value || '').length;
+                const atEnd = type === 'date' || active.selectionEnd === valLen;
+                if (atEnd || e.altKey) {
+                    e.preventDefault();
+                    if (col < maxCol) focusGridCell(row, col + 1);
+                    else if (row < maxRow) focusGridCell(row + 1, 0);
+                }
+                return;
+            }
+        });
+
+        function handleBidInput(rIdx, bidderId, val) {
+            const cleaned = val.replace(/[^0-9.]/g, '');
+            const num = parseFloat(cleaned);
+            state.rows[rIdx].bids[bidderId] = isNaN(num) ? '' : num;
+            recalculateAll();
+            autoSaveSilent();
+        }
+
+        function handleBidBlur(el, rIdx, bidderId) {
+            const raw = state.rows[rIdx].bids[bidderId];
+            if (raw !== '' && raw !== null && raw !== undefined && !isNaN(parseIndianNumber(raw))) {
+                el.value = formatINR(raw);
+            } else {
+                el.value = '';
+            }
+        }
+
+        function handleBaseCurrencyInput(rIdx, colId, val) {
+            const cleaned = val.replace(/[^0-9.]/g, '');
+            const num = parseFloat(cleaned);
+            state.rows[rIdx].cells[colId] = isNaN(num) ? '' : num;
+            autoSaveSilent();
+        }
+
+        function handleBaseCurrencyBlur(el, rIdx, colId) {
+            const raw = state.rows[rIdx].cells[colId];
+            if (raw !== '' && raw !== null && raw !== undefined && !isNaN(parseIndianNumber(raw))) {
+                el.value = formatINR(raw);
+            } else {
+                el.value = '';
+            }
+        }
+
+        function getRowEvaluation(row) {
+            const qtyColId = getQtyColumnId();
+            const qty = parseFloat(row.cells[qtyColId]) || 0;
+            const validBids = [];
+            const bidStatuses = {};
+
+            state.bidders.forEach((bidder) => {
+                const unitPrice = parseIndianNumber(row.bids[bidder.id]);
+                if (!isNaN(unitPrice) && unitPrice > 0) {
+                    const totalPrice = unitPrice * qty;
+                    validBids.push({ bidderId: bidder.id, unitPrice, totalPrice });
+                } else {
+                    bidStatuses[bidder.id] = 'none';
+                }
+            });
+
+            let l1Unit = null;
+            let l1Total = null;
+
+            if (validBids.length > 0) {
+                const unitPrices = validBids.map(b => b.unitPrice);
+                const minUnit = Math.min(...unitPrices);
+                const maxUnit = Math.max(...unitPrices);
+                l1Unit = minUnit;
+                l1Total = minUnit * qty;
+
+                const freqMap = {};
+                unitPrices.forEach(p => { freqMap[p] = (freqMap[p] || 0) + 1; });
+
+                validBids.forEach((b) => {
+                    if (validBids.length === 1) {
+                        bidStatuses[b.bidderId] = 'low';
+                    } else if (minUnit === maxUnit) {
+                        bidStatuses[b.bidderId] = 'equal';
+                    } else if (b.unitPrice === minUnit) {
+                        bidStatuses[b.bidderId] = 'low';
+                    } else if (b.unitPrice === maxUnit) {
+                        bidStatuses[b.bidderId] = 'high';
+                    } else if (freqMap[b.unitPrice] > 1) {
+                        bidStatuses[b.bidderId] = 'equal';
+                    } else {
+                        bidStatuses[b.bidderId] = 'normal';
+                    }
+                });
+            }
+
+            return { qty, validBids, bidStatuses, l1Unit, l1Total };
+        }
+
+        function recalculateAll() {
+            const taxPct = parseFloat(document.getElementById('taxPercent').value) || 0;
+            const bidderTotals = {};
+            state.bidders.forEach(b => bidderTotals[b.id] = 0);
+            let l1GrandSubTotal = 0;
+
+            state.rows.forEach((row, rIdx) => {
+                const evalData = getRowEvaluation(row);
+
+                state.bidders.forEach((bidder) => {
+                    const unitPrice = parseIndianNumber(row.bids[bidder.id]);
+                    const totSpan = document.getElementById(`disp_tot_${rIdx}_${bidder.id}`);
+                    const unitTd = document.getElementById(`cell_unit_${rIdx}_${bidder.id}`);
+                    const totTd = document.getElementById(`cell_tot_${rIdx}_${bidder.id}`);
+
+                    unitTd.classList.remove('low-cell', 'high-cell', 'equal-cell');
+                    totTd.classList.remove('low-cell', 'high-cell', 'equal-cell');
+
+                    if (!isNaN(unitPrice) && unitPrice > 0) {
+                        const totalPrice = unitPrice * evalData.qty;
+                        totSpan.textContent = formatINR(totalPrice);
+                        bidderTotals[bidder.id] += totalPrice;
+
+                        const status = evalData.bidStatuses[bidder.id];
+                        if (status === 'low') {
+                            unitTd.classList.add('low-cell');
+                            totTd.classList.add('low-cell');
+                        } else if (status === 'high') {
+                            unitTd.classList.add('high-cell');
+                            totTd.classList.add('high-cell');
+                        } else if (status === 'equal') {
+                            unitTd.classList.add('equal-cell');
+                            totTd.classList.add('equal-cell');
+                        }
+                    } else {
+                        totSpan.textContent = '—';
+                    }
+                });
+
+                const l1UnitEl = document.getElementById(`l1_unit_${rIdx}`);
+                const l1TotEl = document.getElementById(`l1_tot_${rIdx}`);
+
+                if (evalData.l1Unit !== null) {
+                    l1UnitEl.textContent = formatINR(evalData.l1Unit);
+                    l1TotEl.textContent = formatINR(evalData.l1Total);
+                    l1GrandSubTotal += evalData.l1Total;
+                } else {
+                    l1UnitEl.textContent = '—';
+                    l1TotEl.textContent = '—';
+                }
+            });
+
+            renderFooter(bidderTotals, l1GrandSubTotal, taxPct);
+            applyFreezePanes();
+        }
+
+        function renderFooter(bidderTotals, l1GrandSubTotal, taxPct) {
+            const tfoot = document.getElementById('tableFoot');
+            const baseSpan = 1 + state.baseColumns.length;
+
+            const activeTotals = state.bidders
+                .map(b => bidderTotals[b.id])
+                .filter(val => val > 0);
+
+            const minTotal = activeTotals.length ? Math.min(...activeTotals) : null;
+            const maxTotal = activeTotals.length ? Math.max(...activeTotals) : null;
+
+            let subRow = `<tr>
+        <td colspan="${baseSpan}" class="text-right">Sub-Total (Basic Price ₹)</td>`;
+
+            let taxRow = `<tr>
+        <td colspan="${baseSpan}" class="text-right">GST / Tax (${taxPct}% ₹)</td>`;
+
+            let grandRow = `<tr class="grand-total-row">
+        <td colspan="${baseSpan}" class="text-right">Grand Total (Incl. Tax ₹)</td>`;
+
+            state.bidders.forEach((b) => {
+                const sub = bidderTotals[b.id] || 0;
+                const tax = sub * (taxPct / 100);
+                const grand = sub + tax;
+
+                let highlightClass = '';
+                if (sub > 0 && activeTotals.length > 0) {
+                    if (minTotal === maxTotal && activeTotals.length > 1) {
+                        highlightClass = 'equal-cell';
+                    } else if (sub === minTotal) {
+                        highlightClass = 'low-cell';
+                    } else if (sub === maxTotal && activeTotals.length > 1) {
+                        highlightClass = 'high-cell';
+                    }
+                }
+
+                subRow += `<td class="text-right">—</td><td class="text-right ${highlightClass}">${sub > 0 ? formatINR(sub) : '—'}</td>`;
+                taxRow += `<td class="text-right">—</td><td class="text-right">${sub > 0 ? formatINR(tax) : '—'}</td>`;
+                grandRow += `<td class="text-right">—</td><td class="text-right ${highlightClass}">${sub > 0 ? formatINR(grand) : '—'}</td>`;
+            });
+
+            const l1Tax = l1GrandSubTotal * (taxPct / 100);
+            const l1Grand = l1GrandSubTotal + l1Tax;
+
+            subRow += `<td class="text-right target-cell">—</td><td class="text-right target-cell">${formatINR(l1GrandSubTotal)}</td><td class="no-print"></td></tr>`;
+            taxRow += `<td class="text-right target-cell">—</td><td class="text-right target-cell">${formatINR(l1Tax)}</td><td class="no-print"></td></tr>`;
+            grandRow += `<td class="text-right target-cell">—</td><td class="text-right target-cell">${formatINR(l1Grand)}</td><td class="no-print"></td></tr>`;
+
+            tfoot.innerHTML = subRow + taxRow + grandRow;
+        }
+
+        /* Export & Import CSV (.csv) */
+        function escapeCSVCell(val) {
+            const str = val === null || val === undefined ? '' : String(val);
+            if (/[",\r\n]/.test(str)) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        }
+
+        function parseCSVText(text) {
+            const rows = [];
+            let currentRow = [];
+            let currentVal = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                const next = text[i + 1];
+
+                if (inQuotes) {
+                    if (ch === '"' && next === '"') {
+                        currentVal += '"';
+                        i++;
+                    } else if (ch === '"') {
+                        inQuotes = false;
+                    } else {
+                        currentVal += ch;
+                    }
+                } else {
+                    if (ch === '"') {
+                        inQuotes = true;
+                    } else if (ch === ',') {
+                        currentRow.push(currentVal);
+                        currentVal = '';
+                    } else if (ch === '\r' && next === '\n') {
+                        currentRow.push(currentVal);
+                        rows.push(currentRow);
+                        currentRow = [];
+                        currentVal = '';
+                        i++;
+                    } else if (ch === '\n' || ch === '\r') {
+                        currentRow.push(currentVal);
+                        rows.push(currentRow);
+                        currentRow = [];
+                        currentVal = '';
+                    } else {
+                        currentVal += ch;
+                    }
+                }
+            }
+
+            if (currentVal !== '' || currentRow.length > 0) {
+                currentRow.push(currentVal);
+                rows.push(currentRow);
+            }
+
+            return rows;
+        }
+
+        function exportCSV() {
+            autoSaveSilent();
+            const taxPct = parseFloat(document.getElementById('taxPercent').value) || 0;
+            const lines = [];
+
+            // Metadata header block
+            lines.push(['Enquiry No.', state.enquiryNo || ''].map(escapeCSVCell).join(','));
+            lines.push(['Procurement Details', state.procurementDetails || ''].map(escapeCSVCell).join(','));
+            lines.push(['Project Name', state.projectName || ''].map(escapeCSVCell).join(','));
+            lines.push(['GST / Tax %', taxPct].map(escapeCSVCell).join(','));
+            lines.push('');
+
+            // Table column headers
+            const headers = ['Sl. No.'];
+            state.baseColumns.forEach(col => headers.push(col.name));
+            state.bidders.forEach(b => {
+                headers.push(`${b.name} - Unit Price`);
+                headers.push(`${b.name} - Total Price`);
+            });
+            headers.push('L1 Unit Price', 'L1 Total Price');
+            lines.push(headers.map(escapeCSVCell).join(','));
+
+            // Data rows
+            const bidderTotals = {};
+            state.bidders.forEach(b => bidderTotals[b.id] = 0);
+            let l1SubSum = 0;
+
+            state.rows.forEach((row, rIdx) => {
+                const evalData = getRowEvaluation(row);
+                const rCells = [rIdx + 1];
+
+                state.baseColumns.forEach(col => {
+                    rCells.push(row.cells[col.id] ?? '');
+                });
+
+                state.bidders.forEach(b => {
+                    const unitPrice = parseIndianNumber(row.bids[b.id]);
+                    if (!isNaN(unitPrice) && unitPrice > 0) {
+                        const tot = unitPrice * evalData.qty;
+                        bidderTotals[b.id] += tot;
+                        rCells.push(unitPrice.toFixed(2));
+                        rCells.push(tot.toFixed(2));
+                    } else {
+                        rCells.push('');
+                        rCells.push('');
+                    }
+                });
+
+                if (evalData.l1Unit !== null) {
+                    l1SubSum += evalData.l1Total;
+                    rCells.push(evalData.l1Unit.toFixed(2));
+                    rCells.push(evalData.l1Total.toFixed(2));
+                } else {
+                    rCells.push('');
+                    rCells.push('');
+                }
+
+                lines.push(rCells.map(escapeCSVCell).join(','));
+            });
+
+            // Footer Totals
+            const baseSpacer = new Array(state.baseColumns.length).fill('');
+            const subRow = ['Sub-Total (Basic Price)', ...baseSpacer];
+            const taxRow = [`GST / Tax (${taxPct}%)`, ...baseSpacer];
+            const grandRow = ['Grand Total (Incl. Tax)', ...baseSpacer];
+
+            state.bidders.forEach(b => {
+                const sub = bidderTotals[b.id] || 0;
+                const tax = sub * (taxPct / 100);
+                const grand = sub + tax;
+                subRow.push('', sub > 0 ? sub.toFixed(2) : '');
+                taxRow.push('', sub > 0 ? tax.toFixed(2) : '');
+                grandRow.push('', sub > 0 ? grand.toFixed(2) : '');
+            });
+
+            const l1Tax = l1SubSum * (taxPct / 100);
+            const l1Grand = l1SubSum + l1Tax;
+            subRow.push('', l1SubSum > 0 ? l1SubSum.toFixed(2) : '');
+            taxRow.push('', l1SubSum > 0 ? l1Tax.toFixed(2) : '');
+            grandRow.push('', l1SubSum > 0 ? l1Grand.toFixed(2) : '');
+
+            lines.push(subRow.map(escapeCSVCell).join(','));
+            lines.push(taxRow.map(escapeCSVCell).join(','));
+            lines.push(grandRow.map(escapeCSVCell).join(','));
+
+            const csvContent = '\uFEFF' + lines.join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const nameSeed = state.enquiryNo || state.projectName || state.procurementDetails || 'Bidder_Comparison';
+            a.href = url;
+            a.download = `${nameSeed.replace(/[^a-z0-9]/gi, '_')}_INR.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Exported CSV file successfully!');
+        }
+
+        function triggerImportCSV() {
+            const input = document.getElementById('csvFileInput');
+            input.value = '';
+            input.click();
+        }
+
+        function handleCSVFileUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    importCSVFromText(e.target.result);
+                } catch (err) {
+                    console.error(err);
+                    showToast('Failed to parse CSV file. Please verify format.');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function importCSVFromText(rawText) {
+            const cleanText = rawText.replace(/^\uFEFF/, '');
+            const allRows = parseCSVText(cleanText).filter(r => r.some(cell => cell.trim() !== ''));
+            if (allRows.length < 2) {
+                showToast('CSV file is empty or missing data rows.');
+                return;
+            }
+
+            // Detect metadata rows if present at top
+            let headerRowIndex = 0;
+            for (let i = 0; i < Math.min(allRows.length, 10); i++) {
+                const firstCell = (allRows[i][0] || '').trim().toLowerCase();
+                if (firstCell === 'enquiry no.' || firstCell === 'enquiry no') {
+                    state.enquiryNo = (allRows[i][1] || '').trim();
+                    headerRowIndex = i + 1;
+                } else if (firstCell === 'procurement details') {
+                    state.procurementDetails = (allRows[i][1] || '').trim();
+                    headerRowIndex = i + 1;
+                } else if (firstCell === 'project name') {
+                    state.projectName = (allRows[i][1] || '').trim();
+                    headerRowIndex = i + 1;
+                } else if (firstCell.startsWith('gst')) {
+                    const parsedTax = parseFloat(allRows[i][1]);
+                    if (!isNaN(parsedTax)) state.taxPercent = parsedTax;
+                    headerRowIndex = i + 1;
+                } else if (firstCell === 'sl. no.' || firstCell === 'sl' || firstCell === 'sl.') {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+
+            const headers = allRows[headerRowIndex];
+            if (!headers || headers.length < 2) {
+                showToast('Could not detect valid header columns in CSV.');
+                return;
+            }
+
+            const newBaseColumns = [];
+            const newBidders = [];
+            const bidderMap = {};
+            const colMappings = []; // Maps CSV column index -> { kind: 'sl' | 'base' | 'bid_unit' | 'ignore', id }
+
+            headers.forEach((rawH, idx) => {
+                const h = (rawH || '').trim();
+                const lower = h.toLowerCase();
+
+                if (idx === 0 && (lower === 'sl. no.' || lower === 'sl' || lower === 'sl.' || lower === 's.no')) {
+                    colMappings.push({ kind: 'sl' });
+                    return;
+                }
+
+                if (lower === 'l1 unit price' || lower === 'l1 total price' || lower === 'l1 unit' || lower === 'l1 total') {
+                    colMappings.push({ kind: 'ignore' });
+                    return;
+                }
+
+                const unitMatch = h.match(/^(.*?)\s*-\s*Unit Price$/i);
+                const totalMatch = h.match(/^(.*?)\s*-\s*Total Price$/i);
+
+                if (unitMatch) {
+                    const bName = unitMatch[1].trim() || `Bidder ${newBidders.length + 1}`;
+                    if (!bidderMap[bName]) {
+                        const bId = 'bid_' + Date.now() + '_' + newBidders.length;
+                        bidderMap[bName] = bId;
+                        newBidders.push({ id: bId, name: bName, unitWidth: 135, totalWidth: 150 });
+                    }
+                    colMappings.push({ kind: 'bid_unit', id: bidderMap[bName] });
+                    return;
+                }
+
+                if (totalMatch) {
+                    colMappings.push({ kind: 'ignore' });
+                    return;
+                }
+
+                // Treat remaining columns as Base Columns (preserving Qty role)
+                const isQty = lower === 'qty' || lower === 'quantity';
+                const colId = isQty ? 'col_qty' : 'col_' + Date.now() + '_' + newBaseColumns.length;
+                newBaseColumns.push({
+                    id: colId,
+                    name: h || `Column ${newBaseColumns.length + 1}`,
+                    type: isQty ? 'number' : 'text',
+                    width: isQty ? 75 : (lower.includes('desc') ? 250 : 135),
+                    role: isQty ? 'qty' : 'text'
+                });
+                colMappings.push({ kind: 'base', id: colId });
+            });
+
+            // Ensure at least one Qty column exists for total computation
+            if (!newBaseColumns.some(c => c.role === 'qty')) {
+                newBaseColumns.push({ id: 'col_qty', name: 'Qty', type: 'number', width: 75, role: 'qty' });
+            }
+
+            if (newBidders.length === 0) {
+                newBidders.push({ id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150 });
+            }
+
+            const newRows = [];
+            for (let r = headerRowIndex + 1; r < allRows.length; r++) {
+                const csvRow = allRows[r];
+                const firstLabel = (csvRow[0] || '').trim().toLowerCase();
+                // Skip summary footer rows when re-importing an exported CSV
+                if (firstLabel.startsWith('sub-total') || firstLabel.startsWith('gst / tax') || firstLabel.startsWith('grand total')) {
+                    continue;
+                }
+
+                const cells = {};
+                newBaseColumns.forEach(c => { cells[c.id] = c.role === 'qty' ? 1 : ''; });
+                const bids = {};
+                newBidders.forEach(b => { bids[b.id] = ''; });
+
+                let hasContent = false;
+                colMappings.forEach((map, cIdx) => {
+                    const cellVal = (csvRow[cIdx] ?? '').trim();
+                    if (map.kind === 'base') {
+                        cells[map.id] = cellVal;
+                        if (cellVal !== '') hasContent = true;
+                    } else if (map.kind === 'bid_unit') {
+                        const num = parseIndianNumber(cellVal);
+                        bids[map.id] = !isNaN(num) ? num : '';
+                        if (!isNaN(num)) hasContent = true;
+                    }
+                });
+
+                if (hasContent) {
+                    newRows.push({
+                        id: 'r_' + Date.now() + '_' + newRows.length,
+                        cells,
+                        bids
+                    });
+                }
+            }
+
+            if (newRows.length === 0) {
+                showToast('No valid item rows found in CSV.');
+                return;
+            }
+
+            state.baseColumns = newBaseColumns;
+            state.bidders = newBidders;
+            state.rows = newRows;
+
+            renderTable();
+            autoSaveSilent();
+            showToast(`Imported ${newRows.length} rows from CSV successfully!`);
+        }
+
+        /* Export to Styled Excel (.xlsx) */
+        function exportExcel() {
+            autoSaveSilent();
+            if (typeof XLSX === 'undefined') {
+                showToast('Excel library loading, please try again in a moment.');
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+            const wsData = [];
+            const merges = [];
+            const INR_NUM_FMT = '#,##,##0.00';
+
+            const thinBorder = {
+                top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+                right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+            };
+
+            const headerStyle = {
+                font: { bold: true, color: { rgb: '0F172A' }, sz: 11 },
+                fill: { fgColor: { rgb: 'E2E8F0' } },
+                alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                border: thinBorder
+            };
+
+            const metaLabelStyle = {
+                font: { bold: true, color: { rgb: '0F172A' }, sz: 10.5 },
+                fill: { fgColor: { rgb: 'F8FAFC' } },
+                alignment: { horizontal: 'left', vertical: 'center' },
+                border: thinBorder
+            };
+
+            const metaValueStyle = {
+                font: { color: { rgb: '1E293B' }, sz: 10.5 },
+                fill: { fgColor: { rgb: 'FFFFFF' } },
+                alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+                border: thinBorder
+            };
+
+            const bidderHeaderStyle = {
+                font: { bold: true, color: { rgb: '1E1B4B' }, sz: 11 },
+                fill: { fgColor: { rgb: 'E0E7FF' } },
+                alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                border: thinBorder
+            };
+
+            const l1HeaderStyle = {
+                font: { bold: true, color: { rgb: '14532D' }, sz: 11 },
+                fill: { fgColor: { rgb: 'DCFCE7' } },
+                alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                border: thinBorder
+            };
+
+            const stylesByStatus = {
+                low: {
+                    font: { bold: true, color: { rgb: '166534' } },
+                    fill: { fgColor: { rgb: 'DCFCE7' } },
+                    alignment: { horizontal: 'right', vertical: 'center' },
+                    border: thinBorder,
+                    numFmt: INR_NUM_FMT
+                },
+                high: {
+                    font: { bold: true, color: { rgb: '991B1B' } },
+                    fill: { fgColor: { rgb: 'FEE2E2' } },
+                    alignment: { horizontal: 'right', vertical: 'center' },
+                    border: thinBorder,
+                    numFmt: INR_NUM_FMT
+                },
+                equal: {
+                    font: { bold: true, color: { rgb: '854D0E' } },
+                    fill: { fgColor: { rgb: 'FEF9C3' } },
+                    alignment: { horizontal: 'right', vertical: 'center' },
+                    border: thinBorder,
+                    numFmt: INR_NUM_FMT
+                },
+                normal: {
+                    font: { color: { rgb: '1E293B' } },
+                    alignment: { horizontal: 'right', vertical: 'center' },
+                    border: thinBorder,
+                    numFmt: INR_NUM_FMT
+                },
+                target: {
+                    font: { bold: true, color: { rgb: '14532D' } },
+                    fill: { fgColor: { rgb: 'F0FDF4' } },
+                    alignment: { horizontal: 'right', vertical: 'center' },
+                    border: thinBorder,
+                    numFmt: INR_NUM_FMT
+                }
+            };
+
+            const totalColsCount = 1 + state.baseColumns.length + (state.bidders.length * 2) + 2;
+
+            // Row 0: Title Banner
+            const titleRow = new Array(totalColsCount).fill({ v: '', s: headerStyle });
+            titleRow[0] = {
+                v: `COMPARATIVE STATEMENT & BIDDER EVALUATION (Currency: INR ₹)`,
+                s: {
+                    font: { bold: true, sz: 13, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '1E3A8A' } },
+                    alignment: { horizontal: 'left', vertical: 'center' }
+                }
+            };
+            wsData.push(titleRow);
+            merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: totalColsCount - 1 } });
+
+            // Rows 1, 2, 3: Enquiry No., Procurement Details, Project Name
+            const metaFields = [
+                { label: 'Enquiry No.:', value: state.enquiryNo || '—' },
+                { label: 'Procurement Details:', value: state.procurementDetails || '—' },
+                { label: 'Project Name:', value: state.projectName || '—' }
+            ];
+
+            metaFields.forEach((mf, mIdx) => {
+                const rIdx = 1 + mIdx;
+                const mRow = new Array(totalColsCount).fill({ v: '', s: metaValueStyle });
+                mRow[0] = { v: mf.label, s: metaLabelStyle };
+                mRow[1] = { v: '', s: metaLabelStyle };
+                mRow[2] = { v: mf.value, t: 's', s: metaValueStyle };
+                wsData.push(mRow);
+                merges.push({ s: { r: rIdx, c: 0 }, e: { r: rIdx, c: 1 } });
+                merges.push({ s: { r: rIdx, c: 2 }, e: { r: rIdx, c: totalColsCount - 1 } });
+            });
+
+            // Rows 4 & 5: Two-tier Table Headers
+            const hRow1Idx = 4;
+            const hRow2Idx = 5;
+            const hRow1 = [];
+            const hRow2 = [];
+
+            hRow1.push({ v: 'Sl. No.', s: headerStyle });
+            hRow2.push({ v: '', s: headerStyle });
+            merges.push({ s: { r: hRow1Idx, c: 0 }, e: { r: hRow2Idx, c: 0 } });
+
+            let colCursor = 1;
+            let qtyExcelColLetter = 'D';
+
+            state.baseColumns.forEach((col) => {
+                if (col.role === 'qty') {
+                    qtyExcelColLetter = XLSX.utils.encode_col(colCursor);
+                }
+                hRow1.push({ v: col.name, s: headerStyle });
+                hRow2.push({ v: '', s: headerStyle });
+                merges.push({ s: { r: hRow1Idx, c: colCursor }, e: { r: hRow2Idx, c: colCursor } });
+                colCursor++;
+            });
+
+            state.bidders.forEach((bidder) => {
+                hRow1.push({ v: bidder.name, s: bidderHeaderStyle });
+                hRow1.push({ v: '', s: bidderHeaderStyle });
+                merges.push({ s: { r: hRow1Idx, c: colCursor }, e: { r: hRow1Idx, c: colCursor + 1 } });
+
+                hRow2.push({ v: 'Unit Price (₹)', s: headerStyle });
+                hRow2.push({ v: 'Total Price (₹)', s: headerStyle });
+                colCursor += 2;
+            });
+
+            hRow1.push({ v: 'Lowest Bid (L1) Summary', s: l1HeaderStyle });
+            hRow1.push({ v: '', s: l1HeaderStyle });
+            merges.push({ s: { r: hRow1Idx, c: colCursor }, e: { r: hRow1Idx, c: colCursor + 1 } });
+            hRow2.push({ v: 'L1 Unit (₹)', s: l1HeaderStyle });
+            hRow2.push({ v: 'L1 Total (₹)', s: l1HeaderStyle });
+
+            wsData.push(hRow1);
+            wsData.push(hRow2);
+
+            const dataStartExcelRow = 7; // 1-based Excel row after 6 header/meta rows
+            const bidderTotals = {};
+            state.bidders.forEach(b => bidderTotals[b.id] = 0);
+
+            state.rows.forEach((row, rIdx) => {
+                const excelRowNum = dataStartExcelRow + rIdx;
+                const evalData = getRowEvaluation(row);
+                const rArr = [];
+
+                rArr.push({
+                    v: rIdx + 1,
+                    t: 'n',
+                    s: { alignment: { horizontal: 'center', vertical: 'center' }, border: thinBorder }
+                });
+
+                state.baseColumns.forEach((col) => {
+                    const rawVal = row.cells[col.id] ?? '';
+                    if (col.type === 'currency') {
+                        const num = parseIndianNumber(rawVal);
+                        rArr.push(!isNaN(num)
+                            ? { v: num, t: 'n', s: { alignment: { horizontal: 'right', vertical: 'center' }, border: thinBorder, numFmt: INR_NUM_FMT } }
+                            : { v: '', s: { border: thinBorder } });
+                    } else if (col.type === 'number') {
+                        const num = parseFloat(rawVal);
+                        rArr.push(!isNaN(num)
+                            ? { v: num, t: 'n', s: { alignment: { horizontal: 'right', vertical: 'center' }, border: thinBorder } }
+                            : { v: '', s: { border: thinBorder } });
+                    } else {
+                        rArr.push({
+                            v: String(rawVal),
+                            t: 's',
+                            s: { alignment: { horizontal: 'left', vertical: 'center', wrapText: true }, border: thinBorder }
+                        });
+                    }
+                });
+
+                let cIdx = 1 + state.baseColumns.length;
+                state.bidders.forEach((bidder) => {
+                    const unitColLetter = XLSX.utils.encode_col(cIdx);
+                    const unitPrice = parseIndianNumber(row.bids[bidder.id]);
+                    const status = evalData.bidStatuses[bidder.id] || 'normal';
+                    const cellStyle = stylesByStatus[status] || stylesByStatus.normal;
+
+                    if (!isNaN(unitPrice) && unitPrice > 0) {
+                        const totPrice = unitPrice * evalData.qty;
+                        bidderTotals[bidder.id] += totPrice;
+
+                        rArr.push({ v: unitPrice, t: 'n', s: cellStyle });
+                        rArr.push({
+                            v: totPrice,
+                            t: 'n',
+                            f: `${unitColLetter}${excelRowNum}*${qtyExcelColLetter}${excelRowNum}`,
+                            s: cellStyle
+                        });
+                    } else {
+                        rArr.push({ v: '', s: { alignment: { horizontal: 'right' }, border: thinBorder } });
+                        rArr.push({ v: '', s: { alignment: { horizontal: 'right' }, border: thinBorder } });
+                    }
+                    cIdx += 2;
+                });
+
+                const l1UnitColLetter = XLSX.utils.encode_col(cIdx);
+                if (evalData.l1Unit !== null) {
+                    rArr.push({ v: evalData.l1Unit, t: 'n', s: stylesByStatus.target });
+                    rArr.push({
+                        v: evalData.l1Total,
+                        t: 'n',
+                        f: `${l1UnitColLetter}${excelRowNum}*${qtyExcelColLetter}${excelRowNum}`,
+                        s: stylesByStatus.target
+                    });
+                } else {
+                    rArr.push({ v: '', s: stylesByStatus.target });
+                    rArr.push({ v: '', s: stylesByStatus.target });
+                }
+
+                wsData.push(rArr);
+            });
+
+            const dataEndExcelRow = dataStartExcelRow + state.rows.length - 1;
+            const taxPct = parseFloat(document.getElementById('taxPercent').value) || 0;
+
+            const activeTotals = state.bidders.map(b => bidderTotals[b.id]).filter(v => v > 0);
+            const minTotal = activeTotals.length ? Math.min(...activeTotals) : null;
+            const maxTotal = activeTotals.length ? Math.max(...activeTotals) : null;
+
+            const footerLabelStyle = {
+                font: { bold: true, color: { rgb: '0F172A' } },
+                fill: { fgColor: { rgb: 'F1F5F9' } },
+                alignment: { horizontal: 'right', vertical: 'center' },
+                border: thinBorder
+            };
+
+            const grandLabelStyle = {
+                font: { bold: true, sz: 11, color: { rgb: '0F172A' } },
+                fill: { fgColor: { rgb: 'E2E8F0' } },
+                alignment: { horizontal: 'right', vertical: 'center' },
+                border: thinBorder
+            };
+
+            const subRowIdx = wsData.length;
+            const subExcelRow = subRowIdx + 1;
+            const taxExcelRow = subExcelRow + 1;
+
+            const fSubRow = [];
+            const fTaxRow = [];
+            const fGrandRow = [];
+
+            const baseSpanCols = 1 + state.baseColumns.length;
+            for (let i = 0; i < baseSpanCols; i++) {
+                fSubRow.push({ v: i === 0 ? 'Sub-Total (Basic Price ₹)' : '', s: footerLabelStyle });
+                fTaxRow.push({ v: i === 0 ? `GST / Tax (${taxPct}% ₹)` : '', s: footerLabelStyle });
+                fGrandRow.push({ v: i === 0 ? 'Grand Total (Incl. Tax ₹)' : '', s: grandLabelStyle });
+            }
+            merges.push({ s: { r: subRowIdx, c: 0 }, e: { r: subRowIdx, c: baseSpanCols - 1 } });
+            merges.push({ s: { r: subRowIdx + 1, c: 0 }, e: { r: subRowIdx + 1, c: baseSpanCols - 1 } });
+            merges.push({ s: { r: subRowIdx + 2, c: 0 }, e: { r: subRowIdx + 2, c: baseSpanCols - 1 } });
+
+            let fCol = baseSpanCols;
+            state.bidders.forEach((b) => {
+                const sub = bidderTotals[b.id] || 0;
+                const tax = sub * (taxPct / 100);
+                const grand = sub + tax;
+                const totColLetter = XLSX.utils.encode_col(fCol + 1);
+
+                let stKey = 'normal';
+                if (sub > 0 && activeTotals.length > 0) {
+                    if (minTotal === maxTotal && activeTotals.length > 1) stKey = 'equal';
+                    else if (sub === minTotal) stKey = 'low';
+                    else if (sub === maxTotal && activeTotals.length > 1) stKey = 'high';
+                }
+
+                const totStyle = { ...stylesByStatus[stKey], font: { ...stylesByStatus[stKey].font, bold: true } };
+                const plainTotalStyle = { font: { bold: true }, fill: { fgColor: { rgb: 'F1F5F9' } }, alignment: { horizontal: 'right' }, border: thinBorder, numFmt: INR_NUM_FMT };
+
+                fSubRow.push({ v: '—', s: footerLabelStyle });
+                fSubRow.push({
+                    v: sub,
+                    t: 'n',
+                    f: state.rows.length ? `SUM(${totColLetter}${dataStartExcelRow}:${totColLetter}${dataEndExcelRow})` : '0',
+                    s: sub > 0 ? totStyle : plainTotalStyle
+                });
+
+                fTaxRow.push({ v: '—', s: footerLabelStyle });
+                fTaxRow.push({
+                    v: tax,
+                    t: 'n',
+                    f: `${totColLetter}${subExcelRow}*${taxPct / 100}`,
+                    s: plainTotalStyle
+                });
+
+                fGrandRow.push({ v: '—', s: grandLabelStyle });
+                fGrandRow.push({
+                    v: grand,
+                    t: 'n',
+                    f: `${totColLetter}${subExcelRow}+${totColLetter}${taxExcelRow}`,
+                    s: sub > 0 ? totStyle : plainTotalStyle
+                });
+
+                fCol += 2;
+            });
+
+            const l1TotColLetter = XLSX.utils.encode_col(fCol + 1);
+            const l1SubSum = state.rows.reduce((acc, r) => acc + (getRowEvaluation(r).l1Total || 0), 0);
+            const l1TaxSum = l1SubSum * (taxPct / 100);
+            const l1GrandSum = l1SubSum + l1TaxSum;
+
+            fSubRow.push({ v: '—', s: stylesByStatus.target });
+            fSubRow.push({
+                v: l1SubSum,
+                t: 'n',
+                f: state.rows.length ? `SUM(${l1TotColLetter}${dataStartExcelRow}:${l1TotColLetter}${dataEndExcelRow})` : '0',
+                s: stylesByStatus.target
+            });
+
+            fTaxRow.push({ v: '—', s: stylesByStatus.target });
+            fTaxRow.push({
+                v: l1TaxSum,
+                t: 'n',
+                f: `${l1TotColLetter}${subExcelRow}*${taxPct / 100}`,
+                s: stylesByStatus.target
+            });
+
+            fGrandRow.push({ v: '—', s: stylesByStatus.target });
+            fGrandRow.push({
+                v: l1GrandSum,
+                t: 'n',
+                f: `${l1TotColLetter}${subExcelRow}+${l1TotColLetter}${taxExcelRow}`,
+                s: stylesByStatus.target
+            });
+
+            wsData.push(fSubRow);
+            wsData.push(fTaxRow);
+            wsData.push(fGrandRow);
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws['!merges'] = merges;
+
+            // Apply matching Freeze Panes in exported Excel sheet
+            const frozenCount = getFrozenCount();
+            if (frozenCount > 0) {
+                ws['!freeze'] = { xSplit: frozenCount, ySplit: 6 };
+            }
+
+            const colWidths = [{ wch: 8 }];
+            state.baseColumns.forEach(c => colWidths.push({ wch: Math.max(14, Math.round(c.width / 7)) }));
+            state.bidders.forEach(b => {
+                colWidths.push({ wch: Math.max(18, Math.round(b.unitWidth / 7)) });
+                colWidths.push({ wch: Math.max(20, Math.round(b.totalWidth / 7)) });
+            });
+            colWidths.push({ wch: 18 }, { wch: 20 });
+            ws['!cols'] = colWidths;
+            ws['!rows'] = [{ hpt: 26 }, { hpt: 20 }, { hpt: 20 }, { hpt: 20 }, { hpt: 24 }, { hpt: 22 }];
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Comparison Sheet');
+            const nameSeed = state.enquiryNo || state.projectName || state.procurementDetails || 'Bidder_Comparison';
+            const fileName = `${nameSeed.replace(/[^a-z0-9]/gi, '_')}_INR.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showToast('Exported styled Excel (.xlsx) successfully!');
+        }
+
+        /* Mutators */
+        function addCustomColumn(focusNew = false) {
+            const id = 'col_' + Date.now();
+            state.baseColumns.push({
+                id,
+                name: 'New Field',
+                type: 'text',
+                width: 135,
+                role: 'text'
+            });
+            state.rows.forEach(r => r.cells[id] = '');
+            renderTable();
+            autoSaveSilent();
+            if (focusNew) {
+                const inputs = document.querySelectorAll('.col-title-input');
+                if (inputs.length) {
+                    const last = inputs[inputs.length - 1];
+                    last.focus();
+                    last.select();
+                }
+            }
+        }
+
+        function deleteBaseColumn(idx) {
+            const col = state.baseColumns[idx];
+            if (col.role === 'qty') return;
+            state.baseColumns.splice(idx, 1);
+            state.rows.forEach(r => delete r.cells[col.id]);
+            renderTable();
+            autoSaveSilent();
+        }
+
+        function updateBaseColName(idx, val) {
+            state.baseColumns[idx].name = val;
+            renderFreezeOptions();
+            autoSaveSilent();
+        }
+
+        function updateBaseColType(idx, val) {
+            state.baseColumns[idx].type = val;
+            renderBody();
+            recalculateAll();
+            autoSaveSilent();
+        }
+
+        function addBidderColumn(focusNew = false) {
+            const id = 'bid_' + Date.now();
+            const num = state.bidders.length + 1;
+            state.bidders.push({
+                id,
+                name: `Bidder ${num}`,
+                unitWidth: 135,
+                totalWidth: 150
+            });
+            state.rows.forEach(r => r.bids[id] = '');
+            renderTable();
+            autoSaveSilent();
+            if (focusNew) {
+                const inputs = document.querySelectorAll('.bidder-name-input');
+                if (inputs.length) {
+                    const last = inputs[inputs.length - 1];
+                    last.focus();
+                    last.select();
+                }
+            }
+        }
+
+        function deleteBidder(bIdx) {
+            if (state.bidders.length <= 1) return;
+            const bId = state.bidders[bIdx].id;
+            state.bidders.splice(bIdx, 1);
+            state.rows.forEach(r => delete r.bids[bId]);
+            renderTable();
+            autoSaveSilent();
+        }
+
+        function updateBidderName(bIdx, val) {
+            state.bidders[bIdx].name = val;
+            renderFreezeOptions();
+            autoSaveSilent();
+        }
+
+        function addRow(focusFirstCell = true) {
+            const cells = {};
+            state.baseColumns.forEach(col => {
+                cells[col.id] = col.role === 'qty' ? 1 : '';
+            });
+            const bids = {};
+            state.bidders.forEach(b => bids[b.id] = '');
+
+            state.rows.push({
+                id: 'r_' + Date.now(),
+                cells,
+                bids
+            });
+            renderBody();
+            recalculateAll();
+            lucide.createIcons();
+            autoSaveSilent();
+
+            if (focusFirstCell) {
+                focusGridCell(state.rows.length - 1, 0);
+            }
+        }
+
+        function deleteRow(rIdx) {
+            state.rows.splice(rIdx, 1);
+            renderBody();
+            recalculateAll();
+            lucide.createIcons();
+            autoSaveSilent();
+        }
+
+        function updateBaseCell(rIdx, colId, val) {
+            state.rows[rIdx].cells[colId] = val;
+            if (colId === getQtyColumnId()) {
+                recalculateAll();
+            }
+            autoSaveSilent();
+        }
+
+        function toggleHelpModal(open) {
+            document.getElementById('helpModal').classList.toggle('open', open);
+        }
+
+        /* Column Resizing Logic */
+        function initResizeBase(e, colIdx) {
+            e.preventDefault();
+            e.stopPropagation();
+            const startX = e.pageX;
+            const startWidth = state.baseColumns[colIdx].width;
+            const resizer = e.target;
+            resizer.classList.add('resizing');
+
+            function onMouseMove(moveEvent) {
+                const newWidth = Math.max(60, startWidth + (moveEvent.pageX - startX));
+                state.baseColumns[colIdx].width = newWidth;
+                const th = document.querySelector(`th[data-col-id="${state.baseColumns[colIdx].id}"]`);
+                if (th) th.style.width = newWidth + 'px';
+                applyFreezePanes();
+                resizeAllTextareas();
+            }
+
+            function onMouseUp() {
+                resizer.classList.remove('resizing');
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                autoSaveSilent();
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        function initResizeBidder(e, bidderIdx, prop) {
+            e.preventDefault();
+            e.stopPropagation();
+            const startX = e.pageX;
+            const startWidth = state.bidders[bidderIdx][prop];
+            const resizer = e.target;
+            const th = resizer.parentElement;
+            resizer.classList.add('resizing');
+
+            function onMouseMove(moveEvent) {
+                const newWidth = Math.max(85, startWidth + (moveEvent.pageX - startX));
+                state.bidders[bidderIdx][prop] = newWidth;
+                if (th) th.style.width = newWidth + 'px';
+                applyFreezePanes();
+            }
+
+            function onMouseUp() {
+                resizer.classList.remove('resizing');
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                autoSaveSilent();
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        /* Save & Reset */
+        function syncMetaToState() {
+            state.enquiryNo = document.getElementById('enquiryNo').value;
+            state.procurementDetails = document.getElementById('procurementDetails').value;
+            state.projectName = document.getElementById('projectName').value;
+            state.taxPercent = parseFloat(document.getElementById('taxPercent').value) || 0;
+        }
+
+        function autoSaveSilent() {
+            syncMetaToState();
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (e) { }
+        }
+
+        function saveData() {
+            autoSaveSilent();
+            showToast('Comparison sheet saved to browser storage!');
+        }
+
+        function resetTable() {
+            if (!confirm('Reset the comparison sheet to default sample data?')) return;
+            state = JSON.parse(JSON.stringify(defaultState));
+            localStorage.removeItem(STORAGE_KEY);
+            renderTable();
+            showToast('Reset to default template.');
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        function escapeHtml(str) {
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        window.addEventListener('resize', resizeAllTextareas);
+        window.addEventListener('beforeprint', resizeAllTextareas);
+
+        // Initialize and focus first cell for immediate keyboard entry
+        renderTable();
+        focusGridCell(0, 0);
+    </script>
+</body>
+
+</html>
