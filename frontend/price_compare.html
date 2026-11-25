@@ -397,7 +397,7 @@
         }
 
         thead tr:nth-child(2) th {
-            top: 38px;
+            top: 64px;
         }
 
         /* Frozen Column Styles */
@@ -579,7 +579,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 6px 8px;
+            padding: 6px 8px 4px;
             gap: 6px;
         }
 
@@ -599,6 +599,69 @@
             background: #fff;
             border-color: var(--primary);
             outline: none;
+        }
+
+        /* Bidder Unit Price % Increase / Decrease Controls */
+        .bidder-pct-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 2px 8px 6px;
+        }
+
+        .bidder-pct-label {
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #3730a3;
+            white-space: nowrap;
+        }
+
+        .bidder-pct-input {
+            width: 56px;
+            padding: 2px 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: right;
+            border: 1px solid #c7d2fe;
+            border-radius: 4px;
+            background: #ffffff;
+            color: #0f172a;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .bidder-pct-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .pct-adj-btn {
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 4px;
+            line-height: 1.2;
+            gap: 2px;
+        }
+
+        .pct-adj-btn.inc {
+            background: #fef2f2;
+            color: #991b1b;
+            border-color: #fca5a5;
+        }
+
+        .pct-adj-btn.inc:hover {
+            background: #fee2e2;
+        }
+
+        .pct-adj-btn.dec {
+            background: #f0fdf4;
+            color: #166534;
+            border-color: #86efac;
+        }
+
+        .pct-adj-btn.dec:hover {
+            background: #dcfce7;
         }
 
         .sub-th {
@@ -837,7 +900,8 @@
             .resizer,
             .shortcut-bar,
             .freeze-control,
-            .col-drag-handle {
+            .col-drag-handle,
+            .bidder-pct-bar {
                 display: none !important;
             }
 
@@ -1030,9 +1094,9 @@
                 { id: 'col_qty', name: 'Qty', type: 'number', width: 75, role: 'qty' }
             ],
             bidders: [
-                { id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150 },
-                { id: 'bid_2', name: 'Bidder-2', unitWidth: 135, totalWidth: 150 },
-                { id: 'bid_3', name: 'Bidder-3', unitWidth: 135, totalWidth: 150 }
+                { id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150, adjustPct: '' },
+                { id: 'bid_2', name: 'Bidder-2', unitWidth: 135, totalWidth: 150, adjustPct: '' },
+                { id: 'bid_3', name: 'Bidder-3', unitWidth: 135, totalWidth: 150, adjustPct: '' }
             ],
             rows: [
                 {
@@ -1338,6 +1402,7 @@
             });
 
             state.bidders.forEach((bidder, bIdx) => {
+                const pctVal = bidder.adjustPct !== undefined && bidder.adjustPct !== null ? bidder.adjustPct : '';
                 row1 += `
           <th colspan="2" class="bidder-group-header"
               draggable="true"
@@ -1351,6 +1416,19 @@
               <input type="text" class="bidder-name-input" value="${escapeHtml(bidder.name)}"
                 onchange="updateBidderName(${bIdx}, this.value)" title="Edit Bidder Name" />
               ${state.bidders.length > 1 ? `<button class="icon-btn no-print" tabindex="-1" onclick="deleteBidder(${bIdx})" title="Remove Bidder"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>` : ''}
+            </div>
+            <div class="bidder-pct-bar no-print" title="Adjust all Unit Prices for ${escapeHtml(bidder.name)} by percentage">
+              <span class="bidder-pct-label">Unit Price %:</span>
+              <input type="number" step="any" min="0" class="bidder-pct-input" id="bidder_pct_${bidder.id}"
+                placeholder="0" value="${escapeHtml(String(pctVal))}"
+                oninput="updateBidderAdjustPct(${bIdx}, this.value)"
+                onkeydown="if(event.key==='Enter'){ event.preventDefault(); applyBidderUnitPricePct(${bIdx}, 1); }" />
+              <button type="button" class="pct-adj-btn inc" tabindex="-1"
+                onclick="applyBidderUnitPricePct(${bIdx}, 1)"
+                title="Increase Unit Price by %">+%</button>
+              <button type="button" class="pct-adj-btn dec" tabindex="-1"
+                onclick="applyBidderUnitPricePct(${bIdx}, -1)"
+                title="Decrease Unit Price by %">-%</button>
             </div>
           </th>`;
             });
@@ -1383,6 +1461,67 @@
       </tr>`;
 
             thead.innerHTML = row1 + row2;
+        }
+
+        /* Unit Price Increase / Decrease (%) Logic for Specific Bidder Scope */
+        function updateBidderAdjustPct(bIdx, val) {
+            if (!state.bidders[bIdx]) return;
+            state.bidders[bIdx].adjustPct = val;
+            autoSaveSilent();
+        }
+
+        function applyBidderUnitPricePct(bIdx, direction) {
+            const bidder = state.bidders[bIdx];
+            if (!bidder) return;
+
+            const inputEl = document.getElementById(`bidder_pct_${bidder.id}`);
+            const rawPct = inputEl ? inputEl.value : bidder.adjustPct;
+            const pct = parseFloat(rawPct);
+
+            if (isNaN(pct) || pct === 0) {
+                showToast('Enter a valid non-zero % value first.');
+                if (inputEl) inputEl.focus();
+                return;
+            }
+
+            if (pct < 0) {
+                showToast('Enter a positive % number and click +% or -%.');
+                if (inputEl) inputEl.focus();
+                return;
+            }
+
+            if (direction === -1 && pct > 100) {
+                showToast('Decrease percentage cannot exceed 100%.');
+                if (inputEl) inputEl.focus();
+                return;
+            }
+
+            const multiplier = direction === 1 ? (1 + pct / 100) : (1 - pct / 100);
+            let updatedCount = 0;
+
+            state.rows.forEach((row, rIdx) => {
+                const currentUnit = parseIndianNumber(row.bids[bidder.id]);
+                if (!isNaN(currentUnit) && currentUnit > 0) {
+                    const adjusted = Math.max(0, Math.round((currentUnit * multiplier) * 100) / 100);
+                    row.bids[bidder.id] = adjusted;
+                    updatedCount++;
+
+                    const cellInput = document.querySelector(`#cell_unit_${rIdx}_${bidder.id} input`);
+                    if (cellInput) {
+                        cellInput.value = formatINR(adjusted);
+                    }
+                }
+            });
+
+            if (updatedCount === 0) {
+                showToast(`No valid unit prices found for ${bidder.name}.`);
+                return;
+            }
+
+            recalculateAll();
+            autoSaveSilent();
+            const actionLabel = direction === 1 ? 'Increased' : 'Decreased';
+            showToast(`${actionLabel} ${bidder.name} Unit Prices by ${pct}% (${updatedCount} item${updatedCount > 1 ? 's' : ''}).`);
         }
 
         /* Column Drag & Drop Rearranging Handlers */
@@ -2194,7 +2333,7 @@
                     if (!bidderMap[bName]) {
                         const bId = 'bid_' + Date.now() + '_' + newBidders.length;
                         bidderMap[bName] = bId;
-                        newBidders.push({ id: bId, name: bName, unitWidth: 135, totalWidth: 150 });
+                        newBidders.push({ id: bId, name: bName, unitWidth: 135, totalWidth: 150, adjustPct: '' });
                     }
                     colMappings.push({ kind: 'bid_unit', id: bidderMap[bName] });
                     return;
@@ -2224,7 +2363,7 @@
             }
 
             if (newBidders.length === 0) {
-                newBidders.push({ id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150 });
+                newBidders.push({ id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150, adjustPct: '' });
             }
 
             const newRows = [];
@@ -2716,7 +2855,8 @@
                 id,
                 name: `Bidder ${num}`,
                 unitWidth: 135,
-                totalWidth: 150
+                totalWidth: 150,
+                adjustPct: ''
             });
             state.rows.forEach(r => r.bids[id] = '');
             renderTable();
