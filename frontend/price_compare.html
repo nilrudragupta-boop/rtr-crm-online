@@ -107,8 +107,13 @@
             white-space: nowrap;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             background: #f1f5f9;
+        }
+
+        button:disabled {
+            opacity: 0.48;
+            cursor: not-allowed;
         }
 
         button.primary {
@@ -117,7 +122,7 @@
             border-color: var(--primary);
         }
 
-        button.primary:hover {
+        button.primary:hover:not(:disabled) {
             background: var(--primary-hover);
         }
 
@@ -127,7 +132,7 @@
             border-color: #15803d;
         }
 
-        button.success:hover {
+        button.success:hover:not(:disabled) {
             background: #166534;
         }
 
@@ -137,7 +142,7 @@
             border-color: #0f766e;
         }
 
-        button.excel-btn:hover {
+        button.excel-btn:hover:not(:disabled) {
             background: #115e59;
         }
 
@@ -147,7 +152,7 @@
             border-color: #0369a1;
         }
 
-        button.csv-btn:hover {
+        button.csv-btn:hover:not(:disabled) {
             background: #075985;
         }
 
@@ -157,7 +162,7 @@
             background: #fef2f2;
         }
 
-        button.danger:hover {
+        button.danger:hover:not(:disabled) {
             background: #fee2e2;
         }
 
@@ -397,7 +402,7 @@
         }
 
         thead tr:nth-child(2) th {
-            top: 64px;
+            top: 90px;
         }
 
         /* Frozen Column Styles */
@@ -601,13 +606,13 @@
             outline: none;
         }
 
-        /* Bidder Unit Price % Increase / Decrease Controls */
+        /* Bidder Unit Price % Increase / Decrease & Round-Off Controls */
         .bidder-pct-bar {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 4px;
-            padding: 2px 8px 6px;
+            padding: 2px 8px 4px;
         }
 
         .bidder-pct-label {
@@ -633,6 +638,23 @@
         .bidder-pct-input:focus {
             border-color: var(--primary);
             outline: none;
+        }
+
+        .bidder-round-select {
+            font-size: 10.5px;
+            font-weight: 600;
+            padding: 2px 4px;
+            border: 1px solid #c7d2fe;
+            border-radius: 4px;
+            background: #ffffff;
+            color: #1e1b4b;
+            cursor: pointer;
+            outline: none;
+            max-width: 115px;
+        }
+
+        .bidder-round-select:focus {
+            border-color: var(--primary);
         }
 
         .pct-adj-btn {
@@ -662,6 +684,16 @@
 
         .pct-adj-btn.dec:hover {
             background: #dcfce7;
+        }
+
+        .pct-adj-btn.rnd {
+            background: #eff6ff;
+            color: #1e40af;
+            border-color: #93c5fd;
+        }
+
+        .pct-adj-btn.rnd:hover {
+            background: #dbeafe;
         }
 
         .sub-th {
@@ -970,6 +1002,8 @@
                 Highest & Equal bids</p>
         </div>
         <div class="actions no-print">
+            <button id="undoBtn" onclick="undoAction()" disabled title="Undo Last Action (Ctrl + Z)"><i data-lucide="undo-2"
+                    style="width:15px;height:15px"></i> Undo <span class="kbd-hint">Ctrl+Z</span></button>
             <button onclick="addCustomColumn()" title="Alt + C"><i data-lucide="columns-3"
                     style="width:15px;height:15px"></i> Add Column <span class="kbd-hint">Alt+C</span></button>
             <div class="freeze-control" title="Freeze columns 1 to N from the left while scrolling">
@@ -1004,6 +1038,7 @@
             <span><strong>↑ ↓ ← →</strong> Navigate Grid</span>
             <span><strong>Enter</strong> Next Row (Auto-Add at bottom)</span>
             <span><strong>Tab / Shift+Tab</strong> Next / Prev Cell</span>
+            <span><strong>Ctrl+Z</strong> Undo</span>
             <span><strong>Esc</strong> Revert Edit</span>
             <span><strong>Ctrl+D</strong> Copy Above Cell</span>
             <span><strong>Ctrl+Backspace</strong> Delete Row</span>
@@ -1033,7 +1068,7 @@
                     placeholder="Write Project Name"
                     oninput="autoResizeMetaField(this); autoSaveSilent();"></textarea></label>
             <label><strong>GST / Tax %:</strong> <input type="number" id="taxPercent" value="18" min="0" max="100"
-                    step="0.5" style="width:65px" onchange="recalculateAll(); autoSaveSilent();" /></label>
+                    step="0.5" style="width:65px" onfocus="captureUndoSnapshot('Tax % Change')" onchange="recalculateAll(); autoSaveSilent();" /></label>
         </div>
     </div>
 
@@ -1065,6 +1100,7 @@
                 </div>
                 <div class="shortcut-row"><span>First / Last Cell in Row</span><kbd>Alt + Home</kbd> / <kbd>End</kbd>
                 </div>
+                <div class="shortcut-row"><span>Undo Last Action</span><kbd>Ctrl + Z</kbd></div>
                 <div class="shortcut-row"><span>Revert Active Cell Edit</span><kbd>Esc</kbd></div>
                 <div class="shortcut-row"><span>Copy Cell From Above</span><kbd>Ctrl + D</kbd></div>
                 <div class="shortcut-row"><span>Add New Row</span><kbd>Alt + R</kbd></div>
@@ -1081,6 +1117,7 @@
 
     <script>
         const STORAGE_KEY = 'rtr_bidder_comparison_inr_v2';
+        const MAX_UNDO_HISTORY = 50;
 
         const defaultState = {
             enquiryNo: '',
@@ -1094,9 +1131,9 @@
                 { id: 'col_qty', name: 'Qty', type: 'number', width: 75, role: 'qty' }
             ],
             bidders: [
-                { id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150, adjustPct: '' },
-                { id: 'bid_2', name: 'Bidder-2', unitWidth: 135, totalWidth: 150, adjustPct: '' },
-                { id: 'bid_3', name: 'Bidder-3', unitWidth: 135, totalWidth: 150, adjustPct: '' }
+                { id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150, adjustPct: '', roundMode: 'none' },
+                { id: 'bid_2', name: 'Bidder-2', unitWidth: 135, totalWidth: 150, adjustPct: '', roundMode: 'none' },
+                { id: 'bid_3', name: 'Bidder-3', unitWidth: 135, totalWidth: 150, adjustPct: '', roundMode: 'none' }
             ],
             rows: [
                 {
@@ -1116,6 +1153,75 @@
         let state = loadState();
         let activeCellSnapshot = null; // Stores pre-edit value for Escape revert
         let dragColContext = null; // { group: 'base' | 'bidder', index: number }
+        let undoStack = []; // Stores serialized state snapshots for Ctrl+Z Undo
+        let pendingCellUndoEntry = null; // Captures state at cell focus to push only if modified
+
+        function updateUndoButtonState() {
+            const btn = document.getElementById('undoBtn');
+            if (!btn) return;
+            btn.disabled = undoStack.length === 0;
+            btn.title = undoStack.length > 0
+                ? `Undo: ${undoStack[undoStack.length - 1].label} (Ctrl + Z)`
+                : 'Nothing to Undo (Ctrl + Z)';
+        }
+
+        function captureUndoSnapshot(label = 'Change') {
+            syncMetaToState();
+            const serialized = JSON.stringify(state);
+            if (undoStack.length > 0 && undoStack[undoStack.length - 1].snapshot === serialized) {
+                return;
+            }
+            undoStack.push({ label, snapshot: serialized });
+            if (undoStack.length > MAX_UNDO_HISTORY) {
+                undoStack.shift();
+            }
+            updateUndoButtonState();
+        }
+
+        function commitPendingCellUndoIfChanged() {
+            if (!pendingCellUndoEntry) return;
+            syncMetaToState();
+            const currentSerialized = JSON.stringify(state);
+            if (currentSerialized !== pendingCellUndoEntry.snapshot) {
+                if (undoStack.length === 0 || undoStack[undoStack.length - 1].snapshot !== pendingCellUndoEntry.snapshot) {
+                    undoStack.push(pendingCellUndoEntry);
+                    if (undoStack.length > MAX_UNDO_HISTORY) {
+                        undoStack.shift();
+                    }
+                    updateUndoButtonState();
+                }
+            }
+            pendingCellUndoEntry = null;
+        }
+
+        function undoAction() {
+            if (undoStack.length === 0) {
+                showToast('Nothing to undo');
+                return;
+            }
+
+            const active = document.activeElement;
+            const prevFocus = (active && active.classList.contains('grid-cell'))
+                ? { row: parseInt(active.dataset.row, 10), col: parseInt(active.dataset.col, 10) }
+                : null;
+
+            pendingCellUndoEntry = null;
+            const entry = undoStack.pop();
+            state = JSON.parse(entry.snapshot);
+            renderTable();
+            autoSaveSilent();
+            updateUndoButtonState();
+
+            if (prevFocus && !isNaN(prevFocus.row) && !isNaN(prevFocus.col)) {
+                const safeRow = Math.min(prevFocus.row, state.rows.length - 1);
+                const safeCol = Math.min(prevFocus.col, getTotalEditableCols() - 1);
+                if (safeRow >= 0 && safeCol >= 0) {
+                    focusGridCell(safeRow, safeCol);
+                }
+            }
+
+            showToast(`Undid: ${entry.label}`);
+        }
 
         function loadState() {
             try {
@@ -1242,6 +1348,7 @@
         }
 
         function updateFreezeSelection(val) {
+            captureUndoSnapshot('Freeze Panes');
             state.freezeColCount = parseInt(val, 10) || 0;
             applyFreezePanes();
             autoSaveSilent();
@@ -1364,6 +1471,7 @@
             renderBody();
             recalculateAll();
             applyFreezePanes();
+            updateUndoButtonState();
             lucide.createIcons();
         }
 
@@ -1403,6 +1511,7 @@
 
             state.bidders.forEach((bidder, bIdx) => {
                 const pctVal = bidder.adjustPct !== undefined && bidder.adjustPct !== null ? bidder.adjustPct : '';
+                const rMode = bidder.roundMode || 'none';
                 row1 += `
           <th colspan="2" class="bidder-group-header"
               draggable="true"
@@ -1429,6 +1538,23 @@
               <button type="button" class="pct-adj-btn dec" tabindex="-1"
                 onclick="applyBidderUnitPricePct(${bIdx}, -1)"
                 title="Decrease Unit Price by %">-%</button>
+            </div>
+            <div class="bidder-pct-bar no-print" title="Optional Unit Price round-off for ${escapeHtml(bidder.name)}">
+              <span class="bidder-pct-label">Round-Off:</span>
+              <select class="bidder-round-select" id="bidder_round_${bidder.id}" tabindex="-1"
+                onchange="updateBidderRoundMode(${bIdx}, this.value)">
+                <option value="none" ${rMode === 'none' ? 'selected' : ''}>Off</option>
+                <option value="nearest_1" ${rMode === 'nearest_1' ? 'selected' : ''}>Nearest ₹1</option>
+                <option value="nearest_5" ${rMode === 'nearest_5' ? 'selected' : ''}>Nearest ₹5</option>
+                <option value="nearest_10" ${rMode === 'nearest_10' ? 'selected' : ''}>Nearest ₹10</option>
+                <option value="nearest_50" ${rMode === 'nearest_50' ? 'selected' : ''}>Nearest ₹50</option>
+                <option value="nearest_100" ${rMode === 'nearest_100' ? 'selected' : ''}>Nearest ₹100</option>
+                <option value="ceil_1" ${rMode === 'ceil_1' ? 'selected' : ''}>Round Up (₹1)</option>
+                <option value="floor_1" ${rMode === 'floor_1' ? 'selected' : ''}>Round Down (₹1)</option>
+              </select>
+              <button type="button" class="pct-adj-btn rnd" tabindex="-1"
+                onclick="applyBidderRoundOff(${bIdx})"
+                title="Apply Round-Off to all Unit Prices of ${escapeHtml(bidder.name)}">Round</button>
             </div>
           </th>`;
             });
@@ -1461,6 +1587,125 @@
       </tr>`;
 
             thead.innerHTML = row1 + row2;
+        }
+
+        /* Optional Unit Price Round-Off Logic for Specific Bidder Scope */
+        function computeRoundedUnitPrice(val, mode) {
+            if (!mode || mode === 'none' || isNaN(val)) return val;
+            switch (mode) {
+                case 'nearest_1':
+                    return Math.round(val);
+                case 'nearest_5':
+                    return Math.round(val / 5) * 5;
+                case 'nearest_10':
+                    return Math.round(val / 10) * 10;
+                case 'nearest_50':
+                    return Math.round(val / 50) * 50;
+                case 'nearest_100':
+                    return Math.round(val / 100) * 100;
+                case 'ceil_1':
+                    return Math.ceil(val);
+                case 'floor_1':
+                    return Math.floor(val);
+                default:
+                    return val;
+            }
+        }
+
+        function getRoundModeLabel(mode) {
+            const labels = {
+                none: 'Off',
+                nearest_1: 'Nearest ₹1',
+                nearest_5: 'Nearest ₹5',
+                nearest_10: 'Nearest ₹10',
+                nearest_50: 'Nearest ₹50',
+                nearest_100: 'Nearest ₹100',
+                ceil_1: 'Round Up (₹1)',
+                floor_1: 'Round Down (₹1)'
+            };
+            return labels[mode] || 'Off';
+        }
+
+        function updateBidderRoundMode(bIdx, mode) {
+            const bidder = state.bidders[bIdx];
+            if (!bidder) return;
+            captureUndoSnapshot(`Set ${bidder.name} Round-Off (${getRoundModeLabel(mode)})`);
+            bidder.roundMode = mode;
+
+            if (mode !== 'none') {
+                let updatedCount = 0;
+                state.rows.forEach((row, rIdx) => {
+                    const currentUnit = parseIndianNumber(row.bids[bidder.id]);
+                    if (!isNaN(currentUnit) && currentUnit > 0) {
+                        const rounded = Math.max(0, Math.round(computeRoundedUnitPrice(currentUnit, mode) * 100) / 100);
+                        row.bids[bidder.id] = rounded;
+                        updatedCount++;
+
+                        const cellInput = document.querySelector(`#cell_unit_${rIdx}_${bidder.id} input`);
+                        if (cellInput) {
+                            cellInput.value = formatINR(rounded);
+                        }
+                    }
+                });
+                recalculateAll();
+                autoSaveSilent();
+                showToast(updatedCount > 0
+                    ? `Rounded ${bidder.name} Unit Prices (${getRoundModeLabel(mode)}) for ${updatedCount} item${updatedCount > 1 ? 's' : ''}.`
+                    : `${bidder.name} Round-Off set to ${getRoundModeLabel(mode)}.`);
+            } else {
+                autoSaveSilent();
+                showToast(`${bidder.name} Round-Off turned Off.`);
+            }
+        }
+
+        function applyBidderRoundOff(bIdx) {
+            const bidder = state.bidders[bIdx];
+            if (!bidder) return;
+
+            const selectEl = document.getElementById(`bidder_round_${bidder.id}`);
+            const mode = selectEl ? selectEl.value : (bidder.roundMode || 'none');
+            bidder.roundMode = mode;
+
+            if (!mode || mode === 'none') {
+                showToast(`Select a Round-Off rule for ${bidder.name} first.`);
+                if (selectEl) selectEl.focus();
+                return;
+            }
+
+            let updatedCount = 0;
+            let hasAnyValidPrice = false;
+
+            state.rows.forEach((row) => {
+                const currentUnit = parseIndianNumber(row.bids[bidder.id]);
+                if (!isNaN(currentUnit) && currentUnit > 0) {
+                    hasAnyValidPrice = true;
+                }
+            });
+
+            if (!hasAnyValidPrice) {
+                showToast(`No valid unit prices found for ${bidder.name}.`);
+                return;
+            }
+
+            captureUndoSnapshot(`Round Off ${bidder.name} (${getRoundModeLabel(mode)})`);
+
+            state.rows.forEach((row, rIdx) => {
+                const currentUnit = parseIndianNumber(row.bids[bidder.id]);
+                if (!isNaN(currentUnit) && currentUnit > 0) {
+                    const rounded = Math.max(0, Math.round(computeRoundedUnitPrice(currentUnit, mode) * 100) / 100);
+                    row.bids[bidder.id] = rounded;
+                    updatedCount++;
+
+                    const cellInput = document.querySelector(`#cell_unit_${rIdx}_${bidder.id} input`);
+                    if (cellInput) {
+                        cellInput.value = formatINR(rounded);
+                    }
+                }
+            });
+
+            recalculateAll();
+            autoSaveSilent();
+            showToast(`Rounded ${bidder.name} Unit Prices (${getRoundModeLabel(mode)}) for ${updatedCount} item${updatedCount > 1 ? 's' : ''}.`);
         }
 
         /* Unit Price Increase / Decrease (%) Logic for Specific Bidder Scope */
@@ -1496,13 +1741,30 @@
                 return;
             }
 
+            const hasValidItem = state.rows.some((row) => {
+                const currentUnit = parseIndianNumber(row.bids[bidder.id]);
+                return !isNaN(currentUnit) && currentUnit > 0;
+            });
+
+            if (!hasValidItem) {
+                showToast(`No valid unit prices found for ${bidder.name}.`);
+                return;
+            }
+
+            const actionLabel = direction === 1 ? 'Increase' : 'Decrease';
+            captureUndoSnapshot(`${actionLabel} ${bidder.name} by ${pct}%`);
+
             const multiplier = direction === 1 ? (1 + pct / 100) : (1 - pct / 100);
+            const activeRoundMode = bidder.roundMode || 'none';
             let updatedCount = 0;
 
             state.rows.forEach((row, rIdx) => {
                 const currentUnit = parseIndianNumber(row.bids[bidder.id]);
                 if (!isNaN(currentUnit) && currentUnit > 0) {
-                    const adjusted = Math.max(0, Math.round((currentUnit * multiplier) * 100) / 100);
+                    let adjusted = Math.max(0, Math.round((currentUnit * multiplier) * 100) / 100);
+                    if (activeRoundMode !== 'none') {
+                        adjusted = Math.max(0, Math.round(computeRoundedUnitPrice(adjusted, activeRoundMode) * 100) / 100);
+                    }
                     row.bids[bidder.id] = adjusted;
                     updatedCount++;
 
@@ -1513,15 +1775,10 @@
                 }
             });
 
-            if (updatedCount === 0) {
-                showToast(`No valid unit prices found for ${bidder.name}.`);
-                return;
-            }
-
             recalculateAll();
             autoSaveSilent();
-            const actionLabel = direction === 1 ? 'Increased' : 'Decreased';
-            showToast(`${actionLabel} ${bidder.name} Unit Prices by ${pct}% (${updatedCount} item${updatedCount > 1 ? 's' : ''}).`);
+            const pastLabel = direction === 1 ? 'Increased' : 'Decreased';
+            showToast(`${pastLabel} ${bidder.name} Unit Prices by ${pct}% (${updatedCount} item${updatedCount > 1 ? 's' : ''}).`);
         }
 
         /* Column Drag & Drop Rearranging Handlers */
@@ -1558,6 +1815,7 @@
             e.currentTarget.classList.remove('drag-over-left', 'drag-over-right');
             if (!dragColContext || dragColContext.group !== group || dragColContext.index === targetIndex) return;
 
+            captureUndoSnapshot('Reorder Columns');
             const fromIndex = dragColContext.index;
             if (group === 'base') {
                 const [moved] = state.baseColumns.splice(fromIndex, 1);
@@ -1612,6 +1870,7 @@
                 <textarea rows="1" class="cell-input grid-cell"
                   data-row="${rIdx}" data-col="${gCol}" data-kind="base" data-key="${col.id}" data-type="text"
                   onfocus="handleGridFocus(this)"
+                  onblur="commitPendingCellUndoIfChanged()"
                   oninput="updateBaseCell(${rIdx}, '${col.id}', this.value); autoResizeTextarea(this);">${escapeHtml(String(val))}</textarea>
               </td>`;
                     } else {
@@ -1623,6 +1882,7 @@
                   data-row="${rIdx}" data-col="${gCol}" data-kind="base" data-key="${col.id}" data-type="${col.type}"
                   value="${escapeHtml(String(val))}"
                   onfocus="handleGridFocus(this)"
+                  onblur="commitPendingCellUndoIfChanged()"
                   oninput="updateBaseCell(${rIdx}, '${col.id}', this.value)" />
               </td>`;
                     }
@@ -1664,7 +1924,7 @@
             resizeAllTextareas();
         }
 
-        /* Unified Focus Handler: Highlights Active Row, Snapshots Value for Esc, & Prepares Raw Currency */
+        /* Unified Focus Handler: Highlights Active Row, Snapshots Value for Esc/Undo, & Prepares Raw Currency */
         function handleGridFocus(el) {
             const rIdx = parseInt(el.dataset.row, 10);
             const kind = el.dataset.kind;
@@ -1675,6 +1935,13 @@
             document.querySelectorAll('#tableBody tr.active-row').forEach(tr => tr.classList.remove('active-row'));
             const tr = el.closest('tr');
             if (tr) tr.classList.add('active-row');
+
+            // Snapshot state for Ctrl+Z Undo if this cell gets modified
+            syncMetaToState();
+            pendingCellUndoEntry = {
+                label: `Edit Row ${rIdx + 1}`,
+                snapshot: JSON.stringify(state)
+            };
 
             // Snapshot raw value for Escape key revert
             const rawVal = kind === 'bid' ? state.rows[rIdx].bids[key] : state.rows[rIdx].cells[key];
@@ -1712,6 +1979,12 @@
             const isGridCell = active && active.classList.contains('grid-cell');
 
             // Global Shortcuts (Work anywhere on page)
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                commitPendingCellUndoIfChanged();
+                undoAction();
+                return;
+            }
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
                 e.preventDefault();
                 saveData();
@@ -1771,6 +2044,7 @@
                         active.value = rawVal ?? '';
                         if (active.tagName === 'TEXTAREA') autoResizeTextarea(active);
                     }
+                    pendingCellUndoEntry = null;
                     recalculateAll();
                     autoSaveSilent();
                     showToast('Cell edit reverted');
@@ -1782,6 +2056,7 @@
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
                 e.preventDefault();
                 if (row > 0) {
+                    captureUndoSnapshot(`Fill Down Row ${row + 1}`);
                     const kind = active.dataset.kind;
                     const key = active.dataset.key;
                     const aboveVal = kind === 'bid' ? state.rows[row - 1].bids[key] : state.rows[row - 1].cells[key];
@@ -1794,6 +2069,7 @@
                         active.value = aboveVal ?? '';
                         if (active.tagName === 'TEXTAREA') autoResizeTextarea(active);
                     }
+                    pendingCellUndoEntry = null;
                     recalculateAll();
                     autoSaveSilent();
                     showToast('Copied value from above');
@@ -1804,6 +2080,7 @@
             // Ctrl + Backspace: Delete active row and keep focus smoothly
             if ((e.ctrlKey || e.metaKey) && e.key === 'Backspace') {
                 e.preventDefault();
+                pendingCellUndoEntry = null;
                 deleteRow(row);
                 const nextFocusRow = Math.min(row, state.rows.length - 1);
                 if (nextFocusRow >= 0) {
@@ -1833,6 +2110,7 @@
                     if (row < maxRow) {
                         focusGridCell(row + 1, col);
                     } else {
+                        commitPendingCellUndoIfChanged();
                         addRow(false);
                         focusGridCell(row + 1, 0);
                     }
@@ -1884,12 +2162,21 @@
         }
 
         function handleBidBlur(el, rIdx, bidderId) {
-            const raw = state.rows[rIdx].bids[bidderId];
+            let raw = state.rows[rIdx].bids[bidderId];
             if (raw !== '' && raw !== null && raw !== undefined && !isNaN(parseIndianNumber(raw))) {
+                const bidder = state.bidders.find(b => b.id === bidderId);
+                if (bidder && bidder.roundMode && bidder.roundMode !== 'none') {
+                    const rounded = Math.max(0, Math.round(computeRoundedUnitPrice(parseIndianNumber(raw), bidder.roundMode) * 100) / 100);
+                    state.rows[rIdx].bids[bidderId] = rounded;
+                    raw = rounded;
+                    recalculateAll();
+                    autoSaveSilent();
+                }
                 el.value = formatINR(raw);
             } else {
                 el.value = '';
             }
+            commitPendingCellUndoIfChanged();
         }
 
         function handleBaseCurrencyInput(rIdx, colId, val) {
@@ -1906,6 +2193,7 @@
             } else {
                 el.value = '';
             }
+            commitPendingCellUndoIfChanged();
         }
 
         function getRowEvaluation(row) {
@@ -2279,20 +2567,25 @@
 
             // Detect metadata rows if present at top
             let headerRowIndex = 0;
+            let nextEnquiryNo = state.enquiryNo;
+            let nextProcurementDetails = state.procurementDetails;
+            let nextProjectName = state.projectName;
+            let nextTaxPercent = state.taxPercent;
+
             for (let i = 0; i < Math.min(allRows.length, 10); i++) {
                 const firstCell = (allRows[i][0] || '').trim().toLowerCase();
                 if (firstCell === 'enquiry no.' || firstCell === 'enquiry no') {
-                    state.enquiryNo = (allRows[i][1] || '').trim();
+                    nextEnquiryNo = (allRows[i][1] || '').trim();
                     headerRowIndex = i + 1;
                 } else if (firstCell === 'procurement details') {
-                    state.procurementDetails = (allRows[i][1] || '').trim();
+                    nextProcurementDetails = (allRows[i][1] || '').trim();
                     headerRowIndex = i + 1;
                 } else if (firstCell === 'project name') {
-                    state.projectName = (allRows[i][1] || '').trim();
+                    nextProjectName = (allRows[i][1] || '').trim();
                     headerRowIndex = i + 1;
                 } else if (firstCell.startsWith('gst')) {
                     const parsedTax = parseFloat(allRows[i][1]);
-                    if (!isNaN(parsedTax)) state.taxPercent = parsedTax;
+                    if (!isNaN(parsedTax)) nextTaxPercent = parsedTax;
                     headerRowIndex = i + 1;
                 } else if (firstCell === 'sl. no.' || firstCell === 'sl' || firstCell === 'sl.') {
                     headerRowIndex = i;
@@ -2333,7 +2626,7 @@
                     if (!bidderMap[bName]) {
                         const bId = 'bid_' + Date.now() + '_' + newBidders.length;
                         bidderMap[bName] = bId;
-                        newBidders.push({ id: bId, name: bName, unitWidth: 135, totalWidth: 150, adjustPct: '' });
+                        newBidders.push({ id: bId, name: bName, unitWidth: 135, totalWidth: 150, adjustPct: '', roundMode: 'none' });
                     }
                     colMappings.push({ kind: 'bid_unit', id: bidderMap[bName] });
                     return;
@@ -2363,7 +2656,7 @@
             }
 
             if (newBidders.length === 0) {
-                newBidders.push({ id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150, adjustPct: '' });
+                newBidders.push({ id: 'bid_1', name: 'Bidder-1', unitWidth: 135, totalWidth: 150, adjustPct: '', roundMode: 'none' });
             }
 
             const newRows = [];
@@ -2407,6 +2700,11 @@
                 return;
             }
 
+            captureUndoSnapshot('Import CSV');
+            state.enquiryNo = nextEnquiryNo;
+            state.procurementDetails = nextProcurementDetails;
+            state.projectName = nextProjectName;
+            state.taxPercent = nextTaxPercent;
             state.baseColumns = newBaseColumns;
             state.bidders = newBidders;
             state.rows = newRows;
@@ -2805,6 +3103,7 @@
 
         /* Mutators */
         function addCustomColumn(focusNew = false) {
+            captureUndoSnapshot('Add Column');
             const id = 'col_' + Date.now();
             state.baseColumns.push({
                 id,
@@ -2829,6 +3128,7 @@
         function deleteBaseColumn(idx) {
             const col = state.baseColumns[idx];
             if (col.role === 'qty') return;
+            captureUndoSnapshot(`Delete Column "${col.name}"`);
             state.baseColumns.splice(idx, 1);
             state.rows.forEach(r => delete r.cells[col.id]);
             renderTable();
@@ -2836,12 +3136,14 @@
         }
 
         function updateBaseColName(idx, val) {
+            captureUndoSnapshot('Rename Column');
             state.baseColumns[idx].name = val;
             renderFreezeOptions();
             autoSaveSilent();
         }
 
         function updateBaseColType(idx, val) {
+            captureUndoSnapshot('Change Column Type');
             state.baseColumns[idx].type = val;
             renderBody();
             recalculateAll();
@@ -2849,6 +3151,7 @@
         }
 
         function addBidderColumn(focusNew = false) {
+            captureUndoSnapshot('Add Bidder');
             const id = 'bid_' + Date.now();
             const num = state.bidders.length + 1;
             state.bidders.push({
@@ -2856,7 +3159,8 @@
                 name: `Bidder ${num}`,
                 unitWidth: 135,
                 totalWidth: 150,
-                adjustPct: ''
+                adjustPct: '',
+                roundMode: 'none'
             });
             state.rows.forEach(r => r.bids[id] = '');
             renderTable();
@@ -2873,6 +3177,8 @@
 
         function deleteBidder(bIdx) {
             if (state.bidders.length <= 1) return;
+            const bName = state.bidders[bIdx].name;
+            captureUndoSnapshot(`Delete ${bName}`);
             const bId = state.bidders[bIdx].id;
             state.bidders.splice(bIdx, 1);
             state.rows.forEach(r => delete r.bids[bId]);
@@ -2881,12 +3187,14 @@
         }
 
         function updateBidderName(bIdx, val) {
+            captureUndoSnapshot('Rename Bidder');
             state.bidders[bIdx].name = val;
             renderFreezeOptions();
             autoSaveSilent();
         }
 
         function addRow(focusFirstCell = true) {
+            captureUndoSnapshot('Add Row');
             const cells = {};
             state.baseColumns.forEach(col => {
                 cells[col.id] = col.role === 'qty' ? 1 : '';
@@ -2910,6 +3218,7 @@
         }
 
         function deleteRow(rIdx) {
+            captureUndoSnapshot(`Delete Row ${rIdx + 1}`);
             state.rows.splice(rIdx, 1);
             renderBody();
             recalculateAll();
@@ -3007,6 +3316,7 @@
 
         function resetTable() {
             if (!confirm('Reset the comparison sheet to default sample data?')) return;
+            captureUndoSnapshot('Reset Table');
             state = JSON.parse(JSON.stringify(defaultState));
             localStorage.removeItem(STORAGE_KEY);
             renderTable();
