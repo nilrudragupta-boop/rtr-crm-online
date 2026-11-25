@@ -1926,12 +1926,38 @@
         }
 
         /* Export & Import CSV (.csv) */
-        function escapeCSVCell(val) {
+        function escapeCSVCell(val, forceText = false) {
             const str = val === null || val === undefined ? '' : String(val);
+            // Prevent Excel from converting long numeric Material Codes into scientific notation (e.g. 1.23E+11) or stripping leading zeros
+            if (forceText && str !== '' && /^0\d+$|^\d{10,}$/.test(str.trim())) {
+                return `"=""${str.trim().replace(/"/g, '""')}"""`;
+            }
             if (/[",\r\n]/.test(str)) {
                 return `"${str.replace(/"/g, '""')}"`;
             }
             return str;
+        }
+
+        function normalizeImportedTextCell(rawVal, colName = '') {
+            let val = (rawVal ?? '').trim();
+            if (!val) return '';
+
+            // Unwrap Excel text-formula format: ="0012345" -> 0012345
+            const excelFormulaMatch = val.match(/^="(.*)"$/);
+            if (excelFormulaMatch) {
+                return excelFormulaMatch[1].replace(/""/g, '"');
+            }
+
+            // Convert scientific notation back to exact integer string for code/ID columns if Excel mangled it
+            const isCodeCol = /code|id|part|sku|hsn|sac|no/i.test(colName);
+            if (isCodeCol && /^[+-]?\d+(\.\d+)?[eE][+-]?\d+$/.test(val)) {
+                const num = Number(val);
+                if (!isNaN(num) && isFinite(num)) {
+                    return num.toLocaleString('fullwide', { useGrouping: false });
+                }
+            }
+
+            return val;
         }
 
         function parseCSVText(text) {
@@ -1990,10 +2016,10 @@
             const lines = [];
 
             // Metadata header block
-            lines.push(['Enquiry No.', state.enquiryNo || ''].map(escapeCSVCell).join(','));
-            lines.push(['Procurement Details', state.procurementDetails || ''].map(escapeCSVCell).join(','));
-            lines.push(['Project Name', state.projectName || ''].map(escapeCSVCell).join(','));
-            lines.push(['GST / Tax %', taxPct].map(escapeCSVCell).join(','));
+            lines.push(['Enquiry No.', state.enquiryNo || ''].map(v => escapeCSVCell(v)).join(','));
+            lines.push(['Procurement Details', state.procurementDetails || ''].map(v => escapeCSVCell(v)).join(','));
+            lines.push(['Project Name', state.projectName || ''].map(v => escapeCSVCell(v)).join(','));
+            lines.push(['GST / Tax %', taxPct].map(v => escapeCSVCell(v)).join(','));
             lines.push('');
 
             // Table column headers
@@ -2004,7 +2030,7 @@
                 headers.push(`${b.name} - Total Price`);
             });
             headers.push('L1 Unit Price', 'L1 Total Price');
-            lines.push(headers.map(escapeCSVCell).join(','));
+            lines.push(headers.map(v => escapeCSVCell(v)).join(','));
 
             // Data rows
             const bidderTotals = {};
@@ -2013,10 +2039,11 @@
 
             state.rows.forEach((row, rIdx) => {
                 const evalData = getRowEvaluation(row);
-                const rCells = [rIdx + 1];
+                const rCells = [escapeCSVCell(rIdx + 1)];
 
                 state.baseColumns.forEach(col => {
-                    rCells.push(row.cells[col.id] ?? '');
+                    const isTextCode = col.type === 'text' && /code|id|part|sku|hsn|sac/i.test(col.name || '');
+                    rCells.push(escapeCSVCell(row.cells[col.id] ?? '', isTextCode));
                 });
 
                 state.bidders.forEach(b => {
@@ -2024,8 +2051,8 @@
                     if (!isNaN(unitPrice) && unitPrice > 0) {
                         const tot = unitPrice * evalData.qty;
                         bidderTotals[b.id] += tot;
-                        rCells.push(unitPrice.toFixed(2));
-                        rCells.push(tot.toFixed(2));
+                        rCells.push(escapeCSVCell(unitPrice.toFixed(2)));
+                        rCells.push(escapeCSVCell(tot.toFixed(2)));
                     } else {
                         rCells.push('');
                         rCells.push('');
@@ -2034,14 +2061,14 @@
 
                 if (evalData.l1Unit !== null) {
                     l1SubSum += evalData.l1Total;
-                    rCells.push(evalData.l1Unit.toFixed(2));
-                    rCells.push(evalData.l1Total.toFixed(2));
+                    rCells.push(escapeCSVCell(evalData.l1Unit.toFixed(2)));
+                    rCells.push(escapeCSVCell(evalData.l1Total.toFixed(2)));
                 } else {
                     rCells.push('');
                     rCells.push('');
                 }
 
-                lines.push(rCells.map(escapeCSVCell).join(','));
+                lines.push(rCells.join(','));
             });
 
             // Footer Totals
@@ -2065,9 +2092,9 @@
             taxRow.push('', l1SubSum > 0 ? l1Tax.toFixed(2) : '');
             grandRow.push('', l1SubSum > 0 ? l1Grand.toFixed(2) : '');
 
-            lines.push(subRow.map(escapeCSVCell).join(','));
-            lines.push(taxRow.map(escapeCSVCell).join(','));
-            lines.push(grandRow.map(escapeCSVCell).join(','));
+            lines.push(subRow.map(v => escapeCSVCell(v)).join(','));
+            lines.push(taxRow.map(v => escapeCSVCell(v)).join(','));
+            lines.push(grandRow.map(v => escapeCSVCell(v)).join(','));
 
             const csvContent = '\uFEFF' + lines.join('\r\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
