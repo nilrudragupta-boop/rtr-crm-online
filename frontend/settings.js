@@ -477,6 +477,7 @@ var UI_PERMISSION_REGISTRY = [
     { id: 'perm_employee_manager', label: 'Employees' },
     { id: 'perm_data_analysis', label: 'Data Analysis (BI)' },
     { id: 'perm_marketing_report', label: 'Marketing Report', defaultValue: false },
+    { id: 'perm_price_compare', label: 'Price Comparison', defaultValue: false },
     { id: 'perm_business360', label: 'Business 360', defaultValue: false }
 ];
 
